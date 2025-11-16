@@ -50,92 +50,67 @@ const ImageToSTLConverter = () => {
     }
   };
 
-  // Merge similar colors BUT preserve dark/black colors as outlines
+  // Merge similar colors
   const mergeSimilarColors = (colors: any[], threshold: number) => {
     const merged: { r: number; g: number; b: number; count: any; pixels: any[]; }[] = [];
     const used = new Set();
+    const dark: any[] = [];
+
 
     colors.forEach((color, idx) => {
       if (used.has(idx)) return;
-
-      // Check if this is a dark/black color (outline)
-      const isDark = (color.r + color.g + color.b) < 100;
-
-      const cluster = [color];
       used.add(idx);
 
-      for (let i = idx + 1; i < colors.length; i++) {
-        if (used.has(i)) continue;
+      if (isDarkNeutralColor(color)) {
+        dark.push(color);
 
-        const otherColor = colors[i];
-        const otherIsDark = (otherColor.r + otherColor.g + otherColor.b) < 100;
+        for (let i = idx + 1; i < colors.length; i++) {
+          if (used.has(i)) continue;
 
-        // Never merge dark colors with light colors
-        if (isDark !== otherIsDark) continue;
+          const otherColor = colors[i];
 
-        // Use stricter threshold for dark colors to preserve outlines
-        const effectiveThreshold = isDark ? threshold * 0.5 : threshold;
-
-        if (colorDistance(color, otherColor) < effectiveThreshold) {
-          cluster.push(otherColor);
-          used.add(i);
+          if (isDarkNeutralColor(otherColor)) {
+            dark.push(otherColor);
+            used.add(i);
+          }
         }
+
+        // Calculate average color
+        const avg = clusterAvgColor(dark);
+        merged.push(avg);
+      } else {
+        const cluster = [color];
+
+        for (let i = idx + 1; i < colors.length; i++) {
+          if (used.has(i)) continue;
+
+          const otherColor = colors[i];
+
+          if (colorDistance(color, otherColor) < threshold) {
+            cluster.push(otherColor);
+            used.add(i);
+          }
+        }
+
+        // Calculate average color
+        const avg = clusterAvgColor(cluster);
+        merged.push(avg);
       }
 
-      // Calculate average color
-      const avg = clusterAvgColor(cluster);
-      merged.push(avg);
     });
 
     return merged;
   };
 
-  const isDarkNeutralColor = (color: { r: number; g: number; b: number; }, threshold = 30, darkThreshold = 100) => {
+  const isDarkNeutralColor = (color: { r: number; g: number; b: number; },
+    neutralThreshold = 35, darkThreshold = 150) => {
     const dim = (color.r + color.g + color.b) < darkThreshold;
     const max = Math.max(color.r, color.g, color.b);
     const min = Math.min(color.r, color.g, color.b);
-    const netural = (max - min) < threshold;
+    const netural = (max - min) < neutralThreshold;
     return dim && netural;
   };
 
-  // Merge only dark colors (all RGB < 100 and neutral)
-  const mergeDarkColors = (colors: any[], threshold: number) => {
-    const merged: { r: number; g: number; b: number; count: any; pixels: any[]; }[] = [];
-    const used = new Set();
-
-    colors.forEach((color, idx) => {
-      if (used.has(idx)) return;
-
-      if (!isDarkNeutralColor(color)) {
-        // Keep non-dark colors as-is
-        merged.push(color);
-        return;
-      }
-
-      const cluster = [color];
-      used.add(idx);
-
-      for (let i = idx + 1; i < colors.length; i++) {
-        if (used.has(i)) continue;
-
-        const otherColor = colors[i];
-
-        // Only merge if both are dark
-        if (!isDarkNeutralColor(otherColor)) continue;
-
-        if (colorDistance(color, otherColor) < threshold) {
-          cluster.push(otherColor);
-          used.add(i);
-        }
-      }
-
-      // Calculate average color
-      const avg = clusterAvgColor(cluster);
-      merged.push(avg);
-    });
-
-    return merged;
-  };
 
   // Reassign noise colors to nearest major color
   const reassignColors = (mainColors, restColors) => {
@@ -205,9 +180,7 @@ const ImageToSTLConverter = () => {
     // Convert to array
     let colors = Array.from(colorMap.values());
 
-    // Step 1: Merge dark colors (all RGB < 100)
-    colors = mergeDarkColors(colors, colorThreshold);
-
+    // Step 1: Merge similar colors
     colors = mergeSimilarColors(colors, colorThreshold);
 
     // Step 2: Sort by frequency
