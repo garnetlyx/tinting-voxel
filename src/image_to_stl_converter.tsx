@@ -3,12 +3,13 @@ import { Upload, Download, Settings, Palette } from 'lucide-react';
 
 const ImageToSTLConverter = () => {
   const [image, setImage] = useState(null);
-  const [originalImage, setOriginalImage] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [colorBlocks, setColorBlocks] = useState([]);
   const [processedImageUrl, setProcessedImageUrl] = useState(null);
   const [maxColors, setMaxColors] = useState(50);
   const [colorThreshold, setColorThreshold] = useState(50);
+  const [maxLength, setMaxLength] = useState(400);
+  const [layerHeight, setLayerDepth] = useState(0.1);
   const [showSettings, setShowSettings] = useState(false);
   const canvasRef = useRef(null);
   const previewCanvasRef = useRef(null);
@@ -47,7 +48,7 @@ const ImageToSTLConverter = () => {
       b: Math.round(cluster.reduce((sum, c) => sum + c.b, 0) / cluster.length),
       count: cluster.reduce((sum, c) => sum + c.count, 0),
       pixels: cluster.flatMap(c => c.pixels)
-    }
+    };
   };
 
   // Merge similar colors
@@ -147,8 +148,7 @@ const ImageToSTLConverter = () => {
     const ctx = canvas.getContext('2d');
 
     // Resize for processing
-    const maxDim = 400;
-    const scale = Math.min(maxDim / img.width, maxDim / img.height);
+    const scale = Math.min(maxLength / img.width, maxLength / img.height);
     canvas.width = img.width * scale;
     canvas.height = img.height * scale;
 
@@ -271,8 +271,7 @@ const ImageToSTLConverter = () => {
 
   // Generate STL file content
   const generateSTL = (color, width, height) => {
-    const path = generateSVGPath(color.pixels, width, height);
-    const depth = 2; // STL depth in mm
+    // const path = generateSVGPath(color.pixels, width, height);
 
     let stl = 'solid colorblock\n';
 
@@ -280,7 +279,7 @@ const ImageToSTLConverter = () => {
     color.pixels.forEach(({ x, y }) => {
       const x1 = x, x2 = x + 1;
       const y1 = y, y2 = y + 1;
-      const z1 = 0, z2 = depth;
+      const z1 = 0, z2 = layerHeight;
 
       // Top face
       stl += `facet normal 0 0 1\n  outer loop\n`;
@@ -541,6 +540,32 @@ const ImageToSTLConverter = () => {
                   className="w-full"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Max Plate Size: {maxLength} mm
+                </label>
+                <input
+                  type="range"
+                  min="100"
+                  max="1000"
+                  value={maxLength}
+                  onChange={(e) => setMaxLength(parseInt(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Layer Height: {layerHeight} mm
+                </label>
+                <input
+                  type="range"
+                  min="0.04"
+                  max="0.28"
+                  value={layerHeight}
+                  onChange={(e) => setLayerDepth(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
               {image && (
                 <button
                   onClick={() => processImage(image)}
@@ -671,8 +696,8 @@ const ImageToSTLConverter = () => {
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
