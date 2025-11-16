@@ -8,7 +8,7 @@ const ImageToSTLConverter = () => {
   const [colorBlocks, setColorBlocks] = useState([]);
   const [processedImageUrl, setProcessedImageUrl] = useState(null);
   const [maxColors, setMaxColors] = useState(50);
-  const [colorThreshold, setColorThreshold] = useState(30);
+  const [colorThreshold, setColorThreshold] = useState(50);
   const [showSettings, setShowSettings] = useState(false);
   const canvasRef = useRef(null);
   const previewCanvasRef = useRef(null);
@@ -40,9 +40,19 @@ const ImageToSTLConverter = () => {
     );
   };
 
+  const clusterAvgColor = (cluster: any[]) => {
+    return {
+      r: Math.round(cluster.reduce((sum, c) => sum + c.r, 0) / cluster.length),
+      g: Math.round(cluster.reduce((sum, c) => sum + c.g, 0) / cluster.length),
+      b: Math.round(cluster.reduce((sum, c) => sum + c.b, 0) / cluster.length),
+      count: cluster.reduce((sum, c) => sum + c.count, 0),
+      pixels: cluster.flatMap(c => c.pixels)
+    }
+  };
+
   // Merge similar colors BUT preserve dark/black colors as outlines
-  const mergeSimilarColors = (colors, threshold) => {
-    const merged = [];
+  const mergeSimilarColors = (colors: any[], threshold: number) => {
+    const merged: { r: number; g: number; b: number; count: any; pixels: any[]; }[] = [];
     const used = new Set();
 
     colors.forEach((color, idx) => {
@@ -73,30 +83,30 @@ const ImageToSTLConverter = () => {
       }
 
       // Calculate average color
-      const avg = {
-        r: Math.round(cluster.reduce((sum, c) => sum + c.r, 0) / cluster.length),
-        g: Math.round(cluster.reduce((sum, c) => sum + c.g, 0) / cluster.length),
-        b: Math.round(cluster.reduce((sum, c) => sum + c.b, 0) / cluster.length),
-        count: cluster.reduce((sum, c) => sum + c.count, 0),
-        pixels: cluster.flatMap(c => c.pixels)
-      };
+      const avg = clusterAvgColor(cluster);
       merged.push(avg);
     });
 
     return merged;
   };
 
-  // Merge only dark colors (all RGB < 100)
-  const mergeDarkColors = (colors, threshold) => {
-    const merged = [];
+  const isDarkNeutralColor = (color: { r: number; g: number; b: number; }, threshold = 30, darkThreshold = 100) => {
+    const dim = (color.r + color.g + color.b) < darkThreshold;
+    const max = Math.max(color.r, color.g, color.b);
+    const min = Math.min(color.r, color.g, color.b);
+    const netural = (max - min) < threshold;
+    return dim && netural;
+  };
+
+  // Merge only dark colors (all RGB < 100 and neutral)
+  const mergeDarkColors = (colors: any[], threshold: number) => {
+    const merged: { r: number; g: number; b: number; count: any; pixels: any[]; }[] = [];
     const used = new Set();
 
     colors.forEach((color, idx) => {
       if (used.has(idx)) return;
 
-      const isDark = color.r < 100 && color.g < 100 && color.b < 100;
-
-      if (!isDark) {
+      if (!isDarkNeutralColor(color)) {
         // Keep non-dark colors as-is
         merged.push(color);
         return;
@@ -109,10 +119,9 @@ const ImageToSTLConverter = () => {
         if (used.has(i)) continue;
 
         const otherColor = colors[i];
-        const otherIsDark = otherColor.r < 100 && otherColor.g < 100 && otherColor.b < 100;
 
         // Only merge if both are dark
-        if (!otherIsDark) continue;
+        if (!isDarkNeutralColor(otherColor)) continue;
 
         if (colorDistance(color, otherColor) < threshold) {
           cluster.push(otherColor);
@@ -121,13 +130,7 @@ const ImageToSTLConverter = () => {
       }
 
       // Calculate average color
-      const avg = {
-        r: Math.round(cluster.reduce((sum, c) => sum + c.r, 0) / cluster.length),
-        g: Math.round(cluster.reduce((sum, c) => sum + c.g, 0) / cluster.length),
-        b: Math.round(cluster.reduce((sum, c) => sum + c.b, 0) / cluster.length),
-        count: cluster.reduce((sum, c) => sum + c.count, 0),
-        pixels: cluster.flatMap(c => c.pixels)
-      };
+      const avg = clusterAvgColor(cluster);
       merged.push(avg);
     });
 
@@ -135,34 +138,17 @@ const ImageToSTLConverter = () => {
   };
 
   // Reassign noise colors to nearest major color
-  const reassignNoiseColors = (colors, mainColors) => {
-    // Identify noise colors (small pixel count)
-    const noiseThreshold = 10;
-    const noiseColors = [];
-    const keepColors = [];
+  const reassignColors = (mainColors, restColors) => {
 
-    colors.forEach(color => {
-      if (color.count < noiseThreshold) {
-        noiseColors.push(color);
-      } else {
-        keepColors.push(color);
-      }
-    });
-
-    // If all colors would be removed, keep them
-    if (keepColors.length === 0) {
-      return colors;
-    }
-
-    // Reassign noise pixels to nearest main color
-    noiseColors.forEach(noiseColor => {
-      noiseColor.pixels.forEach(pixel => {
+    // Reassign rest color to nearest main color
+    restColors.forEach(tbdColor => {
+      tbdColor.pixels.forEach(pixel => {
         // Find nearest main color
         let minDist = Infinity;
         let nearestColorIdx = 0;
 
-        keepColors.forEach((mainColor, idx) => {
-          const dist = colorDistance(noiseColor, mainColor);
+        mainColors.forEach((mainColor, idx) => {
+          const dist = colorDistance(tbdColor, mainColor);
           if (dist < minDist) {
             minDist = dist;
             nearestColorIdx = idx;
@@ -170,12 +156,12 @@ const ImageToSTLConverter = () => {
         });
 
         // Add pixel to nearest color
-        keepColors[nearestColorIdx].pixels.push(pixel);
-        keepColors[nearestColorIdx].count++;
+        mainColors[nearestColorIdx].pixels.push(pixel);
+        mainColors[nearestColorIdx].count++;
       });
     });
 
-    return keepColors;
+    return mainColors;
   };
 
   // Process image to extract color blocks
@@ -204,9 +190,6 @@ const ImageToSTLConverter = () => {
       const b = pixels[i + 2];
       const a = pixels[i + 3];
 
-      // Skip transparent pixels
-      if (a < 128) continue;
-
       const key = `${r},${g},${b}`;
       const x = (i / 4) % canvas.width;
       const y = Math.floor((i / 4) / canvas.width);
@@ -225,14 +208,17 @@ const ImageToSTLConverter = () => {
     // Step 1: Merge dark colors (all RGB < 100)
     colors = mergeDarkColors(colors, colorThreshold);
 
+    colors = mergeSimilarColors(colors, colorThreshold);
+
     // Step 2: Sort by frequency
     colors.sort((a, b) => b.count - a.count);
 
     // Step 3: Limit to max colors
     const mainColors = colors.slice(0, maxColors);
+    const restColors = colors.slice(maxColors);
 
     // Step 4: Reassign remaining colors (noise) to nearest main color
-    colors = reassignNoiseColors(colors, mainColors);
+    colors = reassignColors(mainColors, restColors);
 
     setColorBlocks(colors);
 
@@ -282,88 +268,6 @@ const ImageToSTLConverter = () => {
     setProcessedImageUrl(previewCanvas.toDataURL());
   };
 
-  // Fill all empty pixels with nearest color, preserve original edges
-  const fillIsolatedPixels = (colors, width, height) => {
-    // Create a pixel map for quick lookup
-    const pixelMap = new Map();
-    const colorPixelSets = colors.map(() => new Set());
-
-    // Identify dark colors (outlines)
-    const isDarkColor = colors.map(color =>
-      (color.r + color.g + color.b) < 100
-    );
-
-    colors.forEach((color, colorIdx) => {
-      color.pixels.forEach(({ x, y }) => {
-        const key = `${x},${y}`;
-        pixelMap.set(key, colorIdx);
-        colorPixelSets[colorIdx].add(key);
-      });
-    });
-
-    // Find all empty pixels
-    const emptyPixels = [];
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const key = `${x},${y}`;
-        if (!pixelMap.has(key)) {
-          emptyPixels.push({ x, y, key });
-        }
-      }
-    }
-
-    // Fill each empty pixel with nearest color using direct distance
-    emptyPixels.forEach(({ x, y, key }) => {
-      let minDist = Infinity;
-      let nearestColorIdx = null;
-      let minDarkDist = Infinity;
-      let nearestDarkIdx = null;
-
-      // Check distance to each color's pixels
-      colors.forEach((color, colorIdx) => {
-        // Sample a subset of pixels for performance (every Nth pixel)
-        const sampleRate = Math.max(1, Math.floor(color.pixels.length / 100));
-
-        for (let i = 0; i < color.pixels.length; i += sampleRate) {
-          const pixel = color.pixels[i];
-          const dx = pixel.x - x;
-          const dy = pixel.y - y;
-          const dist = dx * dx + dy * dy; // Squared distance (faster)
-
-          // Track nearest dark color separately
-          if (isDarkColor[colorIdx]) {
-            if (dist < minDarkDist) {
-              minDarkDist = dist;
-              nearestDarkIdx = colorIdx;
-            }
-          }
-
-          if (dist < minDist) {
-            minDist = dist;
-            nearestColorIdx = colorIdx;
-          }
-
-          // Early exit if very close
-          if (dist <= 1) break;
-        }
-      });
-
-      // Prefer dark color if it's reasonably close (within 2x distance)
-      // This preserves black outlines
-      if (nearestDarkIdx !== null && minDarkDist < minDist * 4) {
-        nearestColorIdx = nearestDarkIdx;
-      }
-
-      // Assign to nearest color
-      if (nearestColorIdx !== null) {
-        pixelMap.set(key, nearestColorIdx);
-        colors[nearestColorIdx].pixels.push({ x, y });
-        colors[nearestColorIdx].count++;
-      }
-    });
-
-    return colors;
-  };
   const generateSVGPath = (pixels, width, height) => {
     // Create a grid map
     const grid = Array(height).fill(null).map(() => Array(width).fill(false));
