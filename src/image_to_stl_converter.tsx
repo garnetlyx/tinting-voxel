@@ -626,7 +626,7 @@ const ImageToSTLConverter = () => {
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
               <Palette className="w-8 h-8 text-purple-600" />
-              图片转STL色块转换器
+              Image to STL Color Block Converter
             </h1>
             <button
               onClick={() => setShowSettings(!showSettings)}
@@ -640,7 +640,7 @@ const ImageToSTLConverter = () => {
             <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  最大颜色数量: {maxColors}
+                  Max Colors: {maxColors}
                 </label>
                 <input
                   type="range"
@@ -653,7 +653,7 @@ const ImageToSTLConverter = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  颜色合并阈值: {colorThreshold}
+                  Color Merge Threshold: {colorThreshold}
                 </label>
                 <input
                   type="range"
@@ -669,7 +669,7 @@ const ImageToSTLConverter = () => {
                   onClick={() => processImage(image)}
                   className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >
-                  重新处理
+                  Reprocess
                 </button>
               )}
             </div>
@@ -688,7 +688,7 @@ const ImageToSTLConverter = () => {
               className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition-all flex items-center justify-center gap-3 text-gray-600 hover:text-purple-600"
             >
               <Upload className="w-6 h-6" />
-              <span className="font-medium">点击上传图片</span>
+              <span className="font-medium">Click to Upload Image</span>
             </button>
           </div>
 
@@ -698,7 +698,7 @@ const ImageToSTLConverter = () => {
           {processing && (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-200 border-t-purple-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">处理中...</p>
+              <p className="text-gray-600">Processing...</p>
             </div>
           )}
 
@@ -706,10 +706,10 @@ const ImageToSTLConverter = () => {
             <div>
               {/* Before/After Preview */}
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">处理前后对比</h2>
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">Before and After Comparison</h2>
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">原始图片</h3>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Original Image</h3>
                     <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
                       <img
                         src={image.src}
@@ -719,7 +719,7 @@ const ImageToSTLConverter = () => {
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">处理后 ({colorBlocks.length}色)</h3>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Processed ({colorBlocks.length} colors)</h3>
                     <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
                       {processedImageUrl && (
                         <img
@@ -735,7 +735,7 @@ const ImageToSTLConverter = () => {
 
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-gray-800">
-                  提取的颜色 ({colorBlocks.length})
+                  Extracted Colors ({colorBlocks.length})
                 </h2>
                 <div className="flex gap-3">
                   <button
@@ -743,14 +743,14 @@ const ImageToSTLConverter = () => {
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                   >
                     <Download className="w-4 h-4" />
-                    下载CSV
+                    Download CSV
                   </button>
                   <button
                     onClick={downloadAllSTLs}
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
                   >
                     <Download className="w-4 h-4" />
-                    下载所有STL (ZIP)
+                    Download All STLs (ZIP)
                   </button>
                 </div>
               </div>
@@ -769,13 +769,13 @@ const ImageToSTLConverter = () => {
                       RGB({color.r},{color.g},{color.b})
                     </div>
                     <div className="text-xs text-gray-500 mb-2">
-                      {color.count} 像素
+                      {color.count} pixels
                     </div>
                     <button
                       onClick={() => downloadSTL(color, index)}
                       className="w-full py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
                     >
-                      下载STL
+                      Download STL
                     </button>
                   </div>
                 ))}
@@ -785,7 +785,7 @@ const ImageToSTLConverter = () => {
 
           {image && colorBlocks.length === 0 && !processing && (
             <div className="mt-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">原始图片预览</h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Original Image Preview</h3>
               <img
                 src={image.src}
                 alt="Preview"
