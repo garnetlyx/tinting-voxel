@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Download, Settings, Palette } from 'lucide-react';
 import JSZip from "jszip";
 
-const ImageToSTLConverter = () => {
+const ImageToMeshConverter = () => {
   const [image, setImage] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [colorBlocks, setColorBlocks] = useState([]);
@@ -679,4 +679,4 @@ const ImageToSTLConverter = () => {
   );
 };
 
-export default ImageToSTLConverter;
+export default ImageToMeshConverter;
