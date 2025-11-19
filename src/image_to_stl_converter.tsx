@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Download, Settings, Palette } from 'lucide-react';
+import JSZip from "jszip";
 
 const ImageToSTLConverter = () => {
   const [image, setImage] = useState(null);
@@ -8,15 +9,19 @@ const ImageToSTLConverter = () => {
   const [processedImageUrl, setProcessedImageUrl] = useState(null);
   const [maxColors, setMaxColors] = useState(50);
   const [colorThreshold, setColorThreshold] = useState(50);
-  const [maxLength, setMaxLength] = useState(400);
+  const [maxCanvasLength, setMaxLength] = useState(400);
   const [layerHeight, setLayerDepth] = useState(0.1);
-  const [showSettings, setShowSettings] = useState(false);
+  const [pixelSize, setPixelSize] = useState(1);
+  const [showSettings, setShowSettings] = useState(true);
   const canvasRef = useRef(null);
   const previewCanvasRef = useRef(null);
   const fileInputRef = useRef(null);
+  type Vec3 = [number, number, number];
+  type Face = [number, number, number];
+
 
   // Handle image upload
-  const handleImageUpload = (e) => {
+  const handleImageUpload = (e: { target: { files: any[]; }; }) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
@@ -33,7 +38,7 @@ const ImageToSTLConverter = () => {
   };
 
   // Color distance calculation
-  const colorDistance = (c1, c2) => {
+  const colorDistance = (c1: { r: number; g: number; b: number; }, c2: { r: number; g: number; b: number; }) => {
     return Math.sqrt(
       Math.pow(c1.r - c2.r, 2) +
       Math.pow(c1.g - c2.g, 2) +
@@ -114,16 +119,16 @@ const ImageToSTLConverter = () => {
 
 
   // Reassign noise colors to nearest major color
-  const reassignColors = (mainColors, restColors) => {
+  const reassignColors = (mainColors: any[], restColors: any[]) => {
 
     // Reassign rest color to nearest main color
-    restColors.forEach(tbdColor => {
-      tbdColor.pixels.forEach(pixel => {
+    restColors.forEach((tbdColor: { pixels: any[]; }) => {
+      tbdColor.pixels.forEach((pixel: any) => {
         // Find nearest main color
         let minDist = Infinity;
         let nearestColorIdx = 0;
 
-        mainColors.forEach((mainColor, idx) => {
+        mainColors.forEach((mainColor: any, idx: number) => {
           const dist = colorDistance(tbdColor, mainColor);
           if (dist < minDist) {
             minDist = dist;
@@ -141,14 +146,15 @@ const ImageToSTLConverter = () => {
   };
 
   // Process image to extract color blocks
-  const processImage = async (img) => {
+  const processImage = async (img: HTMLImageElement) => {
     setProcessing(true);
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
     // Resize for processing
-    const scale = Math.min(maxLength / img.width, maxLength / img.height);
+    // const scale = Math.min(maxCanvasLength / img.width, maxCanvasLength / img.height);
+    const scale = 1;
     canvas.width = img.width * scale;
     canvas.height = img.height * scale;
 
@@ -202,7 +208,7 @@ const ImageToSTLConverter = () => {
   };
 
   // Generate processed image preview
-  const generateProcessedPreview = (colors, width, height) => {
+  const generateProcessedPreview = (colors: any[], width: number, height: number) => {
     const previewCanvas = previewCanvasRef.current;
     const ctx = previewCanvas.getContext('2d');
     previewCanvas.width = width;
@@ -213,7 +219,7 @@ const ImageToSTLConverter = () => {
     const pixelColorMap = new Map();
 
     // Map each pixel to its color
-    colors.forEach(color => {
+    colors.forEach((color: { pixels: { x: any; y: any; }[]; }) => {
       color.pixels.forEach(({ x, y }) => {
         pixelColorMap.set(`${x},${y}`, color);
       });
@@ -241,7 +247,7 @@ const ImageToSTLConverter = () => {
     setProcessedImageUrl(previewCanvas.toDataURL());
   };
 
-  const generateSVGPath = (pixels, width, height) => {
+  const generateSVGPath = (pixels: { x: any; y: any; }[], width: number, height: number) => {
     // Create a grid map
     const grid = Array(height).fill(null).map(() => Array(width).fill(false));
     pixels.forEach(({ x, y }) => {
@@ -269,202 +275,162 @@ const ImageToSTLConverter = () => {
     return path;
   };
 
-  // Generate STL file content
-  const generateSTL = (color, width, height) => {
-    // const path = generateSVGPath(color.pixels, width, height);
+  function generateSTLByColor(color: never) {
+    const stls: ArrayBuffer[] = [];
 
-    let stl = 'solid colorblock\n';
-
-    // Simplified STL generation - each pixel becomes a rectangular prism
     color.pixels.forEach(({ x, y }) => {
-      const x1 = x, x2 = x + 1;
-      const y1 = y, y2 = y + 1;
+      const x1 = x, x2 = x + pixelSize;
+      const y1 = y, y2 = y + pixelSize;
       const z1 = 0, z2 = layerHeight;
-
-      // Top face
-      stl += `facet normal 0 0 1\n  outer loop\n`;
-      stl += `    vertex ${x1} ${y1} ${z2}\n    vertex ${x2} ${y1} ${z2}\n    vertex ${x2} ${y2} ${z2}\n  endloop\nendfacet\n`;
-      stl += `facet normal 0 0 1\n  outer loop\n`;
-      stl += `    vertex ${x1} ${y1} ${z2}\n    vertex ${x2} ${y2} ${z2}\n    vertex ${x1} ${y2} ${z2}\n  endloop\nendfacet\n`;
-
-      // Bottom face
-      stl += `facet normal 0 0 -1\n  outer loop\n`;
-      stl += `    vertex ${x1} ${y1} ${z1}\n    vertex ${x2} ${y2} ${z1}\n    vertex ${x2} ${y1} ${z1}\n  endloop\nendfacet\n`;
-      stl += `facet normal 0 0 -1\n  outer loop\n`;
-      stl += `    vertex ${x1} ${y1} ${z1}\n    vertex ${x1} ${y2} ${z1}\n    vertex ${x2} ${y2} ${z1}\n  endloop\nendfacet\n`;
+      const xrange = [x1, x2];
+      const yrange = [y1, y2];
+      const zrange = [z1, z2];
+      const buffer = generateBoxSTL(xrange, yrange, zrange);
+      stls.push(buffer);
     });
+    return mergeSTL(stls);
+  }
 
-    stl += 'endsolid colorblock\n';
-    return stl;
-  };
 
-  // Download STL for a specific color
-  const downloadSTL = (color, index) => {
-    const canvas = canvasRef.current;
-    const stlContent = generateSTL(color, canvas.width, canvas.height);
-    const blob = new Blob([stlContent], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rgb_${String(color.r).padStart(3, '0')}${String(color.g).padStart(3, '0')}${String(color.b).padStart(3, '0')}.stl`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 100);
-  };
+  // Merge multiple STL ArrayBuffers into a single valid STL
+  function mergeSTL(buffers: ArrayBuffer[]): ArrayBuffer {
+    // Skip empty
+    const validBuffers = buffers.filter(b => b.byteLength >= 84);
 
-  // Create a simple ZIP file manually
-  const createZipFile = (files) => {
-    // Simple ZIP file structure (ZIP64 format)
-    const encoder = new TextEncoder();
-    let offset = 0;
-    const fileRecords = [];
-    const chunks = [];
+    // Count total triangles
+    let totalTriangles = 0;
+    const parts: Uint8Array[] = [];
 
-    files.forEach(({ filename, content }) => {
-      const filenameBytes = encoder.encode(filename);
-      const contentBytes = encoder.encode(content);
+    for (const buf of validBuffers) {
+      const view = new DataView(buf);
+      const triCount = view.getUint32(80, true);
+      totalTriangles += triCount;
 
-      // Local file header
-      const localHeader = new Uint8Array(30 + filenameBytes.length);
-      const view = new DataView(localHeader.buffer);
+      // extract triangle data part (after 84-byte header)
+      const body = new Uint8Array(buf, 84);
+      parts.push(body);
+    }
 
-      // Local file header signature
-      view.setUint32(0, 0x04034b50, true);
-      // Version needed to extract
-      view.setUint16(4, 20, true);
-      // General purpose bit flag
-      view.setUint16(6, 0, true);
-      // Compression method (0 = no compression)
-      view.setUint16(8, 0, true);
-      // File modification time
-      view.setUint16(10, 0, true);
-      // File modification date
-      view.setUint16(12, 0, true);
-      // CRC-32
-      view.setUint32(14, 0, true);
-      // Compressed size
-      view.setUint32(18, contentBytes.length, true);
-      // Uncompressed size
-      view.setUint32(22, contentBytes.length, true);
-      // Filename length
-      view.setUint16(26, filenameBytes.length, true);
-      // Extra field length
-      view.setUint16(28, 0, true);
-      // Filename
-      localHeader.set(filenameBytes, 30);
+    // Allocate new STL buffer
+    const totalBytes = 84 + totalTriangles * 50;
+    const output = new ArrayBuffer(totalBytes);
+    const outView = new DataView(output);
 
-      chunks.push(localHeader);
-      chunks.push(contentBytes);
+    // Write header (80 bytes are blank)
+    // Write total triangle count
+    outView.setUint32(80, totalTriangles, true);
 
-      fileRecords.push({
-        filename: filenameBytes,
-        offset,
-        compressedSize: contentBytes.length,
-        uncompressedSize: contentBytes.length
-      });
+    // Write all triangle bodies
+    let offset = 84;
+    const outputArray = new Uint8Array(output);
 
-      offset += localHeader.length + contentBytes.length;
-    });
+    for (const p of parts) {
+      outputArray.set(p, offset);
+      offset += p.byteLength;
+    }
 
-    // Central directory
-    const centralDirStart = offset;
-    fileRecords.forEach(record => {
-      const centralHeader = new Uint8Array(46 + record.filename.length);
-      const view = new DataView(centralHeader.buffer);
+    return output;
+  }
 
-      // Central directory file header signature
-      view.setUint32(0, 0x02014b50, true);
-      // Version made by
-      view.setUint16(4, 20, true);
-      // Version needed to extract
-      view.setUint16(6, 20, true);
-      // General purpose bit flag
-      view.setUint16(8, 0, true);
-      // Compression method
-      view.setUint16(10, 0, true);
-      // File modification time
-      view.setUint16(12, 0, true);
-      // File modification date
-      view.setUint16(14, 0, true);
-      // CRC-32
-      view.setUint32(16, 0, true);
-      // Compressed size
-      view.setUint32(20, record.compressedSize, true);
-      // Uncompressed size
-      view.setUint32(24, record.uncompressedSize, true);
-      // Filename length
-      view.setUint16(28, record.filename.length, true);
-      // Extra field length
-      view.setUint16(30, 0, true);
-      // File comment length
-      view.setUint16(32, 0, true);
-      // Disk number start
-      view.setUint16(34, 0, true);
-      // Internal file attributes
-      view.setUint16(36, 0, true);
-      // External file attributes
-      view.setUint32(38, 0, true);
-      // Relative offset of local header
-      view.setUint32(42, record.offset, true);
-      // Filename
-      centralHeader.set(record.filename, 46);
+  function generateBoxSTL(
+    xrange: [number, number],
+    yrange: [number, number],
+    zrange: [number, number]
+  ): ArrayBuffer {
 
-      chunks.push(centralHeader);
-      offset += centralHeader.length;
-    });
+    const [x1, x2] = xrange;
+    const [y1, y2] = yrange;
+    const [z1, z2] = zrange;
 
-    const centralDirSize = offset - centralDirStart;
+    // 8 vertices
+    const vertices: Vec3[] = [
+      [x1, y1, z1],
+      [x2, y1, z1],
+      [x2, y2, z1],
+      [x1, y2, z1],
+      [x1, y1, z2],
+      [x2, y1, z2],
+      [x2, y2, z2],
+      [x1, y2, z2]
+    ];
 
-    // End of central directory record
-    const endRecord = new Uint8Array(22);
-    const endView = new DataView(endRecord.buffer);
+    // 12 triangular faces
+    const faces: Face[] = [
+      [0, 3, 1], [1, 3, 2],    // bottom
+      [0, 4, 7], [0, 7, 3],    // left
+      [4, 5, 6], [4, 6, 7],    // top
+      [5, 1, 2], [5, 2, 6],    // right
+      [2, 3, 6], [3, 7, 6],    // back
+      [0, 1, 5], [0, 5, 4]     // front
+    ];
 
-    // End of central directory signature
-    endView.setUint32(0, 0x06054b50, true);
-    // Number of this disk
-    endView.setUint16(4, 0, true);
-    // Disk where central directory starts
-    endView.setUint16(6, 0, true);
-    // Number of central directory records on this disk
-    endView.setUint16(8, fileRecords.length, true);
-    // Total number of central directory records
-    endView.setUint16(10, fileRecords.length, true);
-    // Size of central directory
-    endView.setUint32(12, centralDirSize, true);
-    // Offset of start of central directory
-    endView.setUint32(16, centralDirStart, true);
-    // Comment length
-    endView.setUint16(20, 0, true);
+    // STL binary header: 80 bytes + uint32 triangle count
+    const tris = faces.length;
+    const buffer = new ArrayBuffer(84 + tris * 50);
+    const view = new DataView(buffer);
 
-    chunks.push(endRecord);
+    // Write triangle count
+    view.setUint32(80, tris, true);
 
-    // Combine all chunks
-    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-    const zipData = new Uint8Array(totalLength);
-    let position = 0;
-    chunks.forEach(chunk => {
-      zipData.set(chunk, position);
-      position += chunk.length;
-    });
+    let offset = 84;
 
-    return zipData;
-  };
+    // Calculate normal of a triangle
+    function computeNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {
+      const u: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const v: Vec3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      const nx = u[1] * v[2] - u[2] * v[1];
+      const ny = u[2] * v[0] - u[0] * v[2];
+      const nz = u[0] * v[1] - u[1] * v[0];
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      return [nx / len, ny / len, nz / len];
+    }
+
+    // Write each triangle
+    for (const f of faces) {
+      const v1 = vertices[f[0]];
+      const v2 = vertices[f[1]];
+      const v3 = vertices[f[2]];
+
+      const normal = computeNormal(v1, v2, v3);
+
+      // Write normal vector
+      for (let i = 0; i < 3; i++) {
+        view.setFloat32(offset, normal[i], true);
+        offset += 4;
+      }
+
+      // Write 3 vertices
+      for (const v of [v1, v2, v3]) {
+        for (let i = 0; i < 3; i++) {
+          view.setFloat32(offset, v[i], true);
+          offset += 4;
+        }
+      }
+
+      // Attribute byte count (unused)
+      view.setUint16(offset, 0, true);
+      offset += 2;
+    }
+    return buffer;
+  }
+
 
   // Download all STLs as a zip
   const downloadAllSTLs = async () => {
     const canvas = canvasRef.current;
     const files = [];
+    const zip = new JSZip();
 
     // Prepare all STL files
     colorBlocks.forEach((color) => {
-      const stlContent = generateSTL(color, canvas.width, canvas.height);
+      const stlContent = generateSTLByColor(color);
       const filename = `rgb_${String(color.r).padStart(3, '0')}${String(color.g).padStart(3, '0')}${String(color.b).padStart(3, '0')}.stl`;
-      files.push({ filename, content: stlContent });
+      files.push({ filename, content: [stlContent] });
+      zip.file(filename, stlContent);
     });
 
     // Create ZIP file
-    const zipData = createZipFile(files);
+    const zipData = await zip.generateAsync({ type: "arraybuffer" });
     const blob = new Blob([zipData], { type: 'application/zip' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -520,7 +486,7 @@ const ImageToSTLConverter = () => {
                 </label>
                 <input
                   type="range"
-                  min="10"
+                  min="2"
                   max="100"
                   value={maxColors}
                   onChange={(e) => setMaxColors(parseInt(e.target.value))}
@@ -542,13 +508,13 @@ const ImageToSTLConverter = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Max Plate Size: {maxLength} mm
+                  Max Plate Size: {maxCanvasLength} mm
                 </label>
                 <input
                   type="range"
                   min="100"
-                  max="1000"
-                  value={maxLength}
+                  max="500"
+                  value={maxCanvasLength}
                   onChange={(e) => setMaxLength(parseInt(e.target.value))}
                   className="w-full"
                 />
@@ -563,6 +529,19 @@ const ImageToSTLConverter = () => {
                   max="0.28"
                   value={layerHeight}
                   onChange={(e) => setLayerDepth(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pixel Size: {pixelSize} mm
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="2"
+                  value={pixelSize}
+                  onChange={(e) => setPixelSize(parseFloat(e.target.value))}
                   className="w-full"
                 />
               </div>
