@@ -1,467 +1,126 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Download, Settings, Palette } from 'lucide-react';
-import JSZip from "jszip";
+import type { ColorBlock } from './api/types';
+import { processImage, downloadCSV, downloadSTL } from './api/client';
 
 const ImageToMeshConverter = () => {
-  const [image, setImage] = useState(null);
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [colorBlocks, setColorBlocks] = useState([]);
-  const [rgbColorMap, setRgbColorMap] = useState(new Map());
-  const [processedImageUrl, setProcessedImageUrl] = useState(null);
+  const [colorBlocks, setColorBlocks] = useState<ColorBlock[]>([]);
+  const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [maxColors, setMaxColors] = useState(10);
   const [colorThreshold, setColorThreshold] = useState(50);
-  const [maxCanvasLength, setMaxLength] = useState(400);
-  const [layerHeight, setLayerDepth] = useState(0.08);
+  const [layerHeight, setLayerHeight] = useState(0.08);
   const [pixelSize, setPixelSize] = useState(0.08);
+  const [layerCount] = useState(4);
   const [showSettings, setShowSettings] = useState(true);
-  const canvasRef = useRef(null);
-  const previewCanvasRef = useRef(null);
-  const fileInputRef = useRef(null);
-  type Vec3 = [number, number, number];
-  type Face = [number, number, number];
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load default image on component mount
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
       setImage(img);
-      processImage(img);
+      handleProcessImage(img);
     };
-    img.src = 'example.png'; // Assuming example.png is in the public directory
+    img.src = 'example.png';
   }, []);
 
-
   // Handle image upload
-  const handleImageUpload = (e: { target: { files: any[]; }; }) => {
-    const file = e.target.files[0];
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
           setImage(img);
-          processImage(img);
+          handleProcessImage(img);
         };
-        img.src = event.target.result;
+        img.src = event.target?.result as string;
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Color distance calculation
-  const colorDistance = (c1: { r: number; g: number; b: number; }, c2: { r: number; g: number; b: number; }) => {
-    return Math.sqrt(
-      Math.pow(c1.r - c2.r, 2) +
-      Math.pow(c1.g - c2.g, 2) +
-      Math.pow(c1.b - c2.b, 2)
-    );
-  };
-
-  const clusterAvgColor = (cluster: any[]) => {
-    return {
-      r: Math.round(cluster.reduce((sum, c) => sum + c.r, 0) / cluster.length),
-      g: Math.round(cluster.reduce((sum, c) => sum + c.g, 0) / cluster.length),
-      b: Math.round(cluster.reduce((sum, c) => sum + c.b, 0) / cluster.length),
-      count: cluster.reduce((sum, c) => sum + c.count, 0),
-      pixels: cluster.flatMap(c => c.pixels)
-    };
-  };
-
-  // Merge similar colors
-  const mergeSimilarColors = (colors: any[], threshold: number) => {
-    const merged: { r: number; g: number; b: number; count: any; pixels: any[]; }[] = [];
-    const used = new Set();
-    const dark: any[] = [];
-
-
-    colors.forEach((color, idx) => {
-      if (used.has(idx)) return;
-      used.add(idx);
-
-      if (isDarkNeutralColor(color)) {
-        dark.push(color);
-
-        for (let i = idx + 1; i < colors.length; i++) {
-          if (used.has(i)) continue;
-
-          const otherColor = colors[i];
-
-          if (isDarkNeutralColor(otherColor)) {
-            dark.push(otherColor);
-            used.add(i);
-          }
-        }
-
-        // Calculate average color
-        const avg = clusterAvgColor(dark);
-        merged.push(avg);
-      } else {
-        const cluster = [color];
-
-        for (let i = idx + 1; i < colors.length; i++) {
-          if (used.has(i)) continue;
-
-          const otherColor = colors[i];
-
-          if (colorDistance(color, otherColor) < threshold) {
-            cluster.push(otherColor);
-            used.add(i);
-          }
-        }
-
-        // Calculate average color
-        const avg = clusterAvgColor(cluster);
-        merged.push(avg);
-      }
-
-    });
-
-    return merged;
-  };
-
-  const isDarkNeutralColor = (color: { r: number; g: number; b: number; },
-    neutralThreshold = 35, darkThreshold = 150) => {
-    const dim = (color.r + color.g + color.b) < darkThreshold;
-    const max = Math.max(color.r, color.g, color.b);
-    const min = Math.min(color.r, color.g, color.b);
-    const netural = (max - min) < neutralThreshold;
-    return dim && netural;
-  };
-
-
-  // Reassign noise colors to nearest major color
-  const reassignColors = (mainColors: any[], restColors: any[]) => {
-
-    // Reassign rest color to nearest main color
-    restColors.forEach((tbdColor: { pixels: any[]; }) => {
-      tbdColor.pixels.forEach((pixel: any) => {
-        // Find nearest main color
-        let minDist = Infinity;
-        let nearestColorIdx = 0;
-
-        mainColors.forEach((mainColor: any, idx: number) => {
-          const dist = colorDistance(tbdColor, mainColor);
-          if (dist < minDist) {
-            minDist = dist;
-            nearestColorIdx = idx;
-          }
-        });
-
-        // Add pixel to nearest color
-        mainColors[nearestColorIdx].pixels.push(pixel);
-        mainColors[nearestColorIdx].count++;
-      });
-    });
-
-    return mainColors;
-  };
-
-  // Process image to extract color blocks
-  const processImage = async (img: HTMLImageElement) => {
+  // Process image by calling backend API
+  const handleProcessImage = async (img: HTMLImageElement) => {
     setProcessing(true);
+    setError(null);
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    try {
+      // Convert image to blob
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0);
 
-    // Resize for processing
-    // const scale = Math.min(maxCanvasLength / img.width, maxCanvasLength / img.height);
-    const scale = 1;
-    canvas.width = img.width * scale;
-    canvas.height = img.height * scale;
-
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const pixels = imageData.data;
-
-    // Extract unique colors with pixel positions
-    const colorMap = new Map();
-
-    for (let i = 0; i < pixels.length; i += 4) {
-      const r = pixels[i];
-      const g = pixels[i + 1];
-      const b = pixels[i + 2];
-      const a = pixels[i + 3];
-
-      const key = `${r},${g},${b}`;
-      const x = (i / 4) % canvas.width;
-      const y = Math.floor((i / 4) / canvas.width);
-
-      if (!colorMap.has(key)) {
-        colorMap.set(key, { r, g, b, count: 0, pixels: [] });
-      }
-      const color = colorMap.get(key);
-      color.count++;
-      color.pixels.push({ x, y });
-    }
-
-    setRgbColorMap(colorMap);
-
-    // Convert to array
-    let colors = Array.from(colorMap.values());
-
-    // Step 1: Merge similar colors
-    colors = mergeSimilarColors(colors, colorThreshold);
-
-    // Step 2: Sort by frequency
-    colors.sort((a, b) => b.count - a.count);
-
-    // Step 3: Limit to max colors
-    const mainColors = colors.slice(0, maxColors);
-    const restColors = colors.slice(maxColors);
-
-    // Step 4: Reassign remaining colors (noise) to nearest main color
-    colors = reassignColors(mainColors, restColors);
-
-    setColorBlocks(colors);
-
-    // Generate processed image preview
-    generateProcessedPreview(colors, canvas.width, canvas.height);
-
-    setProcessing(false);
-  };
-
-  // Generate processed image preview
-  const generateProcessedPreview = (colors: any[], width: number, height: number) => {
-    const previewCanvas = previewCanvasRef.current;
-    const ctx = previewCanvas.getContext('2d');
-    previewCanvas.width = width;
-    previewCanvas.height = height;
-
-    // Create color mapping for each pixel
-    const imageData = ctx.createImageData(width, height);
-    const pixelColorMap = new Map();
-
-    // Map each pixel to its color
-    colors.forEach((color: { pixels: { x: any; y: any; }[]; }) => {
-      color.pixels.forEach(({ x, y }) => {
-        pixelColorMap.set(`${x},${y}`, color);
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((b) => resolve(b!), 'image/png');
       });
-    });
 
-    // Fill the preview canvas
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const key = `${x},${y}`;
-        const color = pixelColorMap.get(key);
-        const i = (y * width + x) * 4;
+      // Create File object from blob
+      const file = new File([blob], 'image.png', { type: 'image/png' });
 
-        if (color) {
-          imageData.data[i] = color.r;
-          imageData.data[i + 1] = color.g;
-          imageData.data[i + 2] = color.b;
-          imageData.data[i + 3] = 255;
-        } else {
-          imageData.data[i + 3] = 0; // transparent
-        }
-      }
+      // Call backend API
+      const result = await processImage(file, {
+        maxColors,
+        colorThreshold,
+        pixelSize,
+      });
+
+      // Update state with results
+      setColorBlocks(result.colorBlocks);
+      setProcessedImageUrl(result.processedImage);
+      setImageDimensions(result.imageDimensions);
+
+    } catch (err) {
+      console.error('Error processing image:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process image');
+    } finally {
+      setProcessing(false);
     }
-
-    ctx.putImageData(imageData, 0, 0);
-    setProcessedImageUrl(previewCanvas.toDataURL());
   };
 
-
-  function generateSTLByColor(color, z_idx) {
-    const stls: ArrayBuffer[] = [];
-
-    color.pixels.forEach(({ x, y }) => {
-      const x1 = x, x2 = x + 1;
-      const y1 = y, y2 = y + 1;
-      const z1 = z_idx * layerHeight, z2 = (z_idx + 1) * layerHeight;
-      const xrange = [x1, x2];
-      const yrange = [y1, y2];
-      const zrange = [z1, z2];
-      const buffer = generatePixelMesh(xrange, yrange, zrange);
-      stls.push(buffer);
-    });
-
-    return stls;
-  }
-
-
-  // Merge multiple STL ArrayBuffers into a single valid STL
-  function mergeMeshes(buffers: ArrayBuffer[]): ArrayBuffer {
-    // Skip empty
-    const validBuffers = buffers.filter(b => b.byteLength >= 84);
-
-    // Count total triangles
-    let totalTriangles = 0;
-    const parts: Uint8Array[] = [];
-
-    for (const buf of validBuffers) {
-      const view = new DataView(buf);
-      const triCount = view.getUint32(80, true);
-      totalTriangles += triCount;
-
-      // extract triangle data part (after 84-byte header)
-      const body = new Uint8Array(buf, 84);
-      parts.push(body);
+  // Reprocess image with current parameters
+  const handleReprocess = () => {
+    if (image) {
+      handleProcessImage(image);
     }
-
-    // Allocate new STL buffer
-    const totalBytes = 84 + totalTriangles * 50;
-    const output = new ArrayBuffer(totalBytes);
-    const outView = new DataView(output);
-
-    // Write header (80 bytes are blank)
-    // Write total triangle count
-    outView.setUint32(80, totalTriangles, true);
-
-    // Write all triangle bodies
-    let offset = 84;
-    const outputArray = new Uint8Array(output);
-
-    for (const p of parts) {
-      outputArray.set(p, offset);
-      offset += p.byteLength;
-    }
-
-    return output;
-  }
-
-  function generatePixelMesh(
-    xrange: [number, number],
-    yrange: [number, number],
-    zrange: [number, number]
-  ): ArrayBuffer {
-
-    const [x1, x2] = xrange;
-    const [y1, y2] = yrange;
-    const [z1, z2] = zrange;
-
-    // 8 vertices
-    const vertices: Vec3[] = [
-      [x1, y1, z1],
-      [x2, y1, z1],
-      [x2, y2, z1],
-      [x1, y2, z1],
-      [x1, y1, z2],
-      [x2, y1, z2],
-      [x2, y2, z2],
-      [x1, y2, z2]
-    ];
-
-    // 12 triangular faces
-    const faces: Face[] = [
-      [0, 3, 1], [1, 3, 2],    // bottom
-      [0, 4, 7], [0, 7, 3],    // left
-      [4, 5, 6], [4, 6, 7],    // top
-      [5, 1, 2], [5, 2, 6],    // right
-      [2, 3, 6], [3, 7, 6],    // back
-      [0, 1, 5], [0, 5, 4]     // front
-    ];
-
-    // STL binary header: 80 bytes + uint32 triangle count
-    const tris = faces.length;
-    const buffer = new ArrayBuffer(84 + tris * 50);
-    const view = new DataView(buffer);
-
-    // Write triangle count
-    view.setUint32(80, tris, true);
-
-    let offset = 84;
-
-    // Calculate normal of a triangle
-    function computeNormal(a: Vec3, b: Vec3, c: Vec3): Vec3 {
-      const u: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-      const v: Vec3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-      const nx = u[1] * v[2] - u[2] * v[1];
-      const ny = u[2] * v[0] - u[0] * v[2];
-      const nz = u[0] * v[1] - u[1] * v[0];
-      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-      return [nx / len, ny / len, nz / len];
-    }
-
-    // Write each triangle
-    for (const f of faces) {
-      const v1 = vertices[f[0]];
-      const v2 = vertices[f[1]];
-      const v3 = vertices[f[2]];
-
-      const normal = computeNormal(v1, v2, v3);
-
-      // Write normal vector
-      for (let i = 0; i < 3; i++) {
-        view.setFloat32(offset, normal[i], true);
-        offset += 4;
-      }
-
-      // Write 3 vertices
-      for (const v of [v1, v2, v3]) {
-        for (let i = 0; i < 3; i++) {
-          view.setFloat32(offset, v[i], true);
-          offset += 4;
-        }
-      }
-
-      // Attribute byte count (unused)
-      view.setUint16(offset, 0, true);
-      offset += 2;
-    }
-    return buffer;
-  }
-
-
-  // Download all STLs as a zip
-  const downloadAllSTLs = async () => {
-    const canvas = canvasRef.current;
-    const files = [];
-    const zip = new JSZip();
-
-    const codeArray = ['C', 'M', 'Y', 'W'];
-    const codeMeshMap = new Map();
-    for (let i = 0; i < codeArray.length; i++) {
-      codeMeshMap.set(codeArray[i], []);
-    }
-
-    // Prepare all STL files
-    colorBlocks.forEach((color) => {
-      const rgbName = `rgb_${String(color.r).padStart(3, '0')}${String(color.g).padStart(3, '0')}${String(color.b).padStart(3, '0')}`;
-      for (let z_idx = 0; z_idx < codeArray.length; z_idx++) {
-        const code = codeArray[z_idx];
-        const stlArray = generateSTLByColor(color, z_idx);
-        codeMeshMap.set(code, codeMeshMap.get(code).concat(stlArray));
-      }
-    });
-
-    for (const [code, stls] of codeMeshMap.entries()) {
-      const filename = `${code}.stl`;
-      const stlContent = mergeMeshes(stls);
-      files.push({ filename, content: [stlContent] });
-      zip.file(filename, stlContent);
-    }
-
-
-    // Create ZIP file
-    const zipData = await zip.generateAsync({ type: "arraybuffer" });
-    const blob = new Blob([zipData], { type: 'application/zip' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'all_color_blocks.zip';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 100);
   };
 
-  // Download CSV with color data
-  const downloadCSV = () => {
-    let csv = 'Color,R,G,B,Hex,PixelCount\n';
-    colorBlocks.forEach((color, index) => {
-      const hex = `#${color.r.toString(16).padStart(2, '0')}${color.g.toString(16).padStart(2, '0')}${color.b.toString(16).padStart(2, '0')}`;
-      csv += `Color${index + 1},${color.r},${color.g},${color.b},${hex},${color.count}\n`;
-    });
+  // Download CSV
+  const handleDownloadCSV = async () => {
+    try {
+      setError(null);
+      await downloadCSV(colorBlocks);
+    } catch (err) {
+      console.error('Error downloading CSV:', err);
+      setError(err instanceof Error ? err.message : 'Failed to download CSV');
+    }
+  };
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'colors.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 100);
+  // Download STL ZIP
+  const handleDownloadSTL = async () => {
+    try {
+      setError(null);
+      setProcessing(true);
+      await downloadSTL({
+        colorBlocks,
+        layerHeight,
+        pixelSize,
+        layerCount,
+        imageDimensions,
+      });
+    } catch (err) {
+      console.error('Error downloading STL:', err);
+      setError(err instanceof Error ? err.message : 'Failed to download STL');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
@@ -511,19 +170,6 @@ const ImageToMeshConverter = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Max Plate Size: {maxCanvasLength} mm
-                </label>
-                <input
-                  type="range"
-                  min="100"
-                  max="500"
-                  value={maxCanvasLength}
-                  onChange={(e) => setMaxLength(parseInt(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Layer Height: {layerHeight} mm
                 </label>
                 <input
@@ -532,7 +178,7 @@ const ImageToMeshConverter = () => {
                   max="0.28"
                   step="0.01"
                   value={layerHeight}
-                  onChange={(e) => setLayerDepth(parseFloat(e.target.value))}
+                  onChange={(e) => setLayerHeight(parseFloat(e.target.value))}
                   className="w-full"
                 />
               </div>
@@ -552,10 +198,11 @@ const ImageToMeshConverter = () => {
               </div>
               {image && (
                 <button
-                  onClick={() => processImage(image)}
-                  className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  onClick={handleReprocess}
+                  disabled={processing}
+                  className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400"
                 >
-                  Reprocess
+                  {processing ? 'Processing...' : 'Reprocess'}
                 </button>
               )}
             </div>
@@ -578,8 +225,11 @@ const ImageToMeshConverter = () => {
             </button>
           </div>
 
-          <canvas ref={canvasRef} className="hidden" />
-          <canvas ref={previewCanvasRef} className="hidden" />
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
 
           {processing && (
             <div className="text-center py-12">
@@ -597,15 +247,19 @@ const ImageToMeshConverter = () => {
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 mb-2">Original Image</h3>
                     <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
-                      <img
-                        src={image.src}
-                        alt="Original"
-                        className="w-full h-auto"
-                      />
+                      {image && (
+                        <img
+                          src={image.src}
+                          alt="Original"
+                          className="w-full h-auto"
+                        />
+                      )}
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Processed ({colorBlocks.length} colors)</h3>
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">
+                      Processed ({colorBlocks.length} colors)
+                    </h3>
                     <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
                       {processedImageUrl && (
                         <img
@@ -625,18 +279,19 @@ const ImageToMeshConverter = () => {
                 </h2>
                 <div className="flex gap-3">
                   <button
-                    onClick={downloadCSV}
+                    onClick={handleDownloadCSV}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                   >
                     <Download className="w-4 h-4" />
                     Download CSV
                   </button>
                   <button
-                    onClick={downloadAllSTLs}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                    onClick={handleDownloadSTL}
+                    disabled={processing}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 disabled:bg-gray-400"
                   >
                     <Download className="w-4 h-4" />
-                    Download All STLs (ZIP)
+                    {processing ? 'Generating...' : 'Download All STLs (ZIP)'}
                   </button>
                 </div>
               </div>
@@ -674,8 +329,8 @@ const ImageToMeshConverter = () => {
             </div>
           )}
         </div>
-      </div >
-    </div >
+      </div>
+    </div>
   );
 };
 

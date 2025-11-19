@@ -29,6 +29,8 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Python output
+# Python
+backend/.venv/
+backend/__pycache__/
 output/*
 __pycache__/*
