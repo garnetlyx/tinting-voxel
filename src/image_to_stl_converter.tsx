@@ -6,12 +6,13 @@ const ImageToSTLConverter = () => {
   const [image, setImage] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [colorBlocks, setColorBlocks] = useState([]);
+  const [rgbColorMap, setRgbColorMap] = useState(new Map());
   const [processedImageUrl, setProcessedImageUrl] = useState(null);
-  const [maxColors, setMaxColors] = useState(50);
+  const [maxColors, setMaxColors] = useState(10);
   const [colorThreshold, setColorThreshold] = useState(50);
   const [maxCanvasLength, setMaxLength] = useState(400);
-  const [layerHeight, setLayerDepth] = useState(0.1);
-  const [pixelSize, setPixelSize] = useState(1);
+  const [layerHeight, setLayerDepth] = useState(0.08);
+  const [pixelSize, setPixelSize] = useState(0.08);
   const [showSettings, setShowSettings] = useState(true);
   const canvasRef = useRef(null);
   const previewCanvasRef = useRef(null);
@@ -193,6 +194,8 @@ const ImageToSTLConverter = () => {
       color.pixels.push({ x, y });
     }
 
+    setRgbColorMap(colorMap);
+
     // Convert to array
     let colors = Array.from(colorMap.values());
 
@@ -258,20 +261,21 @@ const ImageToSTLConverter = () => {
   };
 
 
-  function generateSTLByColor(color: never) {
+  function generateSTLByColor(color, z_idx) {
     const stls: ArrayBuffer[] = [];
 
     color.pixels.forEach(({ x, y }) => {
-      const x1 = x, x2 = x + pixelSize;
-      const y1 = y, y2 = y + pixelSize;
-      const z1 = 0, z2 = layerHeight;
+      const x1 = x, x2 = x + 1;
+      const y1 = y, y2 = y + 1;
+      const z1 = z_idx * layerHeight, z2 = (z_idx + 1) * layerHeight;
       const xrange = [x1, x2];
       const yrange = [y1, y2];
       const zrange = [z1, z2];
       const buffer = generatePixelMesh(xrange, yrange, zrange);
       stls.push(buffer);
     });
-    return mergeMeshes(stls);
+
+    return stls;
   }
 
 
@@ -404,13 +408,29 @@ const ImageToSTLConverter = () => {
     const files = [];
     const zip = new JSZip();
 
+    const codeArray = ['C', 'M', 'Y', 'W'];
+    const codeMeshMap = new Map();
+    for (let i = 0; i < codeArray.length; i++) {
+      codeMeshMap.set(codeArray[i], []);
+    }
+
     // Prepare all STL files
     colorBlocks.forEach((color) => {
-      const stlContent = generateSTLByColor(color);
-      const filename = `rgb_${String(color.r).padStart(3, '0')}${String(color.g).padStart(3, '0')}${String(color.b).padStart(3, '0')}.stl`;
+      const rgbName = `rgb_${String(color.r).padStart(3, '0')}${String(color.g).padStart(3, '0')}${String(color.b).padStart(3, '0')}`;
+      for (let z_idx = 0; z_idx < codeArray.length; z_idx++) {
+        const code = codeArray[z_idx];
+        const stlArray = generateSTLByColor(color, z_idx);
+        codeMeshMap.set(code, codeMeshMap.get(code).concat(stlArray));
+      }
+    });
+
+    for (const [code, stls] of codeMeshMap.entries()) {
+      const filename = `${code}.stl`;
+      const stlContent = mergeMeshes(stls);
       files.push({ filename, content: [stlContent] });
       zip.file(filename, stlContent);
-    });
+    }
+
 
     // Create ZIP file
     const zipData = await zip.generateAsync({ type: "arraybuffer" });
@@ -510,6 +530,7 @@ const ImageToSTLConverter = () => {
                   type="range"
                   min="0.04"
                   max="0.28"
+                  step="0.01"
                   value={layerHeight}
                   onChange={(e) => setLayerDepth(parseFloat(e.target.value))}
                   className="w-full"
@@ -521,8 +542,9 @@ const ImageToSTLConverter = () => {
                 </label>
                 <input
                   type="range"
-                  min="1"
-                  max="2"
+                  min="0.08"
+                  max="1"
+                  step="0.01"
                   value={pixelSize}
                   onChange={(e) => setPixelSize(parseFloat(e.target.value))}
                   className="w-full"
