@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Download, Settings, Palette } from 'lucide-react';
 import JSZip from "jszip";
 
@@ -18,6 +18,16 @@ const ImageToSTLConverter = () => {
   const fileInputRef = useRef(null);
   type Vec3 = [number, number, number];
   type Face = [number, number, number];
+
+  // Load default image on component mount
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      setImage(img);
+      processImage(img);
+    };
+    img.src = 'example.png'; // Assuming example.png is in the public directory
+  }, []);
 
 
   // Handle image upload
@@ -247,33 +257,6 @@ const ImageToSTLConverter = () => {
     setProcessedImageUrl(previewCanvas.toDataURL());
   };
 
-  const generateSVGPath = (pixels: { x: any; y: any; }[], width: number, height: number) => {
-    // Create a grid map
-    const grid = Array(height).fill(null).map(() => Array(width).fill(false));
-    pixels.forEach(({ x, y }) => {
-      if (y < height && x < width) grid[y][x] = true;
-    });
-
-    // Simple contour following (could be improved with marching squares)
-    let path = '';
-    const visited = Array(height).fill(null).map(() => Array(width).fill(false));
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (grid[y][x] && !visited[y][x]) {
-          // Start a new path
-          path += `M ${x} ${y} `;
-          let cx = x, cy = y;
-          visited[cy][cx] = true;
-
-          // Draw rectangle for each pixel (simplified)
-          path += `L ${x + 1} ${y} L ${x + 1} ${y + 1} L ${x} ${y + 1} Z `;
-        }
-      }
-    }
-
-    return path;
-  };
 
   function generateSTLByColor(color: never) {
     const stls: ArrayBuffer[] = [];
@@ -285,15 +268,15 @@ const ImageToSTLConverter = () => {
       const xrange = [x1, x2];
       const yrange = [y1, y2];
       const zrange = [z1, z2];
-      const buffer = generateBoxSTL(xrange, yrange, zrange);
+      const buffer = generatePixelMesh(xrange, yrange, zrange);
       stls.push(buffer);
     });
-    return mergeSTL(stls);
+    return mergeMeshes(stls);
   }
 
 
   // Merge multiple STL ArrayBuffers into a single valid STL
-  function mergeSTL(buffers: ArrayBuffer[]): ArrayBuffer {
+  function mergeMeshes(buffers: ArrayBuffer[]): ArrayBuffer {
     // Skip empty
     const validBuffers = buffers.filter(b => b.byteLength >= 84);
 
@@ -332,7 +315,7 @@ const ImageToSTLConverter = () => {
     return output;
   }
 
-  function generateBoxSTL(
+  function generatePixelMesh(
     xrange: [number, number],
     yrange: [number, number],
     zrange: [number, number]
@@ -652,12 +635,6 @@ const ImageToSTLConverter = () => {
                     <div className="text-xs text-gray-500 mb-2">
                       {color.count} pixels
                     </div>
-                    <button
-                      onClick={() => downloadSTL(color, index)}
-                      className="w-full py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
-                    >
-                      Download STL
-                    </button>
                   </div>
                 ))}
               </div>
