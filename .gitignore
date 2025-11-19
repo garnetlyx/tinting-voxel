@@ -28,3 +28,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Python output
+output/*
+__pycache__/*
