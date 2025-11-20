@@ -7,12 +7,7 @@ import itertools
 from io import BytesIO
 import zipfile
 from typing import List, Dict, Tuple
-import sys
-import os
-
-# Add parent directory to path to import blend_color
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from blend_color import Colors, BlendTestGenerator, Color
+from core.blend_color import Colors, BlendTestGenerator, Color
 
 
 # Global reference matrices (initialized on app startup)

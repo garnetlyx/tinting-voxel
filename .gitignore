@@ -33,4 +33,18 @@ Thumbs.db
 backend/.venv/
 backend/*/__pycache__/
 backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
 output/*
+
+# AI Agent
+.claude/
+
+# Docker
+.dockerignore
+docker-compose.override.yml

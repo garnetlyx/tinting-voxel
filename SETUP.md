@@ -10,6 +10,33 @@ This is an image-to-STL color block converter that transforms images into layere
 
 ## Architecture
 
+```
+src/
+├── components/                  # UI components
+│   ├── ErrorMessage.tsx        
+│   ├── LoadingSpinner.tsx      
+│   ├── ImageUploader.tsx       
+│   ├── ParameterPanel.tsx      
+│   ├── ImageComparison.tsx     
+│   ├── ColorBlocksList.tsx     
+│   ├── DownloadButtons.tsx     
+│   └── index.ts                
+│
+├── pages/                       
+│   └── Converter.tsx           
+│
+├── hooks/                       
+│   └── useImageProcessor.ts    
+│
+├── api/                         
+│   ├── client.ts
+│   └── types.ts
+│
+├── config/                      
+├── main.tsx                     
+└── index.css      
+```
+
 ### Frontend Responsibilities
 - User interface
 - Parameter adjustment (maxColors, colorThreshold, layerHeight, pixelSize)

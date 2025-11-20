@@ -69,13 +69,14 @@ class Color:
         rate = (255 - np.array(self.rgb)) / 255
         return rate
     
-
+    @staticmethod
     def get_transmission_rate(d, td, alpha=12):
         # Beer–Lambert law
         x = alpha * d  / td
         T = np.exp(- x) # transmission rate
         return T
 
+    @staticmethod
     def get_lab(rgb):
         rgb_normalized = np.array(rgb) / 255.0  # Convert [0,255] to [0,1]
         lab = rgb2lab(np.array([rgb_normalized]))  # rgb2lab expects shape (1, 3) or (H, W, 3)
@@ -83,15 +84,17 @@ class Color:
         C = np.sqrt(a**2 + b**2)
         return L, a, b, C
     
-
+    @staticmethod
     def is_neutral(rgb, threshold = 10):
         L, a, b, C = Color.get_lab(rgb)
         return C < threshold or np.std(rgb) < threshold
     
+    @staticmethod
     def is_brown(rgb):
         L, a, b, C = Color.get_lab(rgb)
         return Color.is_neutral(rgb) and L < 60 and a > 5 and b > 10
 
+    @staticmethod
     def map_to_nearest_color(input_colors, reference_code, reference_rgb):
         """
         For each input RGB tuple, find the closest RGB tuple in a reference matrix.

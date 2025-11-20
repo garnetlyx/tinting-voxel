@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import ImageToMeshConverter from './image_to_stl_converter';
+import Converter from './pages/Converter';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-        <ImageToMeshConverter />
+        <Converter />
     </React.StrictMode>,
 );
