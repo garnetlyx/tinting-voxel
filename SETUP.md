@@ -34,7 +34,7 @@
 
 ```bash
 # 进入项目根目录
-cd /Users/garnetlyx/Dropbox/2025/coding/ImageToSTLConverter
+cd ImageToSTLConverter
 
 # 进入后端目录
 cd backend
@@ -52,7 +52,7 @@ uvicorn main:app --reload --port 8000
 
 ```bash
 # 进入项目根目录
-cd /Users/garnetlyx/Dropbox/2025/coding/ImageToSTLConverter
+cd ImageToSTLConverter
 
 # 启动前端开发服务器
 npm run dev
