@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "dev:backend": "cd backend && source .venv/bin/activate && uvicorn main:app --reload --port 8000",
+    "dev:backend": "cd backend && .venv\\Scripts\\activate && uvicorn main:app --reload --port 8000",
+    "dev:backend:unix": "cd backend && source .venv/bin/activate && uvicorn main:app --reload --port 8000",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"

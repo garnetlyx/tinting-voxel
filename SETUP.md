@@ -1,89 +1,183 @@
-# ImageToSTLConverter - 启动指南
+# ImageToSTLConverter - Setup Guide
 
-## 项目概览
+## Project Overview
 
-这是一个图像转STL色块转换器，支持将图像转换为分层的3D打印STL文件。
+This is an image-to-STL color block converter that transforms images into layered 3D-printable STL files.
 
-**技术栈**：
-- 前端：React 19 + TypeScript + Vite + Tailwind CSS
-- 后端：Python 3 + FastAPI + numpy-stl + PIL + scikit-learn
+**Tech Stack**:
+- Frontend: React 19 + TypeScript + Vite + Tailwind CSS
+- Backend: Python 3 + FastAPI + numpy-stl + PIL + scikit-learn
 
-## 前后端架构
+## Architecture
 
-### 前端职责
-- 用户交互界面
-- 参数调整（maxColors, colorThreshold, layerHeight, pixelSize）
-- 图像上传
-- 实时预览
-- 显示色块结果
-- 下载STL ZIP和CSV文件
+### Frontend Responsibilities
+- User interface
+- Parameter adjustment (maxColors, colorThreshold, layerHeight, pixelSize)
+- Image upload
+- Real-time preview
+- Display color block results
+- Download STL ZIP and CSV files
 
-### 后端职责
-- 图像处理和色彩提取
-- 色彩聚类（scikit-learn）
-- 映射到CMYK原色（map_to_nearest_color）
-- 使用Beer-Lambert光学模型计算混色
-- 生成分层STL文件
-- 返回处理后的预览图
+### Backend Responsibilities
+- Image processing and color extraction
+- Color clustering (scikit-learn)
+- Mapping to CMYK primary colors (map_to_nearest_color)
+- Calculate color mixing using Beer-Lambert optical model
+- Generate layered STL files
+- Return processed preview image
 
-## 快速启动
+## Prerequisites
 
-### 方式1：手动启动（推荐）
+### Windows
+- Python 3.8+ ([Download](https://www.python.org/downloads/))
+- Node.js 18+ ([Download](https://nodejs.org/))
+- Git ([Download](https://git-scm.com/download/win))
+- PowerShell or Command Prompt
 
-#### 1. 启动后端
+### macOS
+- Python 3.8+ (pre-installed or via [Homebrew](https://brew.sh/): `brew install python`)
+- Node.js 18+ (via Homebrew: `brew install node` or [Download](https://nodejs.org/))
+- Git (pre-installed with Xcode Command Line Tools)
+
+## Initial Setup
+
+### 1. Clone Repository
 
 ```bash
-# 进入项目根目录
-cd ImageToSTLConverter
+git clone <repository-url>
+cd img2stl
+```
 
-# 进入后端目录
+### 2. Backend Setup
+
+#### Windows (PowerShell)
+
+```powershell
+# Navigate to backend directory
 cd backend
 
-# 激活虚拟环境
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+.\.venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**Note**: If you get an execution policy error, run:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+#### Windows (Command Prompt)
+
+```cmd
+cd backend
+python -m venv .venv
+.\.venv\Scripts\activate.bat
+pip install -r requirements.txt
+```
+
+#### macOS/Linux
+
+```bash
+# Navigate to backend directory
+cd backend
+
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate virtual environment
 source .venv/bin/activate
 
-# 启动后端服务器
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Frontend Setup
+
+```bash
+# Navigate back to project root
+cd ..
+
+# Install Node dependencies
+npm install
+```
+
+## Running the Application
+
+### Method 1: Manual Start (Recommended)
+
+#### Start Backend
+
+**Windows (PowerShell):**
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
 uvicorn main:app --reload --port 8000
 ```
 
-后端将在 http://localhost:8000 启动
+**Windows (Command Prompt):**
+```cmd
+cd backend
+.\.venv\Scripts\activate.bat
+uvicorn main:app --reload --port 8000
+```
 
-#### 2. 启动前端（新终端）
+**macOS/Linux:**
+```bash
+cd backend
+source .venv/bin/activate
+uvicorn main:app --reload --port 8000
+```
+
+Backend will start at http://localhost:8000
+
+#### Start Frontend (New Terminal)
 
 ```bash
-# 进入项目根目录
-cd ImageToSTLConverter
-
-# 启动前端开发服务器
+# From project root
 npm run dev
 ```
 
-前端将在 http://localhost:5173 启动
+Frontend will start at http://localhost:5173
 
-### 方式2：npm脚本
+### Method 2: Using npm Scripts
 
 ```bash
-# 只启动前端
+# Start frontend only
 npm run dev
 
-# 只启动后端
+# Start backend only (macOS/Linux)
 npm run dev:backend
 ```
 
-**注意**：你需要在两个终端窗口中分别运行前后端服务。
+**Note**: You need to run frontend and backend in separate terminal windows.
 
-## API端点
+## Verification
+
+### Check Backend
+
+Visit http://localhost:8000/docs to see the interactive API documentation.
+
+### Check Frontend
+
+Visit http://localhost:5173 to see the web interface.
+
+## API Endpoints
 
 ### 1. POST /api/process-image
-处理上传的图像，提取色块
+Process uploaded image and extract color blocks
 
-**请求**：
-- `image`: File（图像文件）
-- `maxColors`: int（最大色块数量，默认10）
-- `colorThreshold`: float（色彩合并阈值，默认50）
-- `pixelSize`: float（像素尺寸mm，默认0.08）
+**Request**:
+- `image`: File (image file)
+- `maxColors`: int (maximum number of colors, default 10)
+- `colorThreshold`: float (color merge threshold, default 50)
+- `pixelSize`: float (pixel size in mm, default 0.08)
 
-**响应**：
+**Response**:
 ```json
 {
   "colorBlocks": [
@@ -100,21 +194,21 @@ npm run dev:backend
 ```
 
 ### 2. POST /api/download-csv
-下载颜色数据CSV
+Download color data as CSV
 
-**请求**：
+**Request**:
 ```json
 {
   "colorBlocks": [...]
 }
 ```
 
-**响应**：CSV文件
+**Response**: CSV file
 
 ### 3. POST /api/download-stl
-生成并下载按原色合并的STL文件
+Generate and download STL files merged by primary colors
 
-**请求**：
+**Request**:
 ```json
 {
   "colorBlocks": [...],
@@ -125,115 +219,178 @@ npm run dev:backend
 }
 ```
 
-**响应**：ZIP文件（包含 CMYW_208x208x3.36_C.stl 等）
+**Response**: ZIP file (containing CMYW_208x208x3.36_C.stl, etc.)
 
-## 文件结构
+## Project Structure
 
 ```
-ImageToSTLConverter/
+img2stl/
 ├── backend/
-│   ├── main.py                  # FastAPI应用入口
-│   ├── blend_color.py           # 核心色彩算法
+│   ├── main.py                  # FastAPI application entry
+│   ├── blend_color.py           # Core color algorithms
 │   ├── api/
-│   │   ├── models.py           # Pydantic数据模型
+│   │   ├── models.py           # Pydantic data models
 │   │   └── __init__.py
 │   ├── services/
-│   │   ├── image_processor.py  # 图像处理服务
-│   │   ├── stl_generator.py    # STL生成服务
-│   │   ├── csv_generator.py    # CSV导出服务
+│   │   ├── image_processor.py  # Image processing service
+│   │   ├── stl_generator.py    # STL generation service
+│   │   ├── csv_generator.py    # CSV export service
 │   │   └── __init__.py
 │   └── requirements.txt
 ├── src/
-│   ├── main.tsx                # React入口
-│   ├── image_to_stl_converter.tsx  # 主组件
+│   ├── main.tsx                # React entry point
+│   ├── image_to_stl_converter.tsx  # Main component
 │   ├── api/
-│   │   ├── client.ts           # API客户端
-│   │   └── types.ts            # TypeScript类型
+│   │   ├── client.ts           # API client
+│   │   └── types.ts            # TypeScript types
 │   └── index.css
-├── vite.config.ts              # Vite配置（包含API代理）
+├── vite.config.ts              # Vite config (includes API proxy)
 ├── package.json
 └── index.html
 ```
 
-## 依赖检查
+## Dependency Verification
 
-### 后端依赖
+### Backend Dependencies
 
+**Windows:**
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+pip list | findstr "fastapi uvicorn pillow scikit"
+```
+
+**macOS/Linux:**
 ```bash
 cd backend
 source .venv/bin/activate
 pip list | grep -E "fastapi|uvicorn|pillow|scikit"
 ```
 
-应该看到：
+Expected packages:
 - fastapi==0.121.2
 - uvicorn==0.38.0
 - pillow==12.0.0
 - scikit-image==0.25.2
 - scikit-learn==1.7.2
 
-### 前端依赖
+### Frontend Dependencies
 
 ```bash
 npm list --depth=0
 ```
 
-应该看到：
+Expected packages:
 - react@19.2.0
 - vite@5.4.21
 - typescript@5.9.3
 - lucide-react@0.553.0
 
-## 常见问题
+## Troubleshooting
 
-### 1. 后端启动失败
+### 1. Backend Won't Start
 
-**错误**：`ModuleNotFoundError: No module named 'fastapi'`
+**Error**: `ModuleNotFoundError: No module named 'fastapi'`
 
-**解决**：
+**Solution**:
+
+**Windows:**
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+**macOS/Linux:**
 ```bash
 cd backend
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. 前端无法连接后端
+### 2. Frontend Can't Connect to Backend
 
-**错误**：API请求失败
+**Error**: API requests fail
 
-**检查**：
-1. 后端是否在运行：`curl http://localhost:8000/`
-2. Vite代理配置是否正确（见vite.config.ts）
+**Check**:
+1. Is backend running? Visit http://localhost:8000/
+2. Is Vite proxy configured correctly? (see vite.config.ts)
 
-### 3. CORS错误
+### 3. CORS Error
 
-确保后端main.py中的CORS配置包含前端地址：
+Ensure backend main.py CORS configuration includes frontend address:
 ```python
 allow_origins=["http://localhost:5173", "http://localhost:3000"]
 ```
 
-## 开发说明
+### 4. Python Virtual Environment Issues (Windows)
 
-### 前端开发
-- Vite自动代理 `/api/*` 请求到 `http://localhost:8000`
-- 修改代码后自动热更新
-- TypeScript严格模式已启用
+**Error**: `cannot be loaded because running scripts is disabled`
 
-### 后端开发
-- uvicorn `--reload` 模式自动重启
-- 日志输出到控制台
-- API文档：http://localhost:8000/docs
+**Solution**:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
-## 生产部署（TODO）
+### 5. Port Already in Use
 
-- [ ] Docker容器化
-- [ ] 云服务器部署
-- [ ] 环境变量配置
-- [ ] 生产环境优化
-- [ ] 用户手动选择色块颜色映射
-- [ ] 异步任务处理（大图像优化）
-- [ ] 缓存机制（性能优化）
+**Backend (port 8000)**:
+```bash
+# Windows
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
 
-## 许可证
+# macOS/Linux
+lsof -ti:8000 | xargs kill -9
+```
+
+**Frontend (port 5173)**:
+```bash
+# Windows
+netstat -ano | findstr :5173
+taskkill /PID <PID> /F
+
+# macOS/Linux
+lsof -ti:5173 | xargs kill -9
+```
+
+## Development Notes
+
+### Frontend Development
+- Vite automatically proxies `/api/*` requests to `http://localhost:8000`
+- Code changes trigger automatic hot reload
+- TypeScript strict mode enabled
+
+### Backend Development
+- uvicorn `--reload` mode automatically restarts on code changes
+- Logs output to console
+- Interactive API docs: http://localhost:8000/docs
+
+## Cross-Platform Development Tips
+
+### Switching Between Windows and macOS
+
+1. **Virtual Environment**: Always activate the appropriate virtual environment for your platform
+2. **Git**: The `.venv` folder is already in `.gitignore`, so virtual environments won't be synced
+3. **Dependencies**: Run `npm install` and `pip install -r requirements.txt` after pulling changes
+4. **Line Endings**: Git should handle CRLF (Windows) vs LF (macOS/Linux) automatically
+
+### Path Handling in Code
+
+When writing code that handles file paths, use:
+- Python: `pathlib.Path` or `os.path.join()`
+- TypeScript/JavaScript: Always use forward slashes `/` (works on all platforms)
+
+## Production Deployment (TODO)
+
+- [ ] Docker containerization
+- [ ] Cloud server deployment
+- [ ] Environment variable configuration
+- [ ] Production optimization
+- [ ] Manual color mapping selection
+- [ ] Async task processing (large image optimization)
+- [ ] Caching mechanism (performance optimization)
+
+## License
 
 ISC

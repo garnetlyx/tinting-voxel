@@ -31,6 +31,6 @@ Thumbs.db
 
 # Python
 backend/.venv/
+backend/*/__pycache__/
 backend/__pycache__/
 output/*
-__pycache__/*
