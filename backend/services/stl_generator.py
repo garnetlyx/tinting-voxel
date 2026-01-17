@@ -1,13 +1,20 @@
 """
 STL generation service with color mapping and mesh merging
+
+Includes optimization via greedy meshing to reduce file sizes.
 """
+import itertools
+import logging
+import zipfile
+from io import BytesIO
+
 import numpy as np
 import pandas as pd
-import itertools
-from io import BytesIO
-import zipfile
-from typing import List, Dict, Tuple
-from core.blend_color import Colors, BlendTestGenerator, Color
+
+from core.blend_color import BlendTestGenerator, Color, Colors
+from services.mesh_optimizer import generate_optimized_boxes
+
+logger = logging.getLogger(__name__)
 
 
 # Global reference matrices (initialized on app startup)
@@ -67,9 +74,9 @@ def initialize_color_mapping(layer_count: int = 4, layer_height: float = 0.08):
 
 
 def generate_box(
-    xrange: Tuple[float, float],
-    yrange: Tuple[float, float],
-    zrange: Tuple[float, float]
+    xrange: tuple[float, float],
+    yrange: tuple[float, float],
+    zrange: tuple[float, float]
 ) -> np.ndarray:
     """
     Generate a 3D box mesh for a single pixel
@@ -114,7 +121,7 @@ def generate_box(
     return mesh_data
 
 
-def merge_stl_meshes(meshes: List[np.ndarray]) -> bytes:
+def merge_stl_meshes(meshes: list[np.ndarray]) -> bytes:
     """
     Merge multiple mesh arrays into a single STL binary format
 
@@ -175,11 +182,12 @@ def merge_stl_meshes(meshes: List[np.ndarray]) -> bytes:
 
 
 def generate_stl_zip(
-    color_blocks: List[Dict],
+    color_blocks: list[dict],
     layer_height: float,
     pixel_size: float,
     layer_count: int,
-    image_dimensions: Dict
+    image_dimensions: dict,
+    use_greedy_meshing: bool = True
 ) -> bytes:
     """
     Generate ZIP file containing merged STL files by primary color
@@ -190,6 +198,7 @@ def generate_stl_zip(
         pixel_size: Physical size of each pixel in mm
         layer_count: Total number of layers
         image_dimensions: Dict with 'width' and 'height' keys
+        use_greedy_meshing: If True, merge adjacent pixels to reduce file size
 
     Returns:
         ZIP file binary content
@@ -217,6 +226,10 @@ def generate_stl_zip(
         _reference_rgb_matrix
     )
 
+    width, height = image_dimensions['width'], image_dimensions['height']
+    total_original_boxes = 0
+    total_optimized_boxes = 0
+
     # Step 4: Generate meshes for each color block
     for idx, color_block in enumerate(color_blocks):
         pixels = color_block['pixels']
@@ -224,31 +237,48 @@ def generate_stl_zip(
 
         # Generate mesh for each layer
         for z_idx, code_char in enumerate(blend_code):
-            # Generate mesh for all pixels of this color at this layer
-            for pixel in pixels:
-                x, y = pixel['x'], pixel['y']
+            z_min = z_idx * layer_height
+            z_max = (z_idx + 1) * layer_height
 
-                mesh = generate_box(
-                    xrange=(x * pixel_size, (x + 1) * pixel_size),
-                    yrange=(y * pixel_size, (y + 1) * pixel_size),
-                    zrange=(z_idx * layer_height, (z_idx + 1) * layer_height)
+            if use_greedy_meshing and len(pixels) > 1:
+                # Use greedy meshing to merge adjacent pixels
+                optimized_boxes = generate_optimized_boxes(
+                    pixels=pixels,
+                    width=width,
+                    height=height,
+                    pixel_size=pixel_size,
+                    z_min=z_min,
+                    z_max=z_max
                 )
+                total_original_boxes += len(pixels)
+                total_optimized_boxes += len(optimized_boxes)
 
-                # Add to corresponding primary color
-                code_mesh_map[code_char].append(mesh)
+                for xrange, yrange, zrange in optimized_boxes:
+                    mesh = generate_box(xrange, yrange, zrange)
+                    code_mesh_map[code_char].append(mesh)
+            else:
+                # Original per-pixel box generation
+                total_original_boxes += len(pixels)
+                total_optimized_boxes += len(pixels)
+                for pixel in pixels:
+                    x, y = pixel['x'], pixel['y']
+                    mesh = generate_box(
+                        xrange=(x * pixel_size, (x + 1) * pixel_size),
+                        yrange=(y * pixel_size, (y + 1) * pixel_size),
+                        zrange=(z_min, z_max)
+                    )
+                    code_mesh_map[code_char].append(mesh)
+
+    if use_greedy_meshing and total_original_boxes > 0:
+        reduction = (1 - total_optimized_boxes / total_original_boxes) * 100
+        logger.info(
+            "Greedy meshing: %d -> %d boxes (%.1f%% reduction)",
+            total_original_boxes, total_optimized_boxes, reduction
+        )
 
     # Step 5: Merge meshes by primary color and create STL files
     stl_files = {}
     physical_height = layer_count * layer_height
-    width, height = image_dimensions['width'], image_dimensions['height']
-
-    # Primary color standard RGB values (not used in filename anymore, but keep for reference)
-    primary_colors = {
-        'C': (0, 134, 214),
-        'M': (236, 0, 140),
-        'Y': (244, 238, 42),
-        'W': (255, 255, 255)
-    }
 
     for code, meshes in code_mesh_map.items():
         if len(meshes) > 0:
