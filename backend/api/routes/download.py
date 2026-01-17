@@ -1,9 +1,10 @@
 """
 File download endpoints (CSV and STL)
 """
+import logging
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
-import logging
 
 from api.models import DownloadCSVRequest, DownloadSTLRequest
 from services.csv_generator import generate_csv

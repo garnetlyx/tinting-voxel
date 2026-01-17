@@ -1,16 +1,16 @@
 """
 Health check and monitoring endpoints for cloud deployment
 """
-from fastapi import APIRouter
-from typing import Dict
 import platform
 import sys
+
+from fastapi import APIRouter
 
 router = APIRouter(tags=["Health"])
 
 
 @router.get("/")
-async def root() -> Dict[str, str]:
+async def root() -> dict[str, str]:
     """
     Root endpoint - basic health check
     """
@@ -21,7 +21,7 @@ async def root() -> Dict[str, str]:
 
 
 @router.get("/health")
-async def health_check() -> Dict[str, str]:
+async def health_check() -> dict[str, str]:
     """
     Health check endpoint for load balancers and monitoring
     Returns 200 OK if service is healthy
@@ -33,7 +33,7 @@ async def health_check() -> Dict[str, str]:
 
 
 @router.get("/health/detailed")
-async def detailed_health_check() -> Dict:
+async def detailed_health_check() -> dict:
     """
     Detailed health check with system information
     Useful for debugging in cloud environments

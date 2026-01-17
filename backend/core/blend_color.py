@@ -1,17 +1,15 @@
+import ast
+import colorsys
 import itertools
 import math
-import pandas as pd
-from stl import mesh
-import numpy as np
 import os.path
-from PIL import Image, ImageDraw, ImageFont, ImageColor
-import colorsys
-from skimage.color import rgb2lab, lab2rgb
-from sklearn.cluster import KMeans
-import re, ast
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+import re
 
+import numpy as np
+import pandas as pd
+from PIL import Image, ImageColor, ImageDraw
+from skimage.color import rgb2lab
+from stl import mesh
 
 
 class Color:
@@ -25,17 +23,17 @@ class Color:
         self.name = name
         self.td = transmission_distance
         self.rgb = rgb
-        self.absorption = absorption        
+        self.absorption = absorption
 
         if hex == None:
             hex = self.DEFAULT_HEX.get(self.get_label())
-            
+
         self.update_hex(hex)
 
 
     def __repr__(self):
         return self.name
-    
+
     def update_hex(self, hex):
         self.hex = hex
         self.rgb = ImageColor.getcolor(self.hex, 'RGB')
@@ -44,7 +42,7 @@ class Color:
 
     def get_label(self):
         return self.name[0].upper()
-    
+
     def get_cmyk(self, rgb_scale = 255, cmyk_scale = 1):
         r, g, b = self.rgb
         if (r, g, b) == (0, 0, 0):
@@ -64,11 +62,11 @@ class Color:
         k = min_cmy
 
         return c * cmyk_scale, m * cmyk_scale, y * cmyk_scale, k * cmyk_scale
-    
+
     def get_absorption(self):
         rate = (255 - np.array(self.rgb)) / 255
         return rate
-    
+
     @staticmethod
     def get_transmission_rate(d, td, alpha=12):
         # Beer–Lambert law
@@ -83,12 +81,12 @@ class Color:
         L, a, b = lab[:,0], lab[:,1], lab[:,2]
         C = np.sqrt(a**2 + b**2)
         return L, a, b, C
-    
+
     @staticmethod
     def is_neutral(rgb, threshold = 10):
         L, a, b, C = Color.get_lab(rgb)
         return C < threshold or np.std(rgb) < threshold
-    
+
     @staticmethod
     def is_brown(rgb):
         L, a, b, C = Color.get_lab(rgb)
@@ -172,27 +170,27 @@ class Colors:
         if names is not None:
             for c in names:
                 if clear:
-                    hex = self.BAMBU_CMYK_HEX.get(c, '#FFFFFF') 
+                    hex = self.BAMBU_CMYK_HEX.get(c, '#FFFFFF')
                     self.colors[c] = Color(c, Colors.DEFAULT_CLEAR_TD.get(c), hex)
-                    
+
                 else:
-                    hex = self.CLEAR_CMYK_HEX.get(c, '#FFFFFF') 
+                    hex = self.CLEAR_CMYK_HEX.get(c, '#FFFFFF')
                     self.colors[c] = Color(c, Colors.DEFAULT_TD.get(c), hex)
         else:
             # init with cmyw
             for c in Colors.PRIMARY_COLORS:
                 if clear:
-                    hex = self.CLEAR_CMYK_HEX.get(c, '#FFFFFF') 
+                    hex = self.CLEAR_CMYK_HEX.get(c, '#FFFFFF')
                     self.colors[c] = Color(c, Colors.DEFAULT_CLEAR_TD.get(c), hex)
-                    
+
                 else:
-                    hex = self.BAMBU_CMYK_HEX.get(c, '#FFFFFF') 
+                    hex = self.BAMBU_CMYK_HEX.get(c, '#FFFFFF')
                     self.colors[c] = Color(c, Colors.DEFAULT_TD.get(c), hex)
-                
+
 
     def __len__(self):
         return len(self.colors)
-    
+
     def __getitem__(self, label):
         label = label.strip().upper()
         return self.colors[label]
@@ -208,12 +206,12 @@ class Colors:
         self.white_balance['r'] = new_r
         self.white_balance['b'] = new_b
         self.white_balance['g'] = new_g
-    
+
     def get_labels(self):
         return [x for x in self.colors]
 
 class BlendTestGenerator:
-    def __init__(self, plate_length=13*16, plate_width=13*16, grid_length=13, grid_width=13, layer_height=.08, layer_count_max=4, 
+    def __init__(self, plate_length=13*16, plate_width=13*16, grid_length=13, grid_width=13, layer_height=.08, layer_count_max=4,
                  same_height=False, rearrange_by_size = True, sort_color=True, verbose = True,
                  directory = 'output',
                  colors = Colors()
@@ -243,7 +241,7 @@ class BlendTestGenerator:
             df = pd.DataFrame(np.reshape(df, (split_num_y, split_num_x)))
         else:
             df = df
-        
+
         if self.verbose:
             print(f"Length per cell: {self.grid_length:.2f}, Width per cell: {self.grid_width}, Layer height: {self.layer_height}")
             print(f'Total build volume: Length={self.length_total}, Width={self.width_total}, Height={self.layer_height * self.layer_count_max}')
@@ -254,7 +252,7 @@ class BlendTestGenerator:
         for color in meshes:
             filename = f'{''.join(self.colors.get_labels())}_{color}_{self.length_total}x{self.width_total}x{self.layer_height * self.layer_count_max:.2f}.stl'
             self.save_stl_mesh(self.merge_stl_meshes(meshes[color]), filename)
-    
+
     def generate(self):
         if self.same_height:
             df = self.permutation_matrix(self.colors.get_labels(), self.layer_count_max)
@@ -264,7 +262,7 @@ class BlendTestGenerator:
 
         # reshape based on plate dimension
         df, grid_length, grid_width = self.reshape_matrix(df)
-        
+
         # generate rgb based on code
         df_rgb, df_code = self.set_code_rgb_df(df)
 
@@ -297,7 +295,7 @@ class BlendTestGenerator:
         """
         matrix = []
         for first in items:
-            row = [first]  
+            row = [first]
             for length in range(2, count + 1):
                 combos = [first + ''.join(p) for p in itertools.product(items, repeat=length - 1)]
                 row.extend(combos)
@@ -370,7 +368,7 @@ class BlendTestGenerator:
         total_faces = sum(m.data.shape[0] for m in mesh_list)
         # Create a new Mesh to store all faces
         combined = mesh.Mesh(np.zeros(total_faces, dtype=mesh.Mesh.dtype))
-        
+
         current_index = 0
         for m in mesh_list:
             n = m.data.shape[0]
@@ -417,7 +415,7 @@ class BlendTestGenerator:
         # print(df_label.iloc[0,0])   # 'WWWW'
         # print(df_rgb.iloc[0,0])     # (255.0, 255.0, 255.0)
         return df_parsed
-    
+
     def matrix_to_code_color_map(self, df_rgb, df_code):
         map = {}
         n_rows, n_cols = df_rgb.shape
@@ -428,13 +426,13 @@ class BlendTestGenerator:
                 rgb = df_rgb.iloc[r, c]
                 map[code] = rgb
         return map
-        
+
     def set_code_rgb_df(self, df):
         """
         """
         records = []
         n_rows, n_cols = df.shape
-    
+
         # Sort first by hue (left to right), then by lightness (top to bottom)
         df_rgb = pd.DataFrame(records)
 
@@ -454,11 +452,11 @@ class BlendTestGenerator:
                     "rgb": rgb,
                     'code': code,
                     "hue": h,
-                    "light": l, 
-                    "saturation": s, 
+                    "light": l,
+                    "saturation": s,
                     "tone": tone
                 })
-        
+
         # Sort first by hue (left to right), then by lightness (top to bottom)
         df_rgb = pd.DataFrame(records)
         df_code = pd.DataFrame()
@@ -479,7 +477,7 @@ class BlendTestGenerator:
         self.df_code = df_code
         self.df_rgb = df_rgb
         return df_rgb, df_code
-    
+
 
     def code_to_rgb(self, code: str):
         """
@@ -509,9 +507,9 @@ class BlendTestGenerator:
             rgb -= color.get_absorption() * light_loss_ratio[i] # accumulate light loss
         # simulate white background if additional light passes all layers
         rgb = light_loss_ratio[-1] * np.ones(3) + (1 - light_loss_ratio[-1]) * rgb
-        return tuple((rgb * 255))
+        return tuple(rgb * 255)
 
-    
+
     def save_matrix_image(self, save_blank = True):
         rows, cols = self.df_code.shape
         cell_size = 50  # pixels per cell
@@ -579,7 +577,7 @@ class BlendTestGenerator:
                 margin_y = int((1 - sample_fraction) * (y1 - y0) / 2)
                 xs, xe = x0 + margin_x, x1 - margin_x
                 ys, ye = y0 + margin_y, y1 - margin_y
-                
+
                 # sample
                 patch = arr[ys:ye, xs:xe, :]
                 if method == 'median':
@@ -629,7 +627,7 @@ class BlendTestGenerator:
         #     self.save_matrix_image(df_photo, df_rgb, 'sample.png', False)
 
         avg = np.average(pd.DataFrame(diffs))
-        wrong_color_count = {x:0 for x in self.colors.get_labels()}
+        wrong_color_count = dict.fromkeys(self.colors.get_labels(), 0)
         for y_idx in range(df_ref.shape[0]):
             for x_idx in range(df_ref.shape[1]):
                 if diffs[y_idx, x_idx] > avg:
@@ -651,21 +649,21 @@ class BlendTestGenerator:
             return ast.literal_eval(s2)   # yields ('CODE', (r, g, b))
         except Exception:
             return s2
-  
+
 if __name__ == "__main__":
     p1s_plate = 256, 228, 256
     a1_plate = 256, 256, 256
     four = BlendTestGenerator(
         colors=Colors(clear=False),
-        same_height=True, sort_color=True, verbose=True, 
+        same_height=True, sort_color=True, verbose=True,
         layer_height=0.08, layer_count_max=4)
 
     clear = BlendTestGenerator(
         colors=Colors(clear=True),
-        layer_height=.28*3, layer_count_max=4, 
+        layer_height=.28*3, layer_count_max=4,
         same_height=True, sort_color=True, verbose=False
         )
-    
+
 
     model = four
     df_rgb, df_code = model.generate()
@@ -675,5 +673,5 @@ if __name__ == "__main__":
 
     # df_photo = model.image_to_rgb_matrix(model.directory+'IMG_6785.JPG', save_samples=True)
     # print(model.color_variance(df_ref, df_photo, df_rgb, df_code, save_comp_img=True))
-    
+
     print(Color.map_to_nearest_color([(0, 0, 0)], df_code, df_rgb))

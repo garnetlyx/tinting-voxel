@@ -1,15 +1,14 @@
 """
 Image processing service for color extraction and clustering
 """
-import numpy as np
-from PIL import Image
-from sklearn.cluster import KMeans
 import base64
 from io import BytesIO
-from typing import List, Dict, Tuple
+
+import numpy as np
+from PIL import Image
 
 
-def color_distance(c1: Tuple[int, int, int], c2: Tuple[int, int, int]) -> float:
+def color_distance(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
     """
     Calculate Euclidean distance between two RGB colors
     """
@@ -21,7 +20,7 @@ def color_distance(c1: Tuple[int, int, int], c2: Tuple[int, int, int]) -> float:
 
 
 def is_dark_neutral_color(
-    color: Tuple[int, int, int],
+    color: tuple[int, int, int],
     neutral_threshold: int = 35,
     dark_threshold: int = 150
 ) -> bool:
@@ -35,7 +34,7 @@ def is_dark_neutral_color(
     return dim and neutral
 
 
-def cluster_avg_color(cluster: List[Dict]) -> Dict:
+def cluster_avg_color(cluster: list[dict]) -> dict:
     """
     Calculate average color of a cluster
     """
@@ -48,7 +47,7 @@ def cluster_avg_color(cluster: List[Dict]) -> Dict:
     }
 
 
-def merge_similar_colors(colors: List[Dict], threshold: float) -> List[Dict]:
+def merge_similar_colors(colors: list[dict], threshold: float) -> list[dict]:
     """
     Merge colors that are similar within threshold
     """
@@ -102,7 +101,7 @@ def merge_similar_colors(colors: List[Dict], threshold: float) -> List[Dict]:
     return merged
 
 
-def reassign_colors(main_colors: List[Dict], rest_colors: List[Dict]) -> List[Dict]:
+def reassign_colors(main_colors: list[dict], rest_colors: list[dict]) -> list[dict]:
     """
     Reassign pixels from rest_colors to nearest main_color
     """
@@ -133,7 +132,7 @@ def process_image(
     max_colors: int = 10,
     color_threshold: float = 50,
     pixel_size: float = 0.08
-) -> Dict:
+) -> dict:
     """
     Process uploaded image to extract color blocks
 

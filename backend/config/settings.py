@@ -3,7 +3,7 @@ Application settings and environment configuration
 Supports both development and production (cloud) environments
 """
 import os
-from typing import List
+
 from pydantic_settings import BaseSettings
 
 
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # CORS - Frontend URLs
-    cors_origins: List[str] = [
+    cors_origins: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # File Upload
     max_upload_size: int = 10 * 1024 * 1024  # 10MB
-    allowed_extensions: List[str] = [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
+    allowed_extensions: list[str] = [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
 
     # Logging
     log_level: str = "INFO"
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-def get_cors_origins() -> List[str]:
+def get_cors_origins() -> list[str]:
     """
     Get CORS origins from settings
     In production, add custom origins via CORS_ORIGINS environment variable

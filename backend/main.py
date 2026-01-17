@@ -2,14 +2,15 @@
 FastAPI application for ImageToSTLConverter backend
 Refactored for cloud deployment with modular routes
 """
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import logging
 
-from config.settings import settings, get_cors_origins
+from api.routes import download, health, image
+from config.settings import get_cors_origins, settings
 from services.stl_generator import initialize_color_mapping
-from api.routes import health, image, download
 
 # Configure logging
 logging.basicConfig(

@@ -1,8 +1,9 @@
 """
 Image processing endpoints
 """
-from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 import logging
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from api.models import ProcessImageResponse
 from services.image_processor import process_image

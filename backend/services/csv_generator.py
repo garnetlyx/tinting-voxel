@@ -1,10 +1,9 @@
 """
 CSV generation service for color data export
 """
-from typing import List, Dict
 
 
-def generate_csv(color_blocks: List[Dict]) -> str:
+def generate_csv(color_blocks: list[dict]) -> str:
     """
     Generate CSV string from color blocks
 
