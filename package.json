@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "vite",
-    "dev:backend": "cd backend && .venv\\Scripts\\activate && uvicorn main:app --reload --port 8000",
-    "dev:backend:unix": "cd backend && source .venv/bin/activate && uvicorn main:app --reload --port 8000",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "vite",
+    "dev:backend": "node scripts/dev-backend.js",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -24,6 +24,7 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^8.2.2",
     "jszip": "^3.10.1",
     "typescript": "^5.9.3",
     "vite": "^5.4.21"

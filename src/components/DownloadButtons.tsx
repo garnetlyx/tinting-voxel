@@ -9,6 +9,7 @@ interface DownloadButtonsProps {
   onDownloadCSV: () => void;
   onDownloadSTL: () => void;
   processing: boolean;
+  showCSV?: boolean;
 }
 
 export const DownloadButtons: React.FC<DownloadButtonsProps> = ({
@@ -16,6 +17,7 @@ export const DownloadButtons: React.FC<DownloadButtonsProps> = ({
   onDownloadCSV,
   onDownloadSTL,
   processing,
+  showCSV = true,
 }) => {
   return (
     <div className="flex items-center justify-between mb-6">
@@ -23,13 +25,15 @@ export const DownloadButtons: React.FC<DownloadButtonsProps> = ({
         Extracted Colors ({colorCount})
       </h2>
       <div className="flex gap-3">
-        <button
-          onClick={onDownloadCSV}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-        >
-          <Download className="w-4 h-4" />
-          Download CSV
-        </button>
+        {showCSV && (
+          <button
+            onClick={onDownloadCSV}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Download CSV
+          </button>
+        )}
         <button
           onClick={onDownloadSTL}
           disabled={processing}

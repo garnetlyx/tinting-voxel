@@ -227,7 +227,8 @@ class BlendTestGenerator:
         self.same_height = same_height
         self.sort_color = sort_color
         self.verbose = verbose
-        self.filename = f'{''.join(self.colors.get_labels())}_{self.length_total}x{self.width_total}x{self.layer_height * self.layer_count_max:.2f}'
+        color_labels = ''.join(self.colors.get_labels())
+        self.filename = f'{color_labels}_{self.length_total}x{self.width_total}x{self.layer_height * self.layer_count_max:.2f}'
         self.directory = f'./{directory}/{self.filename}/'
         self.df_code = pd.DataFrame()
         self.df_rgb = pd.DataFrame()
@@ -249,8 +250,9 @@ class BlendTestGenerator:
         return df, self.grid_length, self.grid_width
 
     def merge_meshes_by_color(self, meshes):
+        color_labels = ''.join(self.colors.get_labels())
         for color in meshes:
-            filename = f'{''.join(self.colors.get_labels())}_{color}_{self.length_total}x{self.width_total}x{self.layer_height * self.layer_count_max:.2f}.stl'
+            filename = f'{color_labels}_{color}_{self.length_total}x{self.width_total}x{self.layer_height * self.layer_count_max:.2f}.stl'
             self.save_stl_mesh(self.merge_stl_meshes(meshes[color]), filename)
 
     def generate(self):

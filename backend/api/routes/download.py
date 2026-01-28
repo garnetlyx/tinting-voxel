@@ -6,9 +6,15 @@ import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
-from api.models import DownloadCSVRequest, DownloadSTLRequest
+from api.models import (
+    DownloadCSVRequest,
+    DownloadSTLRequest,
+    DownloadSVGSTLRequest,
+    ProcessingMode,
+)
 from services.csv_generator import generate_csv
 from services.stl_generator import generate_stl_zip
+from services.svg_stl_generator import generate_svg_stl_zip
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +33,7 @@ async def api_download_csv(request: DownloadCSVRequest):
         CSV file as response
     """
     try:
-        # Convert Pydantic models to dicts
         color_blocks = [block.dict() for block in request.colorBlocks]
-
-        # Generate CSV
         csv_content = generate_csv(color_blocks)
 
         logger.info(f"Generated CSV for {len(color_blocks)} colors")
@@ -51,7 +54,7 @@ async def api_download_csv(request: DownloadCSVRequest):
 @router.post("/download-stl")
 async def api_download_stl(request: DownloadSTLRequest):
     """
-    Generate and download ZIP file containing color-separated STL files
+    Generate and download ZIP file containing color-separated STL files (pixel mode).
 
     Args:
         request: DownloadSTLRequest with colorBlocks and parameters
@@ -60,11 +63,9 @@ async def api_download_stl(request: DownloadSTLRequest):
         ZIP file containing STL files
     """
     try:
-        # Convert Pydantic models to dicts
         color_blocks = [block.dict() for block in request.colorBlocks]
         image_dimensions = request.imageDimensions.dict()
 
-        # Generate STL ZIP
         zip_content = generate_stl_zip(
             color_blocks=color_blocks,
             layer_height=request.layerHeight,
@@ -73,8 +74,12 @@ async def api_download_stl(request: DownloadSTLRequest):
             image_dimensions=image_dimensions
         )
 
-        logger.info(f"Generated STL ZIP for {len(color_blocks)} colors, "
-                   f"{image_dimensions['width']}x{image_dimensions['height']} pixels")
+        logger.info(
+            "Generated STL ZIP (pixel mode) for %d colors, %dx%d pixels",
+            len(color_blocks),
+            image_dimensions['width'],
+            image_dimensions['height']
+        )
 
         return Response(
             content=zip_content,
@@ -86,4 +91,47 @@ async def api_download_stl(request: DownloadSTLRequest):
 
     except Exception as e:
         logger.error(f"Error generating STL: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate STL: {str(e)}")
+
+
+@router.post("/download-svg-stl")
+async def api_download_svg_stl(request: DownloadSVGSTLRequest):
+    """
+    Generate and download ZIP file containing color-separated STL files (SVG mode).
+
+    Args:
+        request: DownloadSVGSTLRequest with vectorResults and parameters
+
+    Returns:
+        ZIP file containing STL files
+    """
+    try:
+        vector_results = [result.dict() for result in request.vectorResults]
+        image_dimensions = request.imageDimensions.dict()
+
+        zip_content = generate_svg_stl_zip(
+            vector_results=vector_results,
+            layer_height=request.layerHeight,
+            pixel_size=request.pixelSize,
+            layer_count=request.layerCount,
+            image_dimensions=image_dimensions
+        )
+
+        logger.info(
+            "Generated STL ZIP (SVG mode) for %d color groups, %dx%d pixels",
+            len(vector_results),
+            image_dimensions['width'],
+            image_dimensions['height']
+        )
+
+        return Response(
+            content=zip_content,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": "attachment; filename=all_color_blocks.zip"
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error generating SVG STL: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate STL: {str(e)}")

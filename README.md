@@ -77,26 +77,13 @@ npm install
 
 ### Running
 
-**Method 1: Manual Start (Recommended)**
-
 ```bash
-# Terminal 1: Start backend
-cd backend
-# Activate venv first!
-uvicorn main:app --reload --port 8000
-
-# Terminal 2: Start frontend
-npm run dev
-```
-
-**Method 2: npm Scripts**
-
-```bash
-# Start frontend only
+# One command to start both frontend and backend
 npm run dev
 
-# Start backend only (macOS/Linux)
-npm run dev:backend
+# Or start separately
+npm run dev:frontend  # Frontend only (port 5173)
+npm run dev:backend   # Backend only (port 8000)
 ```
 
 - Frontend: http://localhost:5173

@@ -11,6 +11,7 @@ import {
   ParameterPanel,
   ImageComparison,
   ColorBlocksList,
+  VectorColorList,
   DownloadButtons,
 } from '../components';
 
@@ -20,15 +21,34 @@ const Converter: React.FC = () => {
   const {
     image,
     processing,
+    error,
+    mode,
     colorBlocks,
+    vectorResults,
     processedImageUrl,
+    hasResults,
+    resultCount,
+
+    // Pixel mode params
     maxColors,
     colorThreshold,
+
+    // SVG mode params
+    epsilon,
+    minArea,
+    numColors,
+
+    // Shared params
     layerHeight,
     pixelSize,
-    error,
+
+    // Actions
+    setMode,
     setMaxColors,
     setColorThreshold,
+    setEpsilon,
+    setMinArea,
+    setNumColors,
     setLayerHeight,
     setPixelSize,
     handleImageUpload,
@@ -58,12 +78,20 @@ const Converter: React.FC = () => {
           {/* Parameter Panel */}
           {showSettings && (
             <ParameterPanel
+              mode={mode}
+              onModeChange={setMode}
               maxColors={maxColors}
               colorThreshold={colorThreshold}
-              layerHeight={layerHeight}
-              pixelSize={pixelSize}
               onMaxColorsChange={setMaxColors}
               onColorThresholdChange={setColorThreshold}
+              epsilon={epsilon}
+              minArea={minArea}
+              numColors={numColors}
+              onEpsilonChange={setEpsilon}
+              onMinAreaChange={setMinArea}
+              onNumColorsChange={setNumColors}
+              layerHeight={layerHeight}
+              pixelSize={pixelSize}
               onLayerHeightChange={setLayerHeight}
               onPixelSizeChange={setPixelSize}
               onReprocess={handleReprocess}
@@ -82,30 +110,34 @@ const Converter: React.FC = () => {
           {processing && <LoadingSpinner />}
 
           {/* Results */}
-          {!processing && colorBlocks.length > 0 && (
+          {!processing && hasResults && (
             <div>
               {/* Before/After Comparison */}
               <ImageComparison
                 originalImage={image}
                 processedImageUrl={processedImageUrl}
-                colorCount={colorBlocks.length}
+                colorCount={resultCount}
               />
 
               {/* Download Buttons */}
               <DownloadButtons
-                colorCount={colorBlocks.length}
+                colorCount={resultCount}
                 onDownloadCSV={handleDownloadCSV}
                 onDownloadSTL={handleDownloadSTL}
                 processing={processing}
+                showCSV={mode === 'pixel'}
               />
 
-              {/* Color Blocks Grid */}
-              <ColorBlocksList colorBlocks={colorBlocks} />
+              {/* Color Blocks Grid (pixel mode only) */}
+              {mode === 'pixel' && <ColorBlocksList colorBlocks={colorBlocks} />}
+
+              {/* Vector Color List (svg mode) */}
+              {mode === 'svg' && <VectorColorList vectorResults={vectorResults} />}
             </div>
           )}
 
           {/* Original Image Preview (when no results yet) */}
-          {image && colorBlocks.length === 0 && !processing && (
+          {image && !hasResults && !processing && (
             <div className="mt-8">
               <h3 className="text-lg font-semibold text-gray-800 mb-3">Original Image Preview</h3>
               <img
