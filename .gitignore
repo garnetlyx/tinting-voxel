@@ -45,6 +45,9 @@ output/*
 # AI Agent
 .claude/
 
+# Code Review (local only)
+docs/EVAL.md
+
 # Docker
 .dockerignore
 docker-compose.override.yml
