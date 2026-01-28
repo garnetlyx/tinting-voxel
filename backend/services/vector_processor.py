@@ -163,7 +163,12 @@ def quantize_colors(
     num_colors: int
 ) -> tuple[np.ndarray, list[tuple[int, int, int]]]:
     """
-    Reduce image to limited number of colors using k-means.
+    Reduce image to limited number of colors using k-means clustering.
+
+    Uses the most frequent original color within each cluster as the
+    representative color, instead of the cluster center. This preserves
+    extreme colors (brightest/darkest) that would otherwise be lost to
+    averaging.
 
     Args:
         image: RGB image array
@@ -174,10 +179,11 @@ def quantize_colors(
     """
     # Reshape to list of pixels
     pixels = image.reshape(-1, 3).astype(np.float32)
+    pixels_uint8 = image.reshape(-1, 3)
 
     # K-means clustering
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
-    _, labels, centers = cv2.kmeans(
+    _, labels, _ = cv2.kmeans(
         pixels,
         num_colors,
         None,
@@ -186,14 +192,31 @@ def quantize_colors(
         cv2.KMEANS_PP_CENTERS
     )
 
-    # Convert centers to uint8
-    centers = np.uint8(centers)
+    labels_flat = labels.flatten()
 
-    # Reconstruct image
-    quantized = centers[labels.flatten()].reshape(image.shape)
+    # For each cluster, find the most frequent original color
+    colors = []
+    representative_colors = np.zeros((num_colors, 3), dtype=np.uint8)
 
-    # Get unique colors
-    colors = [tuple(map(int, c)) for c in centers]
+    for label in range(num_colors):
+        cluster_mask = labels_flat == label
+        cluster_pixels = pixels_uint8[cluster_mask]
+
+        if len(cluster_pixels) > 0:
+            # Find most frequent color in this cluster
+            unique_colors, counts = np.unique(
+                cluster_pixels, axis=0, return_counts=True
+            )
+            most_frequent_idx = np.argmax(counts)
+            representative = unique_colors[most_frequent_idx]
+            representative_colors[label] = representative
+            colors.append(tuple(map(int, representative)))
+        else:
+            # Empty cluster (rare), use black as placeholder
+            colors.append((0, 0, 0))
+
+    # Reconstruct image using representative colors
+    quantized = representative_colors[labels_flat].reshape(image.shape)
 
     return quantized, colors
 
