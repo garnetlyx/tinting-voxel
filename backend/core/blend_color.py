@@ -4,12 +4,16 @@ import itertools
 import math
 import os.path
 import re
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageColor, ImageDraw
 from skimage.color import rgb2lab
 from stl import mesh
+
+if TYPE_CHECKING:
+    from core.color_config import ColorConfig
 
 
 class Color:
@@ -159,13 +163,17 @@ class Colors:
             }
     PRIMARY_COLORS = ['C', 'M', 'Y', 'W']
 
-    def __init__(self, colors=None, clear=False, names = None):
+    def __init__(self, colors=None, clear=False, names=None):
         self.colors = colors if colors is not None else {}
         self.white_balance = {
             'r': 0,
             'g': 10,
             'b': 24
         }
+
+        # Skip default initialization if colors dict was provided
+        if colors is not None:
+            return
 
         if names is not None:
             for c in names:
@@ -208,7 +216,42 @@ class Colors:
         self.white_balance['g'] = new_g
 
     def get_labels(self):
+        """Return list of color labels in insertion order."""
         return [x for x in self.colors]
+
+    @classmethod
+    def from_configs(cls, configs) -> "Colors":
+        """
+        Create a Colors instance from a list of ColorConfig objects.
+
+        Args:
+            configs: List of ColorConfig objects defining each filament color
+
+        Returns:
+            Colors instance with configured colors
+
+        Example:
+            >>> from core.color_config import ColorConfig
+            >>> configs = [
+            ...     ColorConfig(name="Cyan", hex="#00FFFF", transmission_distance=3.0),
+            ...     ColorConfig(name="Magenta", hex="#FF00FF", transmission_distance=1.9),
+            ... ]
+            >>> colors = Colors.from_configs(configs)
+        """
+        from core.color_config import ColorConfig
+
+        instance = cls(colors={})  # Empty dict, skip default initialization
+
+        for config in configs:
+            label = config.label
+            color = Color(
+                name=config.name,
+                transmission_distance=config.transmission_distance,
+                hex=config.hex
+            )
+            instance.colors[label] = color
+
+        return instance
 
 class BlendTestGenerator:
     def __init__(self, plate_length=13*16, plate_width=13*16, grid_length=13, grid_width=13, layer_height=.08, layer_count_max=4,

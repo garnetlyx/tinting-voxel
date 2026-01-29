@@ -75,3 +75,49 @@ export interface DownloadSVGSTLParams {
   layerCount: number;
   imageDimensions: ImageDimensions;
 }
+
+// V2 API types for configurable filament colors
+
+export type FilamentPreset = 'bambu_cmyk' | 'clear_cmyk';
+
+export interface FilamentColorConfig {
+  name: string;
+  hex: string;
+  transmission_distance: number;
+}
+
+export interface FilamentPresetInfo {
+  name: FilamentPreset;
+  display_name: string;
+  colors: FilamentColorConfig[];
+}
+
+export interface FilamentPresetsResponse {
+  presets: FilamentPresetInfo[];
+}
+
+export interface DownloadSTLParamsV2 extends DownloadSTLParams {
+  filamentPreset?: FilamentPreset;
+  filamentColors?: FilamentColorConfig[];
+}
+
+export interface DownloadSVGSTLParamsV2 extends DownloadSVGSTLParams {
+  filamentPreset?: FilamentPreset;
+  filamentColors?: FilamentColorConfig[];
+}
+
+// Default presets for frontend initialization
+export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
+  bambu_cmyk: [
+    { name: 'Cyan', hex: '#0086D6', transmission_distance: 3.0 },
+    { name: 'Magenta', hex: '#EC008C', transmission_distance: 1.9 },
+    { name: 'Yellow', hex: '#F4EE2A', transmission_distance: 2.5 },
+    { name: 'White', hex: '#FFFFFF', transmission_distance: 7.2 },
+  ],
+  clear_cmyk: [
+    { name: 'Cyan', hex: '#0089cd', transmission_distance: 60.0 },
+    { name: 'Magenta', hex: '#e75d4a', transmission_distance: 100.0 },
+    { name: 'Yellow', hex: '#f6d449', transmission_distance: 70.0 },
+    { name: 'White', hex: '#FFFFFF', transmission_distance: 200.0 },
+  ],
+};

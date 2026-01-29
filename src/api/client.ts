@@ -8,6 +8,9 @@ import type {
   ColorBlock,
   DownloadSTLParams,
   DownloadSVGSTLParams,
+  DownloadSTLParamsV2,
+  DownloadSVGSTLParamsV2,
+  FilamentPresetsResponse,
 } from './types';
 
 const API_BASE_URL = '/api';
@@ -118,4 +121,64 @@ function downloadBlobAsFile(blob: Blob, filename: string): void {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+// V2 API endpoints with configurable filament colors
+
+const API_V2_BASE_URL = '/api/v2';
+
+/**
+ * Get available filament presets
+ */
+export async function getFilamentPresets(): Promise<FilamentPresetsResponse> {
+  const response = await fetch(`${API_V2_BASE_URL}/filament-presets`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get filament presets');
+  }
+
+  return response.json();
+}
+
+/**
+ * Download STL ZIP file with configurable colors (V2 API)
+ */
+export async function downloadSTLV2(params: DownloadSTLParamsV2): Promise<void> {
+  const response = await fetch(`${API_V2_BASE_URL}/download-stl`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to download STL');
+  }
+
+  downloadBlobAsFile(await response.blob(), 'all_color_blocks.zip');
+}
+
+/**
+ * Download STL ZIP file with configurable colors (SVG mode, V2 API)
+ */
+export async function downloadSVGSTLV2(params: DownloadSVGSTLParamsV2): Promise<void> {
+  const response = await fetch(`${API_V2_BASE_URL}/download-svg-stl`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to download STL');
+  }
+
+  downloadBlobAsFile(await response.blob(), 'all_color_blocks.zip');
 }

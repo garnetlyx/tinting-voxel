@@ -6,6 +6,7 @@ export { LoadingSpinner } from './LoadingSpinner';
 export { ImageUploader } from './ImageUploader';
 export { ModeSelector } from './ModeSelector';
 export { ParameterPanel } from './ParameterPanel';
+export { PresetSelector } from './PresetSelector';
 export { ImageComparison } from './ImageComparison';
 export { ColorBlocksList } from './ColorBlocksList';
 export { VectorColorList } from './VectorColorList';

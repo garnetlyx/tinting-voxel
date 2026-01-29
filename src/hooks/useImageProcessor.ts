@@ -7,9 +7,11 @@ import type {
   VectorColorResult,
   ProcessingMode,
   ProcessImageResponse,
-  SVGProcessImageResponse
+  SVGProcessImageResponse,
+  FilamentPreset,
 } from '../api/types';
-import { processImage, downloadCSV, downloadSTL, downloadSVGSTL } from '../api/client';
+import { DEFAULT_PRESETS } from '../api/types';
+import { processImage, downloadCSV, downloadSTLV2, downloadSVGSTLV2 } from '../api/client';
 
 export const useImageProcessor = () => {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -36,6 +38,9 @@ export const useImageProcessor = () => {
   const [layerHeight, setLayerHeight] = useState(0.08);
   const [pixelSize, setPixelSize] = useState(0.08);
   const [layerCount] = useState(4);
+
+  // Filament preset state
+  const [filamentPreset, setFilamentPreset] = useState<FilamentPreset>('bambu_cmyk');
 
   // Process image by calling backend API
   const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode) => {
@@ -143,27 +148,31 @@ export const useImageProcessor = () => {
     }
   };
 
-  // Download STL ZIP
+  // Download STL ZIP using V2 API with filament preset
   const handleDownloadSTL = async () => {
     try {
       setError(null);
       setProcessing(true);
 
       if (mode === 'pixel') {
-        await downloadSTL({
+        await downloadSTLV2({
           colorBlocks,
           layerHeight,
           pixelSize,
           layerCount,
           imageDimensions,
+          filamentPreset,
+          filamentColors: DEFAULT_PRESETS[filamentPreset],
         });
       } else {
-        await downloadSVGSTL({
+        await downloadSVGSTLV2({
           vectorResults,
           layerHeight,
           pixelSize,
           layerCount,
           imageDimensions,
+          filamentPreset,
+          filamentColors: DEFAULT_PRESETS[filamentPreset],
         });
       }
     } catch (err) {
@@ -204,6 +213,9 @@ export const useImageProcessor = () => {
     layerHeight,
     pixelSize,
 
+    // Filament preset
+    filamentPreset,
+
     // Actions
     setMode: handleModeChange,
     setMaxColors,
@@ -213,6 +225,7 @@ export const useImageProcessor = () => {
     setNumColors,
     setLayerHeight,
     setPixelSize,
+    setFilamentPreset,
     handleImageUpload,
     handleReprocess,
     handleDownloadCSV,

@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import download, health, image
+from api.routes import download, download_v2, health, image
 from config.settings import get_cors_origins, settings
 from services.stl_generator import initialize_color_mapping
 
@@ -65,6 +65,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(image.router)
 app.include_router(download.router)
+app.include_router(download_v2.router)
 
 
 if __name__ == "__main__":

@@ -8,12 +8,13 @@ import logging
 import zipfile
 from dataclasses import dataclass
 from io import BytesIO
+from typing import Optional
 
 import numpy as np
 
-from core.blend_color import Color
+from core.blend_color import Color, Colors
 from services import stl_generator
-from services.stl_generator import merge_stl_meshes
+from services.stl_generator import get_filename_prefix, merge_stl_meshes
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +208,8 @@ def generate_svg_stl_zip(
     layer_height: float,
     pixel_size: float,
     layer_count: int,
-    image_dimensions: dict
+    image_dimensions: dict,
+    colors: Optional[Colors] = None
 ) -> bytes:
     """
     Generate ZIP file containing STL files from vector contours.
@@ -222,6 +224,7 @@ def generate_svg_stl_zip(
         pixel_size: Physical size of each pixel in mm
         layer_count: Total number of layers
         image_dimensions: Dict with 'width' and 'height' keys
+        colors: Optional Colors instance. If None, uses current global colors.
 
     Returns:
         ZIP file binary content
@@ -229,13 +232,11 @@ def generate_svg_stl_zip(
     if stl_generator._reference_code_matrix is None:
         raise RuntimeError("Color mapping not initialized. Call initialize_color_mapping() first.")
 
-    # Initialize mesh map for each primary color
-    code_mesh_map = {
-        'C': [],
-        'M': [],
-        'Y': [],
-        'W': []
-    }
+    # Use provided colors or fall back to current global colors
+    active_colors = colors if colors is not None else stl_generator._current_colors
+
+    # Initialize mesh map for each primary color dynamically
+    code_mesh_map = {label: [] for label in active_colors.get_labels()}
 
     # Extract colors from vector results
     input_colors = [result['color'] for result in vector_results]
@@ -288,11 +289,12 @@ def generate_svg_stl_zip(
     # Merge meshes by primary color and create STL files
     stl_files = {}
     physical_height = layer_count * layer_height
+    prefix = get_filename_prefix(active_colors)
 
     for code, meshes in code_mesh_map.items():
         if len(meshes) > 0:
             merged_stl = merge_stl_meshes(meshes)
-            filename = f"CMYW_{width}x{height}x{physical_height:.2f}_{code}.stl"
+            filename = f"{prefix}_{width}x{height}x{physical_height:.2f}_{code}.stl"
             stl_files[filename] = merged_stl
 
     # Create ZIP archive

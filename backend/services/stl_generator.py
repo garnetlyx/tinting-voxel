@@ -7,6 +7,7 @@ import itertools
 import logging
 import zipfile
 from io import BytesIO
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -21,22 +22,30 @@ logger = logging.getLogger(__name__)
 _reference_code_matrix = None
 _reference_rgb_matrix = None
 _blend_generator = None
+_current_colors = None
 
 
-def initialize_color_mapping(layer_count: int = 4, layer_height: float = 0.08):
+def initialize_color_mapping(
+    layer_count: int = 4,
+    layer_height: float = 0.08,
+    colors: Optional[Colors] = None
+):
     """
-    Initialize color mapping reference matrices
-    Called once on application startup
+    Initialize color mapping reference matrices.
+    Called once on application startup or when colors change.
 
     Args:
         layer_count: Number of layers for color blending
         layer_height: Height of each layer in mm
+        colors: Optional Colors instance. If None, uses default CMYK.
     """
-    global _reference_code_matrix, _reference_rgb_matrix, _blend_generator
+    global _reference_code_matrix, _reference_rgb_matrix, _blend_generator, _current_colors
 
-    # Initialize colors with default CMYK configuration
-    # Colors() automatically initializes with CMYW primary colors
-    colors = Colors()
+    # Initialize colors with default CMYK configuration if not provided
+    if colors is None:
+        colors = Colors()
+
+    _current_colors = colors
 
     # Create blend generator
     _blend_generator = BlendTestGenerator(
@@ -45,8 +54,8 @@ def initialize_color_mapping(layer_count: int = 4, layer_height: float = 0.08):
         layer_count_max=layer_count
     )
 
-    # Generate all permutations of CMYW with given layer count
-    items = colors.get_labels()  # ['C', 'M', 'Y', 'W']
+    # Generate all permutations of color labels with given layer count
+    items = colors.get_labels()
     perms = list(itertools.product(items, repeat=layer_count))
     code_list = [''.join(p) for p in perms]
 
@@ -70,7 +79,9 @@ def initialize_color_mapping(layer_count: int = 4, layer_height: float = 0.08):
     _reference_code_matrix = pd.DataFrame(code_matrix)
     _reference_rgb_matrix = pd.DataFrame(rgb_matrix)
 
-    print(f"✓ Initialized color mapping with {len(code_list)} combinations")
+    color_count = len(items)
+    combo_count = len(code_list)
+    print(f"Initialized color mapping: {color_count} colors, {combo_count} combinations")
 
 
 def generate_box(
@@ -181,13 +192,34 @@ def merge_stl_meshes(meshes: list[np.ndarray]) -> bytes:
     return buffer.getvalue()
 
 
+def get_filename_prefix(colors: Colors) -> str:
+    """
+    Generate filename prefix from color labels.
+
+    Maintains backward compatibility: CMYW produces "CMYW" prefix.
+
+    Args:
+        colors: Colors instance
+
+    Returns:
+        String prefix for filenames
+    """
+    labels = colors.get_labels()
+    # Backward compatibility: if labels are exactly C, M, Y, W in any order,
+    # and we have exactly 4 colors, use CMYW for consistency
+    if set(labels) == {'C', 'M', 'Y', 'W'} and len(labels) == 4:
+        return "CMYW"
+    return ''.join(labels)
+
+
 def generate_stl_zip(
     color_blocks: list[dict],
     layer_height: float,
     pixel_size: float,
     layer_count: int,
     image_dimensions: dict,
-    use_greedy_meshing: bool = True
+    use_greedy_meshing: bool = True,
+    colors: Optional[Colors] = None
 ) -> bytes:
     """
     Generate ZIP file containing merged STL files by primary color
@@ -199,22 +231,21 @@ def generate_stl_zip(
         layer_count: Total number of layers
         image_dimensions: Dict with 'width' and 'height' keys
         use_greedy_meshing: If True, merge adjacent pixels to reduce file size
+        colors: Optional Colors instance. If None, uses current global colors.
 
     Returns:
         ZIP file binary content
     """
-    global _reference_code_matrix, _reference_rgb_matrix, _blend_generator
+    global _reference_code_matrix, _reference_rgb_matrix, _blend_generator, _current_colors
 
     if _reference_code_matrix is None:
         raise RuntimeError("Color mapping not initialized. Call initialize_color_mapping() first.")
 
-    # Step 1: Initialize primary color mesh map
-    code_mesh_map = {
-        'C': [],
-        'M': [],
-        'Y': [],
-        'W': []
-    }
+    # Use provided colors or fall back to current global colors
+    active_colors = colors if colors is not None else _current_colors
+
+    # Step 1: Initialize primary color mesh map dynamically
+    code_mesh_map = {label: [] for label in active_colors.get_labels()}
 
     # Step 2: Extract all input colors
     input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
@@ -279,14 +310,15 @@ def generate_stl_zip(
     # Step 5: Merge meshes by primary color and create STL files
     stl_files = {}
     physical_height = layer_count * layer_height
+    prefix = get_filename_prefix(active_colors)
 
     for code, meshes in code_mesh_map.items():
         if len(meshes) > 0:
             # Merge all meshes for this primary color
             merged_stl = merge_stl_meshes(meshes)
 
-            # Generate filename: CMYW_208x208x3.36_C.stl
-            filename = f"CMYW_{width}x{height}x{physical_height:.2f}_{code}.stl"
+            # Generate filename: PREFIX_208x208x3.36_C.stl
+            filename = f"{prefix}_{width}x{height}x{physical_height:.2f}_{code}.stl"
 
             stl_files[filename] = merged_stl
 

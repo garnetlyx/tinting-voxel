@@ -9,6 +9,7 @@ import {
   LoadingSpinner,
   ImageUploader,
   ParameterPanel,
+  PresetSelector,
   ImageComparison,
   ColorBlocksList,
   VectorColorList,
@@ -42,6 +43,9 @@ const Converter: React.FC = () => {
     layerHeight,
     pixelSize,
 
+    // Filament preset
+    filamentPreset,
+
     // Actions
     setMode,
     setMaxColors,
@@ -51,6 +55,7 @@ const Converter: React.FC = () => {
     setNumColors,
     setLayerHeight,
     setPixelSize,
+    setFilamentPreset,
     handleImageUpload,
     handleReprocess,
     handleDownloadCSV,
@@ -77,27 +82,36 @@ const Converter: React.FC = () => {
 
           {/* Parameter Panel */}
           {showSettings && (
-            <ParameterPanel
-              mode={mode}
-              onModeChange={setMode}
-              maxColors={maxColors}
-              colorThreshold={colorThreshold}
-              onMaxColorsChange={setMaxColors}
-              onColorThresholdChange={setColorThreshold}
-              epsilon={epsilon}
-              minArea={minArea}
-              numColors={numColors}
-              onEpsilonChange={setEpsilon}
-              onMinAreaChange={setMinArea}
-              onNumColorsChange={setNumColors}
-              layerHeight={layerHeight}
-              pixelSize={pixelSize}
-              onLayerHeightChange={setLayerHeight}
-              onPixelSizeChange={setPixelSize}
-              onReprocess={handleReprocess}
-              processing={processing}
-              hasImage={image !== null}
-            />
+            <div className="mb-6 space-y-4">
+              <ParameterPanel
+                mode={mode}
+                onModeChange={setMode}
+                maxColors={maxColors}
+                colorThreshold={colorThreshold}
+                onMaxColorsChange={setMaxColors}
+                onColorThresholdChange={setColorThreshold}
+                epsilon={epsilon}
+                minArea={minArea}
+                numColors={numColors}
+                onEpsilonChange={setEpsilon}
+                onMinAreaChange={setMinArea}
+                onNumColorsChange={setNumColors}
+                layerHeight={layerHeight}
+                pixelSize={pixelSize}
+                onLayerHeightChange={setLayerHeight}
+                onPixelSizeChange={setPixelSize}
+                onReprocess={handleReprocess}
+                processing={processing}
+                hasImage={image !== null}
+              />
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <PresetSelector
+                  selectedPreset={filamentPreset}
+                  onPresetChange={setFilamentPreset}
+                  disabled={processing}
+                />
+              </div>
+            </div>
           )}
 
           {/* Image Uploader */}
