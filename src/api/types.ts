@@ -99,11 +99,102 @@ export interface FilamentPresetsResponse {
 export interface DownloadSTLParamsV2 extends DownloadSTLParams {
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
+  basePlateThickness?: number;
+  doubleSided?: boolean;
 }
 
 export interface DownloadSVGSTLParamsV2 extends DownloadSVGSTLParams {
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
+  basePlateThickness?: number;
+  doubleSided?: boolean;
+}
+
+export interface PrintSettingsParams {
+  layerHeight: number;
+  pixelSize: number;
+  layerCount: number;
+  imageDimensions: ImageDimensions;
+  basePlateThickness?: number;
+  filamentPreset?: FilamentPreset;
+  filamentColors?: FilamentColorConfig[];
+}
+
+export interface FilamentPreviewParams {
+  filamentPreset?: FilamentPreset;
+  filamentColors?: FilamentColorConfig[];
+  layerCount: number;
+  layerHeight: number;
+}
+
+export interface ColorMatrixEntry {
+  code: string;
+  rgb: number[];
+}
+
+export interface FilamentPreviewResponse {
+  image: string;
+  colorMatrix: ColorMatrixEntry[];
+  stats: { colorCount: number; combinationCount: number };
+  imageDimensions: { width: number; height: number };
+  warnings: string[];
+}
+
+// Batch processing types
+
+export interface BatchImageResult {
+  filename: string;
+  status: 'success' | 'error';
+  colorBlocks?: ColorBlock[];
+  processedImage?: string;
+  imageDimensions?: ImageDimensions;
+  error?: string;
+}
+
+export interface BatchProcessResponse {
+  results: BatchImageResult[];
+  totalImages: number;
+  successCount: number;
+  errorCount: number;
+}
+
+export interface BatchProcessParams {
+  maxColors: number;
+  colorThreshold: number;
+  pixelSize: number;
+}
+
+export interface BatchDownloadSTLParams {
+  maxColors: number;
+  colorThreshold: number;
+  pixelSize: number;
+  layerHeight: number;
+  layerCount: number;
+  basePlateThickness: number;
+  doubleSided: boolean;
+  filamentPreset?: FilamentPreset;
+  filamentColors?: FilamentColorConfig[];
+}
+
+// Palette library types
+
+export interface PaletteColorInfo {
+  name: string;
+  hex: string;
+  transmission_distance: number;
+}
+
+export interface PaletteInfo {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  colors: PaletteColorInfo[];
+}
+
+export interface PaletteLibraryResponse {
+  palettes: PaletteInfo[];
+  categories: Record<string, string>;
 }
 
 // Default presets for frontend initialization

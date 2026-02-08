@@ -16,7 +16,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload }) =
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/gif,image/webp,image/bmp"
         onChange={onImageUpload}
         className="hidden"
       />

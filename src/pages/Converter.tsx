@@ -2,26 +2,38 @@
  * Main converter page component
  */
 import React, { useState } from 'react';
-import { Settings, Palette } from 'lucide-react';
+import { Settings, Palette, Image as ImageIcon, Layers } from 'lucide-react';
 import { useImageProcessor } from '../hooks/useImageProcessor';
 import {
   ErrorMessage,
   LoadingSpinner,
   ImageUploader,
+  ImageEditor,
   ParameterPanel,
-  PresetSelector,
+  FilamentConfigPanel,
+  FilamentPreview,
+  FilamentPresetManager,
   ImageComparison,
-  ColorBlocksList,
+  ColorAdjustmentPanel,
   VectorColorList,
   DownloadButtons,
+  ThreeDPreview,
+  BatchProcessor,
+  PaletteLibrary,
 } from '../components';
+
+type AppMode = 'single' | 'batch';
 
 const Converter: React.FC = () => {
   const [showSettings, setShowSettings] = useState(true);
+  const [appMode, setAppMode] = useState<AppMode>('single');
 
   const {
     image,
+    rawImage,
+    isEditing,
     processing,
+    processingStage,
     error,
     mode,
     colorBlocks,
@@ -42,9 +54,20 @@ const Converter: React.FC = () => {
     // Shared params
     layerHeight,
     pixelSize,
+    layerCount,
+    basePlateThickness,
+    doubleSided,
+    targetWidth,
+    targetHeight,
+    imageDimensions,
 
-    // Filament preset
+    // Filament state
     filamentPreset,
+    filamentColors,
+    isFilamentConfigValid,
+
+    // Filament storage
+    filamentStorage,
 
     // Actions
     setMode,
@@ -55,11 +78,25 @@ const Converter: React.FC = () => {
     setNumColors,
     setLayerHeight,
     setPixelSize,
-    setFilamentPreset,
+    setTargetWidth,
+    setBasePlateThickness,
+    setDoubleSided,
+    loadPreset,
+    loadSavedPresetColors,
+    updateFilamentColor,
+    addFilamentColor,
+    removeFilamentColor,
     handleImageUpload,
+    handleApplyEdit,
+    handleCancelEdit,
     handleReprocess,
     handleDownloadCSV,
     handleDownloadSTL,
+    handleDownload3MF,
+    handleDownloadPrintSettings,
+    updateColorBlock,
+    mergeColorBlocks,
+    deleteColorBlock,
   } = useImageProcessor();
 
   return (
@@ -100,66 +137,181 @@ const Converter: React.FC = () => {
                 pixelSize={pixelSize}
                 onLayerHeightChange={setLayerHeight}
                 onPixelSizeChange={setPixelSize}
+                targetWidth={targetWidth}
+                targetHeight={targetHeight}
+                onTargetWidthChange={setTargetWidth}
+                basePlateThickness={basePlateThickness}
+                onBasePlateThicknessChange={setBasePlateThickness}
+                doubleSided={doubleSided}
+                onDoubleSidedChange={setDoubleSided}
                 onReprocess={handleReprocess}
                 processing={processing}
                 hasImage={image !== null}
               />
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <PresetSelector
-                  selectedPreset={filamentPreset}
-                  onPresetChange={setFilamentPreset}
+              <div className="p-4 bg-gray-50 rounded-lg space-y-4">
+                <FilamentConfigPanel
+                  filamentPreset={filamentPreset}
+                  filamentColors={filamentColors}
+                  isValid={isFilamentConfigValid}
+                  onLoadPreset={loadPreset}
+                  onUpdateColor={updateFilamentColor}
+                  onAddColor={addFilamentColor}
+                  onRemoveColor={removeFilamentColor}
+                  disabled={processing}
+                />
+                <FilamentPreview
+                  filamentColors={filamentColors}
+                  filamentPreset={filamentPreset}
+                  layerCount={layerCount}
+                  layerHeight={layerHeight}
+                  isConfigValid={isFilamentConfigValid}
+                  disabled={processing}
+                />
+                <FilamentPresetManager
+                  presets={filamentStorage.presets}
+                  currentColors={filamentColors}
+                  isConfigValid={isFilamentConfigValid}
+                  onLoadPreset={loadSavedPresetColors}
+                  onSavePreset={filamentStorage.savePreset}
+                  onUpdatePreset={filamentStorage.updatePreset}
+                  onDeletePreset={filamentStorage.deletePreset}
+                  onRenamePreset={filamentStorage.renamePreset}
+                  onExportPresets={filamentStorage.exportPresets}
+                  onImportPresets={filamentStorage.importPresets}
+                  disabled={processing}
+                />
+                <PaletteLibrary
+                  onApplyPalette={loadSavedPresetColors}
                   disabled={processing}
                 />
               </div>
             </div>
           )}
 
-          {/* Image Uploader */}
-          <ImageUploader onImageUpload={handleImageUpload} />
+          {/* Mode Tabs */}
+          <div className="flex border-b border-gray-200 mb-6">
+            <button
+              onClick={() => setAppMode('single')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                appMode === 'single'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <ImageIcon className="w-4 h-4" />
+              Single Image
+            </button>
+            <button
+              onClick={() => setAppMode('batch')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                appMode === 'batch'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              Batch Processing
+            </button>
+          </div>
 
-          {/* Error Message */}
-          {error && <ErrorMessage message={error} />}
+          {/* Single Image Mode */}
+          {appMode === 'single' && (
+            <>
+              {/* Image Uploader */}
+              <ImageUploader onImageUpload={handleImageUpload} />
 
-          {/* Loading Spinner */}
-          {processing && <LoadingSpinner />}
+              {/* Image Editor (crop/resize) */}
+              {isEditing && rawImage && (
+                <ImageEditor
+                  image={rawImage}
+                  onApply={handleApplyEdit}
+                  onCancel={handleCancelEdit}
+                  disabled={processing}
+                />
+              )}
 
-          {/* Results */}
-          {!processing && hasResults && (
-            <div>
-              {/* Before/After Comparison */}
-              <ImageComparison
-                originalImage={image}
-                processedImageUrl={processedImageUrl}
-                colorCount={resultCount}
-              />
+              {/* Error Message */}
+              {error && <ErrorMessage message={error} />}
 
-              {/* Download Buttons */}
-              <DownloadButtons
-                colorCount={resultCount}
-                onDownloadCSV={handleDownloadCSV}
-                onDownloadSTL={handleDownloadSTL}
-                processing={processing}
-                showCSV={mode === 'pixel'}
-              />
+              {/* Loading Spinner with progress stages */}
+              {processing && <LoadingSpinner stage={processingStage} />}
 
-              {/* Color Blocks Grid (pixel mode only) */}
-              {mode === 'pixel' && <ColorBlocksList colorBlocks={colorBlocks} />}
+              {/* Results */}
+              {!processing && !isEditing && hasResults && (
+                <div>
+                  {/* Before/After Comparison */}
+                  <ImageComparison
+                    originalImage={image}
+                    processedImageUrl={processedImageUrl}
+                    colorCount={resultCount}
+                  />
 
-              {/* Vector Color List (svg mode) */}
-              {mode === 'svg' && <VectorColorList vectorResults={vectorResults} />}
-            </div>
+                  {/* Download Buttons */}
+                  <DownloadButtons
+                    colorCount={resultCount}
+                    onDownloadCSV={handleDownloadCSV}
+                    onDownloadSTL={handleDownloadSTL}
+                    onDownload3MF={mode === 'pixel' ? handleDownload3MF : undefined}
+                    onDownloadPrintSettings={handleDownloadPrintSettings}
+                    processing={processing}
+                    showCSV={mode === 'pixel'}
+                  />
+
+                  {/* 3D Preview (pixel mode only) */}
+                  {mode === 'pixel' && colorBlocks.length > 0 && (
+                    <ThreeDPreview
+                      colorBlocks={colorBlocks}
+                      imageDimensions={imageDimensions}
+                      layerHeight={layerHeight}
+                      pixelSize={pixelSize}
+                      layerCount={layerCount}
+                      basePlateThickness={basePlateThickness}
+                      doubleSided={doubleSided}
+                    />
+                  )}
+
+                  {/* Color Blocks Grid with manual adjustment (pixel mode only) */}
+                  {mode === 'pixel' && (
+                    <ColorAdjustmentPanel
+                      colorBlocks={colorBlocks}
+                      onUpdateColor={updateColorBlock}
+                      onMergeColors={mergeColorBlocks}
+                      onDeleteColor={deleteColorBlock}
+                    />
+                  )}
+
+                  {/* Vector Color List (svg mode) */}
+                  {mode === 'svg' && <VectorColorList vectorResults={vectorResults} />}
+                </div>
+              )}
+
+              {/* Original Image Preview (when no results yet) */}
+              {image && !hasResults && !processing && !isEditing && (
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3">Original Image Preview</h3>
+                  <img
+                    src={image.src}
+                    alt="Preview"
+                    className="max-w-full rounded-lg shadow-md"
+                  />
+                </div>
+              )}
+            </>
           )}
 
-          {/* Original Image Preview (when no results yet) */}
-          {image && !hasResults && !processing && (
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">Original Image Preview</h3>
-              <img
-                src={image.src}
-                alt="Preview"
-                className="max-w-full rounded-lg shadow-md"
-              />
-            </div>
+          {/* Batch Processing Mode */}
+          {appMode === 'batch' && (
+            <BatchProcessor
+              maxColors={maxColors}
+              colorThreshold={colorThreshold}
+              pixelSize={pixelSize}
+              layerHeight={layerHeight}
+              layerCount={layerCount}
+              basePlateThickness={basePlateThickness}
+              doubleSided={doubleSided}
+              filamentPreset={filamentPreset ?? undefined}
+              filamentColors={filamentPreset ? undefined : filamentColors}
+            />
           )}
         </div>
       </div>

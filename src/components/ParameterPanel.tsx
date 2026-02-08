@@ -25,6 +25,16 @@ interface ParameterPanelProps {
   pixelSize: number;
   onLayerHeightChange: (value: number) => void;
   onPixelSizeChange: (value: number) => void;
+  // Target physical size
+  targetWidth: number;
+  targetHeight: number;
+  onTargetWidthChange: (value: number) => void;
+  // Base plate
+  basePlateThickness: number;
+  onBasePlateThicknessChange: (value: number) => void;
+  // Double-sided
+  doubleSided: boolean;
+  onDoubleSidedChange: (value: boolean) => void;
   onReprocess: () => void;
   processing: boolean;
   hasImage: boolean;
@@ -47,6 +57,13 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   pixelSize,
   onLayerHeightChange,
   onPixelSizeChange,
+  targetWidth,
+  targetHeight,
+  onTargetWidthChange,
+  basePlateThickness,
+  onBasePlateThicknessChange,
+  doubleSided,
+  onDoubleSidedChange,
   onReprocess,
   processing,
   hasImage,
@@ -164,14 +181,73 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
         </label>
         <input
           type="range"
-          min="0.08"
-          max="1"
+          min="0.01"
+          max="2"
           step="0.01"
           value={pixelSize}
           onChange={(e) => onPixelSizeChange(parseFloat(e.target.value))}
           className="w-full"
         />
       </div>
+
+      {targetWidth > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Target Width: {targetWidth} mm (Height: {targetHeight} mm)
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="500"
+            step="0.1"
+            value={targetWidth}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              if (!isNaN(val) && val > 0) onTargetWidthChange(val);
+            }}
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-purple-500 focus:border-purple-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Enter desired physical width in mm. Height scales proportionally.
+          </p>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Base Plate Thickness: {basePlateThickness} mm
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="2"
+          step="0.1"
+          value={basePlateThickness}
+          onChange={(e) => onBasePlateThicknessChange(parseFloat(e.target.value))}
+          className="w-full"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          {basePlateThickness === 0 ? 'No base plate' : `Adds a solid base plate below color layers`}
+        </p>
+      </div>
+
+      {mode === 'pixel' && (
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="doubleSided"
+            checked={doubleSided}
+            onChange={(e) => onDoubleSidedChange(e.target.checked)}
+            className="h-4 w-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+          />
+          <label htmlFor="doubleSided" className="text-sm font-medium text-gray-700">
+            Double-sided print
+          </label>
+          <p className="text-xs text-gray-500">
+            Generates mirrored back side for two-sided viewing
+          </p>
+        </div>
+      )}
 
       {hasImage && (
         <button
