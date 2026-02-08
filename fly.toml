@@ -1,0 +1,40 @@
+# fly.toml - Fly.io deployment configuration
+# Deploy with: fly launch --no-deploy && fly deploy
+
+app = "img2stl"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[http_service.concurrency]
+  type = "requests"
+  hard_limit = 50
+  soft_limit = 25
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+[checks]
+  [checks.health]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    port = 8000
+    timeout = "5s"
+    type = "http"
+
+[env]
+  ENVIRONMENT = "production"
+  LOG_LEVEL = "INFO"
+  PORT = "8000"

@@ -42,8 +42,19 @@ pip-log.txt
 pip-delete-this-directory.txt
 output/*
 
+# Test coverage
+.coverage
+backend/.coverage
+htmlcov/
+backend/htmlcov/
+
+# Test artifacts
+test-results/
+backend/tests/calibration/
+
 # AI Agent
 .claude/
+.mcp.json
 
 # Code Review (local only)
 docs/EVAL.md
@@ -52,3 +63,5 @@ docs/EVAL.md
 .dockerignore
 docker-compose.override.yml
 feedback.md
+.crew/
+.playwright-mcp/
