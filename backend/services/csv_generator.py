@@ -1,6 +1,8 @@
 """
 CSV generation service for color data export
 """
+import csv
+import io
 
 
 def generate_csv(color_blocks: list[dict]) -> str:
@@ -13,12 +15,18 @@ def generate_csv(color_blocks: list[dict]) -> str:
     Returns:
         CSV string with header and data rows
     """
-    csv_lines = ['Color,R,G,B,Hex,PixelCount']
+    output = io.StringIO()
+    writer = csv.writer(output, quoting=csv.QUOTE_ALL)
+    writer.writerow(['Color', 'R', 'G', 'B', 'Hex', 'PixelCount'])
 
     for index, color in enumerate(color_blocks):
-        csv_lines.append(
-            f"Color{index + 1},{color['r']},{color['g']},{color['b']},"
-            f"{color['hex']},{color['count']}"
-        )
+        writer.writerow([
+            f"Color{index + 1}",
+            color['r'],
+            color['g'],
+            color['b'],
+            color['hex'],
+            color['count'],
+        ])
 
-    return '\n'.join(csv_lines)
+    return output.getvalue().rstrip('\r\n')

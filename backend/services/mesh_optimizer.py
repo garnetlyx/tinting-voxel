@@ -40,10 +40,23 @@ def pixels_to_grid(
         2D numpy boolean array where True indicates a pixel is present
     """
     grid = np.zeros((height, width), dtype=bool)
+    dropped = 0
     for pixel in pixels:
         x, y = pixel['x'], pixel['y']
         if 0 <= x < width and 0 <= y < height:
             grid[y, x] = True
+        else:
+            dropped += 1
+    if dropped > 0:
+        if dropped == len(pixels):
+            raise ValueError(
+                f"All {dropped} pixel(s) are outside image bounds "
+                f"({width}x{height}). Check image dimensions."
+            )
+        logger.warning(
+            "Dropped %d of %d pixels outside image bounds (%dx%d)",
+            dropped, len(pixels), width, height
+        )
     return grid
 
 

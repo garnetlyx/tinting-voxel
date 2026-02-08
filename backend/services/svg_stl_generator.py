@@ -36,9 +36,32 @@ def triangulate_polygon(polygon: list[tuple[float, float]]) -> list[tuple[int, i
 
     Returns:
         List of triangle indices (i, j, k) referencing the polygon vertices
+
+    Raises:
+        ValueError: If polygon has more than 1000 vertices (DoS protection)
     """
     if len(polygon) < 3:
         return []
+
+    # P0 Security: Limit maximum vertices to prevent DoS attacks (QA code review)
+    MAX_VERTICES = 1000
+    if len(polygon) > MAX_VERTICES:
+        raise ValueError(
+            f"Polygon has {len(polygon)} vertices, exceeding maximum of {MAX_VERTICES}. "
+            f"Complex polygons may cause performance issues."
+        )
+
+    # Detect winding order using signed area
+    # Positive = counter-clockwise, Negative = clockwise
+    area = 0.0
+    n = len(polygon)
+    for i in range(n):
+        j = (i + 1) % n
+        area += (polygon[j][0] - polygon[i][0]) * (polygon[j][1] + polygon[i][1])
+
+    # Reverse polygon if clockwise (negative area)
+    if area < 0:
+        polygon = list(reversed(polygon))
 
     # Work with a copy of indices
     indices = list(range(len(polygon)))
@@ -120,8 +143,12 @@ def triangulate_polygon(polygon: list[tuple[float, float]]) -> list[tuple[int, i
                 break
 
         if not ear_found:
-            # Fallback: use fan triangulation from first vertex
-            break
+            # Fallback: use fan triangulation from first vertex for remaining vertices
+            # This handles complex polygons where ear clipping gets stuck
+            remaining = indices
+            for i in range(1, len(remaining) - 1):
+                triangles.append((remaining[0], remaining[i], remaining[i + 1]))
+            return triangles
 
     # Handle remaining triangle
     if len(indices) == 3:
@@ -209,7 +236,9 @@ def generate_svg_stl_zip(
     pixel_size: float,
     layer_count: int,
     image_dimensions: dict,
-    colors: Optional[Colors] = None
+    colors: Optional[Colors] = None,
+    base_plate_thickness: float = 0.0,
+    double_sided: bool = False,
 ) -> bytes:
     """
     Generate ZIP file containing STL files from vector contours.
@@ -225,15 +254,20 @@ def generate_svg_stl_zip(
         layer_count: Total number of layers
         image_dimensions: Dict with 'width' and 'height' keys
         colors: Optional Colors instance. If None, uses current global colors.
+        base_plate_thickness: Thickness of solid base plate in mm (0 = no base plate)
 
     Returns:
         ZIP file binary content
     """
-    if stl_generator._reference_code_matrix is None:
-        raise RuntimeError("Color mapping not initialized. Call initialize_color_mapping() first.")
-
-    # Use provided colors or fall back to current global colors
+    # Use provided colors or fall back to global state
     active_colors = colors if colors is not None else stl_generator._current_colors
+    if active_colors is None:
+        raise RuntimeError("No colors provided and no global colors initialized.")
+
+    # Compute reference matrices locally (thread-safe)
+    ref_code_matrix, ref_rgb_matrix = stl_generator.compute_reference_matrices(
+        layer_count, layer_height, active_colors
+    )
 
     # Initialize mesh map for each primary color dynamically
     code_mesh_map = {label: [] for label in active_colors.get_labels()}
@@ -244,14 +278,17 @@ def generate_svg_stl_zip(
     # Map to blend codes using Beer-Lambert model
     result_codes, result_rgbs = Color.map_to_nearest_color(
         input_colors,
-        stl_generator._reference_code_matrix,
-        stl_generator._reference_rgb_matrix
+        ref_code_matrix,
+        ref_rgb_matrix
     )
 
     width = image_dimensions['width']
     height = image_dimensions['height']
     total_polygons = 0
     total_triangles = 0
+
+    # Z offset: color layers sit on top of base plate
+    z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
     # Process each color group
     for idx, result in enumerate(vector_results):
@@ -260,8 +297,8 @@ def generate_svg_stl_zip(
 
         # Generate mesh for each layer
         for z_idx, code_char in enumerate(blend_code):
-            z_min = z_idx * layer_height
-            z_max = (z_idx + 1) * layer_height
+            z_min = z_offset + z_idx * layer_height
+            z_max = z_offset + (z_idx + 1) * layer_height
 
             # Extrude each polygon
             for polygon in polygons:
@@ -286,9 +323,46 @@ def generate_svg_stl_zip(
         total_polygons, total_triangles
     )
 
+    # Step 4b: Generate back-side (mirrored) layers if double_sided
+    if double_sided:
+        front_top = z_offset + layer_count * layer_height
+        for idx, result in enumerate(vector_results):
+            polygons = result['polygons']
+            blend_code = result_codes[idx]
+
+            # Mirror polygons horizontally: x -> (width - 1 - x)
+            mirrored_polygons = [
+                [(width - 1 - x, y) for x, y in polygon]
+                for polygon in polygons
+            ]
+
+            # Back layers are stacked on top of front, in reverse order
+            for z_idx, code_char in enumerate(reversed(blend_code)):
+                z_min = front_top + z_idx * layer_height
+                z_max = front_top + (z_idx + 1) * layer_height
+
+                # Extrude each mirrored polygon
+                for polygon in mirrored_polygons:
+                    if len(polygon) < 3:
+                        continue
+
+                    mesh = generate_polygon_mesh(
+                        polygon=polygon,
+                        z_min=z_min,
+                        z_max=z_max,
+                        pixel_size=pixel_size
+                    )
+
+                    if len(mesh) > 0:
+                        total_triangles += len(mesh)
+                        code_mesh_map[code_char].append(mesh)
+
+        logger.info("Generated double-sided print: front + mirrored back")
+
     # Merge meshes by primary color and create STL files
     stl_files = {}
-    physical_height = layer_count * layer_height
+    effective_layer_count = layer_count * 2 if double_sided else layer_count
+    physical_height = effective_layer_count * layer_height + z_offset
     prefix = get_filename_prefix(active_colors)
 
     for code, meshes in code_mesh_map.items():
@@ -296,6 +370,19 @@ def generate_svg_stl_zip(
             merged_stl = merge_stl_meshes(meshes)
             filename = f"{prefix}_{width}x{height}x{physical_height:.2f}_{code}.stl"
             stl_files[filename] = merged_stl
+
+    # Generate base plate if thickness > 0
+    if base_plate_thickness > 0:
+        base_mesh = stl_generator.generate_box(
+            xrange=(0, width * pixel_size),
+            yrange=(0, height * pixel_size),
+            zrange=(0, base_plate_thickness)
+        )
+        base_stl = merge_stl_meshes([base_mesh])
+        base_filename = f"{prefix}_{width}x{height}x{physical_height:.2f}_base.stl"
+        stl_files[base_filename] = base_stl
+        logger.info("Generated base plate: %.2f x %.2f x %.2f mm",
+                     width * pixel_size, height * pixel_size, base_plate_thickness)
 
     # Create ZIP archive
     zip_buffer = BytesIO()

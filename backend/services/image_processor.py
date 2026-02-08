@@ -2,10 +2,16 @@
 Image processing service for color extraction and clustering
 """
 import base64
+import logging
 from io import BytesIO
 
 import numpy as np
 from PIL import Image
+
+logger = logging.getLogger(__name__)
+
+# Maximum dimension before auto-downscaling (preserves aspect ratio)
+MAX_PROCESSING_DIMENSION = 1024
 
 
 def color_distance(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
@@ -62,9 +68,9 @@ def merge_similar_colors(colors: list[dict], threshold: float) -> list[dict]:
 
         color_rgb = (color['r'], color['g'], color['b'])
 
-        # Handle dark neutral colors separately
+        # Handle dark neutral colors with threshold check (same as non-dark)
         if is_dark_neutral_color(color_rgb):
-            dark.append(color)
+            dark_cluster = [color]
 
             for i in range(idx + 1, len(colors)):
                 if i in used:
@@ -73,12 +79,11 @@ def merge_similar_colors(colors: list[dict], threshold: float) -> list[dict]:
                 other_color = colors[i]
                 other_rgb = (other_color['r'], other_color['g'], other_color['b'])
 
-                if is_dark_neutral_color(other_rgb):
-                    dark.append(other_color)
+                if is_dark_neutral_color(other_rgb) and color_distance(color_rgb, other_rgb) < threshold:
+                    dark_cluster.append(other_color)
                     used.add(i)
 
-            # Calculate average color for dark cluster
-            avg = cluster_avg_color(dark)
+            avg = cluster_avg_color(dark_cluster)
             merged.append(avg)
         else:
             cluster = [color]
@@ -127,6 +132,34 @@ def reassign_colors(main_colors: list[dict], rest_colors: list[dict]) -> list[di
     return main_colors
 
 
+def _downscale_if_needed(img: Image.Image, max_dim: int) -> Image.Image:
+    """
+    Downscale image if either dimension exceeds max_dim, preserving aspect ratio.
+
+    Args:
+        img: PIL Image
+        max_dim: Maximum allowed dimension
+
+    Returns:
+        Original or downscaled PIL Image
+    """
+    width, height = img.size
+    if width <= max_dim and height <= max_dim:
+        return img
+
+    scale = max_dim / max(width, height)
+    new_width = int(width * scale)
+    new_height = int(height * scale)
+    # Clamp to minimum 1 pixel to prevent zero-dimension images
+    new_width = max(1, new_width)
+    new_height = max(1, new_height)
+    logger.info(
+        "Downscaling image from %dx%d to %dx%d for processing",
+        width, height, new_width, new_height
+    )
+    return img.resize((new_width, new_height), Image.LANCZOS)
+
+
 def process_image(
     image_bytes: bytes,
     max_colors: int = 10,
@@ -145,9 +178,19 @@ def process_image(
     Returns:
         Dictionary containing colorBlocks, processedImage, and imageDimensions
     """
-    # Load image
+    # Load and optionally downscale image
     img = Image.open(BytesIO(image_bytes))
-    img = img.convert('RGB')
+    # Convert RGBA to RGB with white background for 3D printing
+    # (transparent = no filament = white base color)
+    if img.mode == 'RGBA':
+        # Create white background
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        # Paste RGBA image onto white background using alpha channel as mask
+        background.paste(img, mask=img.split()[3])  # alpha channel
+        img = background
+    else:
+        img = img.convert('RGB')
+    img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
 
     width, height = img.size
 
@@ -155,26 +198,29 @@ def process_image(
     img_array = np.array(img)
     pixels = img_array.reshape(-1, 3)
 
-    # Extract unique colors with pixel positions
+    # Build coordinate arrays once (avoids repeated divmod in loop)
+    total_pixels = len(pixels)
+    xs = np.arange(total_pixels) % width
+    ys = np.arange(total_pixels) // width
+
+    # Extract unique colors with pixel positions using integer tuple keys
     color_map = {}
 
-    for i in range(len(pixels)):
-        r, g, b = pixels[i]
-        key = f"{r},{g},{b}"
-        x = i % width
-        y = i // width
+    for i in range(total_pixels):
+        r, g, b = int(pixels[i, 0]), int(pixels[i, 1]), int(pixels[i, 2])
+        key = (r, g, b)
 
         if key not in color_map:
             color_map[key] = {
-                'r': int(r),
-                'g': int(g),
-                'b': int(b),
+                'r': r,
+                'g': g,
+                'b': b,
                 'count': 0,
                 'pixels': []
             }
 
         color_map[key]['count'] += 1
-        color_map[key]['pixels'].append({'x': int(x), 'y': int(y)})
+        color_map[key]['pixels'].append({'x': int(xs[i]), 'y': int(ys[i])})
 
     # Convert to list
     colors = list(color_map.values())
@@ -199,21 +245,13 @@ def process_image(
     for color in colors:
         color['hex'] = f"#{color['r']:02x}{color['g']:02x}{color['b']:02x}"
 
-    # Generate processed image preview
+    # Generate processed image preview using numpy vectorized operations
     processed_img_array = np.zeros((height, width, 3), dtype=np.uint8)
-    pixel_color_map = {}
 
     for color in colors:
+        rgb = np.array([color['r'], color['g'], color['b']], dtype=np.uint8)
         for pixel in color['pixels']:
-            key = f"{pixel['x']},{pixel['y']}"
-            pixel_color_map[key] = color
-
-    for y in range(height):
-        for x in range(width):
-            key = f"{x},{y}"
-            if key in pixel_color_map:
-                color = pixel_color_map[key]
-                processed_img_array[y, x] = [color['r'], color['g'], color['b']]
+            processed_img_array[pixel['y'], pixel['x']] = rgb
 
     # Convert processed image to base64
     processed_img = Image.fromarray(processed_img_array)

@@ -4,7 +4,7 @@ Pydantic models for API request and response validation
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ProcessingMode(str, Enum):
@@ -15,24 +15,38 @@ class ProcessingMode(str, Enum):
 
 class FilamentColorConfig(BaseModel):
     """Configuration for a single filament color."""
-    name: str = Field(..., min_length=1, description="Display name for the color")
+    name: str = Field(..., min_length=1, max_length=200, description="Display name for the color")
     hex: str = Field(..., description="Hex color code (e.g., '#00FFFF')")
     transmission_distance: float = Field(
         ...,
         gt=0,
+        le=1000,
         description="Beer-Lambert transmission distance (opacity control)"
     )
 
-    @validator('hex')
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v):
+        """Reject whitespace-only names and strip leading/trailing whitespace."""
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("Name cannot be whitespace-only")
+        # Name must start with an ASCII letter (A-Z or a-z)
+        # The first character becomes the blend code, which must be ASCII
+        if not stripped[0].isalpha() or not stripped[0].isascii():
+            raise ValueError(
+                f"Name must start with an ASCII letter (A-Z, a-z): {stripped}. "
+                f"The first character is used as the blend code identifier."
+            )
+        return stripped
+
+    @field_validator('hex')
+    @classmethod
     def validate_hex(cls, v):
-        """Validate hex color format."""
-        hex_value = v.lstrip('#')
-        if len(hex_value) != 6:
-            raise ValueError(f"Invalid hex color format: {v}")
-        try:
-            int(hex_value, 16)
-        except ValueError:
-            raise ValueError(f"Invalid hex color format: {v}")
+        """Validate hex color format. Requires exactly '#' followed by 6 hex digits."""
+        import re
+        if not re.match(r'^#[0-9a-fA-F]{6}$', v):
+            raise ValueError(f"Invalid hex color format: {v}. Must be '#' followed by 6 hex digits (e.g., '#00FFFF')")
         return v
 
     @property
@@ -49,8 +63,8 @@ class FilamentPreset(str, Enum):
 
 class PixelCoordinate(BaseModel):
     """Single pixel coordinate"""
-    x: int
-    y: int
+    x: int = Field(..., ge=0)
+    y: int = Field(..., ge=0)
 
 
 class ColorBlock(BaseModel):
@@ -58,15 +72,36 @@ class ColorBlock(BaseModel):
     r: int = Field(..., ge=0, le=255)
     g: int = Field(..., ge=0, le=255)
     b: int = Field(..., ge=0, le=255)
-    count: int = Field(..., ge=0)
-    pixels: List[PixelCoordinate]
+    pixels: List[PixelCoordinate] = Field(..., min_length=1, max_length=1048576)
+    count: int = Field(..., ge=1)
     hex: str
+
+    @field_validator('hex')
+    @classmethod
+    def validate_hex(cls, v):
+        """Validate hex color format."""
+        import re
+        if not re.match(r'^#[0-9a-fA-F]{6}$', v):
+            raise ValueError(f"Invalid hex color format: {v}. Must be '#' followed by 6 hex digits")
+        return v
+
+    @field_validator('count')
+    @classmethod
+    def validate_count_matches_pixels(cls, v, info):
+        """Ensure count matches the number of pixels."""
+        # Pydantic V2: use info.data instead of values
+        pixels = info.data.get('pixels')
+        if pixels is not None and v != len(pixels):
+            raise ValueError(
+                f"count ({v}) does not match number of pixels ({len(pixels)})"
+            )
+        return v
 
 
 class ImageDimensions(BaseModel):
     """Image dimensions in pixels"""
-    width: int
-    height: int
+    width: int = Field(..., gt=0, le=10000)
+    height: int = Field(..., gt=0, le=10000)
 
 
 class ProcessImageResponse(BaseModel):
@@ -78,7 +113,7 @@ class ProcessImageResponse(BaseModel):
 
 class DownloadCSVRequest(BaseModel):
     """Request model for /api/download-csv endpoint"""
-    colorBlocks: List[ColorBlock]
+    colorBlocks: List[ColorBlock] = Field(..., min_length=1)
 
 
 class VectorColorResult(BaseModel):
@@ -98,9 +133,9 @@ class SVGProcessImageResponse(BaseModel):
 
 class DownloadSTLRequest(BaseModel):
     """Request model for /api/download-stl endpoint (pixel mode)."""
-    colorBlocks: List[ColorBlock]
-    layerHeight: float = Field(..., gt=0)
-    pixelSize: float = Field(..., gt=0)
+    colorBlocks: List[ColorBlock] = Field(..., min_length=1)
+    layerHeight: float = Field(..., gt=0, le=10)
+    pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
     mode: ProcessingMode = ProcessingMode.PIXEL
@@ -108,65 +143,82 @@ class DownloadSTLRequest(BaseModel):
 
 class DownloadSVGSTLRequest(BaseModel):
     """Request model for /api/download-stl endpoint (SVG mode)."""
-    vectorResults: List[VectorColorResult]
-    layerHeight: float = Field(..., gt=0)
-    pixelSize: float = Field(..., gt=0)
+    vectorResults: List[VectorColorResult] = Field(..., min_length=1)
+    layerHeight: float = Field(..., gt=0, le=10)
+    pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
+
+
+# Shared mixin for filament configuration validation
+class FilamentConfigMixin(BaseModel):
+    """Mixin providing filament preset/custom color fields and validators."""
+    filamentPreset: Optional[FilamentPreset] = None
+    filamentColors: Optional[List[FilamentColorConfig]] = Field(
+        None,
+        min_length=4,
+        max_length=16,
+        description="Custom filament colors (4-16 colors)"
+    )
+
+    @field_validator('filamentColors')
+    @classmethod
+    def validate_unique_labels(cls, v):
+        """Ensure all filament colors have unique labels and hex values."""
+        if v is None:
+            return v
+        labels = [c.name[0].upper() for c in v]
+        if len(labels) != len(set(labels)):
+            raise ValueError("Filament colors must have unique first letters")
+        hex_values = [c.hex.lower() for c in v]
+        if len(hex_values) != len(set(hex_values)):
+            raise ValueError("Filament colors must have unique hex values")
+        return v
+
+    @model_validator(mode='after')
+    def validate_preset_or_custom_not_both(self):
+        """Reject requests that provide both preset and custom colors."""
+        if self.filamentPreset is not None and self.filamentColors is not None:
+            raise ValueError(
+                "Cannot provide both filamentPreset and filamentColors. Use one or the other."
+            )
+        return self
 
 
 # V2 API Models with configurable colors
-class DownloadSTLRequestV2(BaseModel):
+class DownloadSTLRequestV2(FilamentConfigMixin):
     """Request model for /api/v2/download-stl endpoint with configurable colors."""
-    colorBlocks: List[ColorBlock]
-    layerHeight: float = Field(..., gt=0)
-    pixelSize: float = Field(..., gt=0)
+    colorBlocks: List[ColorBlock] = Field(..., min_length=1)
+    layerHeight: float = Field(..., gt=0, le=10)
+    pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
     mode: ProcessingMode = ProcessingMode.PIXEL
-    filamentPreset: Optional[FilamentPreset] = None
-    filamentColors: Optional[List[FilamentColorConfig]] = Field(
-        None,
-        min_items=4,
-        max_items=10,
-        description="Custom filament colors (4-10 colors)"
+    basePlateThickness: Optional[float] = Field(
+        None, ge=0, le=10,
+        description="Base plate thickness in mm (0 or None = no base plate)"
+    )
+    doubleSided: bool = Field(
+        False,
+        description="Generate mirrored back side for double-sided printing"
     )
 
-    @validator('filamentColors')
-    def validate_unique_labels(cls, v):
-        """Ensure all filament colors have unique labels."""
-        if v is None:
-            return v
-        labels = [c.name[0].upper() for c in v]
-        if len(labels) != len(set(labels)):
-            raise ValueError("Filament colors must have unique first letters")
-        return v
 
-
-class DownloadSVGSTLRequestV2(BaseModel):
+class DownloadSVGSTLRequestV2(FilamentConfigMixin):
     """Request model for /api/v2/download-svg-stl endpoint with configurable colors."""
-    vectorResults: List[VectorColorResult]
-    layerHeight: float = Field(..., gt=0)
-    pixelSize: float = Field(..., gt=0)
+    vectorResults: List[VectorColorResult] = Field(..., min_length=1)
+    layerHeight: float = Field(..., gt=0, le=10)
+    pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
-    filamentPreset: Optional[FilamentPreset] = None
-    filamentColors: Optional[List[FilamentColorConfig]] = Field(
-        None,
-        min_items=4,
-        max_items=10,
-        description="Custom filament colors (4-10 colors)"
+    basePlateThickness: Optional[float] = Field(
+        None, ge=0, le=10,
+        description="Base plate thickness in mm (0 or None = no base plate)"
     )
-
-    @validator('filamentColors')
-    def validate_unique_labels(cls, v):
-        """Ensure all filament colors have unique labels."""
-        if v is None:
-            return v
-        labels = [c.name[0].upper() for c in v]
-        if len(labels) != len(set(labels)):
-            raise ValueError("Filament colors must have unique first letters")
-        return v
+    doubleSided: bool = Field(
+        False,
+        description="Generate mirrored back side for double-sided printing"
+    )
 
 
 class FilamentPresetInfo(BaseModel):
@@ -179,3 +231,101 @@ class FilamentPresetInfo(BaseModel):
 class FilamentPresetsResponse(BaseModel):
     """Response model for /api/filament-presets endpoint."""
     presets: List[FilamentPresetInfo]
+
+
+class FilamentPreviewRequest(FilamentConfigMixin):
+    """Request model for /api/filament-preview endpoint."""
+    layerCount: int = Field(4, ge=1, le=10)
+    layerHeight: float = Field(0.08, gt=0, le=10)
+    page: Optional[int] = Field(None, ge=1, description="Page number (1-based) for paginated results")
+    pageSize: Optional[int] = Field(None, ge=1, le=10000, description="Number of entries per page")
+
+    @model_validator(mode='after')
+    def validate_preview_constraints(self):
+        """Require at least one color source and validate pagination params."""
+        if self.filamentPreset is None and self.filamentColors is None:
+            raise ValueError(
+                "Must provide either filamentPreset or filamentColors."
+            )
+        if (self.page is None) != (self.pageSize is None):
+            raise ValueError(
+                "page and pageSize must both be provided or both be omitted."
+            )
+        return self
+
+
+class PrintSettingsRequest(FilamentConfigMixin):
+    """Request model for /api/v2/print-settings endpoint."""
+    layerHeight: float = Field(..., gt=0, le=10)
+    pixelSize: float = Field(..., gt=0, le=10)
+    layerCount: int = Field(..., ge=1, le=10)
+    imageDimensions: ImageDimensions
+    basePlateThickness: Optional[float] = Field(None, ge=0, le=10)
+    doubleSided: bool = Field(
+        False,
+        description="Generate mirrored back side for double-sided printing"
+    )
+
+
+class ColorMatrixEntry(BaseModel):
+    """Single entry in the color matrix."""
+    code: str
+    rgb: List[int]
+
+
+class PaginationInfo(BaseModel):
+    """Pagination metadata for paginated responses."""
+    page: int
+    pageSize: int
+    totalCombinations: int
+    totalPages: int
+
+
+class FilamentPreviewResponse(BaseModel):
+    """Response model for /api/filament-preview endpoint."""
+    image: str  # base64 encoded PNG
+    colorMatrix: List[ColorMatrixEntry]
+    stats: dict
+    imageDimensions: dict
+    warnings: List[str] = []
+    pagination: Optional[PaginationInfo] = None
+
+
+class BatchImageResult(BaseModel):
+    """Result for a single image in a batch processing request."""
+    filename: str
+    status: str = Field(..., description="'success' or 'error'")
+    colorBlocks: Optional[List[ColorBlock]] = None
+    processedImage: Optional[str] = None
+    imageDimensions: Optional[ImageDimensions] = None
+    error: Optional[str] = None
+
+
+class BatchProcessResponse(BaseModel):
+    """Response model for batch image processing."""
+    results: List[BatchImageResult]
+    totalImages: int
+    successCount: int
+    errorCount: int
+
+
+class PaletteColorInfo(BaseModel):
+    """Color info within a palette entry."""
+    name: str
+    hex: str
+    transmission_distance: float
+
+
+class PaletteInfo(BaseModel):
+    """A single palette in the library."""
+    id: str
+    name: str
+    description: str
+    category: str
+    colors: List[PaletteColorInfo]
+
+
+class PaletteLibraryResponse(BaseModel):
+    """Response model for palette library listing."""
+    palettes: List[PaletteInfo]
+    categories: dict

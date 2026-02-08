@@ -4,6 +4,7 @@ Supports both development and production (cloud) environments
 """
 import os
 
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -15,7 +16,7 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "ImageToSTL Converter API"
     app_version: str = "1.0.0"
-    debug: bool = True
+    debug: bool = False
 
     # Server
     host: str = "0.0.0.0"  # Listen on all interfaces for cloud deployment
@@ -41,7 +42,7 @@ class Settings(BaseSettings):
 
     # File Upload
     max_upload_size: int = 10 * 1024 * 1024  # 10MB
-    allowed_extensions: list[str] = [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
+    allowed_extensions: list[str] = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"]
 
     # Logging
     log_level: str = "INFO"
@@ -50,10 +51,11 @@ class Settings(BaseSettings):
     # Set these via environment variables in production
     environment: str = "development"  # development, staging, production
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False
+    )
 
 
 # Global settings instance

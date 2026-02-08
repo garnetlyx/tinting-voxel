@@ -2,14 +2,6 @@
 Application constants
 """
 
-# CMYK Primary Colors (RGB values)
-PRIMARY_COLORS = {
-    'C': (0, 134, 214),     # Cyan
-    'M': (236, 0, 140),     # Magenta
-    'Y': (244, 238, 42),    # Yellow
-    'W': (255, 255, 255)    # White
-}
-
 # API Response Messages
 API_SUCCESS = "Success"
 API_ERROR_UPLOAD = "Failed to upload image"

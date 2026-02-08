@@ -1,6 +1,8 @@
 import ast
 import colorsys
+import functools
 import itertools
+import logging
 import math
 import os.path
 import re
@@ -15,6 +17,8 @@ from stl import mesh
 if TYPE_CHECKING:
     from core.color_config import ColorConfig
 
+logger = logging.getLogger(__name__)
+
 
 class Color:
     DEFAULT_HEX = {
@@ -24,13 +28,26 @@ class Color:
                 'W': '#FFFFFF',  # White
             }
     def __init__(self, name, transmission_distance, hex=None, absorption=None, rgb = None):
+        # Validate that name starts with ASCII letter (used as label in blend codes)
+        if not name or not name[0].isalpha() or not name[0].isascii():
+            raise ValueError(
+                f"Color name must start with an ASCII letter (A-Z, a-z): {name}. "
+                f"The first character is used as the blend code identifier."
+            )
+
         self.name = name
         self.td = transmission_distance
         self.rgb = rgb
         self.absorption = absorption
 
-        if hex == None:
+        if hex is None:
             hex = self.DEFAULT_HEX.get(self.get_label())
+
+        if hex is None:
+            raise ValueError(
+                f"hex is required for non-default color name '{name}'. "
+                f"Only CMYW colors have default hex values."
+            )
 
         self.update_hex(hex)
 
@@ -50,8 +67,8 @@ class Color:
     def get_cmyk(self, rgb_scale = 255, cmyk_scale = 1):
         r, g, b = self.rgb
         if (r, g, b) == (0, 0, 0):
-            # black
-            return 0, 0, 0
+            # black: C=0, M=0, Y=0, K=1
+            return 0, 0, 0, cmyk_scale
 
         # rgb [0,255] -> cmy [0,1]
         c = 1 - r / rgb_scale
@@ -74,6 +91,8 @@ class Color:
     @staticmethod
     def get_transmission_rate(d, td, alpha=12):
         # Beer–Lambert law
+        if td <= 0:
+            return 0.0  # Fully opaque for zero/negative transmission distance
         x = alpha * d  / td
         T = np.exp(- x) # transmission rate
         return T
@@ -82,7 +101,7 @@ class Color:
     def get_lab(rgb):
         rgb_normalized = np.array(rgb) / 255.0  # Convert [0,255] to [0,1]
         lab = rgb2lab(np.array([rgb_normalized]))  # rgb2lab expects shape (1, 3) or (H, W, 3)
-        L, a, b = lab[:,0], lab[:,1], lab[:,2]
+        L, a, b = lab[0, 0], lab[0, 1], lab[0, 2]
         C = np.sqrt(a**2 + b**2)
         return L, a, b, C
 
@@ -94,7 +113,7 @@ class Color:
     @staticmethod
     def is_brown(rgb):
         L, a, b, C = Color.get_lab(rgb)
-        return Color.is_neutral(rgb) and L < 60 and a > 5 and b > 10
+        return L < 60 and a > 5 and b > 10 and C < 70
 
     @staticmethod
     def map_to_nearest_color(input_colors, reference_code, reference_rgb):
@@ -141,27 +160,86 @@ class Color:
             dists = np.linalg.norm(ref_lab - lab_color, axis=1)
             nearest_idx = np.argmin(dists)
             results_code.append(ref_blend_codes[nearest_idx])
-            results_color.append(ref_colors[nearest_idx]*255)
+            results_color.append(np.round(ref_colors[nearest_idx] * 255).astype(int))
 
         return results_code, results_color
 
-class Colors:
-    DEFAULT_TD = {'C': 3, 'M': 1.9, 'Y': 2.5, 'W': 7.2}
-    BAMBU_CMYK_HEX = {
-                        'C': "#0086D6",  # Cyan
-                        'M': "#EC008C",  # Magenta
-                        'Y': '#F4EE2A',  # Yellow
-                        'W': '#FFFFFF',  # White
-            }
+@functools.lru_cache(maxsize=4096)
+def _code_to_rgb_cached(code: str, layer_height: float, color_key: tuple, alpha: float = 12.0) -> tuple:
+    """Cached computation of layered optical mixing using Beer-Lambert.
 
-    DEFAULT_CLEAR_TD = {'C': 60, 'M': 100, 'Y': 70, 'W': 200}
-    CLEAR_CMYK_HEX = {
-                        'C': "#0089cd",  # Cyan
-                        'M': "#e75d4a",  # Magenta
-                        'Y': '#f6d449',  # Yellow
-                        'W': '#FFFFFF',  # White
-            }
-    PRIMARY_COLORS = ['C', 'M', 'Y', 'W']
+    Args:
+        code: Color code string (e.g. "CMYW"), already stripped/uppercased.
+        layer_height: Layer height in mm.
+        color_key: Frozen tuple of (label, transmission_distance, hex) per color,
+                   used as hashable cache key.
+        alpha: Absorption coefficient for Beer-Lambert model.
+    """
+    if not code:
+        return (255.0, 255.0, 255.0)
+
+    # Rebuild color lookup from the hashable key
+    color_map = {}
+    for label, td, hex_val in color_key:
+        color_map[label] = Color(label, td, hex_val)
+
+    for c in code:
+        if c not in color_map:
+            available = ', '.join(sorted(color_map.keys()))
+            raise ValueError(
+                f"Unknown color label '{c}' in blend code '{code}'. "
+                f"Available labels: {available}"
+            )
+
+    transmission = [
+        Color.get_transmission_rate(layer_height, color_map[c].td, alpha=alpha)
+        for c in code
+    ]
+
+    remain = 1
+    array_size = max(len(code), 4) + 1  # min 4 for layer_count_max compat
+    light_loss_ratio = np.zeros(array_size)
+
+    for i, t in enumerate(transmission):
+        light_loss_ratio[i] = remain * (1 - t)
+        remain *= t
+    # Background gets all remaining transmitted light (no extra absorption)
+    light_loss_ratio[len(code)] = remain
+
+    light_loss_ratio = light_loss_ratio / np.sum(light_loss_ratio)
+
+    bg = light_loss_ratio[len(code)]
+    rgb = np.ones(3)
+    for i, c in enumerate(code):
+        color = color_map[c]
+        rgb -= color.get_absorption() * light_loss_ratio[i]
+    rgb = bg * np.ones(3) + (1 - bg) * rgb
+    return tuple(np.clip(rgb * 255, 0, 255))
+
+
+def clear_rgb_cache():
+    """Clear the code_to_rgb LRU cache."""
+    _code_to_rgb_cached.cache_clear()
+
+
+def rgb_cache_info():
+    """Return cache statistics for code_to_rgb."""
+    return _code_to_rgb_cached.cache_info()
+
+
+class Colors:
+    # Preset data derived from color_config.py (single source of truth)
+    from core.color_config import BAMBU_CMYK_PRESET, CLEAR_CMYK_PRESET
+
+    _BAMBU_PRESET = {c.label: c for c in BAMBU_CMYK_PRESET}
+    _CLEAR_PRESET = {c.label: c for c in CLEAR_CMYK_PRESET}
+    PRIMARY_COLORS = [c.label for c in BAMBU_CMYK_PRESET]
+
+    # Keep these as derived views for backward compatibility with tests
+    DEFAULT_TD = {c.label: c.transmission_distance for c in BAMBU_CMYK_PRESET}
+    BAMBU_CMYK_HEX = {c.label: c.hex for c in BAMBU_CMYK_PRESET}
+    DEFAULT_CLEAR_TD = {c.label: c.transmission_distance for c in CLEAR_CMYK_PRESET}
+    CLEAR_CMYK_HEX = {c.label: c.hex for c in CLEAR_CMYK_PRESET}
 
     def __init__(self, colors=None, clear=False, names=None):
         self.colors = colors if colors is not None else {}
@@ -175,25 +253,17 @@ class Colors:
         if colors is not None:
             return
 
-        if names is not None:
-            for c in names:
-                if clear:
-                    hex = self.BAMBU_CMYK_HEX.get(c, '#FFFFFF')
-                    self.colors[c] = Color(c, Colors.DEFAULT_CLEAR_TD.get(c), hex)
+        preset = self._CLEAR_PRESET if clear else self._BAMBU_PRESET
+        labels = names if names is not None else self.PRIMARY_COLORS
 
-                else:
-                    hex = self.CLEAR_CMYK_HEX.get(c, '#FFFFFF')
-                    self.colors[c] = Color(c, Colors.DEFAULT_TD.get(c), hex)
-        else:
-            # init with cmyw
-            for c in Colors.PRIMARY_COLORS:
-                if clear:
-                    hex = self.CLEAR_CMYK_HEX.get(c, '#FFFFFF')
-                    self.colors[c] = Color(c, Colors.DEFAULT_CLEAR_TD.get(c), hex)
-
-                else:
-                    hex = self.BAMBU_CMYK_HEX.get(c, '#FFFFFF')
-                    self.colors[c] = Color(c, Colors.DEFAULT_TD.get(c), hex)
+        for c in labels:
+            cfg = preset.get(c)
+            if cfg is None:
+                raise ValueError(
+                    f"Unknown color label '{c}'. "
+                    f"Valid labels: {list(preset.keys())}"
+                )
+            self.colors[c] = Color(c, cfg.transmission_distance, cfg.hex)
 
 
     def __len__(self):
@@ -201,19 +271,24 @@ class Colors:
 
     def __getitem__(self, label):
         label = label.strip().upper()
+        if label not in self.colors:
+            available = ', '.join(sorted(self.colors.keys()))
+            raise KeyError(
+                f"Color label '{label}' not found. Available labels: {available}"
+            )
         return self.colors[label]
 
     def __setitem__(self, label, value=None):
         label = label.strip().upper()
-        self.colors[label.strip().upper()] = value
+        self.colors[label] = value
 
     def add(self, color):
         self.colors[color.get_label()] = color
 
-    def update_white_balance(self, new_r, new_b, new_g):
+    def update_white_balance(self, new_r, new_g, new_b):
         self.white_balance['r'] = new_r
-        self.white_balance['b'] = new_b
         self.white_balance['g'] = new_g
+        self.white_balance['b'] = new_b
 
     def get_labels(self):
         """Return list of color labels in insertion order."""
@@ -244,6 +319,18 @@ class Colors:
 
         for config in configs:
             label = config.label
+            # Validate that label is ASCII (first char of name must be ASCII letter)
+            if not label.isascii():
+                raise ValueError(
+                    f"Color label '{label}' from name '{config.name}' is not ASCII. "
+                    f"Color names must start with an ASCII letter (A-Z, a-z). "
+                    f"The first character is used as the blend code identifier."
+                )
+            if label in instance.colors:
+                raise ValueError(
+                    f"Duplicate color label '{label}' from name '{config.name}'. "
+                    f"Each color must have a unique first letter."
+                )
             color = Color(
                 name=config.name,
                 transmission_distance=config.transmission_distance,
@@ -257,15 +344,19 @@ class BlendTestGenerator:
     def __init__(self, plate_length=13*16, plate_width=13*16, grid_length=13, grid_width=13, layer_height=.08, layer_count_max=4,
                  same_height=False, rearrange_by_size = True, sort_color=True, verbose = True,
                  directory = 'output',
-                 colors = Colors()
+                 colors = None,
+                 alpha: float = 12.0
                 ):
+        if layer_count_max <= 0:
+            raise ValueError(f"layer_count_max must be positive, got {layer_count_max}")
         self.length_total = plate_length
         self.width_total = plate_width
         self.grid_length = grid_length
         self.grid_width = grid_width
         self.layer_height = layer_height
         self.layer_count_max = layer_count_max
-        self.colors = colors
+        self.colors = colors if colors is not None else Colors()
+        self.alpha = alpha
         self.reshape = rearrange_by_size
         self.same_height = same_height
         self.sort_color = sort_color
@@ -279,6 +370,9 @@ class BlendTestGenerator:
     def reshape_matrix(self, df):
         # split
         split_num_x = df.shape[0] * df.shape[1] * self.grid_length // self.length_total
+        # Guard against split_num_x being 0 before using it in division
+        if split_num_x == 0:
+            return df, self.grid_length, self.grid_width
         split_num_y = df.shape[0] * df.shape[1] // split_num_x
 
         if split_num_x > 0 and self.reshape:
@@ -287,8 +381,8 @@ class BlendTestGenerator:
             df = df
 
         if self.verbose:
-            print(f"Length per cell: {self.grid_length:.2f}, Width per cell: {self.grid_width}, Layer height: {self.layer_height}")
-            print(f'Total build volume: Length={self.length_total}, Width={self.width_total}, Height={self.layer_height * self.layer_count_max}')
+            logger.debug("Length per cell: %.2f, Width per cell: %s, Layer height: %s", self.grid_length, self.grid_width, self.layer_height)
+            logger.debug("Total build volume: Length=%s, Width=%s, Height=%s", self.length_total, self.width_total, self.layer_height * self.layer_count_max)
 
         return df, self.grid_length, self.grid_width
 
@@ -321,11 +415,6 @@ class BlendTestGenerator:
                         x_range = [grid_length*(x), grid_length*(x+1)]
                         y_range = [grid_width*y, grid_width*(y+1)]
                         z_range = [self.layer_height * color_idx, self.layer_height * (color_idx + 1)]
-                        # if self.verbose:
-                        #     print(f"{len(code)} layers: [{code}:{code[color_idx]}]. "
-                        #         f"x=[{x_range}], "
-                        #         f"y=[{y_range}], "
-                        #         f"z=[{z_range}]")
                         meshes[color].append(self.generate_box(x_range, y_range, z_range))
 
         self.merge_meshes_by_color(meshes)
@@ -344,7 +433,6 @@ class BlendTestGenerator:
             for length in range(2, count + 1):
                 combos = [first + ''.join(p) for p in itertools.product(items, repeat=length - 1)]
                 row.extend(combos)
-            # row.sort()
             matrix.append(row)
         max_len = max(len(r) for r in matrix)
 
@@ -361,6 +449,8 @@ class BlendTestGenerator:
         """
         Generate a permutation matrix for the given items and count.
         """
+        if not items:
+            raise ValueError("items list cannot be empty for permutation_matrix")
         perms = list(itertools.product(items, repeat=count))
         joined  = [''.join(p) for p in perms]
         row = len(items)
@@ -429,8 +519,7 @@ class BlendTestGenerator:
         """
 
         file_path = os.path.join(self.directory, filename)
-        if not os.path.isdir(self.directory):
-            os.mkdir(self.directory)
+        os.makedirs(self.directory, exist_ok=True)
         mesh_obj.save(file_path)
         return mesh_obj
 
@@ -440,25 +529,16 @@ class BlendTestGenerator:
         """
 
         file_path = os.path.join(self.directory, self.filename)
-        if not os.path.isdir(self.directory):
-            os.mkdir(self.directory)
+        os.makedirs(self.directory, exist_ok=True)
         self.df_rgb.to_csv(file_path+'_rgb.csv', index=False)
         self.df_code.to_csv(file_path+'_code.csv', index=False)
 
     def read_matrix_csv(self, filename):
         # read CSV forcing strings
-        df_raw = pd.read_csv(model.directory+filename,
+        df_raw = pd.read_csv(os.path.join(self.directory, filename),
                             header=0, dtype=str)
 
         df_parsed = df_raw.map(self.parse_cell)
-
-        # # If you want separate label and rgb matrices:
-        # df_label = df_parsed.applymap(lambda v: v[0] if isinstance(v, tuple) else v)
-        # df_rgb   = df_parsed.applymap(lambda v: tuple(map(float, v[1])) if isinstance(v, tuple) else v)
-
-        # Example access
-        # print(df_label.iloc[0,0])   # 'WWWW'
-        # print(df_rgb.iloc[0,0])     # (255.0, 255.0, 255.0)
         return df_parsed
 
     def matrix_to_code_color_map(self, df_rgb, df_code):
@@ -485,7 +565,8 @@ class BlendTestGenerator:
             for c in range(n_cols):
                 code = df.iloc[r, c]
                 rgb = self.code_to_rgb(code)
-                h, l, s = colorsys.rgb_to_hls(*rgb)
+                # code_to_rgb returns [0, 255] RGB values, normalize for colorsys
+                h, l, s = colorsys.rgb_to_hls(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
                 tone = 2
                 if Color.is_neutral(rgb, 15.5):
                     tone = 0
@@ -507,8 +588,11 @@ class BlendTestGenerator:
         df_code = pd.DataFrame()
         sorted_by_hue = df_rgb.sort_values(by=["tone", "hue"], ascending=[False, True]).reset_index(drop=True)
         df_rgb = pd.DataFrame(index=range(n_rows), columns=range(n_cols), dtype=object)
-        cols_per_hue = np.array_split(sorted_by_hue, n_cols)
-        for new_c, col_group in enumerate(cols_per_hue):
+
+        # Split DataFrame into columns and convert back to DataFrame if needed
+        indices = np.array_split(range(len(sorted_by_hue)), n_cols)
+        for new_c, idx_group in enumerate(indices):
+            col_group = sorted_by_hue.iloc[idx_group]
             # sort by light
             col_sorted = col_group.sort_values(by=["tone", "light", "code"], ascending=[False, False, True]).reset_index(drop=True)
             # fill
@@ -524,35 +608,23 @@ class BlendTestGenerator:
         return df_rgb, df_code
 
 
+    def _color_key(self) -> tuple:
+        """Build a hashable key from current color configuration."""
+        return tuple(
+            (label, self.colors[label].td, self.colors[label].hex)
+            for label in self.colors.get_labels()
+        )
+
     def code_to_rgb(self, code: str):
         """
-        Layered optical mixing using Beer–Lambert
-        td: bound to material, not floating
+        Layered optical mixing using Beer-Lambert law.
+        Results are LRU-cached keyed on (code, layer_height, color_config, alpha).
         """
         if not code:
             return (255, 255, 255)
 
         code = code.strip().upper()
-        tranmission = [Color.get_transmission_rate(self.layer_height, self.colors[c].td, alpha=23) for c in code]
-
-        remain = 1
-        light_loss_ratio = np.zeros(self.layer_count_max+1)
-
-        for i, t in enumerate(tranmission):  # top to bottom
-            light_loss_ratio[i] = remain * (1-t)
-            remain *= t
-        light_loss_ratio[i+1] = remain * (1-t)
-
-        # Normalize
-        light_loss_ratio = light_loss_ratio / np.sum(light_loss_ratio)
-
-        rgb = np.ones(3)
-        for i, c in enumerate(code):
-            color = self.colors[c]
-            rgb -= color.get_absorption() * light_loss_ratio[i] # accumulate light loss
-        # simulate white background if additional light passes all layers
-        rgb = light_loss_ratio[-1] * np.ones(3) + (1 - light_loss_ratio[-1]) * rgb
-        return tuple(rgb * 255)
+        return _code_to_rgb_cached(code, self.layer_height, self._color_key(), self.alpha)
 
 
     def save_matrix_image(self, save_blank = True):
@@ -562,21 +634,20 @@ class BlendTestGenerator:
         for y in range(rows):
             for x in range(cols):
                 rgb = self.df_rgb.iat[y, x]
-                if rgb == None:
+                if rgb is None:
                     rgb_array[y*cell_size:(y+1)*cell_size, x*cell_size:(x+1)*cell_size] = (255, 255, 255)
                 else:
                     rgb_array[y*cell_size:(y+1)*cell_size, x*cell_size:(x+1)*cell_size] = rgb
 
         file_path = os.path.join(self.directory, self.filename+'.png')
-        if not os.path.isdir(self.directory):
-            os.mkdir(self.directory)
+        os.makedirs(self.directory, exist_ok=True)
         img = Image.fromarray(rgb_array)
         draw = ImageDraw.Draw(img)
         img_blank = Image.fromarray(rgb_array)
         draw_blank = ImageDraw.Draw(img_blank)
         for y in range(rows):
             for x in range(cols):
-                if (self.df_code.iat[y, x] == None):
+                if self.df_code.iat[y, x] is None:
                     continue
                 else:
                     if pd.isna(self.df_code.iat[y, x]):
@@ -633,10 +704,9 @@ class BlendTestGenerator:
 
                 if save_samples:
                     filename = f"tile{row}_{col}.png"
-                    directory = self.directory+'samples/'
+                    directory = os.path.join(self.directory, 'samples')
                     file_path = os.path.join(directory, filename)
-                    if not os.path.isdir(directory):
-                        os.mkdir(directory)
+                    os.makedirs(directory, exist_ok=True)
 
                     # save and check cropped sample
                     cell = img.crop((xs, ys, xe, ye))
@@ -663,13 +733,8 @@ class BlendTestGenerator:
                 photo_rgb = df_photo.iat[y_idx, x_idx]
                 new_rgb = code_color_map[photo_code]
 
-                # df_photo.iloc[y_idx, x_idx] =  tuple((photo_code, photo_rgb))
                 diff = math.sqrt((new_rgb[0]-photo_rgb[0]) ** 2 + (new_rgb[1]-photo_rgb[1]) ** 2 + (new_rgb[2]-photo_rgb[2]) ** 2) / max_diff
                 diffs[y_idx, x_idx] = round(diff, 2)
-                # if self.verbose:
-                #     print(f'code: {df_gen.iat[y_idx, x_idx][0]}, preview:{gen_rgb}, photo_sample:{photo_rgb}')
-        # if save_comp_img:
-        #     self.save_matrix_image(df_photo, df_rgb, 'sample.png', False)
 
         avg = np.average(pd.DataFrame(diffs))
         wrong_color_count = dict.fromkeys(self.colors.get_labels(), 0)
@@ -679,7 +744,7 @@ class BlendTestGenerator:
                     code, _ = df_ref.iloc[y_idx][x_idx]
                     for c in code:
                         wrong_color_count[c] = wrong_color_count[c] + diffs[y_idx, x_idx]
-        print(wrong_color_count)
+        logger.debug("Wrong color count: %s", wrong_color_count)
         return avg
 
 
@@ -708,15 +773,3 @@ if __name__ == "__main__":
         layer_height=.28*3, layer_count_max=4,
         same_height=True, sort_color=True, verbose=False
         )
-
-
-    model = four
-    df_rgb, df_code = model.generate()
-
-    # df_ref = model.read_matrix_csv('IMG_6785.csv')
-    # # df_ref_clear = model.read_matrix_csv('IMG_6803.csv')
-
-    # df_photo = model.image_to_rgb_matrix(model.directory+'IMG_6785.JPG', save_samples=True)
-    # print(model.color_variance(df_ref, df_photo, df_rgb, df_code, save_comp_img=True))
-
-    print(Color.map_to_nearest_color([(0, 0, 0)], df_code, df_rgb))
