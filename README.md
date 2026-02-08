@@ -167,6 +167,56 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - [Architecture](docs/ARCHITECTURE.md)
 - [Project Instructions](CLAUDE.md)
 
+## Calibration
+
+The Beer-Lambert model uses two key parameters per filament:
+- **alpha** -- absorption coefficient (`T = exp(-alpha * d / td)`)
+- **td** -- transmission distance (material property)
+
+These can be calibrated against photos of physical test prints to minimize perceptual color error (CIELAB Delta-E).
+
+### Workflow
+
+1. **Print a test plate** -- 16x16 grid of all 256 CMYW permutations
+2. **Photograph** -- diffuse lighting, straight-on, crop to grid boundaries
+3. **Run calibration** -- CLI optimizes parameters to match the photo
+
+```bash
+cd backend
+source .venv/bin/activate
+
+# Alpha-only (fast, recommended first step)
+python -m tests.calibration.run_calibration \
+  --photo tests/calibration/print_regular_0.32.png \
+  --preset bambu \
+  --mode alpha \
+  --gen-alpha 23
+
+# Alpha + per-color td (slower, global optimizer)
+python -m tests.calibration.run_calibration \
+  --photo tests/calibration/print_clear_3.36.png \
+  --preset clear \
+  --mode alpha_td
+```
+
+4. **Review output** -- `calibration_report.json` (metrics, per-color errors, worst codes) + `comparison.png` (3-panel: photo / original model / optimized model)
+5. **Update presets** -- apply optimal values in `backend/core/color_config.py`
+
+### CLI Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--photo` | Path to calibration photo | (required) |
+| `--preset` | `bambu` or `clear` | `bambu` |
+| `--mode` | `alpha` (1 param, L-BFGS-B) or `alpha_td` (5 params, differential evolution) | `alpha` |
+| `--gen-alpha` | Alpha used when generating the printed test plate | auto-detect |
+| `--output` | Output directory | `tests/calibration/results/` |
+| `--grid-size` | Grid dimensions | `16` |
+| `--layer-height` | Layer height in mm | `0.08` |
+| `--layer-count` | Number of layers | `4` |
+
+See [`backend/tests/calibration/README.md`](backend/tests/calibration/README.md) for full details.
+
 ## How It Works
 
 1. **Color Extraction** - K-means clustering extracts dominant colors from image
