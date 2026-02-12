@@ -50,7 +50,10 @@ backend/htmlcov/
 
 # Test artifacts
 test-results/
-backend/tests/calibration/
+
+# Calibration outputs (generated plates, results, history)
+backend/tools/calibration/plates/
+backend/tools/calibration/results/
 
 # AI Agent
 .claude/

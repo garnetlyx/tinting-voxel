@@ -363,7 +363,7 @@ class BlendTestGenerator:
         self.verbose = verbose
         color_labels = ''.join(self.colors.get_labels())
         self.filename = f'{color_labels}_{self.length_total}x{self.width_total}x{self.layer_height * self.layer_count_max:.2f}'
-        self.directory = f'./{directory}/{self.filename}/'
+        self.directory = os.path.join(directory, self.filename) + '/'
         self.df_code = pd.DataFrame()
         self.df_rgb = pd.DataFrame()
 
