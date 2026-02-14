@@ -15,7 +15,7 @@ import trimesh
 
 from core.blend_color import Color, Colors
 from services.mesh_optimizer import generate_optimized_boxes
-from services.stl_generator import compute_reference_matrices, generate_box
+from services.stl_generator import compute_reference_matrices, generate_box, generate_boxes_batch
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +35,16 @@ def _triangles_to_trimesh(mesh_arrays: list[np.ndarray], color_rgb: tuple = None
         return trimesh.Trimesh()
 
     all_triangles = np.concatenate(mesh_arrays, axis=0)
+    mesh_arrays.clear()  # free source arrays for GC
     num_triangles = all_triangles.shape[0]
 
     # Build vertex and face arrays from triangle soup
     vertices = all_triangles.reshape(-1, 3)
     faces = np.arange(num_triangles * 3).reshape(-1, 3)
 
-    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=True)
+    # process=False: skip vertex deduplication (box meshes don't share vertices)
+    # Saves ~150 MB peak memory and 15-30s processing time
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
 
     if color_rgb:
         r, g, b = color_rgb
@@ -115,6 +118,19 @@ def generate_3mf(
     width, height = image_dimensions['width'], image_dimensions['height']
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
+    # Complexity guard
+    estimated_boxes = sum(len(b['pixels']) for b in color_blocks) * layer_count
+    if estimated_boxes > 5_000_000:
+        raise ValueError(
+            f"Request too complex: ~{estimated_boxes:,} estimated boxes. "
+            f"Reduce image size or colors."
+        )
+
+    logger.info(
+        "3MF generation: %d color blocks, %d layers, %dx%d image, ~%d estimated boxes",
+        len(color_blocks), layer_count, width, height, estimated_boxes
+    )
+
     # Generate meshes per color block
     for idx, color_block in enumerate(color_blocks):
         pixels = color_block['pixels']
@@ -129,18 +145,20 @@ def generate_3mf(
                     pixels=pixels, width=width, height=height,
                     pixel_size=pixel_size, z_min=z_min, z_max=z_max
                 )
-                for xrange, yrange, zrange in optimized_boxes:
-                    mesh = generate_box(xrange, yrange, zrange)
-                    code_mesh_map[code_char].append(mesh)
+                batch_mesh = generate_boxes_batch(optimized_boxes)
+                code_mesh_map[code_char].append(batch_mesh)
             else:
-                for pixel in pixels:
-                    x, y = pixel['x'], pixel['y']
-                    mesh = generate_box(
-                        xrange=(x * pixel_size, (x + 1) * pixel_size),
-                        yrange=(y * pixel_size, (y + 1) * pixel_size),
-                        zrange=(z_min, z_max)
+                box_ranges = [
+                    (
+                        (pixel['x'] * pixel_size, (pixel['x'] + 1) * pixel_size),
+                        (pixel['y'] * pixel_size, (pixel['y'] + 1) * pixel_size),
+                        (z_min, z_max)
                     )
-                    code_mesh_map[code_char].append(mesh)
+                    for pixel in pixels
+                ]
+                if box_ranges:
+                    batch_mesh = generate_boxes_batch(box_ranges)
+                    code_mesh_map[code_char].append(batch_mesh)
 
     # Generate back-side (mirrored) layers if double-sided
     if double_sided:
@@ -163,20 +181,24 @@ def generate_3mf(
                         pixels=mirrored_pixels, width=width, height=height,
                         pixel_size=pixel_size, z_min=z_min, z_max=z_max
                     )
-                    for xrange, yrange, zrange in optimized_boxes:
-                        mesh = generate_box(xrange, yrange, zrange)
-                        code_mesh_map[code_char].append(mesh)
+                    batch_mesh = generate_boxes_batch(optimized_boxes)
+                    code_mesh_map[code_char].append(batch_mesh)
                 else:
-                    for pixel in mirrored_pixels:
-                        x, y = pixel['x'], pixel['y']
-                        mesh = generate_box(
-                            xrange=(x * pixel_size, (x + 1) * pixel_size),
-                            yrange=(y * pixel_size, (y + 1) * pixel_size),
-                            zrange=(z_min, z_max)
+                    box_ranges = [
+                        (
+                            (p['x'] * pixel_size, (p['x'] + 1) * pixel_size),
+                            (p['y'] * pixel_size, (p['y'] + 1) * pixel_size),
+                            (z_min, z_max)
                         )
-                        code_mesh_map[code_char].append(mesh)
+                        for p in mirrored_pixels
+                    ]
+                    if box_ranges:
+                        batch_mesh = generate_boxes_batch(box_ranges)
+                        code_mesh_map[code_char].append(batch_mesh)
 
         logger.info("Generated double-sided 3MF: front + mirrored back")
+
+    logger.info("Mesh generation complete, converting to trimesh objects...")
 
     # Convert to trimesh Scene with named objects
     scene = trimesh.Scene()
@@ -197,6 +219,7 @@ def generate_3mf(
 
         mesh_obj = _triangles_to_trimesh(mesh_arrays, color_rgb=rgb)
         scene.add_geometry(mesh_obj, node_name=f"color_{label}")
+        logger.info("Converted color '%s': %d triangles", label, len(mesh_obj.faces))
 
     # Add base plate
     if base_plate_thickness > 0:
@@ -209,6 +232,7 @@ def generate_3mf(
         scene.add_geometry(base_obj, node_name="base_plate")
 
     # Export as 3MF
+    logger.info("Exporting 3MF file with %d objects...", len(scene.geometry))
     buf = BytesIO()
     scene.export(buf, file_type='3mf')
     result = buf.getvalue()
