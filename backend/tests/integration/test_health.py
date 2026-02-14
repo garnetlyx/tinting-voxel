@@ -3,17 +3,9 @@ Integration tests for health check endpoints.
 """
 
 
-def test_root_returns_200(client):
-    """GET / returns 200 with status ok."""
-    response = client.get("/")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
-
-
 def test_health_check_returns_healthy(client):
-    """GET /health returns healthy status."""
-    response = client.get("/health")
+    """GET /api/health returns healthy status."""
+    response = client.get("/api/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
@@ -21,8 +13,8 @@ def test_health_check_returns_healthy(client):
 
 
 def test_detailed_health_returns_system_info(client):
-    """GET /health/detailed returns service info (system info removed for security)."""
-    response = client.get("/health/detailed")
+    """GET /api/health/detailed returns service info (system info removed for security)."""
+    response = client.get("/api/health/detailed")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"

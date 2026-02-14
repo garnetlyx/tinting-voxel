@@ -6,18 +6,7 @@ from fastapi import APIRouter
 router = APIRouter(tags=["Health"])
 
 
-@router.get("/")
-async def root() -> dict[str, str]:
-    """
-    Root endpoint - basic health check
-    """
-    return {
-        "status": "ok",
-        "message": "ImageToSTL Converter API"
-    }
-
-
-@router.get("/health")
+@router.get("/api/health")
 async def health_check() -> dict[str, str]:
     """
     Health check endpoint for load balancers and monitoring
@@ -29,7 +18,7 @@ async def health_check() -> dict[str, str]:
     }
 
 
-@router.get("/health/detailed")
+@router.get("/api/health/detailed")
 async def detailed_health_check() -> dict:
     """
     Detailed health check with service information
