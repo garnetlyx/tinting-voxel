@@ -93,6 +93,92 @@ def compute_reference_matrices(
     return code_df, rgb_df
 
 
+def _log_blend_code_distribution(
+    result_codes: list[str],
+    labels: list[str],
+    generator_name: str = "STL"
+) -> dict[str, int]:
+    """
+    Log blend code distribution to help diagnose missing filament colors.
+
+    Args:
+        result_codes: List of blend code strings (e.g., ["CCMY", "CCCC", ...])
+        labels: All available filament labels (e.g., ["C", "M", "Y", "W"])
+        generator_name: Name for log messages
+
+    Returns:
+        Dict mapping each label to its total layer count
+    """
+    from collections import Counter
+
+    char_counts: Counter = Counter()
+    code_counts: Counter = Counter()
+    for code in result_codes:
+        code_counts[code] += 1
+        for ch in code:
+            char_counts[ch] += 1
+
+    total_layers = sum(char_counts.values())
+
+    label_stats = []
+    absent_labels = []
+    for label in labels:
+        count = char_counts.get(label, 0)
+        pct = (count / total_layers * 100) if total_layers > 0 else 0
+        label_stats.append(f"{label}={count} ({pct:.1f}%)")
+        if count == 0:
+            absent_labels.append(label)
+
+    logger.info(
+        "%s blend codes (%d blocks, %d layers): %s",
+        generator_name, len(result_codes), total_layers,
+        ", ".join(label_stats)
+    )
+
+    top_codes = code_counts.most_common(5)
+    logger.info(
+        "%s top codes: %s",
+        generator_name,
+        ", ".join(f"{code}={count}" for code, count in top_codes)
+    )
+
+    if absent_labels:
+        logger.warning(
+            "%s: filament(s) %s not used in any blend code",
+            generator_name, ", ".join(absent_labels)
+        )
+
+    return dict(char_counts)
+
+
+def _log_input_color_brightness(
+    input_colors: list[tuple[int, int, int]],
+    generator_name: str = "STL"
+) -> None:
+    """
+    Log brightness statistics for input colors.
+
+    Helps diagnose why White filament may not appear — if no input colors
+    are near-white, the mapping will never select W layers.
+    """
+    if not input_colors:
+        return
+
+    brightnesses = [
+        (r * 0.299 + g * 0.587 + b * 0.114) / 255.0
+        for r, g, b in input_colors
+    ]
+    avg_brightness = sum(brightnesses) / len(brightnesses)
+    max_brightness = max(brightnesses)
+    near_white = sum(1 for b in brightnesses if b > 0.85)
+
+    logger.info(
+        "%s input brightness: avg=%.2f, max=%.2f, near-white (>85%%): %d/%d",
+        generator_name, avg_brightness, max_brightness,
+        near_white, len(input_colors)
+    )
+
+
 def initialize_color_mapping(
     layer_count: int = 4,
     layer_height: float = 0.08,
@@ -372,6 +458,9 @@ def generate_stl_zip(
         ref_code_matrix,
         ref_rgb_matrix
     )
+
+    _log_input_color_brightness(input_colors, "STL")
+    _log_blend_code_distribution(result_codes, active_colors.get_labels(), "STL")
 
     width, height = image_dimensions['width'], image_dimensions['height']
     total_original_boxes = 0

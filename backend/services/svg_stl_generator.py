@@ -14,7 +14,12 @@ import numpy as np
 
 from core.blend_color import Color, Colors
 from services import stl_generator
-from services.stl_generator import get_filename_prefix, merge_stl_meshes
+from services.stl_generator import (
+    get_filename_prefix,
+    merge_stl_meshes,
+    _log_blend_code_distribution,
+    _log_input_color_brightness,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +286,9 @@ def generate_svg_stl_zip(
         ref_code_matrix,
         ref_rgb_matrix
     )
+
+    _log_input_color_brightness(input_colors, "SVG-STL")
+    _log_blend_code_distribution(result_codes, active_colors.get_labels(), "SVG-STL")
 
     width = image_dimensions['width']
     height = image_dimensions['height']

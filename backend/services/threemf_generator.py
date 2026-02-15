@@ -15,7 +15,13 @@ import trimesh
 
 from core.blend_color import Color, Colors
 from services.mesh_optimizer import generate_optimized_boxes
-from services.stl_generator import compute_reference_matrices, generate_box, generate_boxes_batch
+from services.stl_generator import (
+    compute_reference_matrices,
+    generate_box,
+    generate_boxes_batch,
+    _log_blend_code_distribution,
+    _log_input_color_brightness,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +48,10 @@ def _triangles_to_trimesh(mesh_arrays: list[np.ndarray], color_rgb: tuple = None
     vertices = all_triangles.reshape(-1, 3)
     faces = np.arange(num_triangles * 3).reshape(-1, 3)
 
-    # process=False: skip vertex deduplication (box meshes don't share vertices)
-    # Saves ~150 MB peak memory and 15-30s processing time
+    # process=False skips full processing; merge_vertices() deduplicates vertices
+    # to fix non-manifold edges while avoiding expensive winding/degenerate checks
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+    mesh.merge_vertices()
 
     if color_rgb:
         r, g, b = color_rgb
@@ -114,6 +121,9 @@ def generate_3mf(
     result_codes, _ = Color.map_to_nearest_color(
         input_colors, ref_code_matrix, ref_rgb_matrix
     )
+
+    _log_input_color_brightness(input_colors, "3MF")
+    _log_blend_code_distribution(result_codes, labels, "3MF")
 
     width, height = image_dimensions['width'], image_dimensions['height']
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
