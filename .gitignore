@@ -51,7 +51,8 @@ backend/htmlcov/
 # Test artifacts
 test-results/
 
-# Calibration outputs (generated plates, results, history)
+# Calibration data (photos, generated plates, results)
+backend/tools/calibration/photos/
 backend/tools/calibration/plates/
 backend/tools/calibration/results/
 

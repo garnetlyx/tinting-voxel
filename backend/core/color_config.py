@@ -65,9 +65,9 @@ class ColorConfig:
 
 # Preset definitions for common filament configurations
 BAMBU_CMYK_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan", hex="#0086D6", transmission_distance=3.0, alpha=12.0),
-    ColorConfig(name="Magenta", hex="#EC008C", transmission_distance=1.9, alpha=12.0),
-    ColorConfig(name="Yellow", hex="#F4EE2A", transmission_distance=2.5, alpha=12.0),
+    ColorConfig(name="Cyan", hex="#3D79C6", transmission_distance=3.0, alpha=12.0),
+    ColorConfig(name="Magenta", hex="#B3356E", transmission_distance=1.9, alpha=12.0),
+    ColorConfig(name="Yellow", hex="#FFE665", transmission_distance=2.5, alpha=12.0),
     ColorConfig(name="White", hex="#FFFFFF", transmission_distance=7.2, alpha=12.0),
 ]
 
