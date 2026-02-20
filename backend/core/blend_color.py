@@ -165,7 +165,8 @@ class Color:
         return results_code, results_color
 
 @functools.lru_cache(maxsize=4096)
-def _code_to_rgb_cached(code: str, layer_height: float, color_key: tuple, alpha: float = 12.0) -> tuple:
+def _code_to_rgb_cached(code: str, layer_height: float, color_key: tuple,
+                        alpha: float = 12.0, blend_mode: str = "original") -> tuple:
     """Cached computation of layered optical mixing using Beer-Lambert.
 
     Args:
@@ -174,6 +175,7 @@ def _code_to_rgb_cached(code: str, layer_height: float, color_key: tuple, alpha:
         color_key: Frozen tuple of (label, transmission_distance, hex) per color,
                    used as hashable cache key.
         alpha: Absorption coefficient for Beer-Lambert model.
+        blend_mode: Blending algorithm — "original", "kromacut", or "per_channel".
     """
     if not code:
         return (255.0, 255.0, 255.0)
@@ -191,6 +193,12 @@ def _code_to_rgb_cached(code: str, layer_height: float, color_key: tuple, alpha:
                 f"Available labels: {available}"
             )
 
+    if blend_mode == "kromacut":
+        return _blend_kromacut(code, layer_height, color_map)
+    elif blend_mode == "per_channel":
+        return _blend_per_channel(code, layer_height, color_map)
+
+    # Original mode
     transmission = [
         Color.get_transmission_rate(layer_height, color_map[c].td, alpha=alpha)
         for c in code
@@ -215,6 +223,51 @@ def _code_to_rgb_cached(code: str, layer_height: float, color_key: tuple, alpha:
         rgb -= color.get_absorption() * light_loss_ratio[i]
     rgb = bg * np.ones(3) + (1 - bg) * rgb
     return tuple(np.clip(rgb * 255, 0, 255))
+
+
+def _blend_kromacut(code: str, layer_height: float, color_map: dict) -> tuple:
+    """Mode A: Kromacut/HueForge-style blending.
+
+    Scalar transmission T = 10^(-d/TD) with per-channel linear interpolation.
+    Iterative: each layer blends onto previous result, starting from white.
+    """
+    LN10 = np.log(10)
+    result = np.array([255.0, 255.0, 255.0])  # white background
+
+    for c in code:
+        color = color_map[c]
+        td = color.td
+        if td <= 0:
+            t = 0.0
+        else:
+            t = np.exp(-LN10 * layer_height / td)  # T = 10^(-d/TD)
+        opacity = 1.0 - t
+        filament_rgb = np.array(color.rgb, dtype=np.float64)
+        result = filament_rgb * opacity + result * t
+
+    return tuple(np.clip(result, 0, 255))
+
+
+def _blend_per_channel(code: str, layer_height: float, color_map: dict) -> tuple:
+    """Mode B: Per-channel transmission blending.
+
+    Each RGB channel has its own transmission rate derived from the filament's
+    absorption in that channel: T_ch = exp(-absorption_ch * d / TD).
+    """
+    result = np.array([255.0, 255.0, 255.0])  # white background
+
+    for c in code:
+        color = color_map[c]
+        td = color.td
+        if td <= 0:
+            t_ch = np.zeros(3)
+        else:
+            absorption = color.get_absorption()  # (255 - rgb) / 255 per channel
+            t_ch = np.exp(-absorption * layer_height / td)  # per-channel T
+        filament_rgb = np.array(color.rgb, dtype=np.float64)
+        result = filament_rgb * (1.0 - t_ch) + result * t_ch
+
+    return tuple(np.clip(result, 0, 255))
 
 
 def clear_rgb_cache():
@@ -345,7 +398,8 @@ class BlendTestGenerator:
                  same_height=False, rearrange_by_size = True, sort_color=True, verbose = True,
                  directory = 'output',
                  colors = None,
-                 alpha: float = 12.0
+                 alpha: float = 12.0,
+                 blend_mode: str = "original"
                 ):
         if layer_count_max <= 0:
             raise ValueError(f"layer_count_max must be positive, got {layer_count_max}")
@@ -357,6 +411,7 @@ class BlendTestGenerator:
         self.layer_count_max = layer_count_max
         self.colors = colors if colors is not None else Colors()
         self.alpha = alpha
+        self.blend_mode = blend_mode
         self.reshape = rearrange_by_size
         self.same_height = same_height
         self.sort_color = sort_color
@@ -624,7 +679,7 @@ class BlendTestGenerator:
             return (255, 255, 255)
 
         code = code.strip().upper()
-        return _code_to_rgb_cached(code, self.layer_height, self._color_key(), self.alpha)
+        return _code_to_rgb_cached(code, self.layer_height, self._color_key(), self.alpha, self.blend_mode)
 
 
     def save_matrix_image(self, save_blank = True):
