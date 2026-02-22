@@ -270,6 +270,59 @@ def _blend_per_channel(code: str, layer_height: float, color_map: dict) -> tuple
     return tuple(np.clip(result, 0, 255))
 
 
+def _blend_hybrid(code: str, layer_height: float, color_map: dict,
+                   scatter_alpha: float = 5.0, k: float = 10.0) -> tuple:
+    """Hybrid blend: Original-style probabilistic stacking + per-channel transmission.
+
+    Combines the proven stacking model from Original mode with per-channel
+    transmission to handle selective absorption (CMY) correctly.
+
+    T_ch = exp(-(scatter_alpha/td + k * absorption_ch) * layer_height)
+
+    Where scatter_alpha/td provides channel-neutral base opacity (works for
+    White/Black) and k * absorption_ch adds per-channel selective attenuation
+    (works for CMY).
+    """
+    n = len(code)
+    if n == 0:
+        return (255.0, 255.0, 255.0)
+
+    # Per-layer, per-channel transmission
+    transmissions = []
+    for c in code:
+        color = color_map[c]
+        td = color.td
+        if td <= 0:
+            t_ch = np.zeros(3)
+        else:
+            scatter = scatter_alpha / td
+            absorption = color.get_absorption()  # (255 - rgb) / 255 per channel
+            t_ch = np.exp(-(scatter + k * absorption) * layer_height)
+            t_ch = np.clip(t_ch, 0, 1)
+        transmissions.append(t_ch)
+
+    # Original-style light distribution (per-channel)
+    remain = np.ones(3)
+    array_size = max(n, 4) + 1
+    light_loss = np.zeros((array_size, 3))
+    for i, t_ch in enumerate(transmissions):
+        light_loss[i] = remain * (1.0 - t_ch)
+        remain *= t_ch
+    light_loss[n] = remain
+
+    total = light_loss.sum(axis=0)
+    total = np.where(total > 0, total, 1.0)
+    light_loss /= total
+
+    bg = light_loss[n]
+    rgb = np.ones(3)
+    for i, c in enumerate(code):
+        color = color_map[c]
+        rgb -= color.get_absorption() * light_loss[i]
+    rgb = bg * np.ones(3) + (1.0 - bg) * rgb
+    return tuple(np.clip(rgb * 255, 0, 255))
+
+
 def clear_rgb_cache():
     """Clear the code_to_rgb LRU cache."""
     _code_to_rgb_cached.cache_clear()
