@@ -367,3 +367,146 @@ Hybrid (per-channel T, probabilistic stacking)
     v
 Next: validate on 16x16 plate, then promote to production
 ```
+
+---
+
+## Related Work
+
+Academic literature on color prediction for translucent 3D-printed materials. Our hybrid model sits between the simple Beer-Lambert approach used by HueForge and the full Kubelka-Munk / radiative transfer models used in research.
+
+### Key Papers
+
+**1. DreamPrinting** — Iser, Rittig, Wilkie et al. (SIGGRAPH 2025)
+[arXiv:2503.00887](https://arxiv.org/abs/2503.00887)
+
+Full Kubelka-Munk model with per-wavelength K(λ) and S(λ) for each pigment. Pigment mixing via linear superposition (`K_mix = Σ ci·Ki`, `S_mix = Σ ci·Si`). Calibrated with spectrophotometer + Levenberg-Marquardt inverse solve. Platform: Stratasys J850 (CMYKW+Clear, 6-color resin). Most directly comparable to our problem.
+
+K-M reflectance/transmittance for thickness d:
+
+```
+a = (S + K) / S,   b = √(a² - 1)
+
+R(λ) = sinh(b·S·d) / [a·sinh(b·S·d) + b·cosh(b·S·d)]
+T(λ) = b / [a·sinh(b·S·d) + b·cosh(b·S·d)]
+```
+
+**2. Scattering-Aware Color Calibration** — Iser, Rittig, Wilkie (SIGGRAPH Asia 2025, Honorable Mention)
+[ACM DOI:10.1145/3763293](https://dl.acm.org/doi/10.1145/3763293)
+
+Multiple-scattering radiative transfer. Per-resin parameters: single-scattering albedo + extinction coefficient. Uses a single printable calibration target — thin translucent layers on black and white substrates. Calibrates neutral colors first (scatter-dominated), then chromatic colors (absorption-dominated). Same strategy as our hybrid approach. Validated on 242 color mixtures.
+
+**3. Color Contoning for 3D Printing** — Babaei et al. (SIGGRAPH 2017)
+[ACM DOI:10.1145/3072959.3073605](https://dl.acm.org/doi/10.1145/3072959.3073605)
+
+Weighted regression of spectral absorptions. Creates colors by varying layer thickness inside the volume (not spatial halftoning) — same principle as our thickness-based color mixing. Achieves continuous-tone color with virtually invisible surface patterns.
+
+**4. Pushing the Limits of 3D Color Printing** — Brunton, Arikan, Urban (ACM TOG 2015)
+[arXiv:1506.02400](https://arxiv.org/abs/1506.02400)
+
+Error diffusion halftoning for translucent multi-jet materials. Addresses the challenge that translucency causes volumetric cross-talk between adjacent voxels.
+
+**5. Geometry-Aware Scattering Compensation** — Sumin et al. (2019)
+[Project page](https://cgg.mff.cuni.cz/~jaroslav/papers/2019-texfab3d/index.html)
+
+Monte Carlo light transport for arbitrary 3D shapes. Content-aware gamut mapping for thin geometric features where scattering cross-talk is worst.
+
+**6. Neural Acceleration of Scattering-Aware Color 3D Printing** — Rittig et al. (Eurographics 2021)
+[DOI:10.1111/cgf.142626](https://onlinelibrary.wiley.com/doi/10.1111/cgf.142626)
+
+Neural network replaces Monte Carlo simulation, achieving 300× speedup with equivalent quality. Predicts surface appearance of heterogeneous translucent media.
+
+**7. White Core Thickness Effect on 3D-Printed Color Reproduction** (IJAMT 2025)
+[Springer](https://link.springer.com/article/10.1007/s00170-025-15515-w)
+
+Experimental proof that white core thickness < 2mm affects reproduced surface color when using translucent inks. Validates the double-pass light transport assumption underlying our Original model's `(1-T)²` opacity.
+
+### Model Hierarchy
+
+| Model | Parameters | Per-channel? | Scattering? | Used by |
+|-------|-----------|-------------|------------|---------|
+| Beer-Lambert (scalar) | α, td | No | No | HueForge, our Original/Kromacut |
+| Beer-Lambert (per-ch) | A_ch, td | Yes | No | Our Mode B (White invisible) |
+| **Our Hybrid** | scatter_α, k, td | **Yes** | **Yes (empirical)** | **Our Mode H** |
+| Kubelka-Munk (2-flux) | K(λ), S(λ) | Per-wavelength | Yes (rigorous) | DreamPrinting, coatings industry |
+| 4-flux model | K, S + directional | Per-wavelength | Yes + specular | Printing research |
+| Full radiative transfer | albedo, σ_ext, phase fn | Per-wavelength | Yes (Monte Carlo) | Sumin 2019, Rittig 2021 |
+
+### Our Hybrid as Simplified K-M
+
+Our hybrid transmission formula maps to Kubelka-Munk concepts:
+
+```
+Our:  T_ch = exp(-(scatter_alpha/td + k·A_ch) · d)
+                  |_______________|   |________|
+                  ≈ K-M scattering S   ≈ K-M absorption K
+
+K-M:  When S is small relative to K, the K-M solution approximates Beer-Lambert:
+      T ≈ exp(-(K + S) · d)
+```
+
+Key differences from full K-M:
+- We use RGB 3-channel, not per-wavelength spectral
+- We use `exp(-μd)` (Beer-Lambert), not `sinh/cosh` (K-M finite-thickness solution)
+- We calibrate with camera + photography, not spectrophotometer
+- Trade-off: less accurate, but accessible for FDM maker workflow (TD1S + hex color input)
+
+### Kubelka-Munk Fundamentals
+
+For reference, the full K-M two-flux differential equations:
+
+```
+di/dx = -(K + S)·i + S·j        [downward flux i absorbed and scattered]
+dj/dx =  (K + S)·j - S·i        [upward flux j absorbed and scattered]
+```
+
+where K = absorption coefficient, S = scattering coefficient, x = depth into layer.
+
+For a layer of thickness d on a substrate with reflectance Rg:
+
+```
+R = [1 - Rg·(a - b·coth(bSd))] / [a - Rg + b·coth(bSd)]
+```
+
+When S → 0 (pure absorption, no scattering): K-M degrades to Beer-Lambert `T = exp(-Kd)`.
+When K → 0 (pure scattering, no absorption): the layer becomes a diffuser.
+
+---
+
+## Future Directions
+
+Potential improvements informed by the academic literature, ordered by complexity:
+
+### 1. Per-Color k (Near-term)
+
+Replace global `k` with per-color `k_c`. Each pigment has a different scatter-to-absorption ratio. Addresses the Magenta anomaly where `td_M = 299.6` in hybrid_td optimization (scatter effectively disabled). See `docs/CALIBRATION.md` Phase 3.5.
+
+```
+T_ch(c) = exp(-(scatter_alpha / td_c + k_c · A_ch(c)) · d)
+```
+
+Parameters: scatter_alpha + N × k_c + N × td_c = 1 + 2N (11 for CMYKW).
+
+### 2. Saunderson Correction (Medium-term)
+
+Account for Fresnel reflection at the PLA-air interface (refractive index n ≈ 1.46):
+
+```
+R_measured = k1 + (1 - k1)(1 - k2) · R_internal / (1 - k2 · R_internal)
+```
+
+where k1 ≈ 0.04 (external specular reflection) and k2 ≈ 0.6 (internal diffuse reflection). Currently ignored — light internally reflected back into the layer undergoes extra absorption passes, contributing to the double-pass `(1-T)²` effect.
+
+### 3. Kubelka-Munk Upgrade (Medium-term)
+
+Replace Beer-Lambert `exp(-μd)` with the K-M finite-thickness solution:
+
+```
+R = sinh(bSd) / [a·sinh(bSd) + b·cosh(bSd)]
+T = b / [a·sinh(bSd) + b·cosh(bSd)]
+```
+
+More accurate for highly scattering materials (White PLA). Backward compatible: when S → 0, K-M degrades to Beer-Lambert. Per-color K and S replace scatter_alpha + k.
+
+### 4. Spectral Model (Long-term)
+
+Per-wavelength K(λ), S(λ) across visible spectrum (380–750nm), converted to RGB via CIE color matching functions under D65 illuminant. Eliminates metamerism issues. Requires spectrophotometer for calibration — not practical for typical FDM maker workflow, but would be definitive. See DreamPrinting (2025).
