@@ -193,6 +193,8 @@ class TestQA70LabelCollisionFromDifferentNames:
         configs = [
             ColorConfig(name="Crimson", hex="#DC143C", transmission_distance=3.0),
             ColorConfig(name="Coral", hex="#FF7F50", transmission_distance=4.0),
+            ColorConfig(name="Magenta", hex="#FF00FF", transmission_distance=2.0),
+            ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=2.5),
         ]
 
         with pytest.raises(ValueError) as exc_info:

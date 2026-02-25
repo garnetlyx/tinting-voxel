@@ -640,6 +640,8 @@ class TestQA142PermutationMatrixEmptyItems:
         """permutation_matrix([]) should raise ValueError, not ZeroDivisionError."""
         configs = [
             ColorConfig(name="Cyan", hex="#00FFFF", transmission_distance=4),
+            ColorConfig(name="Magenta", hex="#FF00FF", transmission_distance=2),
+            ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=3),
             ColorConfig(name="White", hex="#FFFFFF", transmission_distance=20),
         ]
         gen = BlendTestGenerator(

@@ -118,6 +118,8 @@ class TestColorsCaseInsensitiveLookup:
             Colors.from_configs([
                 ColorConfig(name='Cyan', hex='#00FFFF', transmission_distance=3.0),
                 ColorConfig(name='cyan', hex='#00FFFF', transmission_distance=3.0),
+                ColorConfig(name='Magenta', hex='#FF00FF', transmission_distance=2.0),
+                ColorConfig(name='Yellow', hex='#FFFF00', transmission_distance=2.5),
             ])
 
 
@@ -206,12 +208,11 @@ class TestEmptyColorsEdgeCases:
 
     def test_empty_colors_from_configs(self):
         """
-        QA-170: Colors.from_configs with empty list creates empty instance.
+        QA-170: Colors.from_configs with empty list now raises ValueError.
+        Updated: Minimum 4 colors required.
         """
-        colors = Colors.from_configs([])
-
-        assert len(colors) == 0
-        assert colors.get_labels() == []
+        with pytest.raises(ValueError, match="at least 4 colors"):
+            Colors.from_configs([])
 
 
 class TestFilamentConfigMixinValidation:

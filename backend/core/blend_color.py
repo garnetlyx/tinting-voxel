@@ -421,6 +421,13 @@ class Colors:
         """
         from core.color_config import ColorConfig
 
+        # Enforce minimum 4 colors for proper CMYK color mixing
+        if len(configs) < 4:
+            raise ValueError(
+                f"Color configuration requires at least 4 colors, got {len(configs)}. "
+                f"Use the default CMYK preset or provide 4+ custom filament colors."
+            )
+
         instance = cls(colors={})  # Empty dict, skip default initialization
 
         for config in configs:
@@ -559,6 +566,8 @@ class BlendTestGenerator:
         """
         if not items:
             raise ValueError("items list cannot be empty for permutation_matrix")
+        if count <= 0:
+            raise ValueError(f"count must be positive, got {count}")
         perms = list(itertools.product(items, repeat=count))
         joined  = [''.join(p) for p in perms]
         row = len(items)
@@ -575,6 +584,22 @@ class BlendTestGenerator:
         x1, x2 = xrange
         y1, y2 = yrange
         z1, z2 = zrange
+
+        # Validate coordinates are non-negative
+        if x1 < 0 or x2 < 0:
+            raise ValueError(f"X coordinates must be non-negative, got ({x1}, {x2})")
+        if y1 < 0 or y2 < 0:
+            raise ValueError(f"Y coordinates must be non-negative, got ({y1}, {y2})")
+        if z1 < 0 or z2 < 0:
+            raise ValueError(f"Z coordinates must be non-negative, got ({z1}, {z2})")
+
+        # Validate ranges are not inverted
+        if x1 >= x2:
+            raise ValueError(f"X range start must be less than end, got ({x1}, {x2})")
+        if y1 >= y2:
+            raise ValueError(f"Y range start must be less than end, got ({y1}, {y2})")
+        if z1 >= z2:
+            raise ValueError(f"Z range start must be less than end, got ({z1}, {z2})")
 
         vertices = np.array([
             [x1, y1, z1],

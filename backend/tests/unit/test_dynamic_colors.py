@@ -111,11 +111,13 @@ class TestColorsFromConfigs:
         configs = [
             ColorConfig(name="Cyan", hex="#00FFFF", transmission_distance=3.0),
             ColorConfig(name="Magenta", hex="#FF00FF", transmission_distance=1.9),
+            ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=2.5),
+            ColorConfig(name="White", hex="#FFFFFF", transmission_distance=1.0),
         ]
         colors = Colors.from_configs(configs)
 
-        assert len(colors) == 2
-        assert colors.get_labels() == ['C', 'M']
+        assert len(colors) == 4
+        assert colors.get_labels() == ['C', 'M', 'Y', 'W']
         assert colors['C'].name == "Cyan"
         assert colors['M'].name == "Magenta"
 
@@ -132,15 +134,19 @@ class TestColorsFromConfigs:
             ColorConfig(name="Red", hex="#FF0000", transmission_distance=2.0),
             ColorConfig(name="Green", hex="#00FF00", transmission_distance=2.5),
             ColorConfig(name="Blue", hex="#0000FF", transmission_distance=3.0),
+            ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=2.8),
         ]
         colors = Colors.from_configs(configs)
 
-        assert colors.get_labels() == ['R', 'G', 'B']
+        assert colors.get_labels() == ['R', 'G', 'B', 'Y']
 
     def test_from_configs_sets_transmission_distance(self):
         """from_configs correctly sets transmission distance."""
         configs = [
             ColorConfig(name="Cyan", hex="#00FFFF", transmission_distance=5.5),
+            ColorConfig(name="Magenta", hex="#FF00FF", transmission_distance=2.0),
+            ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=3.0),
+            ColorConfig(name="White", hex="#FFFFFF", transmission_distance=1.0),
         ]
         colors = Colors.from_configs(configs)
 
@@ -212,10 +218,11 @@ class TestFilenamePrefix:
             ColorConfig(name="Red", hex="#FF0000", transmission_distance=2.0),
             ColorConfig(name="Green", hex="#00FF00", transmission_distance=2.5),
             ColorConfig(name="Blue", hex="#0000FF", transmission_distance=3.0),
+            ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=2.8),
         ]
         colors = Colors.from_configs(configs)
         prefix = get_filename_prefix(colors)
-        assert prefix == "RGB"
+        assert prefix == "RGBY"
 
     def test_six_color_prefix(self):
         """Six colors produce six-character prefix."""
@@ -252,11 +259,13 @@ class TestColorsGetLabels:
         """Custom colors return correct labels."""
         configs = [
             ColorConfig(name="Red", hex="#FF0000", transmission_distance=2.0),
+            ColorConfig(name="Green", hex="#00FF00", transmission_distance=2.5),
             ColorConfig(name="Blue", hex="#0000FF", transmission_distance=3.0),
+            ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=2.8),
         ]
         colors = Colors.from_configs(configs)
         labels = colors.get_labels()
-        assert labels == ['R', 'B']
+        assert labels == ['R', 'G', 'B', 'Y']
 
 
 class TestBackwardCompatibility:
