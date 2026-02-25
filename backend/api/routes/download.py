@@ -1,9 +1,8 @@
 """
 File download endpoints (CSV and STL)
 
-TODO: V1 STL endpoints are superseded by V2 (download_v2.py).
-      Deprecate /api/download-stl and /api/download-svg-stl once frontend
-      fully migrates. CSV endpoint has no V2 replacement yet.
+V1 STL endpoints are superseded by V2 (/api/v2/download-stl, /api/v2/download-svg-stl).
+These endpoints remain for backward compatibility.
 """
 import logging
 
@@ -26,6 +25,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Downloads"])
 
+V1_STL_DEPRECATION_HEADERS = {
+    "Deprecation": "true",
+    "Link": '</api/v2/download-stl>; rel="successor-version"',
+}
+
+V1_SVG_STL_DEPRECATION_HEADERS = {
+    "Deprecation": "true",
+    "Link": '</api/v2/download-svg-stl>; rel="successor-version"',
+}
+
 
 @router.post("/download-csv")
 @limiter.limit("20/minute")
@@ -44,11 +53,11 @@ async def api_download_csv(request: Request, body: DownloadCSVRequest):
     )
 
 
-@router.post("/download-stl")
+@router.post("/download-stl", deprecated=True)
 @limiter.limit("5/minute")
 @handle_api_errors("generating STL")
 async def api_download_stl(request: Request, body: DownloadSTLRequest):
-    """Generate and download ZIP file containing color-separated STL files (pixel mode)."""
+    """Deprecated: use /api/v2/download-stl."""
     color_blocks = [block.model_dump() for block in body.colorBlocks]
     image_dimensions = body.imageDimensions.model_dump()
 
@@ -70,15 +79,18 @@ async def api_download_stl(request: Request, body: DownloadSTLRequest):
     return Response(
         content=zip_content,
         media_type="application/zip",
-        headers={"Content-Disposition": "attachment; filename=all_color_blocks.zip"}
+        headers={
+            "Content-Disposition": "attachment; filename=all_color_blocks.zip",
+            **V1_STL_DEPRECATION_HEADERS,
+        }
     )
 
 
-@router.post("/download-svg-stl")
+@router.post("/download-svg-stl", deprecated=True)
 @limiter.limit("5/minute")
 @handle_api_errors("generating SVG STL")
 async def api_download_svg_stl(request: Request, body: DownloadSVGSTLRequest):
-    """Generate and download ZIP file containing color-separated STL files (SVG mode)."""
+    """Deprecated: use /api/v2/download-svg-stl."""
     vector_results = [result.model_dump() for result in body.vectorResults]
     image_dimensions = body.imageDimensions.model_dump()
 
@@ -100,5 +112,8 @@ async def api_download_svg_stl(request: Request, body: DownloadSVGSTLRequest):
     return Response(
         content=zip_content,
         media_type="application/zip",
-        headers={"Content-Disposition": "attachment; filename=all_color_blocks.zip"}
+        headers={
+            "Content-Disposition": "attachment; filename=all_color_blocks.zip",
+            **V1_SVG_STL_DEPRECATION_HEADERS,
+        }
     )

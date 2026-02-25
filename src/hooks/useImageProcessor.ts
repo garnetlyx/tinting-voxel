@@ -230,6 +230,12 @@ export const useImageProcessor = () => {
     }
   }, [mode, maxColors, colorThreshold, epsilon, minArea, numColors, pixelSize]);
 
+  // Keep a stable reference to the latest processing callback for mount-only bootstrap logic.
+  const latestProcessImageRef = useRef(handleProcessImage);
+  useEffect(() => {
+    latestProcessImageRef.current = handleProcessImage;
+  }, [handleProcessImage]);
+
   // Auto-load last used saved preset on mount
   useEffect(() => {
     const lastId = filamentStorage.lastPresetId;
@@ -243,12 +249,16 @@ export const useImageProcessor = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only on mount
 
-  // Load default image on mount
+  // Load default image on mount (run once, but use latest processing callback when load resolves)
+  const hasBootstrappedDefaultImageRef = useRef(false);
   useEffect(() => {
+    if (hasBootstrappedDefaultImageRef.current) return;
+    hasBootstrappedDefaultImageRef.current = true;
+
     const img = new Image();
     img.onload = () => {
       setImage(img);
-      handleProcessImage(img, 'pixel');
+      latestProcessImageRef.current(img, 'pixel');
     };
     img.onerror = () => {
       console.warn('Default example image not found (example.png). Upload an image to get started.');
