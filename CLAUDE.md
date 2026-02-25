@@ -48,6 +48,9 @@ img2stl/
 │   │   └── analytics.py         # In-memory usage analytics
 │   ├── config/           # Configuration
 │   └── tests/            # Test suite (573 tests, 89% coverage)
+│       └── fixtures/
+│           ├── images/        # Committed small test images (200-500px, <100KB)
+│           └── images-local/  # Gitignored large images for local manual testing
 │       └── calibration/      # Calibration photos, CLI runner, results
 ├── src/                  # React frontend
 │   ├── main.tsx          # Entry point

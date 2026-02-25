@@ -51,6 +51,9 @@ backend/htmlcov/
 # Test artifacts
 test-results/
 
+# Large local test images (not committed)
+backend/tests/fixtures/images-local/
+
 # Calibration data (photos, generated plates, results)
 backend/tools/calibration/photos/
 backend/tools/calibration/plates/
