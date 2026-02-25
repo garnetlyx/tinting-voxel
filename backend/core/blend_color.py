@@ -541,7 +541,23 @@ class BlendTestGenerator:
     def combined_permutation_matrix(self, items, count):
         """
         Generate a combined permutation matrix for the given items and count.
+
+        Args:
+            items: List of color labels (e.g., ['C', 'M', 'Y', 'W'])
+            count: Maximum layer count (must be >= 1).
+                   count=1 returns only single-character codes.
+
+        Returns:
+            DataFrame with permutations grouped by first character.
+
+        Raises:
+            ValueError: If items is empty or count < 1.
         """
+        if not items:
+            raise ValueError("items list cannot be empty for combined_permutation_matrix")
+        if count < 1:
+            raise ValueError(f"count must be at least 1, got {count}")
+
         matrix = []
         for first in items:
             row = [first]
@@ -753,7 +769,7 @@ class BlendTestGenerator:
         Layered optical mixing using Beer-Lambert law.
         Results are LRU-cached keyed on (code, layer_height, color_config, alpha).
         """
-        if not code:
+        if not code or not code.strip():
             return (255, 255, 255)
 
         code = code.strip().upper()

@@ -29,13 +29,23 @@ def generate_print_settings(
         pixel_size: Physical size of each pixel in mm
         layer_count: Number of color layers
         image_dimensions: Dict with 'width' and 'height' keys (pixels)
-        filament_colors: List of dicts with 'name', 'hex', 'transmission_distance'
+        filament_colors: List of dicts with 'name', 'hex', 'transmission_distance'.
+                         Must contain at least 1 color.
         base_plate_thickness: Base plate thickness in mm
         filament_preset: Name of the preset used (if any)
 
     Returns:
         JSON string with print settings
+
+    Raises:
+        ValueError: If filament_colors is empty or missing required keys.
     """
+    if not filament_colors:
+        raise ValueError(
+            "filament_colors must contain at least 1 color, got empty list. "
+            "Print settings require at least one extruder configuration."
+        )
+
     try:
         width_mm = round(image_dimensions['width'] * pixel_size, 2)
         height_mm = round(image_dimensions['height'] * pixel_size, 2)
