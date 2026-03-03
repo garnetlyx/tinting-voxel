@@ -1618,9 +1618,9 @@ class TestBasePlate:
             base_plate_thickness=0.5,
         )
         zf = zipfile.ZipFile(BytesIO(result))
-        # physical_height = 4 * 0.08 + 0.5 = 0.82
+        # physical_height = (4 optical + 1 white backing) * 0.08 + 0.5 = 0.90
         for f in zf.namelist():
-            assert 'x0.82_' in f, f"Expected 0.82mm total height in filename, got {f}"
+            assert 'x0.90_' in f, f"Expected 0.90mm total height in filename, got {f}"
 
     def test_base_plate_model_validation_negative(self):
         """basePlateThickness field rejects negative values."""

@@ -87,11 +87,11 @@ class TestDoubleSidedGeneration:
         assert len(double) > len(single)
 
     def test_double_sided_physical_height_doubled(self, simple_color_blocks, default_colors):
-        """Filename encodes 2x layer height for double-sided."""
+        """Filename encodes height for double-sided (2x optical + 2 backing layers)."""
         layer_height = 0.08
         layer_count = 4
-        single_height = layer_count * layer_height  # 0.32
-        double_height = layer_count * 2 * layer_height  # 0.64
+        # Double-sided: 2x optical layers + 2 white backing layers
+        expected_height = (layer_count * 2 + 2) * layer_height  # 0.80
 
         result = generate_stl_zip(
             color_blocks=simple_color_blocks,
@@ -104,12 +104,11 @@ class TestDoubleSidedGeneration:
         )
         zf = zipfile.ZipFile(BytesIO(result))
         filenames = zf.namelist()
-        # All filenames should contain double physical height
+        # All filenames should contain the expected physical height
         for fn in filenames:
-            assert f"x{double_height:.2f}" in fn, (
-                f"Expected double height {double_height:.2f} in filename '{fn}'"
+            assert f"x{expected_height:.2f}" in fn, (
+                f"Expected height {expected_height:.2f} in filename '{fn}'"
             )
-            assert f"x{single_height:.2f}" not in fn
 
     def test_double_sided_more_triangles(self, simple_color_blocks, default_colors):
         """Double-sided STL files contain more triangles than single-sided."""
@@ -196,11 +195,12 @@ class TestDoubleSidedWithBasePlate:
         assert len(base_files) == 1
 
     def test_double_sided_base_plate_height_in_filename(self, simple_color_blocks, default_colors):
-        """Physical height = 2 * layers * layer_height + base_plate."""
+        """Physical height = (2 * layers + 2 backing) * layer_height + base_plate."""
         layer_height = 0.1
         layer_count = 4
         base_plate = 0.5
-        expected_height = 2 * layer_count * layer_height + base_plate  # 1.3
+        # 2x optical layers + 2 white backing layers + base plate
+        expected_height = (2 * layer_count + 2) * layer_height + base_plate  # 1.5
 
         result = generate_stl_zip(
             color_blocks=simple_color_blocks,

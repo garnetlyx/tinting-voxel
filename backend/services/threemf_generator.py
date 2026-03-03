@@ -19,6 +19,7 @@ from services.stl_generator import (
     compute_reference_matrices,
     generate_box,
     generate_boxes_batch,
+    _find_white_label,
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
@@ -129,6 +130,20 @@ def generate_3mf(
     width, height = image_dimensions['width'], image_dimensions['height']
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
+    # Add mandatory white backing layer
+    w_label = _find_white_label(colors)
+    if w_label:
+        backing_mesh = generate_box(
+            xrange=(0, width * pixel_size),
+            yrange=(0, height * pixel_size),
+            zrange=(z_offset, z_offset + layer_height)
+        )
+        code_mesh_map[w_label].append(backing_mesh)
+        z_offset += layer_height
+        logger.info("3MF: added white backing layer '%s'", w_label)
+    else:
+        logger.warning("3MF: no white filament found — skipping backing layer")
+
     # Complexity guard
     estimated_boxes = sum(len(b['pixels']) for b in color_blocks) * layer_count
     if estimated_boxes > 5_000_000:
@@ -174,6 +189,17 @@ def generate_3mf(
     # Generate back-side (mirrored) layers if double-sided
     if double_sided:
         front_top = z_offset + layer_count * layer_height
+
+        # Add white backing between front and back layers
+        if w_label:
+            backing_mesh = generate_box(
+                xrange=(0, width * pixel_size),
+                yrange=(0, height * pixel_size),
+                zrange=(front_top, front_top + layer_height)
+            )
+            code_mesh_map[w_label].append(backing_mesh)
+            front_top += layer_height
+
         for idx, color_block in enumerate(color_blocks):
             pixels = color_block['pixels']
             blend_code = result_codes[idx]
@@ -316,6 +342,18 @@ def generate_svg_3mf(
     height = image_dimensions['height']
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
+    # Add mandatory white backing layer
+    w_label = _find_white_label(colors)
+    if w_label:
+        backing_mesh = generate_box(
+            xrange=(0, width * pixel_size),
+            yrange=(0, height * pixel_size),
+            zrange=(z_offset, z_offset + layer_height)
+        )
+        code_mesh_map[w_label].append(backing_mesh)
+        z_offset += layer_height
+        logger.info("SVG-3MF: added white backing layer '%s'", w_label)
+
     for idx, result in enumerate(vector_results):
         polygons = result['polygons']
         blend_code = result_codes[idx]
@@ -336,6 +374,17 @@ def generate_svg_3mf(
 
     if double_sided:
         front_top = z_offset + layer_count * layer_height
+
+        # Add white backing between front and back layers
+        if w_label:
+            backing_mesh = generate_box(
+                xrange=(0, width * pixel_size),
+                yrange=(0, height * pixel_size),
+                zrange=(front_top, front_top + layer_height)
+            )
+            code_mesh_map[w_label].append(backing_mesh)
+            front_top += layer_height
+
         for idx, result in enumerate(vector_results):
             polygons = result['polygons']
             blend_code = result_codes[idx]

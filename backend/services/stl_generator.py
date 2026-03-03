@@ -380,6 +380,24 @@ def generate_boxes_batch(
     return triangles.reshape(-1, 3, 3)
 
 
+def _find_white_label(colors: Colors) -> Optional[str]:
+    """
+    Find the white filament label in a Colors instance.
+
+    Checks for label 'W' first, then falls back to any color with hex '#FFFFFF'.
+
+    Returns:
+        The label string (e.g. 'W') or None if no white filament found.
+    """
+    labels = colors.get_labels()
+    if 'W' in labels:
+        return 'W'
+    for label in labels:
+        if colors[label].hex.upper() == '#FFFFFF':
+            return label
+    return None
+
+
 def get_filename_prefix(colors: Colors) -> str:
     """
     Generate filename prefix from color labels.
@@ -477,6 +495,22 @@ def generate_stl_zip(
     # Z offset: color layers sit on top of base plate
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
+    # Add mandatory white backing layer (provides the reflective surface
+    # the Beer-Lambert model assumes as white background)
+    w_label = _find_white_label(active_colors)
+    if w_label:
+        backing_mesh = generate_box(
+            xrange=(0, width * pixel_size),
+            yrange=(0, height * pixel_size),
+            zrange=(z_offset, z_offset + layer_height)
+        )
+        code_mesh_map[w_label].append(backing_mesh)
+        z_offset += layer_height
+        logger.info("Added white backing layer '%s' at z=%.2f-%.2f mm",
+                     w_label, z_offset - layer_height, z_offset)
+    else:
+        logger.warning("No white filament found — skipping backing layer")
+
     logger.info(
         "STL generation: %d color blocks, %d layers, %dx%d image, ~%d estimated boxes",
         len(color_blocks), layer_count, width, height, estimated_boxes
@@ -527,6 +561,18 @@ def generate_stl_zip(
     # Step 4b: Generate back-side (mirrored) layers if double-sided
     if double_sided:
         front_top = z_offset + layer_count * layer_height
+
+        # Add white backing between front and back layers
+        if w_label:
+            backing_mesh = generate_box(
+                xrange=(0, width * pixel_size),
+                yrange=(0, height * pixel_size),
+                zrange=(front_top, front_top + layer_height)
+            )
+            code_mesh_map[w_label].append(backing_mesh)
+            front_top += layer_height
+            logger.info("Added double-sided white backing at z=%.2f mm", front_top - layer_height)
+
         for idx, color_block in enumerate(color_blocks):
             pixels = color_block['pixels']
             blend_code = result_codes[idx]
@@ -579,8 +625,9 @@ def generate_stl_zip(
 
     # Step 5: Merge meshes by primary color and create STL files
     stl_files = {}
-    effective_layer_count = layer_count * 2 if double_sided else layer_count
-    physical_height = effective_layer_count * layer_height + z_offset
+    backing_layers = (2 if double_sided else 1) if w_label else 0
+    effective_layer_count = (layer_count * 2 if double_sided else layer_count) + backing_layers
+    physical_height = effective_layer_count * layer_height + (base_plate_thickness if base_plate_thickness > 0 else 0.0)
     prefix = get_filename_prefix(active_colors)
 
     for code, meshes in code_mesh_map.items():
