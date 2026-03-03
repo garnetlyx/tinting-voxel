@@ -86,6 +86,7 @@ const Converter: React.FC = () => {
     updateFilamentColor,
     addFilamentColor,
     removeFilamentColor,
+    handleFile,
     handleImageUpload,
     handleApplyEdit,
     handleCancelEdit,
@@ -220,7 +221,7 @@ const Converter: React.FC = () => {
               {appMode === 'single' && (
                 <div className="space-y-6">
                   {/* Image Uploader */}
-                  <ImageUploader onImageUpload={handleImageUpload} />
+                  <ImageUploader onImageUpload={handleImageUpload} onFileDrop={handleFile} />
 
                   {/* Image Editor (crop/resize) */}
                   {isEditing && rawImage && (

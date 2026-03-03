@@ -230,12 +230,6 @@ export const useImageProcessor = () => {
     }
   }, [mode, maxColors, colorThreshold, epsilon, minArea, numColors, pixelSize]);
 
-  // Keep a stable reference to the latest processing callback for mount-only bootstrap logic.
-  const latestProcessImageRef = useRef(handleProcessImage);
-  useEffect(() => {
-    latestProcessImageRef.current = handleProcessImage;
-  }, [handleProcessImage]);
-
   // Auto-load last used saved preset on mount
   useEffect(() => {
     const lastId = filamentStorage.lastPresetId;
@@ -249,22 +243,6 @@ export const useImageProcessor = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only on mount
 
-  // Load default image on mount (run once, but use latest processing callback when load resolves)
-  const hasBootstrappedDefaultImageRef = useRef(false);
-  useEffect(() => {
-    if (hasBootstrappedDefaultImageRef.current) return;
-    hasBootstrappedDefaultImageRef.current = true;
-
-    const img = new Image();
-    img.onload = () => {
-      setImage(img);
-      latestProcessImageRef.current(img, 'pixel');
-    };
-    img.onerror = () => {
-      console.warn('Default example image not found (example.png). Upload an image to get started.');
-    };
-    img.src = 'example.png';
-  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -275,16 +253,11 @@ export const useImageProcessor = () => {
     };
   }, []);
 
-  // Handle image upload — enter editing mode for crop/resize
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Load a File into editing mode
+  const handleFile = (file: File) => {
     const validTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp'];
     if (!validTypes.includes(file.type)) {
       setError(`Unsupported file type: ${file.type}. Please upload a PNG, JPEG, GIF, WebP, or BMP image.`);
-      // Reset input to allow re-selecting the same file
-      e.target.value = '';
       return;
     }
 
@@ -297,17 +270,22 @@ export const useImageProcessor = () => {
       };
       img.onerror = () => {
         setError('Failed to load image. The file may be corrupted or not a valid image.');
-        // Reset input to allow re-selecting the same file
-        e.target.value = '';
       };
       img.src = event.target?.result as string;
     };
     reader.onerror = () => {
       setError('Failed to read file.');
-      // Reset input to allow re-selecting the same file
-      e.target.value = '';
     };
     reader.readAsDataURL(file);
+  };
+
+  // Handle image upload from file input
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    handleFile(file);
+    // Reset input to allow re-selecting the same file
+    e.target.value = '';
   };
 
   // Apply edited image from ImageEditor and start processing
@@ -623,6 +601,7 @@ export const useImageProcessor = () => {
     updateFilamentColor,
     addFilamentColor,
     removeFilamentColor,
+    handleFile,
     handleImageUpload,
     handleApplyEdit,
     handleCancelEdit,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { useImageProcessor } from './useImageProcessor';
 import { processImage } from '../api/client';
 
@@ -77,25 +77,11 @@ describe('useImageProcessor', () => {
     vi.restoreAllMocks();
   });
 
-  it('uses the latest maxColors value when default image finishes loading', async () => {
-    const { result } = renderHook(() => useImageProcessor());
+  it('does not create any images on mount (no default bootstrap image)', async () => {
+    renderHook(() => useImageProcessor());
 
-    expect(createdImages).toHaveLength(1);
-
-    act(() => {
-      result.current.setMaxColors(12);
-    });
-
-    act(() => {
-      createdImages[0].triggerLoad();
-    });
-
-    await waitFor(() => {
-      expect(mockedProcessImage).toHaveBeenCalledTimes(1);
-    });
-
-    const [, params] = mockedProcessImage.mock.calls[0];
-    expect(params.mode).toBe('pixel');
-    expect(params.pixelParams?.maxColors).toBe(12);
+    // No images should be created on mount since bootstrap logic was removed
+    expect(createdImages).toHaveLength(0);
+    expect(mockedProcessImage).not.toHaveBeenCalled();
   });
 });
