@@ -22,6 +22,7 @@ from services.stl_generator import (
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
+from services.svg_stl_generator import generate_polygon_mesh
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +250,151 @@ def generate_3mf(
 
     logger.info(
         "Generated 3MF file: %d objects, %d bytes",
+        len(scene.geometry), len(result)
+    )
+
+    return result
+
+
+def generate_svg_3mf(
+    vector_results: list[dict],
+    layer_height: float,
+    pixel_size: float,
+    layer_count: int,
+    image_dimensions: dict,
+    colors: Optional[Colors] = None,
+    base_plate_thickness: float = 0.0,
+    color_hex_map: Optional[dict] = None,
+    double_sided: bool = False,
+) -> bytes:
+    """
+    Generate a single 3MF file from SVG vector contours with color-separated objects.
+
+    Args:
+        vector_results: List of dicts with 'color' (RGB tuple) and 'polygons' keys
+        layer_height: Height of each layer in mm
+        pixel_size: Physical size of each pixel in mm
+        layer_count: Total number of layers
+        image_dimensions: Dict with 'width' and 'height' keys
+        colors: Colors instance (required)
+        base_plate_thickness: Thickness of base plate in mm
+        color_hex_map: Optional dict mapping label -> hex color for visual colors
+        double_sided: If True, generate mirrored back side layers on top
+
+    Returns:
+        3MF file binary content
+    """
+    if not vector_results:
+        raise ValueError("No vector results provided")
+
+    if colors is None:
+        raise ValueError("Colors instance is required for 3MF generation")
+
+    if color_hex_map:
+        for label, hex_color in color_hex_map.items():
+            if not re.match(r'^#[0-9a-fA-F]{6}$', hex_color):
+                raise ValueError(
+                    f"Invalid hex color '{hex_color}' for label '{label}'"
+                )
+
+    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
+        layer_count, layer_height, colors
+    )
+
+    labels = colors.get_labels()
+    code_mesh_map: dict[str, list[np.ndarray]] = {label: [] for label in labels}
+
+    input_colors = [result['color'] for result in vector_results]
+    result_codes, _ = Color.map_to_nearest_color(
+        input_colors, ref_code_matrix, ref_rgb_matrix
+    )
+
+    _log_input_color_brightness(input_colors, "SVG-3MF")
+    _log_blend_code_distribution(result_codes, labels, "SVG-3MF")
+
+    width = image_dimensions['width']
+    height = image_dimensions['height']
+    z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
+
+    for idx, result in enumerate(vector_results):
+        polygons = result['polygons']
+        blend_code = result_codes[idx]
+
+        for z_idx, code_char in enumerate(blend_code):
+            z_min = z_offset + z_idx * layer_height
+            z_max = z_offset + (z_idx + 1) * layer_height
+
+            for polygon in polygons:
+                if len(polygon) < 3:
+                    continue
+                mesh = generate_polygon_mesh(
+                    polygon=polygon, z_min=z_min, z_max=z_max,
+                    pixel_size=pixel_size
+                )
+                if len(mesh) > 0:
+                    code_mesh_map[code_char].append(mesh)
+
+    if double_sided:
+        front_top = z_offset + layer_count * layer_height
+        for idx, result in enumerate(vector_results):
+            polygons = result['polygons']
+            blend_code = result_codes[idx]
+
+            mirrored_polygons = [
+                [(width - 1 - x, y) for x, y in polygon]
+                for polygon in polygons
+            ]
+
+            for z_idx, code_char in enumerate(reversed(blend_code)):
+                z_min = front_top + z_idx * layer_height
+                z_max = front_top + (z_idx + 1) * layer_height
+
+                for polygon in mirrored_polygons:
+                    if len(polygon) < 3:
+                        continue
+                    mesh = generate_polygon_mesh(
+                        polygon=polygon, z_min=z_min, z_max=z_max,
+                        pixel_size=pixel_size
+                    )
+                    if len(mesh) > 0:
+                        code_mesh_map[code_char].append(mesh)
+
+        logger.info("Generated double-sided SVG 3MF: front + mirrored back")
+
+    scene = trimesh.Scene()
+
+    for label, mesh_arrays in code_mesh_map.items():
+        if not mesh_arrays:
+            continue
+
+        rgb = None
+        if color_hex_map and label in color_hex_map:
+            hex_color = color_hex_map[label]
+            rgb = (
+                int(hex_color[1:3], 16),
+                int(hex_color[3:5], 16),
+                int(hex_color[5:7], 16),
+            )
+
+        mesh_obj = _triangles_to_trimesh(mesh_arrays, color_rgb=rgb)
+        scene.add_geometry(mesh_obj, node_name=f"color_{label}")
+        logger.info("SVG-3MF color '%s': %d triangles", label, len(mesh_obj.faces))
+
+    if base_plate_thickness > 0:
+        base_mesh_data = generate_box(
+            xrange=(0, width * pixel_size),
+            yrange=(0, height * pixel_size),
+            zrange=(0, base_plate_thickness)
+        )
+        base_obj = _triangles_to_trimesh([base_mesh_data])
+        scene.add_geometry(base_obj, node_name="base_plate")
+
+    buf = BytesIO()
+    scene.export(buf, file_type='3mf')
+    result = buf.getvalue()
+
+    logger.info(
+        "Generated SVG 3MF file: %d objects, %d bytes",
         len(scene.geometry), len(result)
     )
 

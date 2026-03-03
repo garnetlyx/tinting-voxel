@@ -44,7 +44,7 @@ test.describe('Download Flows - Pixel Mode', () => {
 });
 
 test.describe('Download Flows - SVG Mode', () => {
-  test('SVG mode hides CSV and 3MF buttons', async ({ page }) => {
+  test('SVG mode hides CSV but shows 3MF button', async ({ page }) => {
     await page.goto('/');
 
     // Use larger image for SVG mode (small images produce contours below minArea threshold)
@@ -63,12 +63,12 @@ test.describe('Download Flows - SVG Mode', () => {
     // Wait for SVG processing to complete
     await waitForProcessingComplete(page);
 
-    // CSV and 3MF should not be visible in SVG mode
+    // CSV should not be visible in SVG mode
     await expect(page.getByRole('button', { name: /Download CSV/ })).not.toBeVisible();
-    await expect(page.getByRole('button', { name: /Download 3MF/ })).not.toBeVisible();
 
-    // STL and Print Settings should still be visible
+    // STL, 3MF, and Print Settings should be visible
     await expect(page.getByRole('button', { name: /Download STL/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Download 3MF/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /Print Settings/ })).toBeVisible();
   });
 });

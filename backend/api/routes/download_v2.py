@@ -30,7 +30,7 @@ from core.color_config import (
 from services.print_settings_generator import generate_print_settings
 from services.stl_generator import generate_stl_zip
 from services.svg_stl_generator import generate_svg_stl_zip
-from services.threemf_generator import generate_3mf
+from services.threemf_generator import generate_3mf, generate_svg_3mf
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +211,47 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
     logger.info(
         "Generated 3MF for %d color blocks, %dx%d pixels",
         len(color_blocks), image_dimensions['width'], image_dimensions['height']
+    )
+
+    return Response(
+        content=threemf_content,
+        media_type="application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+        headers={"Content-Disposition": "attachment; filename=color_blocks.3mf"}
+    )
+
+
+@router.post("/download-svg-3mf")
+@limiter.limit("5/minute")
+@handle_api_errors("generating SVG 3MF")
+async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
+    """Generate and download a 3MF file from SVG vector contours with color-separated objects."""
+    colors = get_colors_from_request(body.filamentPreset, body.filamentColors)
+    vector_results = [result.model_dump() for result in body.vectorResults]
+    image_dimensions = body.imageDimensions.model_dump()
+
+    color_hex_map = {}
+    if body.filamentColors:
+        for fc in body.filamentColors:
+            color_hex_map[fc.label] = fc.hex
+    else:
+        for label in colors.get_labels():
+            color_hex_map[label] = colors[label].hex
+
+    threemf_content = generate_svg_3mf(
+        vector_results=vector_results,
+        layer_height=body.layerHeight,
+        pixel_size=body.pixelSize,
+        layer_count=body.layerCount,
+        image_dimensions=image_dimensions,
+        colors=colors,
+        base_plate_thickness=body.basePlateThickness or 0.0,
+        color_hex_map=color_hex_map,
+        double_sided=body.doubleSided,
+    )
+
+    logger.info(
+        "Generated SVG 3MF for %d color groups, %dx%d pixels",
+        len(vector_results), image_dimensions['width'], image_dimensions['height']
     )
 
     return Response(

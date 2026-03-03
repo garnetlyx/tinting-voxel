@@ -13,7 +13,7 @@ import type {
 } from '../api/types';
 import { DEFAULT_PRESETS } from '../api/types';
 import type { ProcessingStage } from '../components/LoadingSpinner';
-import { processImage, downloadCSV, downloadSTLV2, downloadSVGSTLV2, download3MFV2, downloadPrintSettings } from '../api/client';
+import { processImage, downloadCSV, downloadSTLV2, downloadSVGSTLV2, download3MFV2, downloadSVG3MFV2, downloadPrintSettings } from '../api/client';
 import { useFilamentStorage } from './useFilamentStorage';
 
 const MIN_FILAMENT_COLORS = 4;
@@ -373,14 +373,10 @@ export const useImageProcessor = () => {
     }
   };
 
-  // Download 3MF file using V2 API (pixel mode only)
+  // Download 3MF file using V2 API (pixel and SVG modes)
   const handleDownload3MF = async () => {
     if (!isFilamentConfigValid) {
       setError('Invalid filament color configuration');
-      return;
-    }
-    if (mode !== 'pixel') {
-      setError('3MF download is only available in Pixel mode');
       return;
     }
 
@@ -389,8 +385,7 @@ export const useImageProcessor = () => {
       setProcessing(true);
       setProcessingStage('generating');
 
-      await download3MFV2({
-        colorBlocks,
+      const commonParams = {
         layerHeight,
         pixelSize,
         layerCount,
@@ -398,7 +393,13 @@ export const useImageProcessor = () => {
         filamentColors,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         ...(doubleSided ? { doubleSided } : {}),
-      });
+      };
+
+      if (mode === 'pixel') {
+        await download3MFV2({ colorBlocks, ...commonParams });
+      } else {
+        await downloadSVG3MFV2({ vectorResults, ...commonParams });
+      }
     } catch (err) {
       console.error('Error downloading 3MF:', err);
       setError(err instanceof Error ? err.message : 'Failed to download 3MF');

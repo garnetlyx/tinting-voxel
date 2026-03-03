@@ -220,6 +220,26 @@ export async function download3MFV2(params: DownloadSTLParamsV2, signal?: AbortS
 }
 
 /**
+ * Download 3MF file from SVG vector contours (V2 API, SVG mode)
+ */
+export async function downloadSVG3MFV2(params: DownloadSVGSTLParamsV2, signal?: AbortSignal): Promise<void> {
+  const response = await fetch(`${API_V2_BASE_URL}/download-svg-3mf`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorDetail(response, 'Failed to download 3MF'));
+  }
+
+  downloadBlobAsFile(await response.blob(), 'color_blocks.3mf');
+}
+
+/**
  * Download print settings JSON file (V2 API)
  */
 export async function downloadPrintSettings(params: PrintSettingsParams, signal?: AbortSignal): Promise<void> {

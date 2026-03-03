@@ -254,7 +254,7 @@ const Converter: React.FC = () => {
                         colorCount={resultCount}
                         onDownloadCSV={handleDownloadCSV}
                         onDownloadSTL={handleDownloadSTL}
-                        onDownload3MF={mode === 'pixel' ? handleDownload3MF : undefined}
+                        onDownload3MF={handleDownload3MF}
                         onDownloadPrintSettings={handleDownloadPrintSettings}
                         processing={processing}
                         showCSV={mode === 'pixel'}
