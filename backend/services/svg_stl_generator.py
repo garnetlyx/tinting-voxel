@@ -19,6 +19,7 @@ from services.stl_generator import (
     get_filename_prefix,
     merge_stl_meshes,
     _find_white_label,
+    _calculate_white_layers,
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
@@ -300,17 +301,12 @@ def generate_svg_stl_zip(
     # Z offset: color layers sit on top of base plate
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
-    # Add mandatory white backing layer
+    # Compute dynamic white backing thickness based on optical transparency
     w_label = _find_white_label(active_colors)
+    unique_codes = set(result_codes)
+    n_white = _calculate_white_layers(unique_codes, layer_height, active_colors) if w_label else 0
     if w_label:
-        backing_mesh = generate_box(
-            xrange=(0, width * pixel_size),
-            yrange=(0, height * pixel_size),
-            zrange=(z_offset, z_offset + layer_height)
-        )
-        code_mesh_map[w_label].append(backing_mesh)
-        z_offset += layer_height
-        logger.info("SVG-STL: added white backing layer '%s'", w_label)
+        logger.info("SVG-STL: white backing label='%s', n_white=%d", w_label, n_white)
 
     # Process each color group
     for idx, result in enumerate(vector_results):
@@ -345,19 +341,23 @@ def generate_svg_stl_zip(
         total_polygons, total_triangles
     )
 
-    # Step 4b: Generate back-side (mirrored) layers if double_sided
-    if double_sided:
-        front_top = z_offset + layer_count * layer_height
-
-        # Add white backing between front and back layers
-        if w_label:
+    # Add white backing above optical layers (reflector behind colors)
+    if n_white > 0:
+        optical_top = z_offset + layer_count * layer_height
+        for i in range(n_white):
             backing_mesh = generate_box(
                 xrange=(0, width * pixel_size),
                 yrange=(0, height * pixel_size),
-                zrange=(front_top, front_top + layer_height)
+                zrange=(optical_top + i * layer_height,
+                        optical_top + (i + 1) * layer_height)
             )
             code_mesh_map[w_label].append(backing_mesh)
-            front_top += layer_height
+        logger.info("SVG-STL: added %d white backing layers at z=%.2f-%.2f mm",
+                     n_white, optical_top, optical_top + n_white * layer_height)
+
+    # Step 4b: Generate back-side (mirrored) layers if double_sided
+    if double_sided:
+        front_top = z_offset + layer_count * layer_height + n_white * layer_height
 
         for idx, result in enumerate(vector_results):
             polygons = result['polygons']
@@ -394,7 +394,7 @@ def generate_svg_stl_zip(
 
     # Merge meshes by primary color and create STL files
     stl_files = {}
-    backing_layers = (2 if double_sided else 1) if w_label else 0
+    backing_layers = n_white
     effective_layer_count = (layer_count * 2 if double_sided else layer_count) + backing_layers
     physical_height = effective_layer_count * layer_height + (base_plate_thickness if base_plate_thickness > 0 else 0.0)
     prefix = get_filename_prefix(active_colors)

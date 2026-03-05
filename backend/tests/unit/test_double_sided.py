@@ -87,11 +87,12 @@ class TestDoubleSidedGeneration:
         assert len(double) > len(single)
 
     def test_double_sided_physical_height_doubled(self, simple_color_blocks, default_colors):
-        """Filename encodes height for double-sided (2x optical + 2 backing layers)."""
+        """Filename encodes height for double-sided (2x optical + n_white backing)."""
         layer_height = 0.08
         layer_count = 4
-        # Double-sided: 2x optical layers + 2 white backing layers
-        expected_height = (layer_count * 2 + 2) * layer_height  # 0.80
+        # n_white=3 for default BAMBU at 0.08mm (max_remain≈0.586, round(2.93)=3)
+        n_white = 3
+        expected_height = (layer_count * 2 + n_white) * layer_height  # 0.88
 
         result = generate_stl_zip(
             color_blocks=simple_color_blocks,
@@ -195,12 +196,13 @@ class TestDoubleSidedWithBasePlate:
         assert len(base_files) == 1
 
     def test_double_sided_base_plate_height_in_filename(self, simple_color_blocks, default_colors):
-        """Physical height = (2 * layers + 2 backing) * layer_height + base_plate."""
+        """Physical height = (2 * layers + n_white backing) * layer_height + base_plate."""
         layer_height = 0.1
         layer_count = 4
         base_plate = 0.5
-        # 2x optical layers + 2 white backing layers + base plate
-        expected_height = (2 * layer_count + 2) * layer_height + base_plate  # 1.5
+        # n_white=3 for default BAMBU at 0.1mm (max_remain≈0.513, round(2.57)=3)
+        n_white = 3
+        expected_height = (2 * layer_count + n_white) * layer_height + base_plate  # 1.60
 
         result = generate_stl_zip(
             color_blocks=simple_color_blocks,

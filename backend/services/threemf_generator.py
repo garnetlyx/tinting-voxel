@@ -20,6 +20,7 @@ from services.stl_generator import (
     generate_box,
     generate_boxes_batch,
     _find_white_label,
+    _calculate_white_layers,
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
@@ -130,17 +131,12 @@ def generate_3mf(
     width, height = image_dimensions['width'], image_dimensions['height']
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
-    # Add mandatory white backing layer
+    # Compute dynamic white backing thickness based on optical transparency
     w_label = _find_white_label(colors)
+    unique_codes = set(result_codes)
+    n_white = _calculate_white_layers(unique_codes, layer_height, colors) if w_label else 0
     if w_label:
-        backing_mesh = generate_box(
-            xrange=(0, width * pixel_size),
-            yrange=(0, height * pixel_size),
-            zrange=(z_offset, z_offset + layer_height)
-        )
-        code_mesh_map[w_label].append(backing_mesh)
-        z_offset += layer_height
-        logger.info("3MF: added white backing layer '%s'", w_label)
+        logger.info("3MF: white backing label='%s', n_white=%d", w_label, n_white)
     else:
         logger.warning("3MF: no white filament found — skipping backing layer")
 
@@ -186,19 +182,23 @@ def generate_3mf(
                     batch_mesh = generate_boxes_batch(box_ranges)
                     code_mesh_map[code_char].append(batch_mesh)
 
-    # Generate back-side (mirrored) layers if double-sided
-    if double_sided:
-        front_top = z_offset + layer_count * layer_height
-
-        # Add white backing between front and back layers
-        if w_label:
+    # Add white backing above optical layers (reflector behind colors)
+    if n_white > 0:
+        optical_top = z_offset + layer_count * layer_height
+        for i in range(n_white):
             backing_mesh = generate_box(
                 xrange=(0, width * pixel_size),
                 yrange=(0, height * pixel_size),
-                zrange=(front_top, front_top + layer_height)
+                zrange=(optical_top + i * layer_height,
+                        optical_top + (i + 1) * layer_height)
             )
             code_mesh_map[w_label].append(backing_mesh)
-            front_top += layer_height
+        logger.info("3MF: added %d white backing layers at z=%.2f-%.2f mm",
+                     n_white, optical_top, optical_top + n_white * layer_height)
+
+    # Generate back-side (mirrored) layers if double-sided
+    if double_sided:
+        front_top = z_offset + layer_count * layer_height + n_white * layer_height
 
         for idx, color_block in enumerate(color_blocks):
             pixels = color_block['pixels']
@@ -255,7 +255,8 @@ def generate_3mf(
             )
 
         mesh_obj = _triangles_to_trimesh(mesh_arrays, color_rgb=rgb)
-        scene.add_geometry(mesh_obj, node_name=f"color_{label}")
+        geom_name = f"color_{label}"
+        scene.add_geometry(mesh_obj, node_name=geom_name, geom_name=geom_name)
         logger.info("Converted color '%s': %d triangles", label, len(mesh_obj.faces))
 
     # Add base plate
@@ -266,7 +267,7 @@ def generate_3mf(
             zrange=(0, base_plate_thickness)
         )
         base_obj = _triangles_to_trimesh([base_mesh_data])
-        scene.add_geometry(base_obj, node_name="base_plate")
+        scene.add_geometry(base_obj, node_name="base_plate", geom_name="base_plate")
 
     # Export as 3MF
     logger.info("Exporting 3MF file with %d objects...", len(scene.geometry))
@@ -342,17 +343,12 @@ def generate_svg_3mf(
     height = image_dimensions['height']
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
-    # Add mandatory white backing layer
+    # Compute dynamic white backing thickness based on optical transparency
     w_label = _find_white_label(colors)
+    unique_codes = set(result_codes)
+    n_white = _calculate_white_layers(unique_codes, layer_height, colors) if w_label else 0
     if w_label:
-        backing_mesh = generate_box(
-            xrange=(0, width * pixel_size),
-            yrange=(0, height * pixel_size),
-            zrange=(z_offset, z_offset + layer_height)
-        )
-        code_mesh_map[w_label].append(backing_mesh)
-        z_offset += layer_height
-        logger.info("SVG-3MF: added white backing layer '%s'", w_label)
+        logger.info("SVG-3MF: white backing label='%s', n_white=%d", w_label, n_white)
 
     for idx, result in enumerate(vector_results):
         polygons = result['polygons']
@@ -372,18 +368,22 @@ def generate_svg_3mf(
                 if len(mesh) > 0:
                     code_mesh_map[code_char].append(mesh)
 
-    if double_sided:
-        front_top = z_offset + layer_count * layer_height
-
-        # Add white backing between front and back layers
-        if w_label:
+    # Add white backing above optical layers (reflector behind colors)
+    if n_white > 0:
+        optical_top = z_offset + layer_count * layer_height
+        for i in range(n_white):
             backing_mesh = generate_box(
                 xrange=(0, width * pixel_size),
                 yrange=(0, height * pixel_size),
-                zrange=(front_top, front_top + layer_height)
+                zrange=(optical_top + i * layer_height,
+                        optical_top + (i + 1) * layer_height)
             )
             code_mesh_map[w_label].append(backing_mesh)
-            front_top += layer_height
+        logger.info("SVG-3MF: added %d white backing layers at z=%.2f-%.2f mm",
+                     n_white, optical_top, optical_top + n_white * layer_height)
+
+    if double_sided:
+        front_top = z_offset + layer_count * layer_height + n_white * layer_height
 
         for idx, result in enumerate(vector_results):
             polygons = result['polygons']
@@ -426,7 +426,8 @@ def generate_svg_3mf(
             )
 
         mesh_obj = _triangles_to_trimesh(mesh_arrays, color_rgb=rgb)
-        scene.add_geometry(mesh_obj, node_name=f"color_{label}")
+        geom_name = f"color_{label}"
+        scene.add_geometry(mesh_obj, node_name=geom_name, geom_name=geom_name)
         logger.info("SVG-3MF color '%s': %d triangles", label, len(mesh_obj.faces))
 
     if base_plate_thickness > 0:
@@ -436,7 +437,7 @@ def generate_svg_3mf(
             zrange=(0, base_plate_thickness)
         )
         base_obj = _triangles_to_trimesh([base_mesh_data])
-        scene.add_geometry(base_obj, node_name="base_plate")
+        scene.add_geometry(base_obj, node_name="base_plate", geom_name="base_plate")
 
     buf = BytesIO()
     scene.export(buf, file_type='3mf')
