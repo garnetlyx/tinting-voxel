@@ -10,7 +10,7 @@ Mathematical reference for all color blending algorithms in img2stl. Each functi
 | Symbol | Meaning | Unit / Range |
 |--------|---------|--------------|
 | `d` | Layer height (single layer thickness) | mm (typically 0.08) |
-| `td_c` | Transmission distance for color `c` | mm (from TD1S or calibrated) |
+| `td_c` | Transmission distance for color `c` | mm (from TD1S prior or calibrated fit) |
 | `alpha` | Absorption coefficient | dimensionless |
 | `F_ch(c)` | Filament RGB value for color `c`, channel `ch` | 0-255 |
 | `A_ch(c)` | Per-channel absorption: `(255 - F_ch(c)) / 255` | 0-1 |
@@ -57,7 +57,7 @@ Effective opacity: `(1 - T)` — linear in transmission.
 
 - Scalar T (same for all RGB channels), per-channel blending via interpolation
 - `alpha = ln(10)` is fixed by convention, not calibrated
-- TD from TD1S instrument is used directly
+- TD may come from TD1S as a prior / initialization, or from fitted calibration parameters
 - Order-dependent (layer sequence matters)
 - Per-channel color mixing comes from `F_ch` in the interpolation, not from T
 
@@ -131,7 +131,7 @@ Original absorbs ~3.6x less per layer. This better matches physical reality — 
 
 | Mode | Parameters | Count |
 |------|-----------|-------|
-| `alpha` | alpha (td fixed from TD1S) | 1 |
+| `alpha` | alpha (td fixed from prior/reference values) | 1 |
 | `alpha_td` | alpha + td per color | 1 + N |
 
 ### Properties
@@ -290,7 +290,7 @@ T_R < T_G < T_B -> absorbs Red most, passes Blue most = Cyan behavior
 
 | Mode | Parameters | Count |
 |------|-----------|-------|
-| `hybrid` | scatter_alpha + k (td fixed from TD1S) | 2 |
+| `hybrid` | scatter_alpha + k (td fixed from prior/reference values) | 2 |
 | `hybrid_td` | scatter_alpha + k + td per color | 2 + N |
 
 ### Why hybrid works
@@ -485,6 +485,8 @@ T_ch(c) = exp(-(scatter_alpha / td_c + k_c · A_ch(c)) · d)
 ```
 
 Parameters: scatter_alpha + N × k_c + N × td_c = 1 + 2N (11 for CMYKW).
+
+Status after model search (`2026-03-07`): this is currently the strongest pure-physics family in replay. A balanced `hybrid_per_color_k_td1s_gamma` candidate beat the production baseline on weighted transfer while also improving `16x16 real`. Important caveat: `kW` is not very meaningful in this exact formula because `A_ch(W) ≈ 0`; most of the gain comes from giving **CMY** different absorption scaling, not from “learning white.”
 
 ### 2. Saunderson Correction (Medium-term)
 

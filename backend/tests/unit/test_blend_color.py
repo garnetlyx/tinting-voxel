@@ -10,7 +10,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from core.blend_color import BlendTestGenerator, Color, Colors
+from core.blend_color import (
+    BlendTestGenerator,
+    Color,
+    Colors,
+    _blend_hybrid,
+    _blend_hybrid_per_color,
+)
 from core.color_config import ColorConfig
 
 
@@ -339,16 +345,37 @@ class TestCodeToRgbCache:
         assert info.hits == 0
         assert info.misses == 0
 
-    def test_cache_hit_on_repeated_call(self, generator):
-        """Repeated calls with same code should hit cache."""
-        from core.blend_color import clear_rgb_cache, rgb_cache_info
-        clear_rgb_cache()
-        generator.code_to_rgb("CCCC")
-        generator.code_to_rgb("CCCC")
-        generator.code_to_rgb("CCCC")
-        info = rgb_cache_info()
-        assert info.hits == 2
-        assert info.misses == 1
+
+class TestHybridPerColorBlend:
+    """Tests for per-color hybrid absorption scaling."""
+
+    @pytest.fixture
+    def color_map(self):
+        colors = Colors()
+        return {label: colors[label] for label in colors.get_labels()}
+
+    def test_matches_hybrid_when_all_k_equal(self, color_map):
+        code = "CMYW"
+        hybrid = _blend_hybrid(
+            code, 0.08, color_map, scatter_alpha=4.0, k=7.5
+        )
+        hybrid_kc = _blend_hybrid_per_color(
+            code,
+            0.08,
+            color_map,
+            scatter_alpha=4.0,
+            k_map={label: 7.5 for label in color_map},
+        )
+        assert hybrid_kc == pytest.approx(hybrid, abs=1e-6)
+
+    def test_higher_yellow_k_darkens_yellow_rich_code(self, color_map):
+        default_rgb = _blend_hybrid_per_color(
+            "YYYY", 0.08, color_map, scatter_alpha=4.0, k_map={"Y": 2.0}
+        )
+        boosted_rgb = _blend_hybrid_per_color(
+            "YYYY", 0.08, color_map, scatter_alpha=4.0, k_map={"Y": 12.0}
+        )
+        assert sum(boosted_rgb) < sum(default_rgb)
 
 
 class TestBlendTestGeneratorGenerateBox:

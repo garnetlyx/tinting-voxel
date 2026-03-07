@@ -6,7 +6,7 @@ import logging
 import math
 import os.path
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
@@ -302,6 +302,57 @@ def _blend_hybrid(code: str, layer_height: float, color_map: dict,
         transmissions.append(t_ch)
 
     # Original-style light distribution (per-channel)
+    remain = np.ones(3)
+    array_size = max(n, 4) + 1
+    light_loss = np.zeros((array_size, 3))
+    for i, t_ch in enumerate(transmissions):
+        light_loss[i] = remain * (1.0 - t_ch)
+        remain *= t_ch
+    light_loss[n] = remain
+
+    total = light_loss.sum(axis=0)
+    total = np.where(total > 0, total, 1.0)
+    light_loss /= total
+
+    bg = light_loss[n]
+    rgb = np.ones(3)
+    for i, c in enumerate(code):
+        color = color_map[c]
+        rgb -= color.get_absorption() * light_loss[i]
+    rgb = bg * np.ones(3) + (1.0 - bg) * rgb
+    return tuple(np.clip(rgb * 255, 0, 255))
+
+
+def _blend_hybrid_per_color(code: str, layer_height: float, color_map: dict,
+                            scatter_alpha: float = 5.0,
+                            k_map: Optional[dict] = None,
+                            default_k: float = 10.0) -> tuple:
+    """Hybrid blend with per-color absorption scaling.
+
+    This keeps the current hybrid stacking behavior but allows each filament
+    to use its own absorption gain `k_c`. That matches the common case where
+    different pigments have different scatter-to-absorption ratios.
+    """
+    n = len(code)
+    if n == 0:
+        return (255.0, 255.0, 255.0)
+
+    k_map = k_map or {}
+
+    transmissions = []
+    for c in code:
+        color = color_map[c]
+        td = color.td
+        if td <= 0:
+            t_ch = np.zeros(3)
+        else:
+            scatter = scatter_alpha / td
+            k_c = float(k_map.get(c, default_k))
+            absorption = color.get_absorption()
+            t_ch = np.exp(-(scatter + k_c * absorption) * layer_height)
+            t_ch = np.clip(t_ch, 0, 1)
+        transmissions.append(t_ch)
+
     remain = np.ones(3)
     array_size = max(n, 4) + 1
     light_loss = np.zeros((array_size, 3))
