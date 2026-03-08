@@ -510,7 +510,12 @@ class BlendTestGenerator:
                  directory = 'output',
                  colors = None,
                  alpha: float = 12.0,
-                 blend_mode: str = "original"
+                 blend_mode: str = "original",
+                 custom_code_grid=None,
+                 grid_origin_x: float = 0.0,
+                 grid_origin_y: float = 0.0,
+                 extra_regions=None,
+                 filename_prefix: Optional[str] = None,
                 ):
         if layer_count_max <= 0:
             raise ValueError(f"layer_count_max must be positive, got {layer_count_max}")
@@ -527,8 +532,12 @@ class BlendTestGenerator:
         self.same_height = same_height
         self.sort_color = sort_color
         self.verbose = verbose
+        self.custom_code_grid = custom_code_grid
+        self.grid_origin_x = float(grid_origin_x)
+        self.grid_origin_y = float(grid_origin_y)
+        self.extra_regions = extra_regions or []
         color_labels = ''.join(self.colors.get_labels())
-        self.filename = f'{color_labels}_{self.length_total}x{self.width_total}x{self.layer_height * self.layer_count_max:.2f}'
+        self.filename = filename_prefix or f'{color_labels}_{self.length_total}x{self.width_total}x{self.layer_height * self.layer_count_max:.2f}'
         self.directory = os.path.join(directory, self.filename) + '/'
         self.df_code = pd.DataFrame()
         self.df_rgb = pd.DataFrame()
@@ -552,6 +561,19 @@ class BlendTestGenerator:
 
         return df, self.grid_length, self.grid_width
 
+    def _build_code_df(self):
+        if self.custom_code_grid is not None:
+            return pd.DataFrame(self.custom_code_grid)
+        if self.same_height:
+            return self.permutation_matrix(self.colors.get_labels(), self.layer_count_max)
+        return self.combined_permutation_matrix(self.colors.get_labels(), self.layer_count_max)
+
+    def _append_code_meshes(self, meshes, code, x_range, y_range):
+        for color_idx in range(len(code)):
+            color = code[color_idx]
+            z_range = [self.layer_height * color_idx, self.layer_height * (color_idx + 1)]
+            meshes[color].append(self.generate_box(x_range, y_range, z_range))
+
     def merge_meshes_by_color(self, meshes):
         color_labels = ''.join(self.colors.get_labels())
         for color in meshes:
@@ -559,11 +581,7 @@ class BlendTestGenerator:
             self.save_stl_mesh(self.merge_stl_meshes(meshes[color]), filename)
 
     def generate(self):
-        if self.same_height:
-            df = self.permutation_matrix(self.colors.get_labels(), self.layer_count_max)
-        else:
-            df = self.combined_permutation_matrix(self.colors.get_labels(), self.layer_count_max)
-
+        df = self._build_code_df()
 
         # reshape based on plate dimension
         df, grid_length, grid_width = self.reshape_matrix(df)
@@ -576,12 +594,21 @@ class BlendTestGenerator:
             for x in range(df_code.shape[1]):
                 if not pd.isna(df_code.iat[y, x]):
                     code = df_code.iat[y, x]
-                    for color_idx in range(len(code)):
-                        color = code[color_idx]
-                        x_range = [grid_length*(x), grid_length*(x+1)]
-                        y_range = [grid_width*y, grid_width*(y+1)]
-                        z_range = [self.layer_height * color_idx, self.layer_height * (color_idx + 1)]
-                        meshes[color].append(self.generate_box(x_range, y_range, z_range))
+                    x_range = [
+                        self.grid_origin_x + grid_length * x,
+                        self.grid_origin_x + grid_length * (x + 1),
+                    ]
+                    y_range = [
+                        self.grid_origin_y + grid_width * y,
+                        self.grid_origin_y + grid_width * (y + 1),
+                    ]
+                    self._append_code_meshes(meshes, code, x_range, y_range)
+
+        for region in self.extra_regions:
+            code = region["code"]
+            x_range = [region["x"], region["x"] + region["width"]]
+            y_range = [region["y"], region["y"] + region["height"]]
+            self._append_code_meshes(meshes, code, x_range, y_range)
 
         self.merge_meshes_by_color(meshes)
         self.save_matrix_csv()
@@ -758,9 +785,6 @@ class BlendTestGenerator:
         records = []
         n_rows, n_cols = df.shape
 
-        # Sort first by hue (left to right), then by lightness (top to bottom)
-        df_rgb = pd.DataFrame(records)
-
         for r in range(n_rows):
             for c in range(n_cols):
                 code = df.iloc[r, c]
@@ -782,6 +806,16 @@ class BlendTestGenerator:
                     "saturation": s,
                     "tone": tone
                 })
+
+        if not self.sort_color:
+            df_rgb = pd.DataFrame(index=range(n_rows), columns=range(n_cols), dtype=object)
+            df_code = pd.DataFrame(index=range(n_rows), columns=range(n_cols), dtype=object)
+            for record in records:
+                df_rgb.iloc[record["old_row"], record["old_col"]] = record["rgb"]
+                df_code.iloc[record["old_row"], record["old_col"]] = record["code"]
+            self.df_code = df_code
+            self.df_rgb = df_rgb
+            return df_rgb, df_code
 
         # Sort first by hue (left to right), then by lightness (top to bottom)
         df_rgb = pd.DataFrame(records)
@@ -864,6 +898,55 @@ class BlendTestGenerator:
                     text_color = (0,0,0) if brightness > 0.5 else (255,255,255)
                     draw.text((x0, y0), code, fill=text_color)
                     draw_blank.text((x0, y0), code, fill=(0, 0, 0))
+        img.save(file_path)
+        if save_blank:
+            img_blank.save(f'{file_path[:-4]}_blank.png')
+
+    def save_plate_layout_image(self, save_blank=True, pixels_per_mm=8):
+        """Save a full-plate preview that includes grid origin offsets and markers."""
+        if self.df_code.empty:
+            raise ValueError("No code matrix available. Call generate() before save_plate_layout_image().")
+
+        width_px = max(1, int(math.ceil(self.length_total * pixels_per_mm)))
+        height_px = max(1, int(math.ceil(self.width_total * pixels_per_mm)))
+        img = Image.new('RGB', (width_px, height_px), (255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        img_blank = Image.new('RGB', (width_px, height_px), (255, 255, 255))
+        draw_blank = ImageDraw.Draw(img_blank)
+
+        def mm_to_px(value):
+            return int(round(value * pixels_per_mm))
+
+        rows, cols = self.df_code.shape
+        for y in range(rows):
+            for x in range(cols):
+                code = self.df_code.iat[y, x]
+                if pd.isna(code):
+                    continue
+                rgb = self.df_rgb.iat[y, x]
+                rgb = tuple(int(round(c)) for c in rgb)
+                x0 = mm_to_px(self.grid_origin_x + self.grid_length * x)
+                x1 = mm_to_px(self.grid_origin_x + self.grid_length * (x + 1))
+                y0 = mm_to_px(self.grid_origin_y + self.grid_width * y)
+                y1 = mm_to_px(self.grid_origin_y + self.grid_width * (y + 1))
+                draw.rectangle([x0, y0, x1, y1], fill=rgb, outline=(0, 0, 0))
+                draw_blank.rectangle([x0, y0, x1, y1], fill=(255, 255, 255), outline=(0, 0, 0))
+
+        for region in self.extra_regions:
+            rgb = tuple(int(c) for c in self.code_to_rgb(region["code"]))
+            x0 = mm_to_px(region["x"])
+            x1 = mm_to_px(region["x"] + region["width"])
+            y0 = mm_to_px(region["y"])
+            y1 = mm_to_px(region["y"] + region["height"])
+            rgb = tuple(int(round(c)) for c in rgb)
+            draw.rectangle([x0, y0, x1, y1], fill=rgb, outline=(0, 0, 0))
+            draw_blank.rectangle([x0, y0, x1, y1], fill=(255, 255, 255), outline=(0, 0, 0))
+            label = region.get("label")
+            if label:
+                draw_blank.text((x0 + 2, y0 + 2), label, fill=(0, 0, 0))
+
+        file_path = os.path.join(self.directory, self.filename + '_plate.png')
+        os.makedirs(self.directory, exist_ok=True)
         img.save(file_path)
         if save_blank:
             img_blank.save(f'{file_path[:-4]}_blank.png')
@@ -963,6 +1046,7 @@ class BlendTestGenerator:
 if __name__ == "__main__":
     p1s_plate = 256, 228, 256
     a1_plate = 256, 256, 256
+    h2c_plate = 300, 320, 320
     four = BlendTestGenerator(
         colors=Colors(clear=False),
         same_height=True, sort_color=True, verbose=True,

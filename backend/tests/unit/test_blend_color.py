@@ -494,6 +494,56 @@ class TestBlendTestGeneratorSetCodeRgbDf:
         assert gen.df_code.shape == df_input.shape
         assert gen.df_rgb.shape == df_input.shape
 
+    def test_set_code_rgb_df_preserves_custom_order_when_sort_disabled(self):
+        gen = BlendTestGenerator(
+            colors=Colors(names=['C', 'M']),
+            layer_height=0.08,
+            layer_count_max=2,
+            verbose=False,
+            sort_color=False,
+        )
+        df_input = pd.DataFrame([["MC", "CC"], ["MM", "CM"]])
+        _, df_code = gen.set_code_rgb_df(df_input)
+        assert df_code.values.tolist() == df_input.values.tolist()
+
+
+class TestBlendTestGeneratorStructuredPlate:
+    def test_generate_with_custom_grid_origin_and_markers(self, tmp_path):
+        colors = Colors.from_configs([
+            ColorConfig(name="Cyan", hex="#3D79C6", transmission_distance=3.0),
+            ColorConfig(name="Magenta", hex="#B3356E", transmission_distance=1.9),
+            ColorConfig(name="Yellow", hex="#FFE665", transmission_distance=2.5),
+            ColorConfig(name="White", hex="#FFFFFF", transmission_distance=7.2),
+            ColorConfig(name="Key", hex="#111111", transmission_distance=0.3),
+        ])
+        gen = BlendTestGenerator(
+            colors=colors,
+            layer_height=0.08,
+            layer_count_max=4,
+            plate_length=60,
+            plate_width=40,
+            grid_length=10,
+            grid_width=10,
+            rearrange_by_size=False,
+            sort_color=False,
+            verbose=False,
+            directory=str(tmp_path),
+            custom_code_grid=[["C", "M"], ["Y", "W"]],
+            grid_origin_x=5,
+            grid_origin_y=3,
+            extra_regions=[
+                {"x": 1, "y": 1, "width": 2, "height": 2, "code": "KKKK", "label": "marker"}
+            ],
+            filename_prefix="structured_test",
+        )
+
+        _, df_code = gen.generate()
+        gen.save_plate_layout_image()
+
+        assert df_code.shape == (2, 2)
+        assert df_code.values.tolist() == [["C", "M"], ["Y", "W"]]
+        assert (tmp_path / "structured_test" / "structured_test_plate.png").exists()
+
 
 class TestBlendTestGeneratorMatrixToCodeColorMap:
     """Tests for BlendTestGenerator.matrix_to_code_color_map()."""
