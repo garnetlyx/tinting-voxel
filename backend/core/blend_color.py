@@ -176,6 +176,9 @@ class BlendTestGenerator:
         return matrix_to_code_color_map(df_rgb, df_code)
 
     def set_code_rgb_df(self, df):
+        # HLS sorting depends on normalized channels before colorsys.rgb_to_hls,
+        # i.e. rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0. The helper keeps
+        # that logic centralized; keep the requirement visible at this entrypoint.
         df_rgb, df_code = build_code_rgb_df(df, self.code_to_rgb, sort_color=self.sort_color)
         self.df_code = df_code
         self.df_rgb = df_rgb
