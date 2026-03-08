@@ -109,6 +109,8 @@ class ProcessImageResponse(BaseModel):
     colorBlocks: List[ColorBlock]
     processedImage: str  # base64 encoded image
     imageDimensions: ImageDimensions
+    pixelSize: Optional[float] = None  # Effective pixel size after detailSize clamping
+    detailSize: Optional[float] = None  # Detail size used for clamping
 
 
 class DownloadCSVRequest(BaseModel):
@@ -202,6 +204,20 @@ class DownloadSTLRequestV2(FilamentConfigMixin):
         False,
         description="Generate mirrored back side for double-sided printing"
     )
+    detailSize: Optional[float] = Field(
+        None, ge=0.2, le=0.8,
+        description="Minimum physical pixel size in mm (default: 0.4)"
+    )
+
+    @model_validator(mode='after')
+    def validate_pixel_size_vs_detail(self):
+        """Reject if pixelSize is below detailSize (if provided)."""
+        if self.detailSize is not None and self.pixelSize < self.detailSize:
+            raise ValueError(
+                f"pixelSize ({self.pixelSize}) is below detailSize ({self.detailSize}). "
+                f"Increase pixelSize or decrease detailSize."
+            )
+        return self
 
 
 class DownloadSVGSTLRequestV2(FilamentConfigMixin):
@@ -219,6 +235,20 @@ class DownloadSVGSTLRequestV2(FilamentConfigMixin):
         False,
         description="Generate mirrored back side for double-sided printing"
     )
+    detailSize: Optional[float] = Field(
+        None, ge=0.2, le=0.8,
+        description="Minimum physical pixel size in mm (default: 0.4)"
+    )
+
+    @model_validator(mode='after')
+    def validate_pixel_size_vs_detail(self):
+        """Reject if pixelSize is below detailSize (if provided)."""
+        if self.detailSize is not None and self.pixelSize < self.detailSize:
+            raise ValueError(
+                f"pixelSize ({self.pixelSize}) is below detailSize ({self.detailSize}). "
+                f"Increase pixelSize or decrease detailSize."
+            )
+        return self
 
 
 class FilamentPresetInfo(BaseModel):
@@ -265,6 +295,20 @@ class PrintSettingsRequest(FilamentConfigMixin):
         False,
         description="Generate mirrored back side for double-sided printing"
     )
+    detailSize: Optional[float] = Field(
+        None, ge=0.2, le=0.8,
+        description="Minimum physical pixel size in mm (default: 0.4)"
+    )
+
+    @model_validator(mode='after')
+    def validate_pixel_size_vs_detail(self):
+        """Reject if pixelSize is below detailSize (if provided)."""
+        if self.detailSize is not None and self.pixelSize < self.detailSize:
+            raise ValueError(
+                f"pixelSize ({self.pixelSize}) is below detailSize ({self.detailSize}). "
+                f"Increase pixelSize or decrease detailSize."
+            )
+        return self
 
 
 class ColorMatrixEntry(BaseModel):

@@ -19,6 +19,7 @@ interface BatchProcessorProps {
   doubleSided: boolean;
   filamentPreset?: string;
   filamentColors?: FilamentColorConfig[];
+  detailSize: number;
 }
 
 export const BatchProcessor: React.FC<BatchProcessorProps> = ({
@@ -31,6 +32,7 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
   doubleSided,
   filamentPreset,
   filamentColors,
+  detailSize,
 }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
@@ -93,7 +95,7 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
     try {
       const result = await batchProcessImages(
         files,
-        { maxColors, colorThreshold, pixelSize },
+        { maxColors, colorThreshold, pixelSize, detailSize },
         controller.signal,
       );
       if (!controller.signal.aborted) {
@@ -109,7 +111,7 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
         setProcessing(false);
       }
     }
-  }, [files, maxColors, colorThreshold, pixelSize]);
+  }, [files, maxColors, colorThreshold, pixelSize, detailSize]);
 
   const handleDownloadSTL = useCallback(async () => {
     if (files.length === 0) return;
@@ -135,6 +137,7 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
         doubleSided,
         filamentPreset: filamentPreset as 'bambu_cmyk' | 'clear_cmyk' | undefined,
         filamentColors,
+        detailSize,
       }, controller.signal);
     } catch (err) {
       // Don't show error if aborted
@@ -145,7 +148,7 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
         setDownloading(false);
       }
     }
-  }, [files, maxColors, colorThreshold, pixelSize, layerHeight, layerCount, basePlateThickness, doubleSided, filamentPreset, filamentColors]);
+  }, [files, maxColors, colorThreshold, pixelSize, layerHeight, layerCount, basePlateThickness, doubleSided, filamentPreset, filamentColors, detailSize]);
 
   return (
     <div className="space-y-4">

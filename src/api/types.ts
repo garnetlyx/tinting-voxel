@@ -34,12 +34,16 @@ export interface ProcessImageResponse {
   colorBlocks: ColorBlock[];
   processedImage: string;  // base64 encoded data URL
   imageDimensions: ImageDimensions;
+  pixelSize?: number;
+  detailSize?: number;
 }
 
 export interface SVGProcessImageResponse {
   vectorResults: VectorColorResult[];
   processedImage: string;  // base64 encoded data URL
   imageDimensions: ImageDimensions;
+  pixelSize?: number;
+  detailSize?: number;
 }
 
 export interface PixelModeParams {
@@ -58,6 +62,7 @@ export interface ProcessImageParams {
   pixelSize: number;
   pixelParams?: PixelModeParams;
   svgParams?: SVGModeParams;
+  detailSize?: number;
 }
 
 export interface DownloadSTLParams {
@@ -101,6 +106,7 @@ export interface DownloadSTLParamsV2 extends DownloadSTLParams {
   filamentColors?: FilamentColorConfig[];
   basePlateThickness?: number;
   doubleSided?: boolean;
+  detailSize?: number;
 }
 
 export interface DownloadSVGSTLParamsV2 extends DownloadSVGSTLParams {
@@ -108,6 +114,7 @@ export interface DownloadSVGSTLParamsV2 extends DownloadSVGSTLParams {
   filamentColors?: FilamentColorConfig[];
   basePlateThickness?: number;
   doubleSided?: boolean;
+  detailSize?: number;
 }
 
 export interface PrintSettingsParams {
@@ -118,6 +125,7 @@ export interface PrintSettingsParams {
   basePlateThickness?: number;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
+  detailSize?: number;
 }
 
 export interface FilamentPreviewParams {
@@ -162,6 +170,7 @@ export interface BatchProcessParams {
   maxColors: number;
   colorThreshold: number;
   pixelSize: number;
+  detailSize?: number;
 }
 
 export interface BatchDownloadSTLParams {
@@ -174,6 +183,7 @@ export interface BatchDownloadSTLParams {
   doubleSided: boolean;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
+  detailSize?: number;
 }
 
 // Palette library types

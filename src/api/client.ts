@@ -60,6 +60,10 @@ export async function processImage(
   formData.append('mode', params.mode);
   formData.append('pixelSize', params.pixelSize.toString());
 
+  if (params.detailSize !== undefined) {
+    formData.append('detailSize', params.detailSize.toString());
+  }
+
   if (params.mode === 'pixel' && params.pixelParams) {
     formData.append('maxColors', params.pixelParams.maxColors.toString());
     formData.append('colorThreshold', params.pixelParams.colorThreshold.toString());
@@ -279,6 +283,10 @@ export async function batchProcessImages(
   formData.append('colorThreshold', params.colorThreshold.toString());
   formData.append('pixelSize', params.pixelSize.toString());
 
+  if (params.detailSize !== undefined) {
+    formData.append('detailSize', params.detailSize.toString());
+  }
+
   const response = await fetch(`${API_BATCH_BASE_URL}/process`, {
     method: 'POST',
     body: formData,
@@ -316,6 +324,9 @@ export async function batchDownloadSTL(
   }
   if (params.filamentColors && params.filamentColors.length > 0) {
     formData.append('filamentColors', JSON.stringify(params.filamentColors));
+  }
+  if (params.detailSize !== undefined) {
+    formData.append('detailSize', params.detailSize.toString());
   }
 
   const response = await fetch(`${API_BATCH_BASE_URL}/download-stl`, {

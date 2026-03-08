@@ -3,6 +3,7 @@ Image processing endpoints
 """
 import base64
 import logging
+from typing import Optional
 from io import BytesIO
 
 import numpy as np
@@ -33,7 +34,8 @@ async def api_process_image(
     pixelSize: float = Form(0.08, gt=0, le=10),
     epsilon: float = Form(2.0, gt=0, le=100),
     minArea: int = Form(100, ge=1),
-    numColors: int = Form(8, ge=1, le=256)
+    numColors: int = Form(8, ge=1, le=256),
+    detailSize: Optional[float] = Form(None, ge=0.2, le=0.8), # Modified detailSize parameter
 ):
     """Process uploaded image to extract color blocks or vector contours."""
     image_bytes = await image.read()
@@ -47,12 +49,17 @@ async def api_process_image(
             detail=f"Invalid processing mode: '{mode}'. Must be 'pixel' or 'svg'."
         )
 
+    # Clamp pixelSize upward to honour detailSize minimum if provided
+    effective_pixel_size = pixelSize
+    if detailSize is not None:
+        effective_pixel_size = max(pixelSize, detailSize)
+
     if processing_mode == ProcessingMode.PIXEL:
         result = process_image(
             image_bytes=image_bytes,
             max_colors=maxColors,
             color_threshold=colorThreshold,
-            pixel_size=pixelSize
+            pixel_size=effective_pixel_size
         )
 
         logger.info(

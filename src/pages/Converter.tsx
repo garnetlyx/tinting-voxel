@@ -54,6 +54,7 @@ const Converter: React.FC = () => {
     // Shared params
     layerHeight,
     pixelSize,
+    detailSize,
     layerCount,
     basePlateThickness,
     doubleSided,
@@ -78,6 +79,7 @@ const Converter: React.FC = () => {
     setNumColors,
     setLayerHeight,
     setPixelSize,
+    setDetailSize,
     setTargetWidth,
     setBasePlateThickness,
     setDoubleSided,
@@ -140,6 +142,8 @@ const Converter: React.FC = () => {
                   pixelSize={pixelSize}
                   onLayerHeightChange={setLayerHeight}
                   onPixelSizeChange={setPixelSize}
+                  detailSize={detailSize}
+                  onDetailSizeChange={setDetailSize}
                   targetWidth={targetWidth}
                   targetHeight={targetHeight}
                   onTargetWidthChange={setTargetWidth}
@@ -198,8 +202,8 @@ const Converter: React.FC = () => {
                 <button
                   onClick={() => setAppMode('single')}
                   className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${appMode === 'single'
-                      ? 'border-purple-600 text-purple-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-purple-600 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                 >
                   <ImageIcon className="w-4 h-4" />
@@ -208,8 +212,8 @@ const Converter: React.FC = () => {
                 <button
                   onClick={() => setAppMode('batch')}
                   className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${appMode === 'batch'
-                      ? 'border-purple-600 text-purple-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-purple-600 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                 >
                   <Layers className="w-4 h-4" />
@@ -314,6 +318,7 @@ const Converter: React.FC = () => {
                   doubleSided={doubleSided}
                   filamentPreset={filamentPreset ?? undefined}
                   filamentColors={filamentPreset ? undefined : filamentColors}
+                  detailSize={detailSize}
                 />
               )}
             </div>

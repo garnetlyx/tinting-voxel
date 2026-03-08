@@ -2,7 +2,7 @@
 
 **Product Name**: img2stl
 **Version**: 1.0
-**Last Updated**: 2026-01-27
+**Last Updated**: 2026-03-08
 **Status**: In Development
 
 ---

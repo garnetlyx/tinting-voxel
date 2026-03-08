@@ -45,7 +45,8 @@ export const useImageProcessor = () => {
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [layerHeight, setLayerHeight] = useState(0.08);
-  const [pixelSize, setPixelSize] = useState(0.08);
+  const [detailSize, setDetailSize] = useState(0.4);
+  const [pixelSize, setPixelSize] = useState(0.4);
   const [layerCount] = useState(4);
 
   // Base plate options
@@ -75,9 +76,21 @@ export const useImageProcessor = () => {
   const setTargetWidth = useCallback((widthMm: number) => {
     if (imageDimensions.width > 0 && widthMm > 0) {
       const newPixelSize = Math.round((widthMm / imageDimensions.width) * 10000) / 10000;
-      setPixelSize(Math.max(0.01, Math.min(2.0, newPixelSize)));
+      const clampedPixelSize = Math.max(detailSize, Math.min(2.0, newPixelSize));
+      setPixelSize(clampedPixelSize);
     }
-  }, [imageDimensions.width]);
+  }, [imageDimensions.width, detailSize]);
+
+  const handleSetPixelSize = useCallback((value: number) => {
+    setPixelSize(Math.max(detailSize, Math.min(2.0, value)));
+  }, [detailSize]);
+
+  // Ensure pixelSize is always at least detailSize
+  useEffect(() => {
+    if (pixelSize < detailSize) {
+      setPixelSize(detailSize);
+    }
+  }, [detailSize, pixelSize]);
 
   // AbortController ref for cancelling in-flight image processing requests
   const processAbortRef = useRef<AbortController | null>(null);
@@ -197,6 +210,7 @@ export const useImageProcessor = () => {
       const result = await processImage(file, {
         mode: processingMode,
         pixelSize,
+        detailSize,
         pixelParams: processingMode === 'pixel' ? { maxColors, colorThreshold } : undefined,
         svgParams: processingMode === 'svg' ? { epsilon, minArea, numColors } : undefined,
       }, controller.signal);
@@ -206,6 +220,14 @@ export const useImageProcessor = () => {
 
       setProcessedImageUrl(result.processedImage);
       setImageDimensions(result.imageDimensions);
+
+      // Sync effective parameters from backend
+      if (result.pixelSize !== undefined) {
+        setPixelSize(result.pixelSize);
+      }
+      if (result.detailSize !== undefined) {
+        setDetailSize(result.detailSize);
+      }
 
       if (processingMode === 'pixel') {
         const pixelResult = result as ProcessImageResponse;
@@ -228,7 +250,7 @@ export const useImageProcessor = () => {
         setProcessingStage('idle');
       }
     }
-  }, [mode, maxColors, colorThreshold, epsilon, minArea, numColors, pixelSize]);
+  }, [mode, maxColors, colorThreshold, epsilon, minArea, numColors, pixelSize, detailSize]);
 
   // Auto-load last used saved preset on mount
   useEffect(() => {
@@ -240,7 +262,7 @@ export const useImageProcessor = () => {
         setFilamentColors([...saved.colors]);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only on mount
 
 
@@ -357,6 +379,7 @@ export const useImageProcessor = () => {
         imageDimensions,
         filamentColors,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
+        detailSize,
       };
 
       if (mode === 'pixel') {
@@ -393,6 +416,7 @@ export const useImageProcessor = () => {
         filamentColors,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         ...(doubleSided ? { doubleSided } : {}),
+        detailSize,
       };
 
       if (mode === 'pixel') {
@@ -427,6 +451,7 @@ export const useImageProcessor = () => {
         imageDimensions,
         filamentColors,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
+        detailSize,
       });
     } catch (err) {
       console.error('Error downloading print settings:', err);
@@ -571,6 +596,7 @@ export const useImageProcessor = () => {
     // Shared params
     layerHeight,
     pixelSize,
+    detailSize,
     layerCount,
     basePlateThickness,
     doubleSided,
@@ -593,7 +619,8 @@ export const useImageProcessor = () => {
     setMinArea,
     setNumColors,
     setLayerHeight,
-    setPixelSize,
+    setPixelSize: handleSetPixelSize,
+    setDetailSize,
     setTargetWidth,
     setBasePlateThickness,
     setDoubleSided,

@@ -1,6 +1,6 @@
 # Architecture
 
-**Last Updated**: 2026-01-27
+**Last Updated**: 2026-03-08
 
 ## Overview
 
@@ -82,57 +82,74 @@ img2stl is a web application that converts images into layered 3D-printable STL 
 
 ```
 img2stl/
-├── backend/                      # Python FastAPI backend
-│   ├── main.py                   # Application entry, lifespan handler
-│   ├── api/
-│   │   ├── models.py             # Pydantic request/response schemas
-│   │   └── routes/
-│   │       ├── health.py         # Health check endpoint
-│   │       ├── image.py          # /api/process-image
-│   │       └── download.py       # /api/download-csv, /api/download-stl
-│   ├── core/
-│   │   └── blend_color.py        # Color classes, Beer-Lambert model (678 lines)
-│   ├── services/
-│   │   ├── image_processor.py    # K-means color extraction
-│   │   ├── stl_generator.py      # STL file generation, color mapping
-│   │   ├── mesh_optimizer.py     # Greedy meshing algorithm
+├── backend/              # Python FastAPI backend
+│   ├── main.py           # Application entry point
+│   ├── api/              # API routes and models
+│   │   ├── models.py     # Pydantic data models (FilamentConfigMixin)
+│   │   ├── error_handlers.py  # @handle_api_errors decorator
+│   │   ├── validators.py # File upload validation
+│   │   └── routes/       # Route handlers
+│   │       ├── image.py      # Image processing (pixel/SVG modes)
+│   │       ├── download.py   # V1 download endpoints (CSV, STL)
+│   │       ├── download_v2.py # V2 N-color endpoints (STL, SVG-STL, 3MF, print settings)
+│   │       ├── filament.py   # Filament preview
+│   │       ├── batch.py      # Batch processing (up to 20 images)
+│   │       ├── palette.py    # Palette library
+│   │       └── health.py     # Health check endpoints
+│   ├── core/             # Core algorithms
+│   │   ├── blend_color.py    # Color blending (Beer-Lambert model)
+│   │   ├── blend_models.py   # Alternative blend functions (kromacut, per_channel, hybrid)
+│   │   ├── calibrator.py     # Beer-Lambert parameter calibration engine
+│   │   ├── calibration_priors.py # Calibration priors and constraints
+│   │   ├── code_grid.py      # Code grid generation utilities
+│   │   ├── color_config.py   # Filament presets (single source of truth)
+│   │   ├── color_materials.py # Material property definitions
+│   │   ├── grid_sampling.py  # Grid sampling for calibration plates
+│   │   ├── plate_geometry.py # Plate geometry calculations
+│   │   ├── ramp_calibrator.py # Ramp plate calibration
+│   │   ├── structured_plate.py # Structured plate layout generation
+│   │   └── palette_library.py # Curated color palettes
+│   ├── services/         # Business logic
+│   │   ├── image_processor.py    # Image processing + auto-downscale
+│   │   ├── stl_generator.py      # STL file generation
+│   │   ├── svg_stl_generator.py  # SVG-mode STL generation
+│   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
 │   │   ├── csv_generator.py      # CSV export
-│   │   └── vector_processor.py   # Vector utilities
-│   ├── config/
-│   │   ├── settings.py           # Environment-based configuration
-│   │   └── constants.py          # Application constants
-│   ├── tests/
-│   │   ├── unit/                 # Unit tests
-│   │   └── integration/          # Integration tests
-│   └── requirements.txt          # Python dependencies
-│
-├── src/                          # React frontend
-│   ├── main.tsx                  # Application entry
-│   ├── pages/
-│   │   └── Converter.tsx         # Main converter page
-│   ├── components/
-│   │   ├── ImageUploader.tsx     # Drag-and-drop upload
-│   │   ├── ParameterPanel.tsx    # Sliders for parameters
-│   │   ├── ImageComparison.tsx   # Side-by-side preview
-│   │   ├── ColorBlocksList.tsx   # Extracted colors display
-│   │   ├── DownloadButtons.tsx   # CSV/STL download
-│   │   ├── LoadingSpinner.tsx    # Loading state
-│   │   ├── ErrorMessage.tsx      # Error display
-│   │   └── index.ts              # Barrel exports
-│   ├── hooks/
-│   │   └── useImageProcessor.ts  # Processing logic and state
-│   └── api/
-│       ├── client.ts             # HTTP client functions
-│       └── types.ts              # TypeScript interfaces
-│
-├── docs/                         # Documentation
-│   ├── PRD.md                    # Product Requirements
-│   └── ARCHITECTURE.md           # This file
-│
-├── vite.config.ts                # Vite config with API proxy
-├── package.json                  # Node dependencies
-├── tsconfig.json                 # TypeScript config
-└── CLAUDE.md                     # Project instructions
+│   │   ├── mesh_optimizer.py     # Greedy meshing optimization
+│   │   ├── vector_processor.py   # Vector/contour processing
+│   │   ├── batch_processor.py    # Multi-image batch processing
+│   │   ├── filament_preview.py   # Color matrix preview
+│   │   ├── print_settings_generator.py # Slicer settings JSON
+│   │   └── analytics.py         # In-memory usage analytics
+│   ├── tools/           # CLI tools
+│   │   └── calibration/ # Calibration tools
+│   │       ├── generate_plate.py       # Generate calibration plates
+│   │       ├── generate_ramp.py        # Generate ramp plates
+│   │       ├── run_calibration.py      # Run photo calibration
+│   │       └── run_ramp_calibration.py # Run ramp plate calibration
+│   ├── config/           # Configuration
+│   └── tests/            # Test suite (573 tests, 89% coverage)
+│       └── fixtures/
+│           ├── images/        # Committed small test images (200-500px, <100KB)
+│           └── images-local/  # Gitignored large images for local manual testing
+│       └── calibration/      # Calibration photos, CLI runner, results
+├── src/                  # React frontend
+│   ├── main.tsx          # Entry point
+│   ├── pages/            # Page components
+│   ├── components/       # UI components (25+ components)
+│   │   ├── ThreeDPreview.tsx     # WebGL 3D preview (three.js)
+│   │   ├── BatchProcessor.tsx    # Batch image processing UI
+│   │   ├── PaletteLibrary.tsx    # Palette selection UI
+│   │   ├── FilamentConfigPanel.tsx # N-color filament config
+│   │   ├── ImageEditor.tsx       # Canvas crop/resize editor
+│   │   └── UploadDropzone.tsx    # Drag-and-drop upload
+│   ├── hooks/            # Custom hooks
+│   └── api/              # API client + types
+├── e2e/                  # Playwright E2E tests (25 tests)
+├── Dockerfile            # Multi-stage Docker build
+├── docker-compose.yml    # Docker Compose config
+├── fly.toml              # Fly.io deploy config
+└── railway.toml          # Railway deploy config
 ```
 
 ## Core Components
@@ -144,8 +161,17 @@ img2stl/
 | **main.py** | App initialization, CORS, route registration, lifespan events | FastAPI, uvicorn |
 | **ImageProcessor** | K-means clustering, color extraction from uploaded images | scikit-learn, Pillow |
 | **STLGenerator** | Convert color blocks to layered STL meshes, color mapping | numpy-stl, blend_color |
+| **SVG-STLGenerator** | Vector-based STL generation from SVG contours | numpy-stl, svg.path |
+| **3MFGenerator** | 3MF file generation with named color objects | trimesh, lxml |
 | **MeshOptimizer** | Greedy meshing to reduce box count, face culling | NumPy |
 | **BlendColor (core)** | Beer-Lambert model, CMYK color mixing, LAB conversion | scikit-image, NumPy |
+| **ColorConfig** | Filament presets and material properties | dataclasses |
+| **Calibrator** | Beer-Lambert parameter calibration from photos | scipy.optimize, PIL |
+| **FilamentPreview** | Color matrix preview generation | PIL, NumPy |
+| **BatchProcessor** | Multi-image batch processing | concurrent.futures |
+| **PaletteLibrary** | Curated color palette management | dataclasses |
+| **PrintSettingsGenerator** | Slicer settings JSON export | json |
+| **Analytics** | In-memory usage analytics | threading |
 
 ### Frontend Components
 
@@ -153,11 +179,15 @@ img2stl/
 |-----------|---------------|------------------|
 | **Converter** | Main page layout, orchestrates child components | Props from useImageProcessor |
 | **useImageProcessor** | All processing logic, API calls, state | React useState, useEffect |
-| **ImageUploader** | File input, drag-and-drop handling | Local file state |
+| **UploadDropzone** | Drag-and-drop file upload with preview | Local file state |
 | **ParameterPanel** | Sliders for maxColors, threshold, layerHeight, pixelSize | Controlled inputs |
-| **ImageComparison** | Side-by-side original vs processed display | Props only |
+| **FilamentConfigPanel** | N-color filament configuration UI | Local state, preset manager |
+| **ThreeDPreview** | WebGL 3D preview with orbit controls | Three.js, useRef |
+| **BatchProcessor** | Batch image processing UI | Local file state |
+| **PaletteLibrary** | Color palette selection UI | Local filter state |
+| **ImageEditor** | Canvas-based crop/resize editor | Canvas API, useRef |
 | **ColorBlocksList** | Display extracted color swatches with data | Props only |
-| **DownloadButtons** | Trigger CSV/STL downloads | Loading state |
+| **DownloadButtons** | Trigger CSV/STL/3MF downloads | Loading state |
 
 ## Data Flow
 

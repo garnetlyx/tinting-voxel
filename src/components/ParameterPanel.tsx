@@ -25,6 +25,9 @@ interface ParameterPanelProps {
   pixelSize: number;
   onLayerHeightChange: (value: number) => void;
   onPixelSizeChange: (value: number) => void;
+  // Detail size
+  detailSize: number;
+  onDetailSizeChange: (value: number) => void;
   // Target physical size
   targetWidth: number;
   targetHeight: number;
@@ -57,6 +60,8 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   pixelSize,
   onLayerHeightChange,
   onPixelSizeChange,
+  detailSize,
+  onDetailSizeChange,
   targetWidth,
   targetHeight,
   onTargetWidthChange,
@@ -177,11 +182,29 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Pixel Size: {pixelSize} mm
+          Detail Size (Min Pixel): {detailSize.toFixed(2)} mm
         </label>
         <input
           type="range"
-          min="0.01"
+          min="0.2"
+          max="0.8"
+          step="0.05"
+          value={detailSize}
+          onChange={(e) => onDetailSizeChange(parseFloat(e.target.value))}
+          className="w-full"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Minimum physical size of a single pixel. Prevents too-small details.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Pixel Size: {pixelSize.toFixed(2)} mm
+        </label>
+        <input
+          type="range"
+          min={detailSize}
           max="2"
           step="0.01"
           value={pixelSize}
