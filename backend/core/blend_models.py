@@ -8,8 +8,15 @@ from core.color_materials import Color
 
 def _build_color_map_from_key(color_key: tuple) -> dict:
     color_map = {}
-    for label, td, hex_val in color_key:
-        color_map[label] = Color(label, td, hex_val)
+    for item in color_key:
+        label = item[0]
+        td = item[1]
+        hex_val = item[2]
+        c = Color(label, td, hex_val)
+        if len(item) >= 5:
+            c.k = item[3]
+            c.alpha = item[4]
+        color_map[label] = c
     return color_map
 
 
@@ -195,6 +202,12 @@ def _code_to_rgb_cached(
         return _blend_kromacut(code, layer_height, color_map)
     if blend_mode == "per_channel":
         return _blend_per_channel(code, layer_height, color_map)
+        
+    if blend_mode == "hybrid_calibrated":
+        # Extract k_map and base alpha from the first valid color in the map
+        k_map = {lbl: getattr(c, 'k', 10.0) for lbl, c in color_map.items()}
+        base_alpha = color_map[list(color_map.keys())[0]].alpha if color_map else alpha
+        return _blend_hybrid_per_color(code, layer_height, color_map, scatter_alpha=base_alpha, k_map=k_map)
 
     return _blend_original(code, layer_height, color_map, alpha=alpha)
 

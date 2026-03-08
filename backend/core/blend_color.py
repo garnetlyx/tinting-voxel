@@ -183,7 +183,7 @@ class BlendTestGenerator:
 
     def _color_key(self) -> tuple:
         return tuple(
-            (label, self.colors[label].td, self.colors[label].hex)
+            (label, self.colors[label].td, self.colors[label].hex, getattr(self.colors[label], 'k', 10.0), getattr(self.colors[label], 'alpha', 12.0))
             for label in self.colors.get_labels()
         )
 
