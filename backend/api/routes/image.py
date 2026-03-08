@@ -63,8 +63,8 @@ async def api_process_image(
         )
 
         logger.info(
-            "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.2f",
-            maxColors, colorThreshold, pixelSize
+            "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.2f, detailSize=%s",
+            maxColors, colorThreshold, pixelSize, str(detailSize)
         )
         logger.info(
             "Processed image: %dx%d, extracted %d colors",
@@ -73,7 +73,11 @@ async def api_process_image(
             len(result['colorBlocks'])
         )
 
-        return ProcessImageResponse(**result)
+        return ProcessImageResponse(
+            **result,
+            pixelSize=effective_pixel_size,
+            detailSize=detailSize
+        )
 
     # SVG mode
     img = Image.open(BytesIO(image_bytes))
@@ -125,5 +129,7 @@ async def api_process_image(
     return SVGProcessImageResponse(
         vectorResults=vector_results,
         processedImage=processed_img_data_url,
-        imageDimensions={'width': img.width, 'height': img.height}
+        imageDimensions={'width': img.width, 'height': img.height},
+        pixelSize=effective_pixel_size,
+        detailSize=detailSize
     )

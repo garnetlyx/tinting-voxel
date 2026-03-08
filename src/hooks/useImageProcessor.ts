@@ -222,10 +222,10 @@ export const useImageProcessor = () => {
       setImageDimensions(result.imageDimensions);
 
       // Sync effective parameters from backend
-      if (result.pixelSize !== undefined) {
+      if (result.pixelSize !== undefined && result.pixelSize !== null) {
         setPixelSize(result.pixelSize);
       }
-      if (result.detailSize !== undefined) {
+      if (result.detailSize !== undefined && result.detailSize !== null) {
         setDetailSize(result.detailSize);
       }
 

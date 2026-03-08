@@ -131,6 +131,8 @@ class SVGProcessImageResponse(BaseModel):
     vectorResults: List[VectorColorResult]
     processedImage: str  # base64 encoded image
     imageDimensions: ImageDimensions
+    pixelSize: Optional[float] = None
+    detailSize: Optional[float] = None
 
 
 class DownloadSTLRequest(BaseModel):

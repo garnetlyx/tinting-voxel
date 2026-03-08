@@ -129,7 +129,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Simplification (Epsilon): {epsilon.toFixed(1)}
+              Simplification (Epsilon): {(epsilon ?? 0).toFixed(1)}
             </label>
             <input
               type="range"
@@ -182,7 +182,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Detail Size (Min Pixel): {detailSize.toFixed(2)} mm
+          Detail Size (Min Pixel): {(detailSize ?? 0).toFixed(2)} mm
         </label>
         <input
           type="range"
@@ -200,7 +200,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Pixel Size: {pixelSize.toFixed(2)} mm
+          Pixel Size: {(pixelSize ?? 0).toFixed(2)} mm
         </label>
         <input
           type="range"
