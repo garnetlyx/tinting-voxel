@@ -40,6 +40,7 @@ const Converter: React.FC = () => {
     colorBlocks,
     vectorResults,
     processedImageUrl,
+    segmentationImageUrl,
     mappedBlockColors,
     mappedBlendPalette,
     hasResults,
@@ -252,6 +253,8 @@ const Converter: React.FC = () => {
                       {/* Before/After Comparison */}
                       <ImageComparison
                         originalImage={image}
+                        intermediateImageUrl={mode === 'pixel' ? segmentationImageUrl : null}
+                        intermediateLabel={mode === 'pixel' ? 'Grouped Colors' : 'Intermediate'}
                         processedImageUrl={processedImageUrl}
                         colorCount={resultCount}
                         processedLabel={mode === 'pixel' ? 'Simulated Print' : 'Processed'}
