@@ -4,6 +4,7 @@ Color configuration dataclass for N-color filament support.
 Provides a clean interface for configuring custom filament colors
 with name, hex color, and transmission distance properties.
 """
+import math
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -50,26 +51,26 @@ class ColorConfig:
                 f"Must be '#' followed by 6 hex digits (e.g., '#00FFFF')"
             )
 
-        if self.transmission_distance <= 0:
+        if not math.isfinite(self.transmission_distance) or self.transmission_distance <= 0:
             raise ValueError(
-                f"Transmission distance must be positive: {self.transmission_distance}"
+                f"Transmission distance must be positive and finite, got {self.transmission_distance}"
             )
 
-        if self.alpha <= 0:
+        if not math.isfinite(self.alpha) or self.alpha <= 0:
             raise ValueError(
-                f"Alpha (absorption coefficient) must be positive: {self.alpha}"
+                f"Alpha (absorption coefficient) must be positive and finite, got {self.alpha}"
             )
 
-        if self.k < 0:
+        if not math.isfinite(self.k) or self.k < 0:
             raise ValueError(
-                f"k (scattering coefficient) must be non-negative: {self.k}"
+                f"k (scattering coefficient) must be non-negative and finite, got {self.k}"
             )
 
-        if self.td_scale <= 0:
-            raise ValueError(f"TD scale must be positive: {self.td_scale}")
+        if not math.isfinite(self.td_scale) or self.td_scale <= 0:
+            raise ValueError(f"TD scale must be positive and finite, got {self.td_scale}")
 
-        if self.td_gamma <= 0:
-            raise ValueError(f"TD gamma must be positive: {self.td_gamma}")
+        if not math.isfinite(self.td_gamma) or self.td_gamma <= 0:
+            raise ValueError(f"TD gamma must be positive and finite, got {self.td_gamma}")
 
     @property
     def label(self) -> str:
