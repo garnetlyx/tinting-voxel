@@ -15,6 +15,9 @@ def test_pixel_mode_success(client, tiny_png_bytes):
     data = response.json()
     assert "colorBlocks" in data
     assert "processedImage" in data
+    assert "segmentationImage" in data
+    assert "mappedBlockColors" in data
+    assert "mappedBlendPalette" in data
     assert "imageDimensions" in data
     assert len(data["colorBlocks"]) > 0
 
@@ -104,3 +107,31 @@ def test_dimensions_match_input(client, tiny_png_bytes):
     dims = response.json()["imageDimensions"]
     assert dims["width"] == 4
     assert dims["height"] == 4
+
+
+def test_simulate_preview_success(client, tiny_png_bytes):
+    """POST /api/simulate-preview returns image-specific mapped palette data."""
+    process_response = client.post(
+        "/api/process-image",
+        files={"image": ("test.png", tiny_png_bytes, "image/png")},
+        data={"mode": "pixel", "maxColors": "4", "colorThreshold": "50", "pixelSize": "0.08"},
+    )
+    assert process_response.status_code == 200
+    processed = process_response.json()
+
+    response = client.post(
+        "/api/simulate-preview",
+        json={
+            "colorBlocks": processed["colorBlocks"],
+            "imageDimensions": processed["imageDimensions"],
+            "layerHeight": 0.08,
+            "layerCount": 4,
+            "filamentPreset": "bambu_cmyk",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "processedImage" in data
+    assert "mappedBlockColors" in data
+    assert "mappedBlendPalette" in data
+    assert len(data["mappedBlendPalette"]) > 0

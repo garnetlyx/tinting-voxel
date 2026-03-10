@@ -9,6 +9,7 @@ from PIL import Image
 from services.image_processor import (
     MAX_PROCESSING_DIMENSION,
     _downscale_if_needed,
+    build_simulated_print_preview,
     process_image,
 )
 
@@ -86,6 +87,10 @@ class TestProcessImageLargeHandling:
         img_bytes = _create_image_bytes(8, 8, color=(0, 0, 255))
         result = process_image(img_bytes)
         assert result['processedImage'].startswith('data:image/png;base64,')
+        assert result['segmentationImage'].startswith('data:image/png;base64,')
+        assert isinstance(result['mappedBlockColors'], list)
+        assert isinstance(result['mappedBlendPalette'], list)
+        assert len(result['mappedBlendPalette']) > 0
 
     def test_process_with_multiple_colors(self):
         """Process handles image with multiple colors."""
@@ -104,3 +109,36 @@ class TestProcessImageLargeHandling:
 
         result = process_image(buf.getvalue(), max_colors=4)
         assert len(result['colorBlocks']) <= 4
+        assert len(result['mappedBlockColors']) == len(result['colorBlocks'])
+        assert len(result['mappedBlendPalette']) == len(result['colorBlocks'])
+
+    def test_simulated_preview_palette_counts_match_pixels(self):
+        """Mapped blend palette accounts for every pixel in the image."""
+        color_blocks = [
+            {
+                'r': 255,
+                'g': 0,
+                'b': 0,
+                'hex': '#ff0000',
+                'count': 3,
+                'pixels': [{'x': 0, 'y': 0}, {'x': 1, 'y': 0}, {'x': 0, 'y': 1}],
+            },
+            {
+                'r': 0,
+                'g': 0,
+                'b': 255,
+                'hex': '#0000ff',
+                'count': 1,
+                'pixels': [{'x': 1, 'y': 1}],
+            },
+        ]
+
+        result = build_simulated_print_preview(
+            color_blocks=color_blocks,
+            image_dimensions={'width': 2, 'height': 2},
+        )
+
+        assert result['processedImage'].startswith('data:image/png;base64,')
+        assert len(result['mappedBlockColors']) == len(color_blocks)
+        assert sum(entry['pixelCount'] for entry in result['mappedBlendPalette']) == 4
+        assert result['mappedBlendPalette'][0]['pixelPercent'] >= result['mappedBlendPalette'][1]['pixelPercent']

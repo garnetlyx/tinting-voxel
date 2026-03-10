@@ -6,10 +6,12 @@ import {
   downloadPrintSettings,
   downloadSTLV2,
   processImage,
+  simulatePrintPreview,
 } from '../api/client';
 
 vi.mock('../api/client', () => ({
   processImage: vi.fn(),
+  simulatePrintPreview: vi.fn(),
   downloadCSV: vi.fn(),
   downloadSTLV2: vi.fn(),
   downloadSVGSTLV2: vi.fn(),
@@ -18,6 +20,7 @@ vi.mock('../api/client', () => ({
 }));
 
 const mockedProcessImage = vi.mocked(processImage);
+const mockedSimulatePrintPreview = vi.mocked(simulatePrintPreview);
 const mockedDownloadSTLV2 = vi.mocked(downloadSTLV2);
 const mockedDownload3MFV2 = vi.mocked(download3MFV2);
 const mockedDownloadPrintSettings = vi.mocked(downloadPrintSettings);
@@ -41,7 +44,15 @@ describe('useImageProcessor', () => {
     mockedProcessImage.mockResolvedValue({
       colorBlocks: [],
       processedImage: 'data:image/png;base64,mock',
+      segmentationImage: 'data:image/png;base64,seg',
+      mappedBlockColors: [],
+      mappedBlendPalette: [],
       imageDimensions: { width: 8, height: 6 },
+    });
+    mockedSimulatePrintPreview.mockResolvedValue({
+      processedImage: 'data:image/png;base64,sim',
+      mappedBlockColors: [],
+      mappedBlendPalette: [],
     });
     mockedDownloadSTLV2.mockResolvedValue(undefined);
     mockedDownload3MFV2.mockResolvedValue(undefined);
@@ -94,6 +105,26 @@ describe('useImageProcessor', () => {
     // No images should be created on mount since bootstrap logic was removed
     expect(createdImages).toHaveLength(0);
     expect(mockedProcessImage).not.toHaveBeenCalled();
+  });
+
+  it('sends filament config and layer settings when processing an image', async () => {
+    const { result } = renderHook(() => useImageProcessor());
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+
+    await act(async () => {
+      result.current.handleApplyEdit(img);
+    });
+
+    expect(mockedProcessImage).toHaveBeenCalledWith(
+      expect.any(File),
+      expect.objectContaining({
+        mode: 'pixel',
+        layerHeight: 0.08,
+        layerCount: 4,
+        filamentPreset: 'bambu_cmyk',
+      }),
+      expect.any(AbortSignal)
+    );
   });
 
   it('preserves filamentPreset for STL downloads when a preset is selected', async () => {

@@ -7,12 +7,14 @@ interface ImageComparisonProps {
   originalImage: HTMLImageElement | null;
   processedImageUrl: string | null;
   colorCount: number;
+  processedLabel?: string;
 }
 
 export const ImageComparison: React.FC<ImageComparisonProps> = ({
   originalImage,
   processedImageUrl,
   colorCount,
+  processedLabel = 'Processed',
 }) => {
   return (
     <div className="mb-8">
@@ -32,7 +34,7 @@ export const ImageComparison: React.FC<ImageComparisonProps> = ({
         </div>
         <div>
           <h3 className="text-sm font-medium text-gray-700 mb-2">
-            Processed ({colorCount} colors)
+            {processedLabel} ({colorCount} colors)
           </h3>
           <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
             {processedImageUrl && (

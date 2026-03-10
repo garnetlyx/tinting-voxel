@@ -5,11 +5,12 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { ColorBlock, ImageDimensions } from '../api/types';
+import type { ColorBlock, ImageDimensions, MappedBlockColor } from '../api/types';
 import { Eye, EyeOff, RotateCcw, Maximize2, Layers } from 'lucide-react';
 
 interface ThreeDPreviewProps {
   colorBlocks: ColorBlock[];
+  mappedBlockColors: MappedBlockColor[];
   imageDimensions: ImageDimensions;
   layerHeight: number;
   pixelSize: number;
@@ -35,6 +36,7 @@ const DIRECTIONAL_LIGHT_INTENSITY = 0.8;
  */
 function buildInstancedMeshes(
   colorBlocks: ColorBlock[],
+  mappedBlockColors: MappedBlockColor[],
   imageDimensions: ImageDimensions,
   pixelSize: number,
   layerHeight: number,
@@ -65,21 +67,23 @@ function buildInstancedMeshes(
 
   const matrix = new THREE.Matrix4();
 
-  for (const block of colorBlocks) {
-    if (!visibilityMap.get(block.hex)) continue;
+  for (const [index, block] of colorBlocks.entries()) {
+    const mappedColor = mappedBlockColors[index];
+    const displayHex = mappedColor?.hex ?? block.hex;
+    if (!visibilityMap.get(displayHex)) continue;
     if (block.pixels.length === 0) continue;
 
     // Get or create cached material for this color
-    let material = materialCacheRef.current.get(block.hex);
+    let material = materialCacheRef.current.get(displayHex);
     if (!material) {
-      const color = new THREE.Color(block.hex);
+      const color = new THREE.Color(displayHex);
       material = new THREE.MeshPhongMaterial({
         color,
         flatShading: true,
         transparent: true,
         opacity: 0.92,
       });
-      materialCacheRef.current.set(block.hex, material);
+      materialCacheRef.current.set(displayHex, material);
     }
 
     // In exploded view, create one instance per layer per pixel
@@ -115,11 +119,13 @@ function buildInstancedMeshes(
   // Double-sided: mirror on back
   if (doubleSided) {
     const mirrorBaseY = -(basePlateThickness + blockHeight / 2);
-    for (const block of colorBlocks) {
-      if (!visibilityMap.get(block.hex)) continue;
+    for (const [index, block] of colorBlocks.entries()) {
+      const mappedColor = mappedBlockColors[index];
+      const displayHex = mappedColor?.hex ?? block.hex;
+      if (!visibilityMap.get(displayHex)) continue;
       if (block.pixels.length === 0) continue;
 
-      const color = new THREE.Color(block.hex);
+      const color = new THREE.Color(displayHex);
       const material = new THREE.MeshPhongMaterial({
         color,
         flatShading: true,
@@ -186,6 +192,7 @@ function buildInstancedMeshes(
 
 export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
   colorBlocks,
+  mappedBlockColors,
   imageDimensions,
   layerHeight,
   pixelSize,
@@ -217,12 +224,22 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
 
   // Initialize color visibility when colorBlocks change
   useEffect(() => {
-    setColorVisibility(colorBlocks.map(b => ({
-      hex: b.hex,
-      visible: true,
-      count: b.count,
-    })));
-  }, [colorBlocks]);
+    const visibilityByHex = new Map<string, ColorVisibility>();
+    colorBlocks.forEach((block, index) => {
+      const displayHex = mappedBlockColors[index]?.hex ?? block.hex;
+      const existing = visibilityByHex.get(displayHex);
+      if (existing) {
+        existing.count += block.count;
+      } else {
+        visibilityByHex.set(displayHex, {
+          hex: displayHex,
+          visible: true,
+          count: block.count,
+        });
+      }
+    });
+    setColorVisibility(Array.from(visibilityByHex.values()));
+  }, [colorBlocks, mappedBlockColors]);
 
   const totalPixels = useMemo(
     () => colorBlocks.reduce((sum, b) => sum + b.pixels.length, 0),
@@ -260,6 +277,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
 
     const group = buildInstancedMeshes(
       colorBlocks,
+      mappedBlockColors,
       imageDimensions,
       pixelSize,
       layerHeight,
@@ -273,7 +291,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
 
     modelGroupRef.current = group;
     scene.add(group);
-  }, [colorBlocks, imageDimensions, pixelSize, layerHeight, layerCount, basePlateThickness, doubleSided, visibilityMap, showExploded]);
+  }, [colorBlocks, mappedBlockColors, imageDimensions, pixelSize, layerHeight, layerCount, basePlateThickness, doubleSided, visibilityMap, showExploded]);
 
   // Initialize three.js scene
   useEffect(() => {

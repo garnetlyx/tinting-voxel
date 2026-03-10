@@ -14,6 +14,7 @@ import {
   FilamentPreview,
   FilamentPresetManager,
   ImageComparison,
+  MappedBlendPalette,
   ColorAdjustmentPanel,
   VectorColorList,
   DownloadButtons,
@@ -39,6 +40,8 @@ const Converter: React.FC = () => {
     colorBlocks,
     vectorResults,
     processedImageUrl,
+    mappedBlockColors,
+    mappedBlendPalette,
     hasResults,
     resultCount,
 
@@ -251,7 +254,12 @@ const Converter: React.FC = () => {
                         originalImage={image}
                         processedImageUrl={processedImageUrl}
                         colorCount={resultCount}
+                        processedLabel={mode === 'pixel' ? 'Simulated Print' : 'Processed'}
                       />
+
+                      {mode === 'pixel' && (
+                        <MappedBlendPalette entries={mappedBlendPalette} />
+                      )}
 
                       {/* Download Buttons */}
                       <DownloadButtons
@@ -268,6 +276,7 @@ const Converter: React.FC = () => {
                       {mode === 'pixel' && colorBlocks.length > 0 && (
                         <ThreeDPreview
                           colorBlocks={colorBlocks}
+                          mappedBlockColors={mappedBlockColors}
                           imageDimensions={imageDimensions}
                           layerHeight={layerHeight}
                           pixelSize={pixelSize}

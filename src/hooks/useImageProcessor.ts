@@ -4,6 +4,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type {
   ColorBlock,
+  MappedBlockColor,
+  MappedBlendPaletteEntry,
   VectorColorResult,
   ProcessingMode,
   ProcessImageResponse,
@@ -13,7 +15,16 @@ import type {
 } from '../api/types';
 import { DEFAULT_PRESETS } from '../api/types';
 import type { ProcessingStage } from '../components/LoadingSpinner';
-import { processImage, downloadCSV, downloadSTLV2, downloadSVGSTLV2, download3MFV2, downloadSVG3MFV2, downloadPrintSettings } from '../api/client';
+import {
+  processImage,
+  simulatePrintPreview,
+  downloadCSV,
+  downloadSTLV2,
+  downloadSVGSTLV2,
+  download3MFV2,
+  downloadSVG3MFV2,
+  downloadPrintSettings,
+} from '../api/client';
 import { useFilamentStorage } from './useFilamentStorage';
 
 const MIN_FILAMENT_COLORS = 4;
@@ -43,6 +54,9 @@ export const useImageProcessor = () => {
 
   // Shared state
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
+  const [segmentationImageUrl, setSegmentationImageUrl] = useState<string | null>(null);
+  const [mappedBlockColors, setMappedBlockColors] = useState<MappedBlockColor[]>([]);
+  const [mappedBlendPalette, setMappedBlendPalette] = useState<MappedBlendPaletteEntry[]>([]);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [layerHeight, setLayerHeight] = useState(0.08);
   const [detailSize, setDetailSize] = useState(0.4);
@@ -94,6 +108,8 @@ export const useImageProcessor = () => {
 
   // AbortController ref for cancelling in-flight image processing requests
   const processAbortRef = useRef<AbortController | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
+  const skipNextPreviewRefreshRef = useRef(false);
 
   // Load a built-in preset into filamentColors
   const loadPreset = useCallback((preset: FilamentPreset) => {
@@ -215,6 +231,9 @@ export const useImageProcessor = () => {
       const result = await processImage(file, {
         mode: processingMode,
         pixelSize,
+        layerHeight,
+        layerCount,
+        ...filamentRequestPayload,
         detailSize,
         pixelParams: processingMode === 'pixel' ? { maxColors, colorThreshold } : undefined,
         svgParams: processingMode === 'svg' ? { epsilon, minArea, numColors } : undefined,
@@ -223,7 +242,6 @@ export const useImageProcessor = () => {
       // Only update state if this request wasn't aborted
       if (controller.signal.aborted) return;
 
-      setProcessedImageUrl(result.processedImage);
       setImageDimensions(result.imageDimensions);
 
       // Sync effective parameters from backend
@@ -236,10 +254,19 @@ export const useImageProcessor = () => {
 
       if (processingMode === 'pixel') {
         const pixelResult = result as ProcessImageResponse;
+        setProcessedImageUrl(pixelResult.processedImage);
+        setSegmentationImageUrl(pixelResult.segmentationImage);
+        setMappedBlockColors(pixelResult.mappedBlockColors);
+        setMappedBlendPalette(pixelResult.mappedBlendPalette);
         setColorBlocks(pixelResult.colorBlocks);
+        skipNextPreviewRefreshRef.current = true;
         setVectorResults([]);
       } else {
         const svgResult = result as SVGProcessImageResponse;
+        setProcessedImageUrl(svgResult.processedImage);
+        setSegmentationImageUrl(null);
+        setMappedBlockColors([]);
+        setMappedBlendPalette([]);
         setVectorResults(svgResult.vectorResults);
         setColorBlocks([]);
       }
@@ -255,7 +282,19 @@ export const useImageProcessor = () => {
         setProcessingStage('idle');
       }
     }
-  }, [mode, maxColors, colorThreshold, epsilon, minArea, numColors, pixelSize, detailSize]);
+  }, [
+    mode,
+    maxColors,
+    colorThreshold,
+    epsilon,
+    minArea,
+    numColors,
+    pixelSize,
+    detailSize,
+    layerHeight,
+    layerCount,
+    filamentRequestPayload,
+  ]);
 
   // Auto-load last used saved preset on mount
   useEffect(() => {
@@ -276,6 +315,9 @@ export const useImageProcessor = () => {
     return () => {
       if (processAbortRef.current) {
         processAbortRef.current.abort();
+      }
+      if (previewAbortRef.current) {
+        previewAbortRef.current.abort();
       }
     };
   }, []);
@@ -467,37 +509,58 @@ export const useImageProcessor = () => {
     }
   };
 
-  // Regenerate the processed image preview from current colorBlocks
-  const regenerateProcessedImage = useCallback((blocks: ColorBlock[]) => {
-    if (blocks.length === 0 || imageDimensions.width === 0) return;
-    const { width, height } = imageDimensions;
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, width, height);
-
-    for (const block of blocks) {
-      ctx.fillStyle = block.hex;
-      for (const pixel of block.pixels) {
-        if (pixel.x >= 0 && pixel.x < width && pixel.y >= 0 && pixel.y < height) {
-          ctx.fillRect(pixel.x, pixel.y, 1, 1);
-        }
-      }
+  const refreshSimulatedPreview = useCallback(async (blocks: ColorBlock[]) => {
+    if (mode !== 'pixel' || blocks.length === 0 || imageDimensions.width === 0 || !isFilamentConfigValid) {
+      return;
     }
 
-    setProcessedImageUrl(canvas.toDataURL('image/png'));
-  }, [imageDimensions]);
+    if (previewAbortRef.current) {
+      previewAbortRef.current.abort();
+    }
 
-  // Regenerate preview when colorBlocks change (for manual color adjustments)
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
+
+    try {
+      const result = await simulatePrintPreview({
+        colorBlocks: blocks,
+        imageDimensions,
+        layerHeight,
+        layerCount,
+        ...filamentRequestPayload,
+      }, controller.signal);
+      if (controller.signal.aborted) return;
+      setProcessedImageUrl(result.processedImage);
+      setMappedBlockColors(result.mappedBlockColors);
+      setMappedBlendPalette(result.mappedBlendPalette);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (controller.signal.aborted) return;
+      console.error('Error refreshing simulated preview:', err);
+      setError(err instanceof Error ? err.message : 'Failed to refresh simulated preview');
+    }
+  }, [
+    mode,
+    imageDimensions,
+    isFilamentConfigValid,
+    layerHeight,
+    layerCount,
+    filamentRequestPayload,
+  ]);
+
+  // Keep the simulated print preview in sync with manual edits and filament changes.
   useEffect(() => {
-    if (colorBlocks.length > 0) {
-      regenerateProcessedImage(colorBlocks);
+    if (mode !== 'pixel') return;
+    if (colorBlocks.length === 0 || imageDimensions.width === 0) return;
+    if (skipNextPreviewRefreshRef.current) {
+      skipNextPreviewRefreshRef.current = false;
+      return;
     }
-  }, [colorBlocks, regenerateProcessedImage]);
+    const timer = window.setTimeout(() => {
+      void refreshSimulatedPreview(colorBlocks);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [mode, colorBlocks, imageDimensions, layerHeight, layerCount, filamentRequestPayload, refreshSimulatedPreview]);
 
   // Update a color block's RGB/hex values (manual color adjustment)
   const updateColorBlock = useCallback((index: number, newHex: string) => {
@@ -585,6 +648,9 @@ export const useImageProcessor = () => {
     colorBlocks,
     vectorResults,
     processedImageUrl,
+    segmentationImageUrl,
+    mappedBlockColors,
+    mappedBlendPalette,
     imageDimensions,
     hasResults,
     resultCount,

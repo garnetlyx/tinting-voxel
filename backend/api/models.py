@@ -132,7 +132,10 @@ class ImageDimensions(BaseModel):
 class ProcessImageResponse(BaseModel):
     """Response model for /api/process-image endpoint"""
     colorBlocks: List[ColorBlock]
-    processedImage: str  # base64 encoded image
+    processedImage: str  # base64 encoded simulated print preview
+    segmentationImage: str  # base64 encoded quantized/merged preview
+    mappedBlockColors: List["MappedBlockColor"]
+    mappedBlendPalette: List["MappedBlendPaletteEntry"]
     imageDimensions: ImageDimensions
     pixelSize: Optional[float] = None  # Effective pixel size after detailSize clamping
     detailSize: Optional[float] = None  # Detail size used for clamping
@@ -344,6 +347,24 @@ class ColorMatrixEntry(BaseModel):
     rgb: List[int]
 
 
+class MappedBlendPaletteEntry(BaseModel):
+    """Single source-color to printable-blend mapping."""
+    code: str
+    rgb: List[int]
+    hex: str
+    sourceRgb: List[int]
+    sourceHex: str
+    pixelCount: int = Field(..., ge=1)
+    pixelPercent: float = Field(..., ge=0, le=100)
+
+
+class MappedBlockColor(BaseModel):
+    """Printable color assigned to a source block, preserving block order."""
+    code: str
+    rgb: List[int]
+    hex: str
+
+
 class PaginationInfo(BaseModel):
     """Pagination metadata for paginated responses."""
     page: int
@@ -360,6 +381,24 @@ class FilamentPreviewResponse(BaseModel):
     imageDimensions: dict
     warnings: List[str] = []
     pagination: Optional[PaginationInfo] = None
+
+
+class SimulatePreviewRequest(FilamentConfigMixin):
+    """Request model for print-simulation preview generation."""
+    colorBlocks: List[ColorBlock] = Field(..., min_length=1)
+    imageDimensions: ImageDimensions
+    layerCount: int = Field(4, ge=1, le=10)
+    layerHeight: float = Field(0.08, gt=0, le=10)
+
+
+class SimulatedPrintPreviewResponse(BaseModel):
+    """Response model for print-simulation preview generation."""
+    processedImage: str  # base64 encoded simulated print preview
+    mappedBlockColors: List[MappedBlockColor]
+    mappedBlendPalette: List[MappedBlendPaletteEntry]
+
+
+ProcessImageResponse.model_rebuild()
 
 
 class BatchImageResult(BaseModel):

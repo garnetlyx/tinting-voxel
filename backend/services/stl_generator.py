@@ -95,6 +95,35 @@ def compute_reference_matrices(
     return code_df, rgb_df
 
 
+def map_color_blocks_to_blend_results(
+    color_blocks: list[dict],
+    layer_height: float,
+    layer_count: int,
+    colors: Colors,
+) -> tuple[list[str], list[tuple[int, int, int]]]:
+    """
+    Map source RGB blocks to nearest printable blend codes and RGBs.
+
+    Uses the same reference matrices and LAB nearest-neighbor matching as STL export.
+    """
+    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
+        layer_count,
+        layer_height,
+        colors,
+    )
+    input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
+    result_codes, result_rgbs = Color.map_to_nearest_color(
+        input_colors,
+        ref_code_matrix,
+        ref_rgb_matrix,
+    )
+    normalized_rgbs = [
+        tuple(int(channel) for channel in np.asarray(rgb).tolist())
+        for rgb in result_rgbs
+    ]
+    return result_codes, normalized_rgbs
+
+
 def _log_blend_code_distribution(
     result_codes: list[str],
     labels: list[str],
@@ -491,22 +520,18 @@ def generate_stl_zip(
     if active_colors is None:
         raise RuntimeError("No colors provided and no global colors initialized.")
 
-    # Compute reference matrices locally (thread-safe)
-    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-        layer_count, layer_height, active_colors
-    )
-
     # Step 1: Initialize primary color mesh map dynamically
     code_mesh_map = {label: [] for label in active_colors.get_labels()}
 
     # Step 2: Extract all input colors
     input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
 
-    # Step 3: Map to blend codes using map_to_nearest_color
-    result_codes, result_rgbs = Color.map_to_nearest_color(
-        input_colors,
-        ref_code_matrix,
-        ref_rgb_matrix
+    # Step 3: Map to blend codes using the shared preview/export mapping path
+    result_codes, result_rgbs = map_color_blocks_to_blend_results(
+        color_blocks=color_blocks,
+        layer_height=layer_height,
+        layer_count=layer_count,
+        colors=active_colors,
     )
 
     _log_input_color_brightness(input_colors, "STL")

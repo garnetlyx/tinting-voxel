@@ -12,6 +12,8 @@ import type {
   FilamentPresetsResponse,
   FilamentPreviewParams,
   FilamentPreviewResponse,
+  SimulatedPrintPreviewParams,
+  SimulatedPrintPreviewResponse,
   BatchProcessResponse,
   BatchProcessParams,
   BatchDownloadSTLParams,
@@ -59,6 +61,14 @@ export async function processImage(
   formData.append('image', file);
   formData.append('mode', params.mode);
   formData.append('pixelSize', params.pixelSize.toString());
+  formData.append('layerHeight', (params.layerHeight ?? 0.08).toString());
+  formData.append('layerCount', (params.layerCount ?? 4).toString());
+
+  if (params.filamentPreset) {
+    formData.append('filamentPreset', params.filamentPreset);
+  } else if (params.filamentColors) {
+    formData.append('filamentColors', JSON.stringify(params.filamentColors));
+  }
 
   if (params.detailSize !== undefined) {
     formData.append('detailSize', params.detailSize.toString());
@@ -81,6 +91,29 @@ export async function processImage(
 
   if (!response.ok) {
     throw new Error(await getErrorDetail(response, 'Failed to process image'));
+  }
+
+  return response.json();
+}
+
+/**
+ * Recompute simulated print preview for current color blocks and filament setup.
+ */
+export async function simulatePrintPreview(
+  params: SimulatedPrintPreviewParams,
+  signal?: AbortSignal
+): Promise<SimulatedPrintPreviewResponse> {
+  const response = await fetch(`${API_BASE_URL}/simulate-preview`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorDetail(response, 'Failed to simulate print preview'));
   }
 
   return response.json();

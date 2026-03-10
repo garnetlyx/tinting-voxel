@@ -106,7 +106,10 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-gray-700">Color Preview</h4>
+        <div>
+          <h4 className="text-sm font-medium text-gray-700">Achievable Filament Gamut</h4>
+          <p className="text-xs text-gray-500">Generic to the current filament setup, not this upload.</p>
+        </div>
         <button
           onClick={fetchPreview}
           disabled={loading || disabled}

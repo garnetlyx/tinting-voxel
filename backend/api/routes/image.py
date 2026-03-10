@@ -2,6 +2,7 @@
 Image processing endpoints
 """
 import base64
+import json
 import logging
 from typing import Optional
 from io import BytesIO
@@ -11,15 +12,76 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from PIL import Image
 
 from api.error_handlers import handle_api_errors
-from api.models import ProcessImageResponse, ProcessingMode, SVGProcessImageResponse
+from api.models import (
+    FilamentColorConfig,
+    FilamentConfigMixin,
+    FilamentPreset,
+    ProcessImageResponse,
+    ProcessingMode,
+    SimulatePreviewRequest,
+    SimulatedPrintPreviewResponse,
+    SVGProcessImageResponse,
+)
 from api.rate_limiter import limiter
+from api.routes.download_v2 import get_colors_from_request
 from api.validators import validate_image_upload
-from services.image_processor import process_image, _downscale_if_needed, MAX_PROCESSING_DIMENSION
+from services.image_processor import (
+    MAX_PROCESSING_DIMENSION,
+    _downscale_if_needed,
+    build_simulated_print_preview,
+    process_image,
+)
 from services.vector_processor import VectorProcessorConfig, process_image_vector
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Image Processing"])
+
+
+def _parse_filament_form_payload(
+    filament_preset: Optional[str],
+    filament_colors: Optional[str],
+) -> tuple[Optional[FilamentPreset], Optional[list[FilamentColorConfig]]]:
+    parsed_preset = None
+    parsed_colors = None
+
+    if filament_preset:
+        try:
+            parsed_preset = FilamentPreset(filament_preset)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Invalid filament preset: {filament_preset}. "
+                    "Valid presets: bambu_cmyk, bambu_cmyk_calibrated, clear_cmyk"
+                ),
+            ) from exc
+
+    if filament_colors:
+        try:
+            colors_data = json.loads(filament_colors)
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid filamentColors JSON: {str(exc)}",
+            ) from exc
+        try:
+            parsed_colors = [FilamentColorConfig.model_validate(item) for item in colors_data]
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid filamentColors format: {str(exc)}",
+            ) from exc
+
+    try:
+        validated = FilamentConfigMixin(
+            filamentPreset=parsed_preset,
+            filamentColors=parsed_colors,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return validated.filamentPreset, validated.filamentColors
 
 
 @router.post("/process-image")
@@ -35,7 +97,11 @@ async def api_process_image(
     epsilon: float = Form(2.0, gt=0, le=100),
     minArea: int = Form(100, ge=1),
     numColors: int = Form(8, ge=1, le=256),
-    detailSize: Optional[float] = Form(None, ge=0.2, le=0.8), # Modified detailSize parameter
+    detailSize: Optional[float] = Form(None, ge=0.2, le=0.8),
+    layerHeight: float = Form(0.08, gt=0, le=10),
+    layerCount: int = Form(4, ge=1, le=10),
+    filamentPreset: Optional[str] = Form(None),
+    filamentColors: Optional[str] = Form(None),
 ):
     """Process uploaded image to extract color blocks or vector contours."""
     image_bytes = await image.read()
@@ -54,12 +120,21 @@ async def api_process_image(
     if detailSize is not None:
         effective_pixel_size = max(pixelSize, detailSize)
 
+    parsed_preset, parsed_colors = _parse_filament_form_payload(
+        filament_preset=filamentPreset,
+        filament_colors=filamentColors,
+    )
+    colors = get_colors_from_request(parsed_preset, parsed_colors)
+
     if processing_mode == ProcessingMode.PIXEL:
         result = process_image(
             image_bytes=image_bytes,
             max_colors=maxColors,
             color_threshold=colorThreshold,
-            pixel_size=effective_pixel_size
+            pixel_size=effective_pixel_size,
+            filament_colors=colors,
+            layer_count=layerCount,
+            layer_height=layerHeight,
         )
 
         logger.info(
@@ -133,3 +208,19 @@ async def api_process_image(
         pixelSize=effective_pixel_size,
         detailSize=detailSize
     )
+
+
+@router.post("/simulate-preview", response_model=SimulatedPrintPreviewResponse)
+@limiter.limit("20/minute")
+@handle_api_errors("simulating print preview")
+async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
+    """Generate an image-specific simulated print preview from current color blocks."""
+    colors = get_colors_from_request(body.filamentPreset, body.filamentColors)
+    result = build_simulated_print_preview(
+        color_blocks=[block.model_dump() for block in body.colorBlocks],
+        image_dimensions=body.imageDimensions.model_dump(),
+        colors=colors,
+        layer_count=body.layerCount,
+        layer_height=body.layerHeight,
+    )
+    return SimulatedPrintPreviewResponse(**result)

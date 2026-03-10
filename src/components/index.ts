@@ -8,6 +8,7 @@ export { ModeSelector } from './ModeSelector';
 export { ParameterPanel } from './ParameterPanel';
 export { PresetSelector } from './PresetSelector';
 export { ImageComparison } from './ImageComparison';
+export { MappedBlendPalette } from './MappedBlendPalette';
 export { ColorBlocksList } from './ColorBlocksList';
 export { ColorAdjustmentPanel } from './ColorAdjustmentPanel';
 export { VectorColorList } from './VectorColorList';

@@ -32,7 +32,10 @@ export interface ImageDimensions {
 
 export interface ProcessImageResponse {
   colorBlocks: ColorBlock[];
-  processedImage: string;  // base64 encoded data URL
+  processedImage: string;  // simulated printable image
+  segmentationImage: string;  // quantized/merged source preview
+  mappedBlockColors: MappedBlockColor[];
+  mappedBlendPalette: MappedBlendPaletteEntry[];
   imageDimensions: ImageDimensions;
   pixelSize?: number;
   detailSize?: number;
@@ -60,6 +63,10 @@ export interface SVGModeParams {
 export interface ProcessImageParams {
   mode: ProcessingMode;
   pixelSize: number;
+  layerHeight?: number;
+  layerCount?: number;
+  filamentPreset?: FilamentPreset;
+  filamentColors?: FilamentColorConfig[];
   pixelParams?: PixelModeParams;
   svgParams?: SVGModeParams;
   detailSize?: number;
@@ -144,12 +151,43 @@ export interface ColorMatrixEntry {
   rgb: number[];
 }
 
+export interface MappedBlendPaletteEntry {
+  code: string;
+  rgb: number[];
+  hex: string;
+  sourceRgb: number[];
+  sourceHex: string;
+  pixelCount: number;
+  pixelPercent: number;
+}
+
+export interface MappedBlockColor {
+  code: string;
+  rgb: number[];
+  hex: string;
+}
+
 export interface FilamentPreviewResponse {
   image: string;
   colorMatrix: ColorMatrixEntry[];
   stats: { colorCount: number; combinationCount: number };
   imageDimensions: { width: number; height: number };
   warnings: string[];
+}
+
+export interface SimulatedPrintPreviewParams {
+  colorBlocks: ColorBlock[];
+  imageDimensions: ImageDimensions;
+  layerHeight: number;
+  layerCount: number;
+  filamentPreset?: FilamentPreset;
+  filamentColors?: FilamentColorConfig[];
+}
+
+export interface SimulatedPrintPreviewResponse {
+  processedImage: string;
+  mappedBlockColors: MappedBlockColor[];
+  mappedBlendPalette: MappedBlendPaletteEntry[];
 }
 
 // Batch processing types

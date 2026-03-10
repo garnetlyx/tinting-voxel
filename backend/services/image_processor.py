@@ -4,14 +4,106 @@ Image processing service for color extraction and clustering
 import base64
 import logging
 from io import BytesIO
+from typing import Callable, Optional
 
 import numpy as np
 from PIL import Image
+
+from core.blend_color import Colors
+from services.stl_generator import map_color_blocks_to_blend_results
 
 logger = logging.getLogger(__name__)
 
 # Maximum dimension before auto-downscaling (preserves aspect ratio)
 MAX_PROCESSING_DIMENSION = 1024
+
+
+def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
+    return f"#{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
+
+
+def _image_to_data_url(img: Image.Image) -> str:
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    return f"data:image/png;base64,{img_base64}"
+
+
+def _render_color_block_image(
+    color_blocks: list[dict],
+    width: int,
+    height: int,
+    rgb_getter: Callable[[dict, int], tuple[int, int, int]],
+) -> str:
+    img_array = np.zeros((height, width, 3), dtype=np.uint8)
+    for idx, color in enumerate(color_blocks):
+        rgb = np.array(rgb_getter(color, idx), dtype=np.uint8)
+        for pixel in color['pixels']:
+            img_array[pixel['y'], pixel['x']] = rgb
+    return _image_to_data_url(Image.fromarray(img_array))
+
+
+def build_simulated_print_preview(
+    color_blocks: list[dict],
+    image_dimensions: dict,
+    colors: Optional[Colors] = None,
+    layer_count: int = 4,
+    layer_height: float = 0.08,
+) -> dict:
+    """
+    Build an image-specific print preview from current color blocks.
+
+    The preview uses the same nearest printable blend mapping as STL export.
+    """
+    if not color_blocks:
+        raise ValueError("No color blocks provided")
+
+    active_colors = colors or Colors()
+    width = image_dimensions['width']
+    height = image_dimensions['height']
+    total_pixels = max(1, sum(block.get('count', len(block['pixels'])) for block in color_blocks))
+
+    result_codes, result_rgbs = map_color_blocks_to_blend_results(
+        color_blocks=color_blocks,
+        layer_height=layer_height,
+        layer_count=layer_count,
+        colors=active_colors,
+    )
+
+    processed_image = _render_color_block_image(
+        color_blocks,
+        width,
+        height,
+        lambda _block, idx: result_rgbs[idx],
+    )
+
+    mapped_block_colors = []
+    mapped_blend_palette = []
+    for block, code, rgb in zip(color_blocks, result_codes, result_rgbs):
+        source_rgb = (int(block['r']), int(block['g']), int(block['b']))
+        pixel_count = int(block.get('count', len(block['pixels'])))
+        mapped_block_colors.append({
+            "code": code,
+            "rgb": list(rgb),
+            "hex": _rgb_to_hex(rgb),
+        })
+        mapped_blend_palette.append({
+            "code": code,
+            "rgb": list(rgb),
+            "hex": _rgb_to_hex(rgb),
+            "sourceRgb": list(source_rgb),
+            "sourceHex": _rgb_to_hex(source_rgb),
+            "pixelCount": pixel_count,
+            "pixelPercent": round(pixel_count * 100.0 / total_pixels, 4),
+        })
+
+    mapped_blend_palette.sort(key=lambda entry: entry["pixelCount"], reverse=True)
+
+    return {
+        "processedImage": processed_image,
+        "mappedBlockColors": mapped_block_colors,
+        "mappedBlendPalette": mapped_blend_palette,
+    }
 
 
 def color_distance(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
@@ -164,7 +256,10 @@ def process_image(
     image_bytes: bytes,
     max_colors: int = 10,
     color_threshold: float = 50,
-    pixel_size: float = 0.08
+    pixel_size: float = 0.08,
+    filament_colors: Optional[Colors] = None,
+    layer_count: int = 4,
+    layer_height: float = 0.08,
 ) -> dict:
     """
     Process uploaded image to extract color blocks
@@ -176,7 +271,8 @@ def process_image(
         pixel_size: Physical size of each pixel in mm
 
     Returns:
-        Dictionary containing colorBlocks, processedImage, and imageDimensions
+        Dictionary containing colorBlocks, processedImage, segmentationImage,
+        mappedBlendPalette, and imageDimensions
     """
     # Load and optionally downscale image
     img = Image.open(BytesIO(image_bytes))
@@ -223,46 +319,48 @@ def process_image(
         color_map[key]['pixels'].append({'x': int(xs[i]), 'y': int(ys[i])})
 
     # Convert to list
-    colors = list(color_map.values())
+    color_blocks = list(color_map.values())
 
     # Step 1: Merge similar colors
-    colors = merge_similar_colors(colors, color_threshold)
+    color_blocks = merge_similar_colors(color_blocks, color_threshold)
 
     # Step 2: Sort by frequency
-    colors.sort(key=lambda c: c['count'], reverse=True)
+    color_blocks.sort(key=lambda c: c['count'], reverse=True)
 
     # Step 3: Limit to max colors
-    main_colors = colors[:max_colors]
-    rest_colors = colors[max_colors:]
+    main_colors = color_blocks[:max_colors]
+    rest_colors = color_blocks[max_colors:]
 
     # Step 4: Reassign remaining colors to nearest main color
     if rest_colors:
-        colors = reassign_colors(main_colors, rest_colors)
+        color_blocks = reassign_colors(main_colors, rest_colors)
     else:
-        colors = main_colors
+        color_blocks = main_colors
 
     # Add hex values
-    for color in colors:
+    for color in color_blocks:
         color['hex'] = f"#{color['r']:02x}{color['g']:02x}{color['b']:02x}"
 
-    # Generate processed image preview using numpy vectorized operations
-    processed_img_array = np.zeros((height, width, 3), dtype=np.uint8)
-
-    for color in colors:
-        rgb = np.array([color['r'], color['g'], color['b']], dtype=np.uint8)
-        for pixel in color['pixels']:
-            processed_img_array[pixel['y'], pixel['x']] = rgb
-
-    # Convert processed image to base64
-    processed_img = Image.fromarray(processed_img_array)
-    buffered = BytesIO()
-    processed_img.save(buffered, format="PNG")
-    processed_img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-    processed_img_data_url = f"data:image/png;base64,{processed_img_base64}"
+    segmentation_image = _render_color_block_image(
+        color_blocks,
+        width,
+        height,
+        lambda color, _idx: (int(color['r']), int(color['g']), int(color['b'])),
+    )
+    simulated_preview = build_simulated_print_preview(
+        color_blocks=color_blocks,
+        image_dimensions={"width": width, "height": height},
+        colors=filament_colors,
+        layer_count=layer_count,
+        layer_height=layer_height,
+    )
 
     return {
-        'colorBlocks': colors,
-        'processedImage': processed_img_data_url,
+        'colorBlocks': color_blocks,
+        'processedImage': simulated_preview['processedImage'],
+        'segmentationImage': segmentation_image,
+        'mappedBlockColors': simulated_preview['mappedBlockColors'],
+        'mappedBlendPalette': simulated_preview['mappedBlendPalette'],
         'imageDimensions': {
             'width': width,
             'height': height

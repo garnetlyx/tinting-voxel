@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   processImage,
+  simulatePrintPreview,
   downloadCSV,
   getFilamentPresets,
   downloadSTLV2,
@@ -72,6 +73,9 @@ describe('processImage', () => {
     const mockResponse = {
       colorBlocks: [],
       processedImage: 'data:image/png;base64,abc',
+      segmentationImage: 'data:image/png;base64,seg',
+      mappedBlockColors: [],
+      mappedBlendPalette: [],
       imageDimensions: { width: 100, height: 100 },
     };
     mockFetchResponse(mockResponse);
@@ -118,7 +122,14 @@ describe('processImage', () => {
   });
 
   it('passes AbortSignal to fetch', async () => {
-    mockFetchResponse({ colorBlocks: [], processedImage: '', imageDimensions: { width: 0, height: 0 } });
+    mockFetchResponse({
+      colorBlocks: [],
+      processedImage: '',
+      segmentationImage: '',
+      mappedBlockColors: [],
+      mappedBlendPalette: [],
+      imageDimensions: { width: 0, height: 0 },
+    });
 
     const controller = new AbortController();
     const file = new File(['test'], 'test.png', { type: 'image/png' });
@@ -142,6 +153,34 @@ describe('processImage', () => {
     await expect(
       processImage(file, { mode: 'pixel', pixelSize: 0.08 })
     ).rejects.toThrow('Failed to process image');
+  });
+});
+
+describe('simulatePrintPreview', () => {
+  it('posts color blocks and returns simulated preview data', async () => {
+    const mockResponse = {
+      processedImage: 'data:image/png;base64,sim',
+      mappedBlockColors: [],
+      mappedBlendPalette: [],
+    };
+    mockFetchResponse(mockResponse);
+
+    const result = await simulatePrintPreview({
+      colorBlocks: [],
+      imageDimensions: { width: 10, height: 10 },
+      layerHeight: 0.08,
+      layerCount: 4,
+      filamentPreset: 'bambu_cmyk',
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/simulate-preview',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    expect(result).toEqual(mockResponse);
   });
 });
 
