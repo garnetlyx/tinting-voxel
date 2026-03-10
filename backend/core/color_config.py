@@ -217,7 +217,7 @@ CLEAR_CMYK_PRESET: List[ColorConfig] = [
 # Uses per-channel scattering coefficients (k_R, k_G, k_B) to model
 # channel-selective scattering behavior identified in error analysis.
 #
-# Key observations from CALIBRATION_IMPROVEMENTS.md:
+# Key observations from docs/CALIBRATION.md:
 # - Cyan R channel reflects (negative absorption) → low k_R
 # - Magenta G channel absorbs strongly → high k_G
 # - Yellow B channel absorbs strongly → high k_B, low k_R/k_G

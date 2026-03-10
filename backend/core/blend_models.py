@@ -326,7 +326,7 @@ def _blend_hybrid_per_channel_k(
     """
     Hybrid blend with per-channel scattering coefficients (k_rgb).
 
-    This implements Proposal A from CALIBRATION_IMPROVEMENTS.md:
+    This implements Proposal A from docs/CALIBRATION.md:
     - Each color has per-channel k values (k_R, k_G, k_B)
     - Allows modeling channel-selective scattering (e.g., Cyan reflects R)
     - Formula: T_ch = exp(-(scatter + k_rgb * absorption) * layer_height)
