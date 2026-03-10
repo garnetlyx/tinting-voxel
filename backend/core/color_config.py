@@ -25,6 +25,8 @@ class ColorConfig:
     transmission_distance: float
     alpha: float = 12.0
     k: float = 10.0  # Scattering coefficient (per-channel `k_c`)
+    td_scale: float = 1.0
+    td_gamma: float = 1.0
 
     def __post_init__(self):
         """Validate color configuration."""
@@ -58,6 +60,17 @@ class ColorConfig:
                 f"Alpha (absorption coefficient) must be positive: {self.alpha}"
             )
 
+        if self.k < 0:
+            raise ValueError(
+                f"k (scattering coefficient) must be non-negative: {self.k}"
+            )
+
+        if self.td_scale <= 0:
+            raise ValueError(f"TD scale must be positive: {self.td_scale}")
+
+        if self.td_gamma <= 0:
+            raise ValueError(f"TD gamma must be positive: {self.td_gamma}")
+
     @property
     def label(self) -> str:
         """Get single-character label from name."""
@@ -72,14 +85,57 @@ BAMBU_CMYK_PRESET: List[ColorConfig] = [
     ColorConfig(name="White", hex="#FFFFFF", transmission_distance=7.2, alpha=12.0, k=10.0),
 ]
 
-# Phase 6 Calibration (2026-03-07) - Derived from Black/White Dual Backing
-# Note: transmission_distance here is the PRE-SCALED TD1S value adjusted by 1.48 * (TD)^0.2
+# Replay benchmark winner (2026-03-07).
+# Uses raw TD1S measurements plus a learned td_scale * td^td_gamma remap and
+# per-color k values. This is the strongest production-facing candidate in
+# docs/CALIBRATION.md because it improves real-plate replay without collapsing
+# transfer on the ramp/pair benchmarks.
 BAMBU_CMYK_CALIBRATED_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan", hex="#3D79C6", transmission_distance=1.70, alpha=8.08, k=8.13),
-    ColorConfig(name="Magenta", hex="#B3356E", transmission_distance=2.22, alpha=8.08, k=8.42),
-    ColorConfig(name="Yellow", hex="#FFE665", transmission_distance=4.15, alpha=8.08, k=3.73),
-    ColorConfig(name="White", hex="#FFFFFF", transmission_distance=5.48, alpha=8.08, k=12.39),
-    ColorConfig(name="Key", hex="#0B0F0C", transmission_distance=2.21, alpha=8.08, k=17.65), # Black (K)
+    ColorConfig(
+        name="Cyan",
+        hex="#3D79C6",
+        transmission_distance=2.0,
+        alpha=5.751822945330163,
+        k=1.2085100532667932,
+        td_scale=1.0056869820712098,
+        td_gamma=0.4543363851088494,
+    ),
+    ColorConfig(
+        name="Magenta",
+        hex="#B3356E",
+        transmission_distance=2.9,
+        alpha=5.751822945330163,
+        k=0.35481383708372416,
+        td_scale=1.0056869820712098,
+        td_gamma=0.4543363851088494,
+    ),
+    ColorConfig(
+        name="Yellow",
+        hex="#FFE665",
+        transmission_distance=5.0,
+        alpha=5.751822945330163,
+        k=8.401071443503248,
+        td_scale=1.0056869820712098,
+        td_gamma=0.4543363851088494,
+    ),
+    ColorConfig(
+        name="White",
+        hex="#FFFFFF",
+        transmission_distance=6.1,
+        alpha=5.751822945330163,
+        k=6.523686193460801,
+        td_scale=1.0056869820712098,
+        td_gamma=0.4543363851088494,
+    ),
+    ColorConfig(
+        name="Key",
+        hex="#0B0F0C",
+        transmission_distance=0.1,
+        alpha=5.751822945330163,
+        k=5.440433103311526,
+        td_scale=1.0056869820712098,
+        td_gamma=0.4543363851088494,
+    ),
 ]
 
 CLEAR_CMYK_PRESET: List[ColorConfig] = [
@@ -102,12 +158,17 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
     """
     if name is None:
         return None
+    normalized = name.lower()
+    alias_map = {
+        "bambu": "bambu_cmyk",
+        "clear": "clear_cmyk",
+    }
     presets = {
         "bambu_cmyk": BAMBU_CMYK_PRESET,
         "bambu_cmyk_calibrated": BAMBU_CMYK_CALIBRATED_PRESET,
         "clear_cmyk": CLEAR_CMYK_PRESET,
     }
-    return presets.get(name.lower())
+    return presets.get(alias_map.get(normalized, normalized))
 
 
 def get_available_presets() -> List[str]:

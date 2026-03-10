@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING
 
 import numpy as np
-import pandas as pd
 from PIL import ImageColor
 from skimage.color import rgb2lab
 
@@ -10,6 +9,10 @@ if TYPE_CHECKING:
 
 
 class Color:
+    DEFAULT_ALPHA = 12.0
+    DEFAULT_K = 10.0
+    DEFAULT_TD_SCALE = 1.0
+    DEFAULT_TD_GAMMA = 1.0
     DEFAULT_HEX = {
         "C": "#00FFFF",
         "M": "#FF00FF",
@@ -17,19 +20,49 @@ class Color:
         "W": "#FFFFFF",
     }
 
-    def __init__(self, name, transmission_distance, hex=None, absorption=None, rgb=None):
+    def __init__(
+        self,
+        name,
+        transmission_distance,
+        hex=None,
+        absorption=None,
+        rgb=None,
+        alpha=DEFAULT_ALPHA,
+        k=DEFAULT_K,
+        td_scale=DEFAULT_TD_SCALE,
+        td_gamma=DEFAULT_TD_GAMMA,
+        display_name=None,
+    ):
         if not name or not name[0].isalpha() or not name[0].isascii():
             raise ValueError(
                 f"Color name must start with an ASCII letter (A-Z, a-z): {name}. "
                 f"The first character is used as the blend code identifier."
+            )
+        if not np.isfinite(float(transmission_distance)):
+            raise ValueError(
+                f"transmission_distance must be finite and not NaN, got {transmission_distance}"
+            )
+        if transmission_distance < 0:
+            raise ValueError(
+                f"transmission_distance must be >= 0, got {transmission_distance}"
             )
 
         self.name = name
         self.td = transmission_distance
         self.rgb = rgb
         self.absorption = absorption
+        self.alpha = alpha
+        self.k = k
+        self.td_scale = td_scale
+        self.td_gamma = td_gamma
+        self.display_name = display_name
 
-        if hex is None:
+        if hex is None and rgb is not None:
+            if len(rgb) != 3:
+                raise ValueError(f"rgb must be a 3-tuple, got: {rgb}")
+            rgb = tuple(int(channel) for channel in rgb)
+            hex = "#{:02X}{:02X}{:02X}".format(*rgb)
+        elif hex is None:
             hex = self.DEFAULT_HEX.get(self.get_label())
 
         if hex is None:
@@ -41,7 +74,7 @@ class Color:
         self.update_hex(hex)
 
     def __repr__(self):
-        return self.name
+        return self.display_name or self.name
 
     def update_hex(self, hex):
         self.hex = hex
@@ -62,9 +95,13 @@ class Color:
         y = 1 - b / rgb_scale
 
         min_cmy = min(c, m, y)
-        c = (c - min_cmy) / (1 - min_cmy)
-        m = (m - min_cmy) / (1 - min_cmy)
-        y = (y - min_cmy) / (1 - min_cmy)
+        denominator = 1 - min_cmy
+        if denominator <= 1e-12:
+            return 0.0, 0.0, 0.0, min_cmy * cmyk_scale
+
+        c = (c - min_cmy) / denominator
+        m = (m - min_cmy) / denominator
+        y = (y - min_cmy) / denominator
         k = min_cmy
 
         return c * cmyk_scale, m * cmyk_scale, y * cmyk_scale, k * cmyk_scale
@@ -156,7 +193,16 @@ class Colors:
                     f"Unknown color label '{c}'. "
                     f"Valid labels: {list(preset.keys())}"
                 )
-            self.colors[c] = Color(c, cfg.transmission_distance, cfg.hex)
+            self.colors[c] = Color(
+                cfg.name,
+                cfg.transmission_distance,
+                cfg.hex,
+                alpha=cfg.alpha,
+                k=cfg.k,
+                td_scale=cfg.td_scale,
+                td_gamma=cfg.td_gamma,
+                display_name=cfg.label,
+            )
 
     def __len__(self):
         return len(self.colors)
@@ -183,6 +229,37 @@ class Colors:
 
     def get_labels(self):
         return [x for x in self.colors]
+
+    def get_blend_mode(self) -> str:
+        """Select the calibrated blend family implied by the material parameters."""
+        colors = self.colors.values() if isinstance(self.colors, dict) else []
+        for color in colors:
+            if (
+                color.td_scale != Color.DEFAULT_TD_SCALE
+                or color.td_gamma != Color.DEFAULT_TD_GAMMA
+            ):
+                return "hybrid_per_color_k_td1s_gamma"
+            if color.alpha != Color.DEFAULT_ALPHA or color.k != Color.DEFAULT_K:
+                return "hybrid_per_color_k"
+        return "original"
+
+    def get_blend_alpha(self) -> float:
+        """Return the shared blend alpha used by the current material set.
+
+        The calibrated blend families still use a single global scatter/alpha
+        term. Reject mixed alpha values instead of silently picking one.
+        """
+        if not isinstance(self.colors, dict) or not self.colors:
+            return Color.DEFAULT_ALPHA
+
+        alphas = {round(float(color.alpha), 12) for color in self.colors.values()}
+        if len(alphas) != 1:
+            raise ValueError(
+                "All filament colors must share the same alpha value for blending. "
+                f"Got: {sorted(alphas)}"
+            )
+
+        return float(next(iter(self.colors.values())).alpha)
 
     @classmethod
     def from_configs(cls, configs) -> "Colors":
@@ -213,6 +290,10 @@ class Colors:
                 name=config.name,
                 transmission_distance=config.transmission_distance,
                 hex=config.hex,
+                alpha=config.alpha,
+                k=config.k,
+                td_scale=config.td_scale,
+                td_gamma=config.td_gamma,
             )
             instance.colors[label] = color
 

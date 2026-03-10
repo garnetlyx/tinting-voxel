@@ -23,6 +23,7 @@ from api.models import (
 from core.blend_color import Colors
 from core.color_config import (
     BAMBU_CMYK_PRESET,
+    BAMBU_CMYK_CALIBRATED_PRESET,
     CLEAR_CMYK_PRESET,
     ColorConfig,
     get_preset,
@@ -59,7 +60,11 @@ def get_colors_from_request(
             ColorConfig(
                 name=fc.name,
                 hex=fc.hex,
-                transmission_distance=fc.transmission_distance
+                transmission_distance=fc.transmission_distance,
+                alpha=fc.alpha,
+                k=fc.k,
+                td_scale=fc.td_scale,
+                td_gamma=fc.td_gamma,
             )
             for fc in filament_colors
         ]
@@ -91,7 +96,11 @@ async def api_get_filament_presets(request: Request):
                 FilamentColorConfig(
                     name=c.name,
                     hex=c.hex,
-                    transmission_distance=c.transmission_distance
+                    transmission_distance=c.transmission_distance,
+                    alpha=c.alpha,
+                    k=c.k,
+                    td_scale=c.td_scale,
+                    td_gamma=c.td_gamma,
                 )
                 for c in BAMBU_CMYK_PRESET
             ]
@@ -103,9 +112,29 @@ async def api_get_filament_presets(request: Request):
                 FilamentColorConfig(
                     name=c.name,
                     hex=c.hex,
-                    transmission_distance=c.transmission_distance
+                    transmission_distance=c.transmission_distance,
+                    alpha=c.alpha,
+                    k=c.k,
+                    td_scale=c.td_scale,
+                    td_gamma=c.td_gamma,
                 )
                 for c in CLEAR_CMYK_PRESET
+            ]
+        ),
+        FilamentPresetInfo(
+            name="bambu_cmyk_calibrated",
+            display_name="Bambu CMYK Calibrated",
+            colors=[
+                FilamentColorConfig(
+                    name=c.name,
+                    hex=c.hex,
+                    transmission_distance=c.transmission_distance,
+                    alpha=c.alpha,
+                    k=c.k,
+                    td_scale=c.td_scale,
+                    td_gamma=c.td_gamma,
+                )
+                for c in BAMBU_CMYK_CALIBRATED_PRESET
             ]
         ),
     ]

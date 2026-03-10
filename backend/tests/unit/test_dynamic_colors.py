@@ -9,6 +9,7 @@ import pytest
 from core.blend_color import Color, Colors
 from core.color_config import (
     BAMBU_CMYK_PRESET,
+    BAMBU_CMYK_CALIBRATED_PRESET,
     CLEAR_CMYK_PRESET,
     ColorConfig,
     get_available_presets,
@@ -88,9 +89,19 @@ class TestPresets:
         preset = get_preset("clear_cmyk")
         assert preset == CLEAR_CMYK_PRESET
 
+    def test_get_preset_calibrated(self):
+        """get_preset returns calibrated preset for 'bambu_cmyk_calibrated'."""
+        preset = get_preset("bambu_cmyk_calibrated")
+        assert preset == BAMBU_CMYK_CALIBRATED_PRESET
+
     def test_get_preset_case_insensitive(self):
         """get_preset is case-insensitive."""
         assert get_preset("BAMBU_CMYK") == BAMBU_CMYK_PRESET
+
+    def test_get_preset_aliases(self):
+        """Short preset aliases resolve to the concrete preset names."""
+        assert get_preset("bambu") == BAMBU_CMYK_PRESET
+        assert get_preset("clear") == CLEAR_CMYK_PRESET
 
     def test_get_preset_invalid_returns_none(self):
         """get_preset returns None for unknown presets."""
@@ -100,6 +111,7 @@ class TestPresets:
         """get_available_presets returns list of preset names."""
         presets = get_available_presets()
         assert "bambu_cmyk" in presets
+        assert "bambu_cmyk_calibrated" in presets
         assert "clear_cmyk" in presets
 
 
@@ -151,6 +163,37 @@ class TestColorsFromConfigs:
         colors = Colors.from_configs(configs)
 
         assert colors['C'].td == 5.5
+
+    def test_from_configs_preserves_alpha_and_k(self):
+        """from_configs preserves calibrated per-material alpha/k parameters."""
+        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+
+        assert colors["C"].alpha == pytest.approx(5.751822945330163)
+        assert colors["C"].k == pytest.approx(1.2085100532667932)
+        assert colors["C"].td_scale == pytest.approx(1.0056869820712098)
+        assert colors["C"].td_gamma == pytest.approx(0.4543363851088494)
+        assert colors["K"].alpha == pytest.approx(5.751822945330163)
+        assert colors["K"].k == pytest.approx(5.440433103311526)
+
+    def test_from_configs_exposes_shared_blend_alpha(self):
+        """Calibrated presets should surface their learned global alpha."""
+        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+
+        assert colors.get_blend_alpha() == pytest.approx(5.751822945330163)
+
+    def test_get_blend_alpha_rejects_inconsistent_values(self):
+        """Mixed alphas are invalid because the blend kernel uses one global alpha."""
+        colors = Colors.from_configs(
+            [
+                ColorConfig(name="Cyan", hex="#00FFFF", transmission_distance=3.0, alpha=4.0),
+                ColorConfig(name="Magenta", hex="#FF00FF", transmission_distance=2.0, alpha=5.0),
+                ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=2.5, alpha=4.0),
+                ColorConfig(name="White", hex="#FFFFFF", transmission_distance=7.0, alpha=4.0),
+            ]
+        )
+
+        with pytest.raises(ValueError, match="must share the same alpha value"):
+            colors.get_blend_alpha()
 
 
 class TestDynamicMeshMap:
@@ -297,3 +340,14 @@ class TestBackwardCompatibility:
         assert stl_generator._reference_code_matrix is not None
         assert stl_generator._current_colors is not None
         assert len(stl_generator._current_colors) == 4
+
+    def test_calibrated_colors_use_td1s_gamma_blend(self):
+        """Calibrated presets must enable the TD1S gamma hybrid blend."""
+        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        initialize_color_mapping(layer_count=4, layer_height=0.08, colors=colors)
+
+        from services import stl_generator
+        assert stl_generator._blend_generator.blend_mode == "hybrid_per_color_k_td1s_gamma"
+        assert stl_generator._blend_generator.alpha == pytest.approx(
+            BAMBU_CMYK_CALIBRATED_PRESET[0].alpha
+        )

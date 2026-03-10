@@ -17,7 +17,7 @@ from core.blend_color import (
     _blend_hybrid,
     _blend_hybrid_per_color,
 )
-from core.color_config import ColorConfig
+from core.color_config import BAMBU_CMYK_CALIBRATED_PRESET, ColorConfig
 
 
 class TestColorGetLabel:
@@ -376,6 +376,54 @@ class TestHybridPerColorBlend:
             "YYYY", 0.08, color_map, scatter_alpha=4.0, k_map={"Y": 12.0}
         )
         assert sum(boosted_rgb) < sum(default_rgb)
+
+    @pytest.mark.parametrize(
+        "blend_mode",
+        ["hybrid_calibrated", "hybrid_per_color_k_td1s_gamma"],
+    )
+    def test_calibrated_mode_aliases_share_same_kernel(self, blend_mode):
+        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        generator = BlendTestGenerator(
+            colors=colors,
+            layer_height=0.08,
+            layer_count_max=4,
+            verbose=False,
+            blend_mode=blend_mode,
+        )
+        baseline = BlendTestGenerator(
+            colors=colors,
+            layer_height=0.08,
+            layer_count_max=4,
+            verbose=False,
+            blend_mode="hybrid_calibrated",
+        )
+
+        assert generator.code_to_rgb("CMYW") == pytest.approx(
+            baseline.code_to_rgb("CMYW"),
+            abs=1e-6,
+        )
+
+    def test_hybrid_per_color_k_ignores_td_gamma_remap(self):
+        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        per_color_mode = BlendTestGenerator(
+            colors=colors,
+            layer_height=0.08,
+            layer_count_max=4,
+            verbose=False,
+            blend_mode="hybrid_per_color_k",
+        )
+        baseline = BlendTestGenerator(
+            colors=colors,
+            layer_height=0.08,
+            layer_count_max=4,
+            verbose=False,
+            blend_mode="hybrid_calibrated",
+        )
+
+        assert per_color_mode.code_to_rgb("CMYW") != pytest.approx(
+            baseline.code_to_rgb("CMYW"),
+            abs=1e-6,
+        )
 
 
 class TestBlendTestGeneratorGenerateBox:

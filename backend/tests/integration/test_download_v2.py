@@ -5,6 +5,9 @@ import json
 import zipfile
 from io import BytesIO
 
+from api.models import FilamentColorConfig
+from api.routes.download_v2 import get_colors_from_request
+
 
 def test_get_filament_presets(client):
     """GET /api/v2/filament-presets returns preset list."""
@@ -12,10 +15,81 @@ def test_get_filament_presets(client):
     assert response.status_code == 200
     data = response.json()
     assert "presets" in data
-    assert len(data["presets"]) == 2
+    assert len(data["presets"]) == 3
     names = [p["name"] for p in data["presets"]]
     assert "bambu_cmyk" in names
+    assert "bambu_cmyk_calibrated" in names
     assert "clear_cmyk" in names
+
+
+def test_get_filament_presets_exposes_calibrated_material_params(client):
+    """GET /api/v2/filament-presets includes calibrated blend parameters."""
+    response = client.get("/api/v2/filament-presets")
+    assert response.status_code == 200
+    data = response.json()
+
+    calibrated = next(
+        preset for preset in data["presets"]
+        if preset["name"] == "bambu_cmyk_calibrated"
+    )
+    cyan = next(color for color in calibrated["colors"] if color["name"] == "Cyan")
+
+    assert cyan["transmission_distance"] == 2.0
+    assert cyan["alpha"] > 0
+    assert cyan["k"] >= 0
+    assert cyan["td_scale"] > 0
+    assert cyan["td_gamma"] > 0
+
+
+def test_get_colors_from_request_preserves_calibrated_custom_params():
+    """Custom filament colors should keep calibrated blend parameters."""
+    colors = get_colors_from_request(
+        None,
+        [
+            FilamentColorConfig(
+                name="Cyan",
+                hex="#3D79C6",
+                transmission_distance=2.0,
+                alpha=5.75,
+                k=1.2,
+                td_scale=1.01,
+                td_gamma=0.45,
+            ),
+            FilamentColorConfig(
+                name="Magenta",
+                hex="#B3356E",
+                transmission_distance=2.9,
+                alpha=5.75,
+                k=0.35,
+                td_scale=1.01,
+                td_gamma=0.45,
+            ),
+            FilamentColorConfig(
+                name="Yellow",
+                hex="#FFE665",
+                transmission_distance=5.0,
+                alpha=5.75,
+                k=8.4,
+                td_scale=1.01,
+                td_gamma=0.45,
+            ),
+            FilamentColorConfig(
+                name="White",
+                hex="#FFFFFF",
+                transmission_distance=6.1,
+                alpha=5.75,
+                k=6.5,
+                td_scale=1.01,
+                td_gamma=0.45,
+            ),
+        ],
+    )
+
+    assert colors.get_blend_mode() == "hybrid_per_color_k_td1s_gamma"
+    assert colors["C"].alpha == 5.75
+    assert colors["C"].k == 1.2
+    assert colors["C"].td_scale == 1.01
+    assert colors["C"].td_gamma == 0.45
 
 
 def test_v2_stl_with_default_colors(client, sample_color_blocks_with_hex):
@@ -46,6 +120,24 @@ def test_v2_stl_with_bambu_preset(client, sample_color_blocks_with_hex):
             "layerCount": 4,
             "imageDimensions": {"width": 4, "height": 4},
             "filamentPreset": "bambu_cmyk",
+        },
+    )
+    assert response.status_code == 200
+    zf = zipfile.ZipFile(BytesIO(response.content))
+    assert len(zf.namelist()) > 0
+
+
+def test_v2_stl_with_calibrated_bambu_preset(client, sample_color_blocks_with_hex):
+    """V2 STL with calibrated preset works."""
+    response = client.post(
+        "/api/v2/download-stl",
+        json={
+            "colorBlocks": sample_color_blocks_with_hex,
+            "layerHeight": 0.08,
+            "pixelSize": 0.08,
+            "layerCount": 4,
+            "imageDimensions": {"width": 4, "height": 4},
+            "filamentPreset": "bambu_cmyk_calibrated",
         },
     )
     assert response.status_code == 200

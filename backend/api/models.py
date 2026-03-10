@@ -23,6 +23,30 @@ class FilamentColorConfig(BaseModel):
         le=1000,
         description="Beer-Lambert transmission distance (opacity control)"
     )
+    alpha: float = Field(
+        12.0,
+        gt=0,
+        le=1000,
+        description="Global scatter/absorption alpha for calibrated blend modes"
+    )
+    k: float = Field(
+        10.0,
+        ge=0,
+        le=1000,
+        description="Per-color absorption gain for calibrated blend modes"
+    )
+    td_scale: float = Field(
+        1.0,
+        gt=0,
+        le=1000,
+        description="TD remap scale for calibrated blend modes"
+    )
+    td_gamma: float = Field(
+        1.0,
+        gt=0,
+        le=1000,
+        description="TD remap exponent for calibrated blend modes"
+    )
 
     @field_validator('name')
     @classmethod
@@ -58,6 +82,7 @@ class FilamentColorConfig(BaseModel):
 class FilamentPreset(str, Enum):
     """Available filament presets."""
     BAMBU_CMYK = "bambu_cmyk"
+    BAMBU_CMYK_CALIBRATED = "bambu_cmyk_calibrated"
     CLEAR_CMYK = "clear_cmyk"
 
 

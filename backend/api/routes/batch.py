@@ -143,7 +143,11 @@ async def api_batch_download_stl(
                 ColorConfig(
                     name=fc['name'],
                     hex=fc['hex'],
-                    transmission_distance=fc['transmission_distance']
+                    transmission_distance=fc['transmission_distance'],
+                    alpha=fc.get('alpha', 12.0),
+                    k=fc.get('k', 10.0),
+                    td_scale=fc.get('td_scale', 1.0),
+                    td_gamma=fc.get('td_gamma', 1.0),
                 )
                 for fc in colors_data
             ]
@@ -163,7 +167,7 @@ async def api_batch_download_stl(
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid filament preset: {filamentPreset}. "
-                f"Valid presets: bambu_cmyk, clear_cmyk"
+                f"Valid presets: bambu_cmyk, bambu_cmyk_calibrated, clear_cmyk"
             )
 
     zip_content = generate_batch_stl_zip(

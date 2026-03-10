@@ -6,7 +6,12 @@ import base64
 import pytest
 
 from core.blend_color import Colors
-from core.color_config import BAMBU_CMYK_PRESET, CLEAR_CMYK_PRESET, ColorConfig
+from core.color_config import (
+    BAMBU_CMYK_CALIBRATED_PRESET,
+    BAMBU_CMYK_PRESET,
+    CLEAR_CMYK_PRESET,
+    ColorConfig,
+)
 from services.filament_preview import FilamentPreviewService
 
 
@@ -77,6 +82,21 @@ class TestFilamentPreviewService:
         service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
         result = service.generate_preview()
         assert result["stats"]["colorCount"] == 4
+
+    def test_generate_preview_uses_calibrated_blend_mode(self):
+        """Calibrated presets should switch preview rendering to the TD1S-gamma blend."""
+        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
+
+        assert service.generator.blend_mode == "hybrid_per_color_k_td1s_gamma"
+        assert service.generator.alpha == pytest.approx(BAMBU_CMYK_CALIBRATED_PRESET[0].alpha)
+
+        baseline = FilamentPreviewService(
+            Colors.from_configs(BAMBU_CMYK_PRESET),
+            layer_count=4,
+            layer_height=0.08,
+        )
+        assert service.generator.code_to_rgb("CMYW") != baseline.generator.code_to_rgb("CMYW")
 
     def test_generate_preview_with_6_colors(self):
         """Preview works with 6 color configurations."""

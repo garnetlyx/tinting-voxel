@@ -36,7 +36,9 @@ class FilamentPreviewService:
             colors=colors,
             layer_height=layer_height,
             layer_count_max=layer_count,
-            verbose=False
+            verbose=False,
+            alpha=colors.get_blend_alpha(),
+            blend_mode=colors.get_blend_mode(),
         )
 
     def generate_preview(self, page: int = None, page_size: int = None) -> dict:

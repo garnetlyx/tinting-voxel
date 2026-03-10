@@ -53,7 +53,9 @@ def compute_reference_matrices(
     generator = BlendTestGenerator(
         colors=colors,
         layer_height=layer_height,
-        layer_count_max=layer_count
+        layer_count_max=layer_count,
+        alpha=colors.get_blend_alpha(),
+        blend_mode=colors.get_blend_mode(),
     )
 
     items = colors.get_labels()
@@ -208,7 +210,9 @@ def initialize_color_mapping(
         _blend_generator = BlendTestGenerator(
             colors=colors,
             layer_height=layer_height,
-            layer_count_max=layer_count
+            layer_count_max=layer_count,
+            alpha=colors.get_blend_alpha(),
+            blend_mode=colors.get_blend_mode(),
         )
 
         _reference_code_matrix, _reference_rgb_matrix = compute_reference_matrices(
