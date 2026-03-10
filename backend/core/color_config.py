@@ -139,6 +139,58 @@ BAMBU_CMYK_CALIBRATED_PRESET: List[ColorConfig] = [
     ),
 ]
 
+# Phase 6 B/W backing calibration (2026-03-07).
+# Uses physically-ordered k values derived from black/white backing dual-calibration.
+# These k values follow the correct physical ordering: K > W > M > C > Y.
+# See docs/CALIBRATION.md "Phase 6" section for full derivation.
+BAMBU_CMYK_PHASE6_PRESET: List[ColorConfig] = [
+    ColorConfig(
+        name="Cyan",
+        hex="#3D79C6",
+        transmission_distance=2.0,  # TD1S sensor value
+        alpha=8.08,  # scatter_alpha from Phase 6
+        k=8.13,  # Per-color scattering coefficient (Phase 6)
+        td_scale=1.48,  # TD1S power-law scaling
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Magenta",
+        hex="#B3356E",
+        transmission_distance=2.9,  # TD1S sensor value
+        alpha=8.08,
+        k=8.42,  # Phase 6 k value
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Yellow",
+        hex="#FFE665",
+        transmission_distance=5.0,  # TD1S sensor value
+        alpha=8.08,
+        k=3.73,  # Phase 6 k value (most translucent)
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="White",
+        hex="#FFFFFF",
+        transmission_distance=6.1,  # TD1S sensor value
+        alpha=8.08,
+        k=12.39,  # Phase 6 k value (high TiO₂ scattering)
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Key",
+        hex="#0B0F0C",
+        transmission_distance=0.1,  # TD1S sensor value (near-zero for black)
+        alpha=8.08,
+        k=17.65,  # Phase 6 k value (near-perfect opacity)
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+]
+
 CLEAR_CMYK_PRESET: List[ColorConfig] = [
     ColorConfig(name="Cyan", hex="#0089cd", transmission_distance=60.0, alpha=12.0, k=10.0),
     ColorConfig(name="Magenta", hex="#e75d4a", transmission_distance=100.0, alpha=12.0, k=10.0),
@@ -152,7 +204,8 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
     Get a preset color configuration by name.
 
     Args:
-        name: Preset name ("bambu_cmyk", "bambu_cmyk_calibrated" or "clear_cmyk")
+        name: Preset name ("bambu_cmyk", "bambu_cmyk_calibrated",
+              "bambu_cmyk_phase6" or "clear_cmyk")
 
     Returns:
         List of ColorConfig or None if preset not found
@@ -167,6 +220,7 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
     presets = {
         "bambu_cmyk": BAMBU_CMYK_PRESET,
         "bambu_cmyk_calibrated": BAMBU_CMYK_CALIBRATED_PRESET,
+        "bambu_cmyk_phase6": BAMBU_CMYK_PHASE6_PRESET,
         "clear_cmyk": CLEAR_CMYK_PRESET,
     }
     return presets.get(alias_map.get(normalized, normalized))
@@ -174,4 +228,4 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
 
 def get_available_presets() -> List[str]:
     """Get list of available preset names."""
-    return ["bambu_cmyk", "bambu_cmyk_calibrated", "clear_cmyk"]
+    return ["bambu_cmyk", "bambu_cmyk_calibrated", "bambu_cmyk_phase6", "clear_cmyk"]
