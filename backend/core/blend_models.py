@@ -30,7 +30,14 @@ def validate_blend_mode(blend_mode: str) -> str:
 
 
 def _normalize_code(code: str) -> str:
-    return "".join(code.split()).upper()
+    if code is None:
+        return ""
+    # Remove whitespace and normalize to uppercase ASCII letters only
+    # This handles Unicode combining characters and other edge cases
+    import unicodedata
+    # Normalize to decomposed form (NFD), then filter only ASCII letters
+    normalized = unicodedata.normalize('NFD', code)
+    return "".join(c.upper() for c in normalized if c.isascii() and c.isalpha())
 
 
 def _build_color_map_from_key(color_key: tuple) -> dict:
@@ -67,6 +74,9 @@ def _validate_code(code: str, color_map: dict) -> None:
 
 
 def _coerce_layer_height(layer_height: float) -> float:
+    # Handle NaN and infinity
+    if not np.isfinite(layer_height):
+        return 0.0
     if layer_height < 0:
         return 0.0
     return float(layer_height)
