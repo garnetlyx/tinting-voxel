@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { useImageProcessor } from './useImageProcessor';
-import { processImage } from '../api/client';
+import {
+  download3MFV2,
+  downloadPrintSettings,
+  downloadSTLV2,
+  processImage,
+} from '../api/client';
 
 vi.mock('../api/client', () => ({
   processImage: vi.fn(),
@@ -13,6 +18,9 @@ vi.mock('../api/client', () => ({
 }));
 
 const mockedProcessImage = vi.mocked(processImage);
+const mockedDownloadSTLV2 = vi.mocked(downloadSTLV2);
+const mockedDownload3MFV2 = vi.mocked(download3MFV2);
+const mockedDownloadPrintSettings = vi.mocked(downloadPrintSettings);
 
 type MockImageInstance = {
   onload: ((this: GlobalEventHandlers, ev: Event) => unknown) | null;
@@ -35,6 +43,9 @@ describe('useImageProcessor', () => {
       processedImage: 'data:image/png;base64,mock',
       imageDimensions: { width: 8, height: 6 },
     });
+    mockedDownloadSTLV2.mockResolvedValue(undefined);
+    mockedDownload3MFV2.mockResolvedValue(undefined);
+    mockedDownloadPrintSettings.mockResolvedValue(undefined);
 
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
       configurable: true,
@@ -83,5 +94,107 @@ describe('useImageProcessor', () => {
     // No images should be created on mount since bootstrap logic was removed
     expect(createdImages).toHaveLength(0);
     expect(mockedProcessImage).not.toHaveBeenCalled();
+  });
+
+  it('preserves filamentPreset for STL downloads when a preset is selected', async () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    await act(async () => {
+      await result.current.handleDownloadSTL();
+    });
+
+    expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filamentPreset: 'bambu_cmyk',
+      })
+    );
+    expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        filamentColors: expect.anything(),
+      })
+    );
+  });
+
+  it('preserves filamentPreset for 3MF and print-settings downloads when a preset is selected', async () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    await act(async () => {
+      await result.current.handleDownload3MF();
+      await result.current.handleDownloadPrintSettings();
+    });
+
+    expect(mockedDownload3MFV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filamentPreset: 'bambu_cmyk',
+      })
+    );
+    expect(mockedDownloadPrintSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filamentPreset: 'bambu_cmyk',
+      })
+    );
+  });
+
+  it('falls back to filamentColors after the preset is edited into a custom config', async () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    act(() => {
+      result.current.updateFilamentColor(0, {
+        name: 'Cyan',
+        hex: '#0086D6',
+        transmission_distance: 3.25,
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleDownloadSTL();
+    });
+
+    expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filamentColors: expect.arrayContaining([
+          expect.objectContaining({
+            transmission_distance: 3.25,
+          }),
+        ]),
+      })
+    );
+    expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        filamentPreset: expect.anything(),
+      })
+    );
+  });
+
+  it('preserves calibrated material parameters when editing a calibrated preset', async () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    act(() => {
+      result.current.loadPreset('bambu_cmyk_calibrated');
+      result.current.updateFilamentColor(0, {
+        name: 'Cyan',
+        hex: '#3D79C6',
+        transmission_distance: 2.1,
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleDownloadSTL();
+    });
+
+    expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filamentColors: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Cyan',
+            transmission_distance: 2.1,
+            alpha: 5.751822945330163,
+            k: 1.2085100532667932,
+            td_scale: 1.0056869820712098,
+            td_gamma: 0.4543363851088494,
+          }),
+        ]),
+      })
+    );
   });
 });

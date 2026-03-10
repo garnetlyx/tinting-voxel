@@ -59,6 +59,8 @@ class BlendTestGenerator:
     ):
         if layer_count_max <= 0:
             raise ValueError(f"layer_count_max must be positive, got {layer_count_max}")
+        if layer_height <= 0:
+            raise ValueError(f"layer_height must be positive, got {layer_height}")
         self.length_total = plate_length
         self.width_total = plate_width
         self.grid_length = grid_length
@@ -176,9 +178,9 @@ class BlendTestGenerator:
         return matrix_to_code_color_map(df_rgb, df_code)
 
     def set_code_rgb_df(self, df):
-        # HLS sorting depends on normalized channels before colorsys.rgb_to_hls,
-        # i.e. rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0. The helper keeps
-        # that logic centralized; keep the requirement visible at this entrypoint.
+        # HLS sorting requires normalized RGB channels before colorsys.rgb_to_hls:
+        #   rgb_normalized = (rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
+        # The normalization / 255.0 is handled by build_code_rgb_df in code_grid.py.
         df_rgb, df_code = build_code_rgb_df(df, self.code_to_rgb, sort_color=self.sort_color)
         self.df_code = df_code
         self.df_rgb = df_rgb

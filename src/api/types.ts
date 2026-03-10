@@ -83,12 +83,16 @@ export interface DownloadSVGSTLParams {
 
 // V2 API types for configurable filament colors
 
-export type FilamentPreset = 'bambu_cmyk' | 'clear_cmyk';
+export type FilamentPreset = 'bambu_cmyk' | 'bambu_cmyk_calibrated' | 'clear_cmyk';
 
 export interface FilamentColorConfig {
   name: string;
   hex: string;
   transmission_distance: number;
+  alpha?: number;
+  k?: number;
+  td_scale?: number;
+  td_gamma?: number;
 }
 
 export interface FilamentPresetInfo {
@@ -210,10 +214,57 @@ export interface PaletteLibraryResponse {
 // Default presets for frontend initialization
 export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
   bambu_cmyk: [
-    { name: 'Cyan', hex: '#0086D6', transmission_distance: 3.0 },
-    { name: 'Magenta', hex: '#EC008C', transmission_distance: 1.9 },
-    { name: 'Yellow', hex: '#F4EE2A', transmission_distance: 2.5 },
+    { name: 'Cyan', hex: '#3D79C6', transmission_distance: 3.0 },
+    { name: 'Magenta', hex: '#B3356E', transmission_distance: 1.9 },
+    { name: 'Yellow', hex: '#FFE665', transmission_distance: 2.5 },
     { name: 'White', hex: '#FFFFFF', transmission_distance: 7.2 },
+  ],
+  bambu_cmyk_calibrated: [
+    {
+      name: 'Cyan',
+      hex: '#3D79C6',
+      transmission_distance: 2.0,
+      alpha: 5.751822945330163,
+      k: 1.2085100532667932,
+      td_scale: 1.0056869820712098,
+      td_gamma: 0.4543363851088494,
+    },
+    {
+      name: 'Magenta',
+      hex: '#B3356E',
+      transmission_distance: 2.9,
+      alpha: 5.751822945330163,
+      k: 0.35481383708372416,
+      td_scale: 1.0056869820712098,
+      td_gamma: 0.4543363851088494,
+    },
+    {
+      name: 'Yellow',
+      hex: '#FFE665',
+      transmission_distance: 5.0,
+      alpha: 5.751822945330163,
+      k: 8.401071443503248,
+      td_scale: 1.0056869820712098,
+      td_gamma: 0.4543363851088494,
+    },
+    {
+      name: 'White',
+      hex: '#FFFFFF',
+      transmission_distance: 6.1,
+      alpha: 5.751822945330163,
+      k: 6.523686193460801,
+      td_scale: 1.0056869820712098,
+      td_gamma: 0.4543363851088494,
+    },
+    {
+      name: 'Key',
+      hex: '#0B0F0C',
+      transmission_distance: 0.1,
+      alpha: 5.751822945330163,
+      k: 5.440433103311526,
+      td_scale: 1.0056869820712098,
+      td_gamma: 0.4543363851088494,
+    },
   ],
   clear_cmyk: [
     { name: 'Cyan', hex: '#0089cd', transmission_distance: 60.0 },

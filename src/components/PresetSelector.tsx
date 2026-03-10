@@ -14,6 +14,7 @@ interface PresetSelectorProps {
 const PRESET_OPTIONS: { value: FilamentPreset | null; label: string }[] = [
   { value: null, label: 'Custom' },
   { value: 'bambu_cmyk', label: 'Bambu CMYK' },
+  { value: 'bambu_cmyk_calibrated', label: 'Bambu CMYK Calibrated' },
   { value: 'clear_cmyk', label: 'Clear CMYK' },
 ];
 

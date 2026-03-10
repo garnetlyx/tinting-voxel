@@ -112,7 +112,7 @@ export const useImageProcessor = () => {
   const updateFilamentColor = useCallback((index: number, updated: FilamentColorConfig) => {
     setFilamentColors(prev => {
       const next = [...prev];
-      next[index] = updated;
+      next[index] = { ...next[index], ...updated };
       return next;
     });
     setFilamentPreset(null);
@@ -161,6 +161,11 @@ export const useImageProcessor = () => {
 
     return true;
   }, [filamentColors]);
+
+  const filamentRequestPayload = useMemo(
+    () => (filamentPreset ? { filamentPreset } : { filamentColors }),
+    [filamentColors, filamentPreset]
+  );
 
   // Process image by calling backend API
   const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode) => {
@@ -377,9 +382,9 @@ export const useImageProcessor = () => {
         pixelSize,
         layerCount,
         imageDimensions,
-        filamentColors,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         detailSize,
+        ...filamentRequestPayload,
       };
 
       if (mode === 'pixel') {
@@ -413,10 +418,10 @@ export const useImageProcessor = () => {
         pixelSize,
         layerCount,
         imageDimensions,
-        filamentColors,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         ...(doubleSided ? { doubleSided } : {}),
         detailSize,
+        ...filamentRequestPayload,
       };
 
       if (mode === 'pixel') {
@@ -449,9 +454,9 @@ export const useImageProcessor = () => {
         pixelSize,
         layerCount,
         imageDimensions,
-        filamentColors,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         detailSize,
+        ...filamentRequestPayload,
       });
     } catch (err) {
       console.error('Error downloading print settings:', err);

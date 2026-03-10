@@ -3,7 +3,11 @@
  */
 import React, { useState, useRef, useCallback } from 'react';
 import { Upload, X, Download, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import type { BatchProcessResponse, FilamentColorConfig } from '../api/types';
+import type {
+  BatchProcessResponse,
+  FilamentColorConfig,
+  FilamentPreset,
+} from '../api/types';
 import { batchProcessImages, batchDownloadSTL } from '../api/client';
 
 const MAX_FILES = 20;
@@ -17,7 +21,7 @@ interface BatchProcessorProps {
   layerCount: number;
   basePlateThickness: number;
   doubleSided: boolean;
-  filamentPreset?: string;
+  filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   detailSize: number;
 }
@@ -135,7 +139,7 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
         layerCount,
         basePlateThickness,
         doubleSided,
-        filamentPreset: filamentPreset as 'bambu_cmyk' | 'clear_cmyk' | undefined,
+        filamentPreset: filamentPreset,
         filamentColors,
         detailSize,
       }, controller.signal);

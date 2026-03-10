@@ -101,6 +101,21 @@ def _blend_original(
     alpha: float = 12.0,
     background_rgb: Optional[tuple] = None,
 ) -> tuple:
+    # Handle empty color_map gracefully
+    if not color_map:
+        return (255.0, 255.0, 255.0)
+    # Validate alpha is positive
+    if not np.isfinite(alpha) or alpha <= 0:
+        raise ValueError(
+            f"alpha must be finite and positive, got {alpha}"
+        )
+    # Validate all code characters are known colors
+    unknown = [c for c in code if c not in color_map]
+    if unknown:
+        raise ValueError(
+            f"blend code contains unknown color characters: {unknown}. "
+            f"Valid colors: {list(color_map.keys())}"
+        )
     layer_height = _coerce_layer_height(layer_height)
     background = _normalize_background_rgb(background_rgb)
     transmission = [
@@ -189,6 +204,20 @@ def _blend_hybrid(
     if n == 0:
         return (255.0, 255.0, 255.0)
 
+    # Validate scatter_alpha is positive
+    if not np.isfinite(scatter_alpha) or scatter_alpha <= 0:
+        raise ValueError(
+            f"scatter_alpha must be finite and positive, got {scatter_alpha}"
+        )
+
+    # Validate all code characters are known colors
+    unknown = [c for c in code if c not in color_map]
+    if unknown:
+        raise ValueError(
+            f"blend code contains unknown color characters: {unknown}. "
+            f"Valid colors: {list(color_map.keys())}"
+        )
+
     transmissions = []
     for c in code:
         color = color_map[c]
@@ -232,11 +261,20 @@ def _blend_hybrid_per_color(
     default_k: float = 10.0,
     background_rgb: Optional[tuple] = None,
 ) -> tuple:
+    # Handle empty color_map gracefully
+    if not color_map:
+        return (255.0, 255.0, 255.0)
     layer_height = _coerce_layer_height(layer_height)
     background = _normalize_background_rgb(background_rgb)
     n = len(code)
     if n == 0:
         return (255.0, 255.0, 255.0)
+
+    # Validate scatter_alpha is positive
+    if not np.isfinite(scatter_alpha) or scatter_alpha <= 0:
+        raise ValueError(
+            f"scatter_alpha must be finite and positive, got {scatter_alpha}"
+        )
 
     k_map = k_map or {}
     transmissions = []

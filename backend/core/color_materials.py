@@ -46,6 +46,38 @@ class Color:
             raise ValueError(
                 f"transmission_distance must be >= 0, got {transmission_distance}"
             )
+        if not np.isfinite(float(td_scale)):
+            raise ValueError(
+                f"td_scale must be finite and not NaN, got {td_scale}"
+            )
+        if td_scale <= 0:
+            raise ValueError(
+                f"td_scale must be positive, got {td_scale}"
+            )
+        if not np.isfinite(float(td_gamma)):
+            raise ValueError(
+                f"td_gamma must be finite and not NaN, got {td_gamma}"
+            )
+        if td_gamma <= 0:
+            raise ValueError(
+                f"td_gamma must be positive, got {td_gamma}"
+            )
+        if not np.isfinite(float(alpha)):
+            raise ValueError(
+                f"alpha must be finite and not NaN, got {alpha}"
+            )
+        if alpha <= 0:
+            raise ValueError(
+                f"alpha must be positive, got {alpha}"
+            )
+        if not np.isfinite(float(k)):
+            raise ValueError(
+                f"k must be finite and not NaN, got {k}"
+            )
+        if k < 0:
+            raise ValueError(
+                f"k must be non-negative, got {k}"
+            )
 
         self.name = name
         self.td = transmission_distance
@@ -265,6 +297,11 @@ class Colors:
     def from_configs(cls, configs) -> "Colors":
         from core.color_config import ColorConfig
 
+        if configs is None:
+            raise ValueError(
+                "Color configuration cannot be None. "
+                "Pass a list of ColorConfig objects or use a preset."
+            )
         if len(configs) < 4:
             raise ValueError(
                 f"Color configuration requires at least 4 colors, got {len(configs)}. "
