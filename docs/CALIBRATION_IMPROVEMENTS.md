@@ -170,8 +170,96 @@ The guessed k_rgb values are not optimal. Proper optimization requires:
 
 For now, **P6 Phase6 remains the recommended preset** as it generalizes better across all photos.
 
+## k_rgb Optimizer Implementation (2026-03-10) ✅
+
+### Implementation Complete
+
+The k_rgb optimizer has been implemented with the following changes:
+
+1. **`_objective_hybrid_per_channel_k()`** in `ramp_calibrator.py`:
+   - Optimizes scatter_alpha + per-color per-channel k_rgb values
+   - Parameter layout: `[scatter_alpha, C_R, C_G, C_B, M_R, M_G, M_B, Y_R, Y_G, Y_B, W_R, W_G, W_B, K_R, K_G, K_B]`
+   - For 5 colors (CMYWK): 1 + 3×5 = 16 parameters
+
+2. **`RampCalibrationConfig.k_rgb_bounds`**: Configurable bounds for k_rgb optimization
+   - Default: `(0.5, 30.0)` - wider than scalar k bounds to allow negative values for reflection modeling
+
+3. **`RampCalibrationResult.optimal_k_rgb_map`**: Stores optimized k_rgb values in result
+
+4. **Optimization path in `run()`**: Detects `hybrid_per_channel_k` blend mode and uses dedicated optimizer
+
+### Usage
+
+```bash
+cd backend
+source .venv/bin/activate
+
+# Run k_rgb optimization on a photo
+python -m tools.calibration.run_ramp_calibration \
+  --photo tools/calibration/photos/IMG_7872_cropped.png \
+  --preset bambu \
+  --blend-mode hybrid_per_channel_k
+```
+
+### Cross-Validation Results (Pre-Optimization)
+
+With guessed k_rgb values:
+
+| Photo | P0 Default | P6 Phase6 | P7 Per-Channel k |
+|-------|------------|-----------|------------------|
+| Ph1 (Ramp 4x5) | 22.78 | **12.72** | 14.31 |
+| Ph2 (Pair 12x4) | — | **14.46** | 19.23 |
+| Ph4 (16x16 synth) | **39.80** | 46.85 | 59.27 |
+| Ph5 (16x16 real) | 42.90 | 39.69 | **39.38** |
+| Ph6 (MC ramp 12x5) | 22.99 | **15.70** | 21.23 |
+
+P7 wins only on Ph5, but is worse on transfer (31.83 vs 28.57).
+
+### Next Steps
+
+1. Run k_rgb optimizer on training photos (Ph1 + Ph2 + Ph6)
+2. Validate optimized k_rgb on held-out photo (Ph5)
+3. Add k_rgb regularization to prevent overfitting
+
+## Original Implementation Requirements (Archived)
+
+The following requirements were documented before implementation:
+
+With proper optimization, P7 could potentially:
+- Reduce Ph5 from 39.38 to ~35 (based on P0c results)
+- Maintain good transfer to Ph6 (target: <20)
+
+## Latest Cross-Validation Results (2026-03-10)
+
+### Full Parameter Set Comparison
+
+| Preset | Ph1 | Ph2 | Ph4 | Ph5 | Ph6 | Transfer |
+|--------|-----|-----|-----|-----|-----|----------|
+| **P0 Default** | 22.78 | — | **39.80** | 42.90 | 22.99 | 35.02 |
+| P0b TD1S α=12 | 27.25 | — | 39.31 | 44.69 | 26.89 | 37.39 |
+| P0c TD1S ln10 | 48.95 | — | 31.93 | **37.44** | 51.29 | 41.65 |
+| P1 Ramp best | **3.30** | — | 68.27 | 67.97 | 24.50 | 49.06 |
+| P3 Hybrid | 8.30 | — | 53.53 | 40.13 | 11.94 | 30.78 |
+| P4 Hybrid_td | 7.29 | **9.78** | 44.03 | 39.03 | **10.62** | **25.62** |
+| **P6 Phase6** | 12.72 | 14.46 | 46.85 | 39.69 | 15.70 | 28.57 |
+| P7 Per-ch k | 14.31 | 19.23 | 59.27 | 39.38 | 21.23 | 31.83 |
+
+### Ranking by Transfer Score (Best Generalization)
+
+1. **P4 Hybrid_td**: 25.62 (best transfer, good Ph5=39.03)
+2. **P6 Phase6**: 28.57 (balanced, recommended production preset)
+3. P3 Hybrid: 30.78
+4. P7 Per-ch k: 31.83 (overfits to Ph5)
+5. P0 Default: 35.02 (safest baseline)
+
+### Recommendations
+
+1. **Production**: Use **P6 Phase6** - best balance of accuracy and generalization
+2. **Single-color**: Use **P4 Hybrid_td** - excellent transfer for limited color mixing
+3. **Future work**: Implement k_rgb optimizer to improve P7's generalization
+
 ## References
 
 - Error analysis: `tools/calibration/results/20260224_125726_error_analysis/`
-- Cross-validation: `tools/calibration/results/20260310_073620_cross_validation/`
+- Cross-validation: `tools/calibration/results/20260310_085528_cross_validation/`
 - Model search: `tools/calibration/results/20260307_025037_model_search/`
