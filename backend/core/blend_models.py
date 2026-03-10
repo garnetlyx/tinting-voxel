@@ -9,6 +9,7 @@ HYBRID_PER_COLOR_BLEND_MODES = {
     "hybrid_calibrated",
     "hybrid_per_color_k",
     "hybrid_per_color_k_td1s_gamma",
+    "hybrid_per_channel_k",
 }
 
 VALID_BLEND_MODES = {
@@ -46,16 +47,18 @@ def _build_color_map_from_key(color_key: tuple) -> dict:
         label = item[0]
         td = item[1]
         hex_val = item[2]
-        k = item[3] if len(item) >= 5 else Color.DEFAULT_K
+        k = item[3] if len(item) >= 4 else Color.DEFAULT_K
         alpha = item[4] if len(item) >= 5 else Color.DEFAULT_ALPHA
         td_scale = item[5] if len(item) >= 6 else Color.DEFAULT_TD_SCALE
         td_gamma = item[6] if len(item) >= 7 else Color.DEFAULT_TD_GAMMA
+        k_rgb = item[7] if len(item) >= 8 else None
         c = Color(
             label,
             td,
             hex_val,
             alpha=alpha,
             k=k,
+            k_rgb=k_rgb,
             td_scale=td_scale,
             td_gamma=td_gamma,
         )
@@ -312,6 +315,81 @@ def _blend_hybrid_per_color(
     return tuple(np.clip(rgb * 255, 0, 255))
 
 
+def _blend_hybrid_per_channel_k(
+    code: str,
+    layer_height: float,
+    color_map: dict,
+    scatter_alpha: float = 5.0,
+    default_k: float = 10.0,
+    background_rgb: Optional[tuple] = None,
+) -> tuple:
+    """
+    Hybrid blend with per-channel scattering coefficients (k_rgb).
+
+    This implements Proposal A from CALIBRATION_IMPROVEMENTS.md:
+    - Each color has per-channel k values (k_R, k_G, k_B)
+    - Allows modeling channel-selective scattering (e.g., Cyan reflects R)
+    - Formula: T_ch = exp(-(scatter + k_rgb * absorption) * layer_height)
+
+    Falls back to scalar k if k_rgb is not defined for a color.
+    """
+    if not color_map:
+        return (255.0, 255.0, 255.0)
+    layer_height = _coerce_layer_height(layer_height)
+    background = _normalize_background_rgb(background_rgb)
+    n = len(code)
+    if n == 0:
+        return (255.0, 255.0, 255.0)
+
+    if not np.isfinite(scatter_alpha) or scatter_alpha <= 0:
+        raise ValueError(
+            f"scatter_alpha must be finite and positive, got {scatter_alpha}"
+        )
+
+    transmissions = []
+    for c in code:
+        color = color_map[c]
+        td = color.td
+        if td <= 0:
+            t_ch = np.zeros(3)
+        else:
+            scatter = scatter_alpha / td
+            absorption = color.get_absorption()
+
+            # Use per-channel k_rgb if available, otherwise fall back to scalar k
+            if color.k_rgb is not None:
+                k_per_ch = np.array(color.k_rgb, dtype=np.float64)
+            else:
+                k_scalar = getattr(color, 'k', default_k)
+                k_per_ch = np.full(3, k_scalar, dtype=np.float64)
+
+            # Per-channel transmission: exp(-(scatter + k_ch * A_ch) * d)
+            scatter_per_ch = scatter + k_per_ch * absorption
+            t_ch = np.exp(-scatter_per_ch * layer_height)
+            t_ch = np.clip(t_ch, 0, 1)
+        transmissions.append(t_ch)
+
+    remain = np.ones(3)
+    array_size = max(n, 4) + 1
+    light_loss = np.zeros((array_size, 3))
+    for i, t_ch in enumerate(transmissions):
+        light_loss[i] = remain * (1.0 - t_ch)
+        remain *= t_ch
+    light_loss[n] = remain
+
+    total = light_loss.sum(axis=0)
+    total = np.where(total > 0, total, 1.0)
+    light_loss /= total
+
+    bg = light_loss[n]
+    rgb = np.ones(3)
+    for i, c in enumerate(code):
+        color = color_map[c]
+        rgb -= color.get_absorption() * light_loss[i]
+    rgb = bg * background + (1.0 - bg) * rgb
+    return tuple(np.clip(rgb * 255, 0, 255))
+
+
 def _build_k_map(color_map: dict) -> dict[str, float]:
     return {label: float(color.k) for label, color in color_map.items()}
 
@@ -336,6 +414,7 @@ def _effective_color_map(color_map: dict, blend_mode: str) -> dict:
             color.hex,
             alpha=color.alpha,
             k=color.k,
+            k_rgb=getattr(color, 'k_rgb', None),
             td_scale=color.td_scale,
             td_gamma=color.td_gamma,
         )
@@ -377,6 +456,14 @@ def _blend_by_mode(
             color_map,
             scatter_alpha=alpha,
             k=base_k,
+            background_rgb=background_rgb,
+        )
+    if blend_mode == "hybrid_per_channel_k":
+        return _blend_hybrid_per_channel_k(
+            code,
+            layer_height,
+            color_map,
+            scatter_alpha=alpha,
             background_rgb=background_rgb,
         )
     if blend_mode in HYBRID_PER_COLOR_BLEND_MODES:

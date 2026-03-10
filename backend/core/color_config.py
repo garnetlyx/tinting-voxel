@@ -20,12 +20,16 @@ class ColorConfig:
         transmission_distance: Beer-Lambert transmission distance parameter
             Controls how light passes through the material.
             Lower values = more opaque, Higher values = more translucent.
+        k_rgb: Optional per-channel scattering coefficients (k_R, k_G, k_B).
+            If provided, overrides k for per-channel scattering calculation.
+            Allows modeling channel-selective scattering (e.g., Cyan reflects R).
     """
     name: str
     hex: str
     transmission_distance: float
     alpha: float = 12.0
-    k: float = 10.0  # Scattering coefficient (per-channel `k_c`)
+    k: float = 10.0  # Scattering coefficient (fallback when k_rgb not provided)
+    k_rgb: Optional[tuple] = None  # Per-channel scattering (k_R, k_G, k_B)
     td_scale: float = 1.0
     td_gamma: float = 1.0
 
@@ -65,6 +69,17 @@ class ColorConfig:
             raise ValueError(
                 f"k (scattering coefficient) must be non-negative and finite, got {self.k}"
             )
+
+        if self.k_rgb is not None:
+            if len(self.k_rgb) != 3:
+                raise ValueError(
+                    f"k_rgb must be a 3-tuple (k_R, k_G, k_B), got {self.k_rgb}"
+                )
+            for i, k_ch in enumerate(self.k_rgb):
+                if not math.isfinite(k_ch):
+                    raise ValueError(
+                        f"k_rgb[{i}] must be finite, got {k_ch}"
+                    )
 
         if not math.isfinite(self.td_scale) or self.td_scale <= 0:
             raise ValueError(f"TD scale must be positive and finite, got {self.td_scale}")
@@ -198,6 +213,69 @@ CLEAR_CMYK_PRESET: List[ColorConfig] = [
     ColorConfig(name="White", hex="#FFFFFF", transmission_distance=200.0, alpha=12.0, k=10.0),
 ]
 
+# Experimental per-channel k preset (2026-03-10).
+# Uses per-channel scattering coefficients (k_R, k_G, k_B) to model
+# channel-selective scattering behavior identified in error analysis.
+#
+# Key observations from CALIBRATION_IMPROVEMENTS.md:
+# - Cyan R channel reflects (negative absorption) → low k_R
+# - Magenta G channel absorbs strongly → high k_G
+# - Yellow B channel absorbs strongly → high k_B, low k_R/k_G
+#
+# Note: This is an experimental preset. Values need calibration optimization.
+BAMBU_CMYK_PER_CHANNEL_K_PRESET: List[ColorConfig] = [
+    ColorConfig(
+        name="Cyan",
+        hex="#3D79C6",
+        transmission_distance=2.0,
+        alpha=8.08,
+        k=8.13,  # Fallback scalar k
+        k_rgb=(2.0, 10.0, 12.0),  # R reflects (low), G/B absorb (moderate-high)
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Magenta",
+        hex="#B3356E",
+        transmission_distance=2.9,
+        alpha=8.08,
+        k=8.42,
+        k_rgb=(8.0, 15.0, 6.0),  # G absorbs strongly (high), R/B moderate
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Yellow",
+        hex="#FFE665",
+        transmission_distance=5.0,
+        alpha=8.08,
+        k=3.73,
+        k_rgb=(1.0, 2.0, 10.0),  # B absorbs (high), R/G reflect (low)
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="White",
+        hex="#FFFFFF",
+        transmission_distance=6.1,
+        alpha=8.08,
+        k=12.39,
+        k_rgb=(12.39, 12.39, 12.39),  # Uniform TiO₂ scattering
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Key",
+        hex="#0B0F0C",
+        transmission_distance=0.1,
+        alpha=8.08,
+        k=17.65,
+        k_rgb=(17.65, 17.65, 17.65),  # Near-perfect opacity
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+]
+
 
 def get_preset(name: str) -> Optional[List[ColorConfig]]:
     """
@@ -205,7 +283,7 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
 
     Args:
         name: Preset name ("bambu_cmyk", "bambu_cmyk_calibrated",
-              "bambu_cmyk_phase6" or "clear_cmyk")
+              "bambu_cmyk_phase6", "bambu_cmyk_per_channel_k", or "clear_cmyk")
 
     Returns:
         List of ColorConfig or None if preset not found
@@ -221,6 +299,7 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
         "bambu_cmyk": BAMBU_CMYK_PRESET,
         "bambu_cmyk_calibrated": BAMBU_CMYK_CALIBRATED_PRESET,
         "bambu_cmyk_phase6": BAMBU_CMYK_PHASE6_PRESET,
+        "bambu_cmyk_per_channel_k": BAMBU_CMYK_PER_CHANNEL_K_PRESET,
         "clear_cmyk": CLEAR_CMYK_PRESET,
     }
     return presets.get(alias_map.get(normalized, normalized))
@@ -228,4 +307,10 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
 
 def get_available_presets() -> List[str]:
     """Get list of available preset names."""
-    return ["bambu_cmyk", "bambu_cmyk_calibrated", "bambu_cmyk_phase6", "clear_cmyk"]
+    return [
+        "bambu_cmyk",
+        "bambu_cmyk_calibrated",
+        "bambu_cmyk_phase6",
+        "bambu_cmyk_per_channel_k",
+        "clear_cmyk",
+    ]

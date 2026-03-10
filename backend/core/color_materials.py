@@ -29,6 +29,7 @@ class Color:
         rgb=None,
         alpha=DEFAULT_ALPHA,
         k=DEFAULT_K,
+        k_rgb=None,
         td_scale=DEFAULT_TD_SCALE,
         td_gamma=DEFAULT_TD_GAMMA,
         display_name=None,
@@ -79,12 +80,25 @@ class Color:
                 f"k must be non-negative, got {k}"
             )
 
+        # Validate k_rgb if provided
+        if k_rgb is not None:
+            if len(k_rgb) != 3:
+                raise ValueError(
+                    f"k_rgb must be a 3-tuple (k_R, k_G, k_B), got {k_rgb}"
+                )
+            for i, k_ch in enumerate(k_rgb):
+                if not np.isfinite(float(k_ch)):
+                    raise ValueError(
+                        f"k_rgb[{i}] must be finite and not NaN, got {k_ch}"
+                    )
+
         self.name = name
         self.td = transmission_distance
         self.rgb = rgb
         self.absorption = absorption
         self.alpha = alpha
         self.k = k
+        self.k_rgb = tuple(float(x) for x in k_rgb) if k_rgb is not None else None
         self.td_scale = td_scale
         self.td_gamma = td_gamma
         self.display_name = display_name
@@ -231,6 +245,7 @@ class Colors:
                 cfg.hex,
                 alpha=cfg.alpha,
                 k=cfg.k,
+                k_rgb=cfg.k_rgb,
                 td_scale=cfg.td_scale,
                 td_gamma=cfg.td_gamma,
                 display_name=cfg.label,
@@ -329,6 +344,7 @@ class Colors:
                 hex=config.hex,
                 alpha=config.alpha,
                 k=config.k,
+                k_rgb=config.k_rgb,
                 td_scale=config.td_scale,
                 td_gamma=config.td_gamma,
             )

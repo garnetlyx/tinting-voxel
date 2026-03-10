@@ -196,6 +196,7 @@ class BlendTestGenerator:
                 getattr(self.colors[label], 'alpha', 12.0),
                 getattr(self.colors[label], 'td_scale', 1.0),
                 getattr(self.colors[label], 'td_gamma', 1.0),
+                getattr(self.colors[label], 'k_rgb', None),
             )
             for label in self.colors.get_labels()
         )
