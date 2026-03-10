@@ -98,6 +98,7 @@ async def api_process_image(
     minArea: int = Form(100, ge=1),
     numColors: int = Form(8, ge=1, le=256),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.8),
+    targetWidth: Optional[float] = Form(None, ge=1, le=500),
     layerHeight: float = Form(0.08, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
     filamentPreset: Optional[str] = Form(None),
@@ -135,11 +136,13 @@ async def api_process_image(
             filament_colors=colors,
             layer_count=layerCount,
             layer_height=layerHeight,
+            target_width=targetWidth,
+            detail_size=detailSize,
         )
 
         logger.info(
-            "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.2f, detailSize=%s",
-            maxColors, colorThreshold, pixelSize, str(detailSize)
+            "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.2f, detailSize=%s, targetWidth=%s",
+            maxColors, colorThreshold, pixelSize, str(detailSize), str(targetWidth)
         )
         logger.info(
             "Processed image: %dx%d, extracted %d colors",
@@ -163,8 +166,25 @@ async def api_process_image(
         img = background
     else:
         img = img.convert('RGB')
-    # Downscale large images to prevent memory issues
-    img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
+
+    # Explicit user-intended scaling if targetWidth is provided
+    if targetWidth is not None and detailSize is not None and detailSize > 0:
+        intended_pixels = int(targetWidth / detailSize)
+        if intended_pixels > 0:
+            w, h = img.size
+            new_width = intended_pixels
+            new_height = int(h * (intended_pixels / w))
+            if new_width != w or new_height != h:
+                logger.info(
+                    "SVG mode: Scaling image to user-intended targetWidth (%.1fmm / %.2fmm): %dx%d (original %dx%d)",
+                    targetWidth, detailSize, new_width, new_height, w, h
+                )
+                img = img.resize((new_width, new_height), Image.LANCZOS)
+        # Apply safety downscale with higher cap for intentional sized prints
+        img = _downscale_if_needed(img, 2048)
+    else:
+        # Standard safety downscale
+        img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
     img_array = np.array(img)
 
     config = VectorProcessorConfig(

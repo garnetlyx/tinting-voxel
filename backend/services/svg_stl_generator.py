@@ -4,6 +4,7 @@ SVG mode STL generation service with polygon extrusion.
 Converts vector contours to 3D meshes using triangulation and extrusion.
 Uses Beer-Lambert color mapping (shared with pixel mode).
 """
+import itertools
 import logging
 import zipfile
 from dataclasses import dataclass
@@ -314,9 +315,12 @@ def generate_svg_stl_zip(
         blend_code = result_codes[idx]
 
         # Generate mesh for each layer
-        for z_idx, code_char in enumerate(blend_code):
-            z_min = z_offset + z_idx * layer_height
-            z_max = z_offset + (z_idx + 1) * layer_height
+        start_idx = 0
+        for code_char, group in itertools.groupby(blend_code):
+            group_len = len(list(group))
+            z_min = z_offset + start_idx * layer_height
+            z_max = z_offset + (start_idx + group_len) * layer_height
+            start_idx += group_len
 
             # Extrude each polygon
             for polygon in polygons:
@@ -344,16 +348,16 @@ def generate_svg_stl_zip(
     # Add white backing above optical layers (reflector behind colors)
     if n_white > 0:
         optical_top = z_offset + layer_count * layer_height
-        for i in range(n_white):
-            backing_mesh = generate_box(
-                xrange=(0, width * pixel_size),
-                yrange=(0, height * pixel_size),
-                zrange=(optical_top + i * layer_height,
-                        optical_top + (i + 1) * layer_height)
-            )
-            code_mesh_map[w_label].append(backing_mesh)
-        logger.info("SVG-STL: added %d white backing layers at z=%.2f-%.2f mm",
-                     n_white, optical_top, optical_top + n_white * layer_height)
+        # Merge all backing layers into a single large block to eliminate internal faces
+        backing_mesh = generate_box(
+            xrange=(0, width * pixel_size),
+            yrange=(0, height * pixel_size),
+            zrange=(optical_top,
+                    optical_top + n_white * layer_height)
+        )
+        code_mesh_map[w_label].append(backing_mesh)
+        logger.info("SVG-STL: added 1 merged white backing block thickness=%.2f mm at z=%.2f-%.2f mm",
+                     n_white * layer_height, optical_top, optical_top + n_white * layer_height)
 
     # Step 4b: Generate back-side (mirrored) layers if double_sided
     if double_sided:
@@ -370,9 +374,12 @@ def generate_svg_stl_zip(
             ]
 
             # Back layers are stacked on top of front, in reverse order
-            for z_idx, code_char in enumerate(reversed(blend_code)):
-                z_min = front_top + z_idx * layer_height
-                z_max = front_top + (z_idx + 1) * layer_height
+            start_idx = 0
+            for code_char, group in itertools.groupby(reversed(blend_code)):
+                group_len = len(list(group))
+                z_min = front_top + start_idx * layer_height
+                z_max = front_top + (start_idx + group_len) * layer_height
+                start_idx += group_len
 
                 # Extrude each mirrored polygon
                 for polygon in mirrored_polygons:

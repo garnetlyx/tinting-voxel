@@ -74,6 +74,10 @@ export async function processImage(
     formData.append('detailSize', params.detailSize.toString());
   }
 
+  if (params.targetWidth !== undefined) {
+    formData.append('targetWidth', params.targetWidth.toString());
+  }
+
   if (params.mode === 'pixel' && params.pixelParams) {
     formData.append('maxColors', params.pixelParams.maxColors.toString());
     formData.append('colorThreshold', params.pixelParams.colorThreshold.toString());

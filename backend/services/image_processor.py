@@ -260,6 +260,8 @@ def process_image(
     filament_colors: Optional[Colors] = None,
     layer_count: int = 4,
     layer_height: float = 0.08,
+    target_width: Optional[float] = None,
+    detail_size: Optional[float] = None,
 ) -> dict:
     """
     Process uploaded image to extract color blocks
@@ -269,6 +271,8 @@ def process_image(
         max_colors: Maximum number of colors to extract
         color_threshold: Threshold for merging similar colors
         pixel_size: Physical size of each pixel in mm
+        target_width: Explicit physical target width in mm
+        detail_size: Minimum physical pixel size in mm
 
     Returns:
         Dictionary containing colorBlocks, processedImage, segmentationImage,
@@ -286,7 +290,25 @@ def process_image(
         img = background
     else:
         img = img.convert('RGB')
-    img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
+
+    # Explicit user-intended scaling if target_width is provided
+    if target_width is not None and detail_size is not None and detail_size > 0:
+        intended_pixels = int(target_width / detail_size)
+        if intended_pixels > 0:
+            w, h = img.size
+            new_width = intended_pixels
+            new_height = int(h * (intended_pixels / w))
+            if new_width != w or new_height != h:
+                logger.info(
+                    "Scaling image to user-intended targetWidth (%.1fmm / %.2fmm): %dx%d (original %dx%d)",
+                    target_width, detail_size, new_width, new_height, w, h
+                )
+                img = img.resize((new_width, new_height), Image.LANCZOS)
+        # Apply safety downscale with higher cap for intentional sized prints
+        img = _downscale_if_needed(img, 2048)
+    else:
+        # Standard safety downscale
+        img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
 
     width, height = img.size
 

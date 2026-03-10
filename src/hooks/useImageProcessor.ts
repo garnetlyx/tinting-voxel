@@ -58,6 +58,7 @@ export const useImageProcessor = () => {
   const [mappedBlockColors, setMappedBlockColors] = useState<MappedBlockColor[]>([]);
   const [mappedBlendPalette, setMappedBlendPalette] = useState<MappedBlendPaletteEntry[]>([]);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [explicitTargetWidth, setExplicitTargetWidth] = useState<number | null>(null);
   const [layerHeight, setLayerHeight] = useState(0.08);
   const [detailSize, setDetailSize] = useState(0.4);
   const [pixelSize, setPixelSize] = useState(0.4);
@@ -86,25 +87,21 @@ export const useImageProcessor = () => {
     ? Math.round(imageDimensions.height * pixelSize * 100) / 100
     : 0;
 
-  // Set target physical width and derive pixelSize from it
+  // Set target physical width as a persistent intent for resizing
   const setTargetWidth = useCallback((widthMm: number) => {
-    if (imageDimensions.width > 0 && widthMm > 0) {
-      const newPixelSize = Math.round((widthMm / imageDimensions.width) * 10000) / 10000;
-      const clampedPixelSize = Math.max(detailSize, Math.min(2.0, newPixelSize));
-      setPixelSize(clampedPixelSize);
-    }
-  }, [imageDimensions.width, detailSize]);
+    setExplicitTargetWidth(widthMm);
+  }, []);
 
   const handleSetPixelSize = useCallback((value: number) => {
-    setPixelSize(Math.max(detailSize, Math.min(2.0, value)));
-  }, [detailSize]);
+    setPixelSize(Math.max(0.01, Math.min(5.0, value)));
+  }, []);
 
-  // Ensure pixelSize is always at least detailSize
+  // Sync pixelSize with detailSize when details change, but only as a suggestion
   useEffect(() => {
     if (pixelSize < detailSize) {
       setPixelSize(detailSize);
     }
-  }, [detailSize, pixelSize]);
+  }, [detailSize]);
 
   // AbortController ref for cancelling in-flight image processing requests
   const processAbortRef = useRef<AbortController | null>(null);
@@ -235,6 +232,7 @@ export const useImageProcessor = () => {
         layerCount,
         ...filamentRequestPayload,
         detailSize,
+        targetWidth: explicitTargetWidth ?? undefined,
         pixelParams: processingMode === 'pixel' ? { maxColors, colorThreshold } : undefined,
         svgParams: processingMode === 'svg' ? { epsilon, minArea, numColors } : undefined,
       }, controller.signal);
