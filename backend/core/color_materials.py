@@ -182,7 +182,7 @@ class Color:
         return L < 60 and a > 5 and b > 10 and C < 70
 
     @staticmethod
-    def map_to_nearest_color(input_colors, reference_code, reference_rgb):
+    def map_to_nearest_color(input_colors, reference_code, reference_rgb, weights=None):
         from skimage.color import deltaE_ciede2000
         
         ref_colors = []
@@ -209,6 +209,42 @@ class Color:
                 deltaE_ciede2000(lab_color, ref_lab_single)
                 for ref_lab_single in ref_lab
             ])
+            
+            source_L = lab_color[0]
+            source_a = lab_color[1]
+            source_b = lab_color[2]
+            source_chroma = np.sqrt(source_a**2 + source_b**2)
+            
+            # For dark colors with visible chroma, hue is critical
+            # CIEDE2000 may not weight hue enough for very dark colors
+            if source_L < 40 and source_chroma > 8:
+                ref_a = ref_lab[:, 1]
+                ref_b = ref_lab[:, 2]
+                ref_chromas = np.sqrt(ref_a**2 + ref_b**2)
+                
+                # Calculate hue angles
+                source_hue = np.arctan2(source_b, source_a)
+                ref_hues = np.arctan2(ref_b, ref_a)
+                
+                # Hue difference (accounting for circular nature)
+                hue_diff = np.abs(source_hue - ref_hues)
+                hue_diff = np.minimum(hue_diff, 2 * np.pi - hue_diff)
+                
+                # Strong hue penalty for dark chromatic colors
+                # Darkness increases hue importance
+                darkness_factor = (40 - source_L) / 40  # 0 to 1
+                chroma_factor = np.minimum(source_chroma / 20, 1.0)
+                hue_penalty = hue_diff * darkness_factor * chroma_factor * 25
+                
+                dists = dists + hue_penalty
+            
+            # For very dark neutrals, prefer low-chroma candidates
+            elif source_L < 35 and source_chroma <= 8:
+                ref_chromas = np.sqrt(ref_lab[:, 1]**2 + ref_lab[:, 2]**2)
+                darkness_factor = (35 - source_L) / 35
+                chroma_penalty = ref_chromas * darkness_factor * 1.5
+                dists = dists + chroma_penalty
+            
             nearest_idx = np.argmin(dists)
             results_code.append(ref_blend_codes[nearest_idx])
             results_color.append(np.round(ref_colors[nearest_idx] * 255).astype(int))
