@@ -183,6 +183,8 @@ class Color:
 
     @staticmethod
     def map_to_nearest_color(input_colors, reference_code, reference_rgb):
+        from skimage.color import deltaE_ciede2000
+        
         ref_colors = []
         ref_blend_codes = []
 
@@ -202,7 +204,11 @@ class Color:
         results_code = []
         results_color = []
         for lab_color in inp_lab:
-            dists = np.linalg.norm(ref_lab - lab_color, axis=1)
+            # Use CIEDE2000 for perceptually uniform color distance
+            dists = np.array([
+                deltaE_ciede2000(lab_color, ref_lab_single)
+                for ref_lab_single in ref_lab
+            ])
             nearest_idx = np.argmin(dists)
             results_code.append(ref_blend_codes[nearest_idx])
             results_color.append(np.round(ref_colors[nearest_idx] * 255).astype(int))
