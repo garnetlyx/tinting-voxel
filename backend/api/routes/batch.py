@@ -128,7 +128,8 @@ async def api_batch_download_stl(
         raise HTTPException(status_code=422, detail="All images failed to process")
 
     # Resolve colors: filamentColors > filamentPreset > default
-    colors = Colors()
+    default_configs = get_preset(FilamentPreset.BAMBU_CMYW_PHASE6.value)
+    colors = Colors.from_configs(default_configs) if default_configs else Colors()
     if filamentColors:
         try:
             import json
@@ -167,7 +168,7 @@ async def api_batch_download_stl(
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid filament preset: {filamentPreset}. "
-                f"Valid presets: bambu_cmyk, bambu_cmyk_calibrated, bambu_cmyk_phase6, clear_cmyk"
+                f"Valid presets: bambu_cmyk, bambu_cmyk_calibrated, bambu_cmyk_phase6, bambu_cmyw_phase6, clear_cmyk"
             )
 
     zip_content = generate_batch_stl_zip(

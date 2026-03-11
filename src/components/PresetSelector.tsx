@@ -16,6 +16,7 @@ const PRESET_OPTIONS: { value: FilamentPreset | null; label: string }[] = [
   { value: 'bambu_cmyk', label: 'Bambu CMYK' },
   { value: 'bambu_cmyk_calibrated', label: 'Bambu CMYK Calibrated' },
   { value: 'bambu_cmyk_phase6', label: 'Bambu CMYK Phase 6' },
+  { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW Phase 6' },
   { value: 'clear_cmyk', label: 'Clear CMYK' },
 ];
 

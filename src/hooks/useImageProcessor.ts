@@ -71,9 +71,9 @@ export const useImageProcessor = () => {
   const [doubleSided, setDoubleSided] = useState(false);
 
   // Filament color state
-  const [filamentPreset, setFilamentPreset] = useState<FilamentPreset | null>('bambu_cmyk');
+  const [filamentPreset, setFilamentPreset] = useState<FilamentPreset | null>('bambu_cmyw_phase6');
   const [filamentColors, setFilamentColors] = useState<FilamentColorConfig[]>(
-    [...DEFAULT_PRESETS['bambu_cmyk']]
+    [...DEFAULT_PRESETS['bambu_cmyw_phase6']]
   );
 
   // Filament preset storage (localStorage persistence)

@@ -95,6 +95,7 @@ export type FilamentPreset =
   | 'bambu_cmyk'
   | 'bambu_cmyk_calibrated'
   | 'bambu_cmyk_phase6'
+  | 'bambu_cmyw_phase6'
   | 'clear_cmyk';
 
 export interface FilamentColorConfig {
@@ -352,6 +353,44 @@ export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
       transmission_distance: 0.1,
       alpha: 8.08,
       k: 17.65,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+  ],
+  bambu_cmyw_phase6: [
+    {
+      name: 'Cyan',
+      hex: '#3D79C6',
+      transmission_distance: 2.0,
+      alpha: 8.08,
+      k: 8.13,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Magenta',
+      hex: '#B3356E',
+      transmission_distance: 2.9,
+      alpha: 8.08,
+      k: 8.42,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Yellow',
+      hex: '#FFE665',
+      transmission_distance: 5.0,
+      alpha: 8.08,
+      k: 3.73,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'White',
+      hex: '#FFFFFF',
+      transmission_distance: 6.1,
+      alpha: 8.08,
+      k: 12.39,
       td_scale: 1.48,
       td_gamma: 0.20,
     },

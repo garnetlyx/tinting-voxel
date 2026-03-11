@@ -206,6 +206,48 @@ BAMBU_CMYK_PHASE6_PRESET: List[ColorConfig] = [
     ),
 ]
 
+# Phase 6 image-preview variant without K.
+# Keeps the same Phase 6 CMYW parameters while removing the black channel so
+# image mapping stays comparable to the legacy 4-color workflows.
+BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
+    ColorConfig(
+        name="Cyan",
+        hex="#3D79C6",
+        transmission_distance=2.0,
+        alpha=8.08,
+        k=8.13,
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Magenta",
+        hex="#B3356E",
+        transmission_distance=2.9,
+        alpha=8.08,
+        k=8.42,
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Yellow",
+        hex="#FFE665",
+        transmission_distance=5.0,
+        alpha=8.08,
+        k=3.73,
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="White",
+        hex="#FFFFFF",
+        transmission_distance=6.1,
+        alpha=8.08,
+        k=12.39,
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+]
+
 CLEAR_CMYK_PRESET: List[ColorConfig] = [
     ColorConfig(name="Cyan", hex="#0089cd", transmission_distance=60.0, alpha=12.0, k=10.0),
     ColorConfig(name="Magenta", hex="#e75d4a", transmission_distance=100.0, alpha=12.0, k=10.0),
@@ -283,7 +325,8 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
 
     Args:
         name: Preset name ("bambu_cmyk", "bambu_cmyk_calibrated",
-              "bambu_cmyk_phase6", "bambu_cmyk_per_channel_k", or "clear_cmyk")
+              "bambu_cmyk_phase6", "bambu_cmyw_phase6",
+              "bambu_cmyk_per_channel_k", or "clear_cmyk")
 
     Returns:
         List of ColorConfig or None if preset not found
@@ -299,6 +342,7 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
         "bambu_cmyk": BAMBU_CMYK_PRESET,
         "bambu_cmyk_calibrated": BAMBU_CMYK_CALIBRATED_PRESET,
         "bambu_cmyk_phase6": BAMBU_CMYK_PHASE6_PRESET,
+        "bambu_cmyw_phase6": BAMBU_CMYW_PHASE6_PRESET,
         "bambu_cmyk_per_channel_k": BAMBU_CMYK_PER_CHANNEL_K_PRESET,
         "clear_cmyk": CLEAR_CMYK_PRESET,
     }
@@ -311,6 +355,7 @@ def get_available_presets() -> List[str]:
         "bambu_cmyk",
         "bambu_cmyk_calibrated",
         "bambu_cmyk_phase6",
+        "bambu_cmyw_phase6",
         "bambu_cmyk_per_channel_k",
         "clear_cmyk",
     ]

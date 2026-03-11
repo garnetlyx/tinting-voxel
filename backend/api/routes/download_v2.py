@@ -25,6 +25,7 @@ from core.color_config import (
     BAMBU_CMYK_PRESET,
     BAMBU_CMYK_CALIBRATED_PRESET,
     BAMBU_CMYK_PHASE6_PRESET,
+    BAMBU_CMYW_PHASE6_PRESET,
     CLEAR_CMYK_PRESET,
     ColorConfig,
     get_preset,
@@ -77,8 +78,9 @@ def get_colors_from_request(
         if preset_configs:
             return Colors.from_configs(preset_configs)
 
-    # Fall back to legacy default CMYK preset for image workflows
-    return Colors()
+    # Fall back to the default image-preview Phase 6 CMYW preset
+    default_configs = get_preset(FilamentPreset.BAMBU_CMYW_PHASE6.value)
+    return Colors.from_configs(default_configs) if default_configs else Colors()
 
 
 @router.get("/filament-presets", response_model=FilamentPresetsResponse)
@@ -152,6 +154,22 @@ async def api_get_filament_presets(request: Request):
                     td_gamma=c.td_gamma,
                 )
                 for c in BAMBU_CMYK_PHASE6_PRESET
+            ]
+        ),
+        FilamentPresetInfo(
+            name="bambu_cmyw_phase6",
+            display_name="Bambu CMYW Phase 6",
+            colors=[
+                FilamentColorConfig(
+                    name=c.name,
+                    hex=c.hex,
+                    transmission_distance=c.transmission_distance,
+                    alpha=c.alpha,
+                    k=c.k,
+                    td_scale=c.td_scale,
+                    td_gamma=c.td_gamma,
+                )
+                for c in BAMBU_CMYW_PHASE6_PRESET
             ]
         ),
     ]

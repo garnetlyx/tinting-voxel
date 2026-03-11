@@ -94,6 +94,13 @@ class TestPresets:
         preset = get_preset("bambu_cmyk_calibrated")
         assert preset == BAMBU_CMYK_CALIBRATED_PRESET
 
+    def test_get_preset_phase6_cmyw(self):
+        """get_preset returns Phase 6 CMYW preset for 'bambu_cmyw_phase6'."""
+        preset = get_preset("bambu_cmyw_phase6")
+        assert preset is not None
+        assert len(preset) == 4
+        assert {color.label for color in preset} == {"C", "M", "Y", "W"}
+
     def test_get_preset_case_insensitive(self):
         """get_preset is case-insensitive."""
         assert get_preset("BAMBU_CMYK") == BAMBU_CMYK_PRESET
@@ -112,6 +119,8 @@ class TestPresets:
         presets = get_available_presets()
         assert "bambu_cmyk" in presets
         assert "bambu_cmyk_calibrated" in presets
+        assert "bambu_cmyk_phase6" in presets
+        assert "bambu_cmyw_phase6" in presets
         assert "clear_cmyk" in presets
 
 

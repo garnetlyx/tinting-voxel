@@ -15,11 +15,12 @@ def test_get_filament_presets(client):
     assert response.status_code == 200
     data = response.json()
     assert "presets" in data
-    assert len(data["presets"]) == 4
+    assert len(data["presets"]) == 5
     names = [p["name"] for p in data["presets"]]
     assert "bambu_cmyk" in names
     assert "bambu_cmyk_calibrated" in names
     assert "bambu_cmyk_phase6" in names
+    assert "bambu_cmyw_phase6" in names
     assert "clear_cmyk" in names
 
 
@@ -59,6 +60,20 @@ def test_get_filament_presets_exposes_phase6_material_params(client):
     assert key["k"] == 17.65
     assert key["td_scale"] == 1.48
     assert key["td_gamma"] == 0.20
+
+
+def test_get_filament_presets_exposes_phase6_cmyw_material_params(client):
+    """GET /api/v2/filament-presets includes the CMYW Phase 6 variant."""
+    response = client.get("/api/v2/filament-presets")
+    assert response.status_code == 200
+    data = response.json()
+
+    phase6_cmyw = next(
+        preset for preset in data["presets"]
+        if preset["name"] == "bambu_cmyw_phase6"
+    )
+    assert len(phase6_cmyw["colors"]) == 4
+    assert not any(color["name"] == "Key" for color in phase6_cmyw["colors"])
 
 
 def test_get_colors_from_request_preserves_calibrated_custom_params():
@@ -129,11 +144,13 @@ def test_v2_stl_with_default_colors(client, sample_color_blocks_with_hex):
     assert len(zf.namelist()) > 0
 
 
-def test_get_colors_from_request_defaults_to_bambu_cmyk():
-    """Default color resolution should use the legacy CMYK preset."""
+def test_get_colors_from_request_defaults_to_phase6_cmyw():
+    """Default color resolution should use the Phase 6 CMYW preset."""
     colors = get_colors_from_request(None, None)
     assert len(colors) == 4
     assert "K" not in colors.get_labels()
+    assert colors["C"].k == 8.13
+    assert colors["W"].k == 12.39
 
 
 def test_v2_stl_with_bambu_preset(client, sample_color_blocks_with_hex):

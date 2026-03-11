@@ -7,6 +7,7 @@ describe('DEFAULT_PRESETS', () => {
     expect(DEFAULT_PRESETS).toHaveProperty('bambu_cmyk');
     expect(DEFAULT_PRESETS).toHaveProperty('bambu_cmyk_calibrated');
     expect(DEFAULT_PRESETS).toHaveProperty('bambu_cmyk_phase6');
+    expect(DEFAULT_PRESETS).toHaveProperty('bambu_cmyw_phase6');
     expect(DEFAULT_PRESETS).toHaveProperty('clear_cmyk');
   });
 
@@ -26,7 +27,17 @@ describe('DEFAULT_PRESETS', () => {
     expect(DEFAULT_PRESETS.bambu_cmyk_phase6).toHaveLength(5);
   });
 
-  const presetNames: FilamentPreset[] = ['bambu_cmyk', 'bambu_cmyk_calibrated', 'bambu_cmyk_phase6', 'clear_cmyk'];
+  it('bambu_cmyw_phase6 has 4 colors', () => {
+    expect(DEFAULT_PRESETS.bambu_cmyw_phase6).toHaveLength(4);
+  });
+
+  const presetNames: FilamentPreset[] = [
+    'bambu_cmyk',
+    'bambu_cmyk_calibrated',
+    'bambu_cmyk_phase6',
+    'bambu_cmyw_phase6',
+    'clear_cmyk',
+  ];
 
   presetNames.forEach(preset => {
     describe(`${preset}`, () => {
@@ -154,6 +165,43 @@ describe('DEFAULT_PRESETS', () => {
         transmission_distance: 0.1,
         alpha: 8.08,
         k: 17.65,
+        td_scale: 1.48,
+        td_gamma: 0.20,
+      }),
+    ]);
+  });
+
+  it('matches the backend phase6 cmyw preset values', () => {
+    expect(DEFAULT_PRESETS.bambu_cmyw_phase6).toEqual([
+      expect.objectContaining({
+        name: 'Cyan',
+        transmission_distance: 2.0,
+        alpha: 8.08,
+        k: 8.13,
+        td_scale: 1.48,
+        td_gamma: 0.20,
+      }),
+      expect.objectContaining({
+        name: 'Magenta',
+        transmission_distance: 2.9,
+        alpha: 8.08,
+        k: 8.42,
+        td_scale: 1.48,
+        td_gamma: 0.20,
+      }),
+      expect.objectContaining({
+        name: 'Yellow',
+        transmission_distance: 5.0,
+        alpha: 8.08,
+        k: 3.73,
+        td_scale: 1.48,
+        td_gamma: 0.20,
+      }),
+      expect.objectContaining({
+        name: 'White',
+        transmission_distance: 6.1,
+        alpha: 8.08,
+        k: 12.39,
         td_scale: 1.48,
         td_gamma: 0.20,
       }),

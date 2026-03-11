@@ -84,6 +84,7 @@ class FilamentPreset(str, Enum):
     BAMBU_CMYK = "bambu_cmyk"
     BAMBU_CMYK_CALIBRATED = "bambu_cmyk_calibrated"
     BAMBU_CMYK_PHASE6 = "bambu_cmyk_phase6"
+    BAMBU_CMYW_PHASE6 = "bambu_cmyw_phase6"
     CLEAR_CMYK = "clear_cmyk"
 
 

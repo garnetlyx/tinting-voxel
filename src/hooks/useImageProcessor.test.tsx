@@ -107,12 +107,13 @@ describe('useImageProcessor', () => {
     expect(mockedProcessImage).not.toHaveBeenCalled();
   });
 
-  it('defaults to the legacy CMYK filament preset', () => {
+  it('defaults to the Phase 6 CMYW filament preset', () => {
     const { result } = renderHook(() => useImageProcessor());
 
-    expect(result.current.filamentPreset).toBe('bambu_cmyk');
+    expect(result.current.filamentPreset).toBe('bambu_cmyw_phase6');
     expect(result.current.filamentColors).toHaveLength(4);
     expect(result.current.filamentColors.some(color => color.name === 'Key')).toBe(false);
+    expect(result.current.filamentColors[0].k).toBe(8.13);
   });
 
   it('sends filament config and layer settings when processing an image', async () => {
@@ -129,7 +130,7 @@ describe('useImageProcessor', () => {
         mode: 'pixel',
         layerHeight: 0.08,
         layerCount: 4,
-        filamentPreset: 'bambu_cmyk',
+        filamentPreset: 'bambu_cmyw_phase6',
       }),
       expect.any(AbortSignal)
     );
@@ -144,7 +145,7 @@ describe('useImageProcessor', () => {
 
     expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
       expect.objectContaining({
-        filamentPreset: 'bambu_cmyk',
+        filamentPreset: 'bambu_cmyw_phase6',
       })
     );
     expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
@@ -164,12 +165,12 @@ describe('useImageProcessor', () => {
 
     expect(mockedDownload3MFV2).toHaveBeenCalledWith(
       expect.objectContaining({
-        filamentPreset: 'bambu_cmyk',
+        filamentPreset: 'bambu_cmyw_phase6',
       })
     );
     expect(mockedDownloadPrintSettings).toHaveBeenCalledWith(
       expect.objectContaining({
-        filamentPreset: 'bambu_cmyk',
+        filamentPreset: 'bambu_cmyw_phase6',
       })
     );
   });
