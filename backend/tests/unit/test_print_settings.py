@@ -46,6 +46,7 @@ class TestGeneratePrintSettings:
         ps = data['print_settings']
         assert ps['layer_height'] == 0.12
         assert ps['layer_count'] == 6
+        assert ps['white_backing_layers'] == 1
         assert ps['base_plate_thickness'] == 0.5
 
     def test_object_dimensions_calculation(self):
@@ -63,7 +64,9 @@ class TestGeneratePrintSettings:
         dims = data['object_dimensions']
         assert dims['width_mm'] == 10.0   # 100 * 0.1
         assert dims['height_mm'] == 8.0   # 80 * 0.1
-        assert dims['total_height_mm'] == 0.32  # 4 * 0.08
+        assert dims['total_height_mm'] == 0.4  # 4 optical + 1 backing
+        assert dims['total_layer_count'] == 5
+        assert dims['optical_layer_count'] == 4
         assert dims['width_pixels'] == 100
         assert dims['height_pixels'] == 80
         assert dims['pixel_size_mm'] == 0.1
@@ -81,7 +84,7 @@ class TestGeneratePrintSettings:
             base_plate_thickness=0.5,
         )
         data = json.loads(result)
-        assert data['object_dimensions']['total_height_mm'] == 0.9  # 4*0.1 + 0.5
+        assert data['object_dimensions']['total_height_mm'] == 1.0  # 4 optical + 1 backing + 0.5 base
 
     def test_filament_extruders(self):
         """Filament section lists all extruders with correct info."""
@@ -155,3 +158,20 @@ class TestGeneratePrintSettings:
         )
         data = json.loads(result)
         assert data['print_settings']['base_plate_thickness'] == 0.0
+
+    def test_explicit_zero_white_backing(self):
+        """Explicitly disabling backing removes it from the reported stack."""
+        result = generate_print_settings(
+            layer_height=0.08,
+            pixel_size=0.1,
+            layer_count=4,
+            image_dimensions={'width': 10, 'height': 10},
+            filament_colors=[
+                {'name': 'Cyan', 'hex': '#0086D6', 'transmission_distance': 3.0},
+            ],
+            white_backing_layers=0,
+        )
+        data = json.loads(result)
+        assert data['print_settings']['white_backing_layers'] == 0
+        assert data['object_dimensions']['total_layer_count'] == 4
+        assert data['object_dimensions']['total_height_mm'] == 0.32

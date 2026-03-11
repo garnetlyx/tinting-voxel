@@ -15,12 +15,14 @@ import trimesh
 
 from core.blend_color import Color, Colors
 from services.mesh_optimizer import generate_optimized_boxes
+from services.print_stack import (
+    normalize_white_backing_layers,
+    resolve_white_backing_label,
+)
 from services.stl_generator import (
     compute_reference_matrices,
     generate_box,
     generate_boxes_batch,
-    _find_white_label,
-    _calculate_white_layers,
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
@@ -74,6 +76,7 @@ def generate_3mf(
     base_plate_thickness: float = 0.0,
     color_hex_map: Optional[dict] = None,
     double_sided: bool = False,
+    white_backing_layers: int = 1,
 ) -> bytes:
     """
     Generate a single 3MF file with color-separated objects.
@@ -131,14 +134,10 @@ def generate_3mf(
     width, height = image_dimensions['width'], image_dimensions['height']
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
-    # Compute dynamic white backing thickness based on optical transparency
-    w_label = _find_white_label(colors)
-    unique_codes = set(result_codes)
-    n_white = _calculate_white_layers(unique_codes, layer_height, colors) if w_label else 0
-    if w_label:
+    n_white = normalize_white_backing_layers(white_backing_layers)
+    w_label = resolve_white_backing_label(colors, n_white)
+    if n_white > 0:
         logger.info("3MF: white backing label='%s', n_white=%d", w_label, n_white)
-    else:
-        logger.warning("3MF: no white filament found — skipping backing layer")
 
     # Complexity guard
     estimated_boxes = sum(len(b['pixels']) for b in color_blocks) * layer_count
@@ -293,6 +292,7 @@ def generate_svg_3mf(
     base_plate_thickness: float = 0.0,
     color_hex_map: Optional[dict] = None,
     double_sided: bool = False,
+    white_backing_layers: int = 1,
 ) -> bytes:
     """
     Generate a single 3MF file from SVG vector contours with color-separated objects.
@@ -343,11 +343,9 @@ def generate_svg_3mf(
     height = image_dimensions['height']
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
-    # Compute dynamic white backing thickness based on optical transparency
-    w_label = _find_white_label(colors)
-    unique_codes = set(result_codes)
-    n_white = _calculate_white_layers(unique_codes, layer_height, colors) if w_label else 0
-    if w_label:
+    n_white = normalize_white_backing_layers(white_backing_layers)
+    w_label = resolve_white_backing_label(colors, n_white)
+    if n_white > 0:
         logger.info("SVG-3MF: white backing label='%s', n_white=%d", w_label, n_white)
 
     for idx, result in enumerate(vector_results):

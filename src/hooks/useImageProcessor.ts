@@ -26,6 +26,7 @@ import {
   downloadPrintSettings,
 } from '../api/client';
 import { useFilamentStorage } from './useFilamentStorage';
+import { buildPrintStack } from '../utils/printStack';
 
 const MIN_FILAMENT_COLORS = 4;
 const MAX_FILAMENT_COLORS = 16;
@@ -63,6 +64,7 @@ export const useImageProcessor = () => {
   const [detailSize, setDetailSize] = useState(0.4);
   const [pixelSize, setPixelSize] = useState(0.4);
   const [layerCount] = useState(4);
+  const [whiteBackingLayers, setWhiteBackingLayers] = useState(1);
 
   // Base plate options
   const [basePlateThickness, setBasePlateThickness] = useState(0.0);
@@ -226,6 +228,7 @@ export const useImageProcessor = () => {
         pixelSize,
         layerHeight,
         layerCount,
+        whiteBackingLayers,
         ...filamentRequestPayload,
         detailSize,
         targetWidth: explicitTargetWidth ?? undefined,
@@ -288,6 +291,7 @@ export const useImageProcessor = () => {
     layerHeight,
     layerCount,
     filamentRequestPayload,
+    whiteBackingLayers,
   ]);
 
   // Auto-load last used saved preset on mount
@@ -417,6 +421,7 @@ export const useImageProcessor = () => {
         layerHeight,
         pixelSize,
         layerCount,
+        whiteBackingLayers,
         imageDimensions,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         detailSize,
@@ -453,6 +458,7 @@ export const useImageProcessor = () => {
         layerHeight,
         pixelSize,
         layerCount,
+        whiteBackingLayers,
         imageDimensions,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         ...(doubleSided ? { doubleSided } : {}),
@@ -489,6 +495,7 @@ export const useImageProcessor = () => {
         layerHeight,
         pixelSize,
         layerCount,
+        whiteBackingLayers,
         imageDimensions,
         basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         detailSize,
@@ -521,6 +528,7 @@ export const useImageProcessor = () => {
         imageDimensions,
         layerHeight,
         layerCount,
+        whiteBackingLayers,
         ...filamentRequestPayload,
       }, controller.signal);
       if (controller.signal.aborted) return;
@@ -540,6 +548,7 @@ export const useImageProcessor = () => {
     layerHeight,
     layerCount,
     filamentRequestPayload,
+    whiteBackingLayers,
   ]);
 
   // Keep the simulated print preview in sync with manual edits and filament changes.
@@ -554,7 +563,18 @@ export const useImageProcessor = () => {
       void refreshSimulatedPreview(colorBlocks);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [mode, colorBlocks, imageDimensions, layerHeight, layerCount, filamentRequestPayload, refreshSimulatedPreview]);
+  }, [mode, colorBlocks, imageDimensions, layerHeight, layerCount, whiteBackingLayers, filamentRequestPayload, refreshSimulatedPreview]);
+
+  const printStack = useMemo(
+    () => buildPrintStack(
+      layerCount,
+      layerHeight,
+      whiteBackingLayers,
+      basePlateThickness,
+      doubleSided,
+    ),
+    [layerCount, layerHeight, whiteBackingLayers, basePlateThickness, doubleSided]
+  );
 
   // Update a color block's RGB/hex values (manual color adjustment)
   const updateColorBlock = useCallback((index: number, newHex: string) => {
@@ -663,10 +683,12 @@ export const useImageProcessor = () => {
     pixelSize,
     detailSize,
     layerCount,
+    whiteBackingLayers,
     basePlateThickness,
     doubleSided,
     targetWidth,
     targetHeight,
+    printStack,
 
     // Filament state
     filamentPreset,
@@ -686,6 +708,7 @@ export const useImageProcessor = () => {
     setLayerHeight,
     setPixelSize: handleSetPixelSize,
     setDetailSize,
+    setWhiteBackingLayers,
     setTargetWidth,
     setBasePlateThickness,
     setDoubleSided,

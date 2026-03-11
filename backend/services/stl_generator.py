@@ -15,6 +15,11 @@ import pandas as pd
 
 from core.blend_color import BlendTestGenerator, Color, Colors
 from services.mesh_optimizer import generate_optimized_boxes
+from services.print_stack import (
+    build_print_stack,
+    normalize_white_backing_layers,
+    resolve_white_backing_label,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -489,6 +494,7 @@ def generate_stl_zip(
     colors: Optional[Colors] = None,
     base_plate_thickness: float = 0.0,
     double_sided: bool = False,
+    white_backing_layers: int = 1,
 ) -> bytes:
     """
     Generate ZIP file containing merged STL files by primary color
@@ -552,14 +558,10 @@ def generate_stl_zip(
     # Z offset: color layers sit on top of base plate
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
 
-    # Compute dynamic white backing thickness based on optical transparency
-    w_label = _find_white_label(active_colors)
-    unique_codes = set(result_codes)
-    n_white = _calculate_white_layers(unique_codes, layer_height, active_colors) if w_label else 0
-    if w_label:
-        logger.info("White backing: label='%s', n_white=%d (max_remain-based)", w_label, n_white)
-    else:
-        logger.warning("No white filament found — skipping backing layer")
+    n_white = normalize_white_backing_layers(white_backing_layers)
+    w_label = resolve_white_backing_label(active_colors, n_white)
+    if n_white > 0:
+        logger.info("White backing: label='%s', n_white=%d (configured)", w_label, n_white)
 
     logger.info(
         "STL generation: %d color blocks, %d layers, %dx%d image, ~%d estimated boxes",
@@ -684,9 +686,14 @@ def generate_stl_zip(
 
     # Step 5: Merge meshes by primary color and create STL files
     stl_files = {}
-    backing_layers = n_white
-    effective_layer_count = (layer_count * 2 if double_sided else layer_count) + backing_layers
-    physical_height = effective_layer_count * layer_height + (base_plate_thickness if base_plate_thickness > 0 else 0.0)
+    print_stack = build_print_stack(
+        layer_count=layer_count,
+        layer_height=layer_height,
+        white_backing_layers=n_white,
+        base_plate_thickness=base_plate_thickness if base_plate_thickness > 0 else 0.0,
+        double_sided=double_sided,
+    )
+    physical_height = print_stack["totalHeightMm"]
     prefix = get_filename_prefix(active_colors)
 
     for code, meshes in code_mesh_map.items():

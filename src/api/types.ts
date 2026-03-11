@@ -39,6 +39,7 @@ export interface ProcessImageResponse {
   imageDimensions: ImageDimensions;
   pixelSize?: number;
   detailSize?: number;
+  printStack: PrintStackInfo;
 }
 
 export interface SVGProcessImageResponse {
@@ -47,6 +48,7 @@ export interface SVGProcessImageResponse {
   imageDimensions: ImageDimensions;
   pixelSize?: number;
   detailSize?: number;
+  printStack: PrintStackInfo;
 }
 
 export interface PixelModeParams {
@@ -65,6 +67,7 @@ export interface ProcessImageParams {
   pixelSize: number;
   layerHeight?: number;
   layerCount?: number;
+  whiteBackingLayers?: number;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   pixelParams?: PixelModeParams;
@@ -121,6 +124,7 @@ export interface FilamentPresetsResponse {
 export interface DownloadSTLParamsV2 extends DownloadSTLParams {
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
+  whiteBackingLayers?: number;
   basePlateThickness?: number;
   doubleSided?: boolean;
   detailSize?: number;
@@ -129,6 +133,7 @@ export interface DownloadSTLParamsV2 extends DownloadSTLParams {
 export interface DownloadSVGSTLParamsV2 extends DownloadSVGSTLParams {
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
+  whiteBackingLayers?: number;
   basePlateThickness?: number;
   doubleSided?: boolean;
   detailSize?: number;
@@ -139,6 +144,7 @@ export interface PrintSettingsParams {
   pixelSize: number;
   layerCount: number;
   imageDimensions: ImageDimensions;
+  whiteBackingLayers?: number;
   basePlateThickness?: number;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
@@ -186,6 +192,7 @@ export interface SimulatedPrintPreviewParams {
   imageDimensions: ImageDimensions;
   layerHeight: number;
   layerCount: number;
+  whiteBackingLayers?: number;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
 }
@@ -194,6 +201,14 @@ export interface SimulatedPrintPreviewResponse {
   processedImage: string;
   mappedBlockColors: MappedBlockColor[];
   mappedBlendPalette: MappedBlendPaletteEntry[];
+  printStack: PrintStackInfo;
+}
+
+export interface PrintStackInfo {
+  opticalLayerCount: number;
+  whiteBackingLayers: number;
+  totalLayerCount: number;
+  totalHeightMm: number;
 }
 
 // Batch processing types
@@ -227,6 +242,7 @@ export interface BatchDownloadSTLParams {
   pixelSize: number;
   layerHeight: number;
   layerCount: number;
+  whiteBackingLayers: number;
   basePlateThickness: number;
   doubleSided: boolean;
   filamentPreset?: FilamentPreset;

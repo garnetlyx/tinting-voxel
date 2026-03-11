@@ -10,7 +10,9 @@ import numpy as np
 from PIL import Image
 
 from core.blend_color import Colors
-from services.stl_generator import map_color_blocks_to_blend_results
+from core.color_materials import Color
+from services.print_stack import build_print_stack, resolve_white_backing_label
+from services.stl_generator import compute_reference_matrices, map_color_blocks_to_blend_results
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,7 @@ def build_simulated_print_preview(
     colors: Optional[Colors] = None,
     layer_count: int = 4,
     layer_height: float = 0.08,
+    white_backing_layers: int = 1,
 ) -> dict:
     """
     Build an image-specific print preview from current color blocks.
@@ -59,6 +62,7 @@ def build_simulated_print_preview(
         raise ValueError("No color blocks provided")
 
     active_colors = colors or Colors()
+    resolve_white_backing_label(active_colors, white_backing_layers)
     width = image_dimensions['width']
     height = image_dimensions['height']
     total_pixels = max(1, sum(block.get('count', len(block['pixels'])) for block in color_blocks))
@@ -103,7 +107,38 @@ def build_simulated_print_preview(
         "processedImage": processed_image,
         "mappedBlockColors": mapped_block_colors,
         "mappedBlendPalette": mapped_blend_palette,
+        "printStack": build_print_stack(
+            layer_count=layer_count,
+            layer_height=layer_height,
+            white_backing_layers=white_backing_layers,
+        ),
     }
+
+
+def build_vector_print_stack(
+    vector_results: list[dict],
+    colors: Optional[Colors] = None,
+    layer_count: int = 4,
+    layer_height: float = 0.08,
+    white_backing_layers: int = 1,
+) -> dict:
+    """Build stack metadata for SVG mode using the same blend mapping as export."""
+    if not vector_results:
+        raise ValueError("No vector results provided")
+
+    active_colors = colors or Colors()
+    resolve_white_backing_label(active_colors, white_backing_layers)
+    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
+        layer_count, layer_height, active_colors
+    )
+    input_colors = [result['color'] for result in vector_results]
+    Color.map_to_nearest_color(input_colors, ref_code_matrix, ref_rgb_matrix)
+
+    return build_print_stack(
+        layer_count=layer_count,
+        layer_height=layer_height,
+        white_backing_layers=white_backing_layers,
+    )
 
 
 def color_distance(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
@@ -401,6 +436,7 @@ def process_image(
     filament_colors: Optional[Colors] = None,
     layer_count: int = 4,
     layer_height: float = 0.08,
+    white_backing_layers: int = 1,
     target_width: Optional[float] = None,
     detail_size: Optional[float] = None,
 ) -> dict:
@@ -506,6 +542,7 @@ def process_image(
         colors=filament_colors,
         layer_count=layer_count,
         layer_height=layer_height,
+        white_backing_layers=white_backing_layers,
     )
 
     return {
@@ -517,5 +554,6 @@ def process_image(
         'imageDimensions': {
             'width': width,
             'height': height
-        }
+        },
+        'printStack': simulated_preview['printStack'],
     }

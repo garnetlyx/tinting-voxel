@@ -48,11 +48,23 @@ describe('useImageProcessor', () => {
       mappedBlockColors: [],
       mappedBlendPalette: [],
       imageDimensions: { width: 8, height: 6 },
+      printStack: {
+        opticalLayerCount: 4,
+        whiteBackingLayers: 1,
+        totalLayerCount: 5,
+        totalHeightMm: 0.4,
+      },
     });
     mockedSimulatePrintPreview.mockResolvedValue({
       processedImage: 'data:image/png;base64,sim',
       mappedBlockColors: [],
       mappedBlendPalette: [],
+      printStack: {
+        opticalLayerCount: 4,
+        whiteBackingLayers: 1,
+        totalLayerCount: 5,
+        totalHeightMm: 0.4,
+      },
     });
     mockedDownloadSTLV2.mockResolvedValue(undefined);
     mockedDownload3MFV2.mockResolvedValue(undefined);
@@ -130,6 +142,7 @@ describe('useImageProcessor', () => {
         mode: 'pixel',
         layerHeight: 0.08,
         layerCount: 4,
+        whiteBackingLayers: 1,
         filamentPreset: 'bambu_cmyw_phase6',
       }),
       expect.any(AbortSignal)

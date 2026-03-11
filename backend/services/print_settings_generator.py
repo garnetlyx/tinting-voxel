@@ -8,6 +8,8 @@ import json
 import logging
 from typing import Optional
 
+from services.print_stack import build_print_stack
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,6 +19,7 @@ def generate_print_settings(
     layer_count: int,
     image_dimensions: dict,
     filament_colors: list[dict],
+    white_backing_layers: int = 1,
     base_plate_thickness: float = 0.0,
     filament_preset: Optional[str] = None,
     double_sided: bool = False,
@@ -52,11 +55,13 @@ def generate_print_settings(
     except KeyError as e:
         raise ValueError(f"Missing required dimension key: {e}")
 
-    # Double-sided doubles the layer height portion (front + mirrored back)
-    layer_height_mm = layer_count * layer_height
-    if double_sided:
-        layer_height_mm *= 2
-    total_height_mm = round(layer_height_mm + base_plate_thickness, 2)
+    print_stack = build_print_stack(
+        layer_count=layer_count,
+        layer_height=layer_height,
+        white_backing_layers=white_backing_layers,
+        base_plate_thickness=base_plate_thickness,
+        double_sided=double_sided,
+    )
 
     extruders = []
     for i, color in enumerate(filament_colors):
@@ -76,13 +81,16 @@ def generate_print_settings(
         "print_settings": {
             "layer_height": layer_height,
             "layer_count": layer_count,
+            "white_backing_layers": print_stack["whiteBackingLayers"],
             "base_plate_thickness": base_plate_thickness,
             "double_sided": double_sided,
         },
         "object_dimensions": {
             "width_mm": width_mm,
             "height_mm": height_mm,
-            "total_height_mm": total_height_mm,
+            "total_height_mm": print_stack["totalHeightMm"],
+            "total_layer_count": print_stack["totalLayerCount"],
+            "optical_layer_count": print_stack["opticalLayerCount"],
             "width_pixels": image_dimensions['width'],
             "height_pixels": image_dimensions['height'],
             "pixel_size_mm": pixel_size,

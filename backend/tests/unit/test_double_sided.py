@@ -90,9 +90,8 @@ class TestDoubleSidedGeneration:
         """Filename encodes height for double-sided (2x optical + n_white backing)."""
         layer_height = 0.08
         layer_count = 4
-        # n_white=3 for default BAMBU at 0.08mm (max_remain≈0.586, round(2.93)=3)
-        n_white = 3
-        expected_height = (layer_count * 2 + n_white) * layer_height  # 0.88
+        n_white = 1
+        expected_height = (layer_count * 2 + n_white) * layer_height  # 0.72
 
         result = generate_stl_zip(
             color_blocks=simple_color_blocks,
@@ -200,9 +199,8 @@ class TestDoubleSidedWithBasePlate:
         layer_height = 0.1
         layer_count = 4
         base_plate = 0.5
-        # n_white=3 for default BAMBU at 0.1mm (max_remain≈0.513, round(2.57)=3)
-        n_white = 3
-        expected_height = (2 * layer_count + n_white) * layer_height + base_plate  # 1.60
+        n_white = 1
+        expected_height = (2 * layer_count + n_white) * layer_height + base_plate  # 1.40
 
         result = generate_stl_zip(
             color_blocks=simple_color_blocks,

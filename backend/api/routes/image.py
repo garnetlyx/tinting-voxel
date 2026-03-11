@@ -28,6 +28,7 @@ from api.validators import validate_image_upload
 from services.image_processor import (
     MAX_PROCESSING_DIMENSION,
     _downscale_if_needed,
+    build_vector_print_stack,
     build_simulated_print_preview,
     process_image,
 )
@@ -101,6 +102,7 @@ async def api_process_image(
     targetWidth: Optional[float] = Form(None, ge=1, le=500),
     layerHeight: float = Form(0.08, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
+    whiteBackingLayers: int = Form(1, ge=0, le=5),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
 ):
@@ -133,6 +135,7 @@ async def api_process_image(
             filament_colors=colors,
             layer_count=layerCount,
             layer_height=layerHeight,
+            white_backing_layers=whiteBackingLayers,
             target_width=targetWidth,
             detail_size=detailSize,
         )
@@ -151,7 +154,7 @@ async def api_process_image(
         return ProcessImageResponse(
             **result,
             pixelSize=pixelSize,
-            detailSize=detailSize
+            detailSize=detailSize,
         )
 
     # SVG mode
@@ -218,12 +221,21 @@ async def api_process_image(
         img.width, img.height, len(vector_results)
     )
 
+    print_stack = build_vector_print_stack(
+        vector_results=vector_results,
+        colors=colors,
+        layer_count=layerCount,
+        layer_height=layerHeight,
+        white_backing_layers=whiteBackingLayers,
+    )
+
     return SVGProcessImageResponse(
         vectorResults=vector_results,
         processedImage=processed_img_data_url,
         imageDimensions={'width': img.width, 'height': img.height},
         pixelSize=effective_pixel_size,
-        detailSize=detailSize
+        detailSize=detailSize,
+        printStack=print_stack,
     )
 
 
@@ -239,5 +251,6 @@ async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
         colors=colors,
         layer_count=body.layerCount,
         layer_height=body.layerHeight,
+        white_backing_layers=body.whiteBackingLayers,
     )
     return SimulatedPrintPreviewResponse(**result)

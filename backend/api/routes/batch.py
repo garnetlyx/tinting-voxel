@@ -98,6 +98,7 @@ async def api_batch_download_stl(
     pixelSize: float = Form(0.08, gt=0, le=10),
     layerHeight: float = Form(0.08, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
+    whiteBackingLayers: int = Form(1, ge=0, le=5),
     basePlateThickness: float = Form(0.0, ge=0, le=10),
     doubleSided: bool = Form(False),
     filamentPreset: Optional[str] = Form(None),
@@ -174,6 +175,7 @@ async def api_batch_download_stl(
         pixel_size=pixelSize,
         layer_count=layerCount,
         colors=colors,
+        white_backing_layers=whiteBackingLayers,
         base_plate_thickness=basePlateThickness,
         double_sided=doubleSided,
     )

@@ -136,9 +136,12 @@ class TestProcessImageLargeHandling:
         result = build_simulated_print_preview(
             color_blocks=color_blocks,
             image_dimensions={'width': 2, 'height': 2},
+            white_backing_layers=0,
         )
 
         assert result['processedImage'].startswith('data:image/png;base64,')
         assert len(result['mappedBlockColors']) == len(color_blocks)
         assert sum(entry['pixelCount'] for entry in result['mappedBlendPalette']) == 4
         assert result['mappedBlendPalette'][0]['pixelPercent'] >= result['mappedBlendPalette'][1]['pixelPercent']
+        assert result['printStack']['whiteBackingLayers'] == 0
+        assert result['printStack']['totalLayerCount'] == 4

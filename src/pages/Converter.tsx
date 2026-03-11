@@ -60,11 +60,13 @@ const Converter: React.FC = () => {
     pixelSize,
     detailSize,
     layerCount,
+    whiteBackingLayers,
     basePlateThickness,
     doubleSided,
     targetWidth,
     targetHeight,
     imageDimensions,
+    printStack,
 
     // Filament state
     filamentPreset,
@@ -84,6 +86,7 @@ const Converter: React.FC = () => {
     setLayerHeight,
     setPixelSize,
     setDetailSize,
+    setWhiteBackingLayers,
     setTargetWidth,
     setBasePlateThickness,
     setDoubleSided,
@@ -151,10 +154,13 @@ const Converter: React.FC = () => {
                   targetWidth={targetWidth}
                   targetHeight={targetHeight}
                   onTargetWidthChange={setTargetWidth}
+                  whiteBackingLayers={whiteBackingLayers}
+                  onWhiteBackingLayersChange={setWhiteBackingLayers}
                   basePlateThickness={basePlateThickness}
                   onBasePlateThicknessChange={setBasePlateThickness}
                   doubleSided={doubleSided}
                   onDoubleSidedChange={setDoubleSided}
+                  printStack={printStack}
                   onReprocess={handleReprocess}
                   processing={processing}
                   hasImage={image !== null}
@@ -284,8 +290,10 @@ const Converter: React.FC = () => {
                           layerHeight={layerHeight}
                           pixelSize={pixelSize}
                           layerCount={layerCount}
+                          whiteBackingLayers={whiteBackingLayers}
                           basePlateThickness={basePlateThickness}
                           doubleSided={doubleSided}
+                          printStack={printStack}
                         />
                       )}
 
@@ -326,6 +334,7 @@ const Converter: React.FC = () => {
                   pixelSize={pixelSize}
                   layerHeight={layerHeight}
                   layerCount={layerCount}
+                  whiteBackingLayers={whiteBackingLayers}
                   basePlateThickness={basePlateThickness}
                   doubleSided={doubleSided}
                   filamentPreset={filamentPreset ?? undefined}

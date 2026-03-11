@@ -141,6 +141,7 @@ class ProcessImageResponse(BaseModel):
     imageDimensions: ImageDimensions
     pixelSize: Optional[float] = None  # Effective pixel size after detailSize clamping
     detailSize: Optional[float] = None  # Detail size used for clamping
+    printStack: "PrintStackInfo"
 
 
 class DownloadCSVRequest(BaseModel):
@@ -163,6 +164,7 @@ class SVGProcessImageResponse(BaseModel):
     imageDimensions: ImageDimensions
     pixelSize: Optional[float] = None
     detailSize: Optional[float] = None
+    printStack: "PrintStackInfo"
 
 
 class DownloadSTLRequest(BaseModel):
@@ -219,8 +221,18 @@ class FilamentConfigMixin(BaseModel):
         return self
 
 
+class WhiteBackingMixin(BaseModel):
+    """Mixin for explicit white backing configuration."""
+    whiteBackingLayers: int = Field(
+        1,
+        ge=0,
+        le=5,
+        description="Number of full-area white backing layers appended after optical layers"
+    )
+
+
 # V2 API Models with configurable colors
-class DownloadSTLRequestV2(FilamentConfigMixin):
+class DownloadSTLRequestV2(FilamentConfigMixin, WhiteBackingMixin):
     """Request model for /api/v2/download-stl endpoint with configurable colors."""
     colorBlocks: List[ColorBlock] = Field(..., min_length=1)
     layerHeight: float = Field(..., gt=0, le=10)
@@ -245,7 +257,7 @@ class DownloadSTLRequestV2(FilamentConfigMixin):
     # Small pixels will be merged at the backend level
 
 
-class DownloadSVGSTLRequestV2(FilamentConfigMixin):
+class DownloadSVGSTLRequestV2(FilamentConfigMixin, WhiteBackingMixin):
     """Request model for /api/v2/download-svg-stl endpoint with configurable colors."""
     vectorResults: List[VectorColorResult] = Field(..., min_length=1)
     layerHeight: float = Field(..., gt=0, le=10)
@@ -302,7 +314,15 @@ class FilamentPreviewRequest(FilamentConfigMixin):
         return self
 
 
-class PrintSettingsRequest(FilamentConfigMixin):
+class PrintStackInfo(BaseModel):
+    """Actual exported stack metadata."""
+    opticalLayerCount: int = Field(..., ge=0)
+    whiteBackingLayers: int = Field(..., ge=0)
+    totalLayerCount: int = Field(..., ge=0)
+    totalHeightMm: float = Field(..., ge=0)
+
+
+class PrintSettingsRequest(FilamentConfigMixin, WhiteBackingMixin):
     """Request model for /api/v2/print-settings endpoint."""
     layerHeight: float = Field(..., gt=0, le=10)
     pixelSize: float = Field(..., gt=0, le=10)
@@ -370,6 +390,7 @@ class SimulatePreviewRequest(FilamentConfigMixin):
     imageDimensions: ImageDimensions
     layerCount: int = Field(4, ge=1, le=10)
     layerHeight: float = Field(0.08, gt=0, le=10)
+    whiteBackingLayers: int = Field(1, ge=0, le=5)
 
 
 class SimulatedPrintPreviewResponse(BaseModel):
@@ -377,6 +398,7 @@ class SimulatedPrintPreviewResponse(BaseModel):
     processedImage: str  # base64 encoded simulated print preview
     mappedBlockColors: List[MappedBlockColor]
     mappedBlendPalette: List[MappedBlendPaletteEntry]
+    printStack: PrintStackInfo
 
 
 ProcessImageResponse.model_rebuild()

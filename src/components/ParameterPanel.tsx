@@ -2,7 +2,7 @@
  * Parameter adjustment panel component with mode-specific parameters
  */
 import React from 'react';
-import type { ProcessingMode } from '../api/types';
+import type { PrintStackInfo, ProcessingMode } from '../api/types';
 import { ModeSelector } from './ModeSelector';
 
 interface ParameterPanelProps {
@@ -32,12 +32,15 @@ interface ParameterPanelProps {
   targetWidth: number;
   targetHeight: number;
   onTargetWidthChange: (value: number) => void;
+  whiteBackingLayers: number;
+  onWhiteBackingLayersChange: (value: number) => void;
   // Base plate
   basePlateThickness: number;
   onBasePlateThicknessChange: (value: number) => void;
   // Double-sided
   doubleSided: boolean;
   onDoubleSidedChange: (value: boolean) => void;
+  printStack: PrintStackInfo;
   onReprocess: () => void;
   processing: boolean;
   hasImage: boolean;
@@ -64,11 +67,13 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   onDetailSizeChange,
   targetWidth,
   targetHeight,
-  onTargetWidthChange,
+  whiteBackingLayers,
+  onWhiteBackingLayersChange,
   basePlateThickness,
   onBasePlateThicknessChange,
   doubleSided,
   onDoubleSidedChange,
+  printStack,
   onReprocess,
   processing,
   hasImage,
@@ -228,6 +233,25 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
       )}
 
       <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="whiteBackingLayers">
+          White Backing Layers
+        </label>
+        <input
+          id="whiteBackingLayers"
+          type="number"
+          min="0"
+          max="5"
+          step="1"
+          value={whiteBackingLayers}
+          onChange={(e) => onWhiteBackingLayersChange(Math.max(0, Math.min(5, parseInt(e.target.value || '0', 10))))}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          0 disables backing. Current stack: {printStack.opticalLayerCount} optical + {printStack.whiteBackingLayers} backing = {printStack.totalLayerCount} total layers.
+        </p>
+      </div>
+
+      <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Base Plate Thickness: {basePlateThickness} mm
         </label>
@@ -243,6 +267,10 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
         <p className="text-xs text-gray-500 mt-1">
           {basePlateThickness === 0 ? 'No base plate' : `Adds a solid base plate below color layers`}
         </p>
+      </div>
+
+      <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
+        Actual export height: {printStack.totalHeightMm.toFixed(2)} mm
       </div>
 
       {mode === 'pixel' && (

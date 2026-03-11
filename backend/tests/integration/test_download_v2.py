@@ -144,11 +144,11 @@ def test_v2_stl_with_default_colors(client, sample_color_blocks_with_hex):
     assert len(zf.namelist()) > 0
 
 
-def test_get_colors_from_request_defaults_to_phase6_cmyw():
-    """Default color resolution should use the Phase 6 CMYW preset."""
+def test_get_colors_from_request_defaults_to_phase6_cmyk():
+    """Default color resolution should use the Phase 6 CMYK preset."""
     colors = get_colors_from_request(None, None)
-    assert len(colors) == 4
-    assert "K" not in colors.get_labels()
+    assert len(colors) == 5
+    assert "K" in colors.get_labels()
     assert colors["C"].k == 8.13
     assert colors["W"].k == 12.39
 
@@ -580,7 +580,8 @@ def test_print_settings_with_base_plate(client):
     assert response.status_code == 200
     data = json.loads(response.content)
     assert data["print_settings"]["base_plate_thickness"] == 0.5
-    assert data["object_dimensions"]["total_height_mm"] == 0.9
+    assert data["print_settings"]["white_backing_layers"] == 1
+    assert data["object_dimensions"]["total_height_mm"] == 1.0
 
 
 def test_print_settings_default_colors(client):

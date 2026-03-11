@@ -5,7 +5,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { ColorBlock, ImageDimensions, MappedBlockColor } from '../api/types';
+import type { ColorBlock, ImageDimensions, MappedBlockColor, PrintStackInfo } from '../api/types';
 import { Eye, EyeOff, RotateCcw, Maximize2, Layers } from 'lucide-react';
 
 interface ThreeDPreviewProps {
@@ -15,8 +15,10 @@ interface ThreeDPreviewProps {
   layerHeight: number;
   pixelSize: number;
   layerCount: number;
+  whiteBackingLayers: number;
   basePlateThickness: number;
   doubleSided: boolean;
+  printStack: PrintStackInfo;
 }
 
 interface ColorVisibility {
@@ -41,6 +43,7 @@ function buildInstancedMeshes(
   pixelSize: number,
   layerHeight: number,
   layerCount: number,
+  whiteBackingLayers: number,
   basePlateThickness: number,
   doubleSided: boolean,
   visibilityMap: Map<string, boolean>,
@@ -163,6 +166,40 @@ function buildInstancedMeshes(
     }
   }
 
+  if (whiteBackingLayers > 0) {
+    const plateWidth = imageDimensions.width * pixelSize;
+    const plateDepth = imageDimensions.height * pixelSize;
+    const whiteMaterial = new THREE.MeshPhongMaterial({
+      color: 0xf8f8f8,
+      flatShading: true,
+      transparent: true,
+      opacity: 0.9,
+    });
+
+    if (showExploded) {
+      const backingGeo = new THREE.BoxGeometry(plateWidth, layerHeight, plateDepth);
+      for (let layer = 0; layer < whiteBackingLayers; layer++) {
+        const backing = new THREE.Mesh(backingGeo, whiteMaterial.clone());
+        const y = basePlateThickness
+          + layerCount * layerHeight
+          + layerCount * explodedGap
+          + (layer + 1) * layerHeight
+          + layer * explodedGap
+          - layerHeight / 2;
+        backing.position.set(0, y, 0);
+        backing.receiveShadow = true;
+        group.add(backing);
+      }
+    } else {
+      const backingThickness = whiteBackingLayers * layerHeight;
+      const backingGeo = new THREE.BoxGeometry(plateWidth, backingThickness, plateDepth);
+      const backing = new THREE.Mesh(backingGeo, whiteMaterial);
+      backing.position.set(0, basePlateThickness + layerCount * layerHeight + backingThickness / 2, 0);
+      backing.receiveShadow = true;
+      group.add(backing);
+    }
+  }
+
   // Base plate
   if (basePlateThickness > 0) {
     const plateWidth = imageDimensions.width * pixelSize;
@@ -197,8 +234,10 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
   layerHeight,
   pixelSize,
   layerCount,
+  whiteBackingLayers,
   basePlateThickness,
   doubleSided,
+  printStack,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -282,6 +321,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
       pixelSize,
       layerHeight,
       layerCount,
+      whiteBackingLayers,
       basePlateThickness,
       doubleSided,
       visibilityMap,
@@ -291,7 +331,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
 
     modelGroupRef.current = group;
     scene.add(group);
-  }, [colorBlocks, mappedBlockColors, imageDimensions, pixelSize, layerHeight, layerCount, basePlateThickness, doubleSided, visibilityMap, showExploded]);
+  }, [colorBlocks, mappedBlockColors, imageDimensions, pixelSize, layerHeight, layerCount, whiteBackingLayers, basePlateThickness, doubleSided, visibilityMap, showExploded]);
 
   // Initialize three.js scene
   useEffect(() => {
@@ -454,7 +494,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
 
   const physicalWidth = (imageDimensions.width * pixelSize).toFixed(1);
   const physicalHeight = (imageDimensions.height * pixelSize).toFixed(1);
-  const totalHeight = (layerHeight * layerCount + basePlateThickness).toFixed(2);
+  const totalHeight = printStack.totalHeightMm.toFixed(2);
 
   if (webglError) {
     return (
@@ -506,6 +546,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
       <div className="text-xs text-gray-500 flex gap-4">
         <span>{physicalWidth} x {physicalHeight} mm</span>
         <span>Height: {totalHeight} mm</span>
+        <span>Layers: {printStack.opticalLayerCount} + {printStack.whiteBackingLayers}</span>
         <span>{totalPixels.toLocaleString()} voxels</span>
         {isLargeModel && <span className="text-amber-600">Large model - simplified rendering</span>}
       </div>
