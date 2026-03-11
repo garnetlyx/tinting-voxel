@@ -241,15 +241,8 @@ class DownloadSTLRequestV2(FilamentConfigMixin):
         description="Minimum physical pixel size in mm (default: 0.4)"
     )
 
-    @model_validator(mode='after')
-    def validate_pixel_size_vs_detail(self):
-        """Reject if pixelSize is below detailSize (if provided)."""
-        if self.detailSize is not None and self.pixelSize < self.detailSize:
-            raise ValueError(
-                f"pixelSize ({self.pixelSize}) is below detailSize ({self.detailSize}). "
-                f"Increase pixelSize or decrease detailSize."
-            )
-        return self
+    # No longer validate pixelSize >= detailSize
+    # Small pixels will be merged at the backend level
 
 
 class DownloadSVGSTLRequestV2(FilamentConfigMixin):
@@ -272,15 +265,8 @@ class DownloadSVGSTLRequestV2(FilamentConfigMixin):
         description="Minimum physical pixel size in mm (default: 0.4)"
     )
 
-    @model_validator(mode='after')
-    def validate_pixel_size_vs_detail(self):
-        """Reject if pixelSize is below detailSize (if provided)."""
-        if self.detailSize is not None and self.pixelSize < self.detailSize:
-            raise ValueError(
-                f"pixelSize ({self.pixelSize}) is below detailSize ({self.detailSize}). "
-                f"Increase pixelSize or decrease detailSize."
-            )
-        return self
+    # No longer validate pixelSize >= detailSize
+    # Small pixels will be merged at the backend level
 
 
 class FilamentPresetInfo(BaseModel):
@@ -332,15 +318,8 @@ class PrintSettingsRequest(FilamentConfigMixin):
         description="Minimum physical pixel size in mm (default: 0.4)"
     )
 
-    @model_validator(mode='after')
-    def validate_pixel_size_vs_detail(self):
-        """Reject if pixelSize is below detailSize (if provided)."""
-        if self.detailSize is not None and self.pixelSize < self.detailSize:
-            raise ValueError(
-                f"pixelSize ({self.pixelSize}) is below detailSize ({self.detailSize}). "
-                f"Increase pixelSize or decrease detailSize."
-            )
-        return self
+    # No longer validate pixelSize >= detailSize
+    # Small pixels will be merged at the backend level
 
 
 class ColorMatrixEntry(BaseModel):

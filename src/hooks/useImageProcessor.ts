@@ -96,12 +96,8 @@ export const useImageProcessor = () => {
     setPixelSize(Math.max(0.01, Math.min(5.0, value)));
   }, []);
 
-  // Sync pixelSize with detailSize when details change, but only as a suggestion
-  useEffect(() => {
-    if (pixelSize < detailSize) {
-      setPixelSize(detailSize);
-    }
-  }, [detailSize]);
+  // No longer force pixelSize >= detailSize
+  // Small pixels will be merged at the backend level
 
   // AbortController ref for cancelling in-flight image processing requests
   const processAbortRef = useRef<AbortController | null>(null);

@@ -194,7 +194,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           className="w-full"
         />
         <p className="text-xs text-gray-500 mt-1">
-          Minimum physical size of a single pixel. Prevents too-small details.
+          Minimum physical size for details. Smaller pixel clusters will be merged with similar colors.
         </p>
       </div>
 
@@ -204,34 +204,25 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
         </label>
         <input
           type="range"
-          min={detailSize}
+          min="0.2"
           max="2"
           step="0.01"
           value={pixelSize}
           onChange={(e) => onPixelSizeChange(parseFloat(e.target.value))}
           className="w-full"
         />
+        <p className="text-xs text-gray-500 mt-1">
+          Base pixel size. Can be smaller than Detail Size - small clusters will merge automatically.
+        </p>
       </div>
 
       {targetWidth > 0 && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Target Width: {targetWidth} mm (Height: {targetHeight} mm)
+            Target Size: {targetWidth.toFixed(1)} mm × {targetHeight.toFixed(1)} mm
           </label>
-          <input
-            type="number"
-            min="1"
-            max="500"
-            step="0.1"
-            value={targetWidth}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              if (!isNaN(val) && val > 0) onTargetWidthChange(val);
-            }}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-purple-500 focus:border-purple-500"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Enter desired physical width in mm. Height scales proportionally.
+          <p className="text-xs text-gray-500">
+            Physical dimensions based on pixel size. Adjust Pixel Size to change model size.
           </p>
         </div>
       )}

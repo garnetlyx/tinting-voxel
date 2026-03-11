@@ -117,10 +117,7 @@ async def api_process_image(
         )
 
     # Clamp pixelSize upward to honour detailSize minimum if provided
-    effective_pixel_size = pixelSize
-    if detailSize is not None:
-        effective_pixel_size = max(pixelSize, detailSize)
-
+    # Use pixel_size directly - detail_size is now handled by pixel merging
     parsed_preset, parsed_colors = _parse_filament_form_payload(
         filament_preset=filamentPreset,
         filament_colors=filamentColors,
@@ -132,7 +129,7 @@ async def api_process_image(
             image_bytes=image_bytes,
             max_colors=maxColors,
             color_threshold=colorThreshold,
-            pixel_size=effective_pixel_size,
+            pixel_size=pixelSize,
             filament_colors=colors,
             layer_count=layerCount,
             layer_height=layerHeight,
@@ -153,7 +150,7 @@ async def api_process_image(
 
         return ProcessImageResponse(
             **result,
-            pixelSize=effective_pixel_size,
+            pixelSize=pixelSize,
             detailSize=detailSize
         )
 

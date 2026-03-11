@@ -71,15 +71,12 @@ async def api_batch_process(
     _validate_batch_input(images)
     files = await _read_batch_files(images)
 
-    effective_pixel_size = pixelSize
-    if detailSize is not None:
-        effective_pixel_size = max(pixelSize, detailSize)
-
+    # Use pixel_size directly - detail_size is now handled by pixel merging
     result = process_batch_images(
         files=files,
         max_colors=maxColors,
         color_threshold=colorThreshold,
-        pixel_size=effective_pixel_size,
+        pixel_size=pixelSize,
     )
 
     logger.info(

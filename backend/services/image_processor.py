@@ -252,6 +252,147 @@ def _downscale_if_needed(img: Image.Image, max_dim: int) -> Image.Image:
     return img.resize((new_width, new_height), Image.LANCZOS)
 
 
+def merge_small_pixels_to_neighbors(
+    color_blocks: list[dict],
+    width: int,
+    height: int,
+    pixel_size: float,
+    detail_size: float,
+) -> list[dict]:
+    """
+    Merge pixels smaller than detail_size with their nearest color-similar neighbor.
+    
+    This prevents tiny details from being printed at sub-detail-size scale,
+    without forcing the entire model to be scaled up.
+    
+    Args:
+        color_blocks: List of color blocks with pixels
+        width: Image width in pixels
+        height: Image height in pixels
+        pixel_size: Physical size of each pixel in mm
+        detail_size: Minimum physical pixel size in mm
+    
+    Returns:
+        Updated color_blocks with small regions merged
+    """
+    if pixel_size >= detail_size:
+        return color_blocks
+    
+    # Build a pixel map: (x, y) -> color_block_index
+    pixel_map = {}
+    for idx, block in enumerate(color_blocks):
+        for pixel in block['pixels']:
+            pixel_map[(pixel['x'], pixel['y'])] = idx
+    
+    # Calculate minimum cluster size in pixels
+    scale_factor = detail_size / pixel_size
+    min_cluster_pixels = int(scale_factor * scale_factor)
+    
+    logger.info(
+        "Merging small pixel clusters: pixel_size=%.2fmm, detail_size=%.2fmm, "
+        "min_cluster=%d pixels",
+        pixel_size, detail_size, min_cluster_pixels
+    )
+    
+    # Find connected components for each color
+    def get_neighbors(x, y):
+        """Get 4-connected neighbors"""
+        neighbors = []
+        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < width and 0 <= ny < height:
+                neighbors.append((nx, ny))
+        return neighbors
+    
+    def flood_fill(start_x, start_y, color_idx, visited):
+        """Find connected component using flood fill"""
+        stack = [(start_x, start_y)]
+        component = []
+        
+        while stack:
+            x, y = stack.pop()
+            if (x, y) in visited:
+                continue
+            if pixel_map.get((x, y)) != color_idx:
+                continue
+            
+            visited.add((x, y))
+            component.append((x, y))
+            
+            for nx, ny in get_neighbors(x, y):
+                if (nx, ny) not in visited:
+                    stack.append((nx, ny))
+        
+        return component
+    
+    # Find all connected components
+    visited = set()
+    small_components = []  # Components smaller than min_cluster_pixels
+    
+    for idx, block in enumerate(color_blocks):
+        for pixel in block['pixels']:
+            pos = (pixel['x'], pixel['y'])
+            if pos not in visited:
+                component = flood_fill(pixel['x'], pixel['y'], idx, visited)
+                if len(component) < min_cluster_pixels:
+                    small_components.append((idx, component))
+    
+    if not small_components:
+        return color_blocks
+    
+    logger.info("Found %d small components to merge", len(small_components))
+    
+    # Merge small components into nearest color-similar neighbor
+    for color_idx, component in small_components:
+        # Find neighboring colors
+        neighbor_colors = set()
+        for x, y in component:
+            for nx, ny in get_neighbors(x, y):
+                neighbor_idx = pixel_map.get((nx, ny))
+                if neighbor_idx is not None and neighbor_idx != color_idx:
+                    neighbor_colors.add(neighbor_idx)
+        
+        if not neighbor_colors:
+            continue  # Isolated component, keep as is
+        
+        # Find most color-similar neighbor
+        source_rgb = (color_blocks[color_idx]['r'], 
+                     color_blocks[color_idx]['g'], 
+                     color_blocks[color_idx]['b'])
+        
+        best_neighbor = min(
+            neighbor_colors,
+            key=lambda idx: color_distance(
+                source_rgb,
+                (color_blocks[idx]['r'], color_blocks[idx]['g'], color_blocks[idx]['b'])
+            )
+        )
+        
+        # Move pixels from source to best neighbor
+        for x, y in component:
+            pixel_map[(x, y)] = best_neighbor
+    
+    # Rebuild color_blocks from updated pixel_map
+    new_blocks = {}
+    for (x, y), idx in pixel_map.items():
+        if idx not in new_blocks:
+            new_blocks[idx] = {
+                'r': color_blocks[idx]['r'],
+                'g': color_blocks[idx]['g'],
+                'b': color_blocks[idx]['b'],
+                'hex': color_blocks[idx]['hex'],
+                'count': 0,
+                'pixels': []
+            }
+        new_blocks[idx]['pixels'].append({'x': x, 'y': y})
+        new_blocks[idx]['count'] += 1
+    
+    result = list(new_blocks.values())
+    result.sort(key=lambda c: c['count'], reverse=True)
+    
+    return result
+
+
 def process_image(
     image_bytes: bytes,
     max_colors: int = 10,
@@ -271,7 +412,7 @@ def process_image(
         max_colors: Maximum number of colors to extract
         color_threshold: Threshold for merging similar colors
         pixel_size: Physical size of each pixel in mm
-        target_width: Explicit physical target width in mm
+        target_width: Explicit physical target width in mm (deprecated, not used)
         detail_size: Minimum physical pixel size in mm
 
     Returns:
@@ -291,24 +432,8 @@ def process_image(
     else:
         img = img.convert('RGB')
 
-    # Explicit user-intended scaling if target_width is provided
-    if target_width is not None and detail_size is not None and detail_size > 0:
-        intended_pixels = int(target_width / detail_size)
-        if intended_pixels > 0:
-            w, h = img.size
-            new_width = intended_pixels
-            new_height = int(h * (intended_pixels / w))
-            if new_width != w or new_height != h:
-                logger.info(
-                    "Scaling image to user-intended targetWidth (%.1fmm / %.2fmm): %dx%d (original %dx%d)",
-                    target_width, detail_size, new_width, new_height, w, h
-                )
-                img = img.resize((new_width, new_height), Image.LANCZOS)
-        # Apply safety downscale with higher cap for intentional sized prints
-        img = _downscale_if_needed(img, 2048)
-    else:
-        # Standard safety downscale
-        img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
+    # Standard safety downscale only
+    img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
 
     width, height = img.size
 
@@ -358,6 +483,12 @@ def process_image(
         color_blocks = reassign_colors(main_colors, rest_colors)
     else:
         color_blocks = main_colors
+    
+    # Step 5: Merge small pixel clusters if detail_size is specified
+    if detail_size is not None and detail_size > pixel_size:
+        color_blocks = merge_small_pixels_to_neighbors(
+            color_blocks, width, height, pixel_size, detail_size
+        )
 
     # Add hex values
     for color in color_blocks:
