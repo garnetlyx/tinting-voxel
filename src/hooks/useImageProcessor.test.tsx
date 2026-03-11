@@ -107,6 +107,14 @@ describe('useImageProcessor', () => {
     expect(mockedProcessImage).not.toHaveBeenCalled();
   });
 
+  it('defaults to the legacy CMYK filament preset', () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    expect(result.current.filamentPreset).toBe('bambu_cmyk');
+    expect(result.current.filamentColors).toHaveLength(4);
+    expect(result.current.filamentColors.some(color => color.name === 'Key')).toBe(false);
+  });
+
   it('sends filament config and layer settings when processing an image', async () => {
     const { result } = renderHook(() => useImageProcessor());
     const img = new globalThis.Image() as unknown as HTMLImageElement;
