@@ -78,8 +78,8 @@ def get_colors_from_request(
         if preset_configs:
             return Colors.from_configs(preset_configs)
 
-    # Fall back to the default image-preview Phase 6 CMYW preset
-    default_configs = get_preset(FilamentPreset.BAMBU_CMYW_PHASE6.value)
+    # Fall back to the default image-preview Phase 6 CMYK preset (with Key/black)
+    default_configs = get_preset(FilamentPreset.BAMBU_CMYK_PHASE6.value)
     return Colors.from_configs(default_configs) if default_configs else Colors()
 
 

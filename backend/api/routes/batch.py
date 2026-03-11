@@ -127,8 +127,8 @@ async def api_batch_download_stl(
     if batch_result['successCount'] == 0:
         raise HTTPException(status_code=422, detail="All images failed to process")
 
-    # Resolve colors: filamentColors > filamentPreset > default
-    default_configs = get_preset(FilamentPreset.BAMBU_CMYW_PHASE6.value)
+    # Resolve colors: filamentColors > filamentPreset > default (Phase 6 CMYK with Key/black)
+    default_configs = get_preset(FilamentPreset.BAMBU_CMYK_PHASE6.value)
     colors = Colors.from_configs(default_configs) if default_configs else Colors()
     if filamentColors:
         try:
