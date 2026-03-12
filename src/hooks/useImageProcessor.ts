@@ -59,7 +59,6 @@ export const useImageProcessor = () => {
   const [mappedBlockColors, setMappedBlockColors] = useState<MappedBlockColor[]>([]);
   const [mappedBlendPalette, setMappedBlendPalette] = useState<MappedBlendPaletteEntry[]>([]);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
-  const [explicitTargetWidth, setExplicitTargetWidth] = useState<number | null>(null);
   const [layerHeight, setLayerHeight] = useState(0.08);
   const [detailSize, setDetailSize] = useState(0.4);
   const [pixelSize, setPixelSize] = useState(0.4);
@@ -81,25 +80,27 @@ export const useImageProcessor = () => {
   // Filament preset storage (localStorage persistence)
   const filamentStorage = useFilamentStorage();
 
-  // Computed target physical width in mm (derived from imageDimensions and pixelSize)
+  // Physical size is derived directly from pixelSize and image dimensions.
   const targetWidth = imageDimensions.width > 0
     ? Math.round(imageDimensions.width * pixelSize * 100) / 100
     : 0;
   const targetHeight = imageDimensions.height > 0
     ? Math.round(imageDimensions.height * pixelSize * 100) / 100
     : 0;
+  const maxDimension = Math.max(targetWidth, targetHeight);
 
-  // Set target physical width as a persistent intent for resizing
-  const setTargetWidth = useCallback((widthMm: number) => {
-    setExplicitTargetWidth(widthMm);
-  }, []);
+  const setMaxDimension = useCallback((dimensionMm: number) => {
+    const clampedDimension = Math.max(1, Math.min(500, dimensionMm));
+    const longestSidePx = Math.max(imageDimensions.width, imageDimensions.height);
+    if (longestSidePx <= 0) return;
+    setPixelSize(Math.max(0.01, Math.min(5.0, clampedDimension / longestSidePx)));
+  }, [imageDimensions.height, imageDimensions.width]);
 
   const handleSetPixelSize = useCallback((value: number) => {
     setPixelSize(Math.max(0.01, Math.min(5.0, value)));
   }, []);
 
-  // No longer force pixelSize >= detailSize
-  // Small pixels will be merged at the backend level
+  // detailSize only controls local feature cleanup; it does not change model scale.
 
   // AbortController ref for cancelling in-flight image processing requests
   const processAbortRef = useRef<AbortController | null>(null);
@@ -231,7 +232,6 @@ export const useImageProcessor = () => {
         whiteBackingLayers,
         ...filamentRequestPayload,
         detailSize,
-        targetWidth: explicitTargetWidth ?? undefined,
         pixelParams: processingMode === 'pixel' ? { maxColors, colorThreshold } : undefined,
         svgParams: processingMode === 'svg' ? { epsilon, minArea, numColors } : undefined,
       }, controller.signal);
@@ -241,7 +241,7 @@ export const useImageProcessor = () => {
 
       setImageDimensions(result.imageDimensions);
 
-      // Sync effective parameters from backend
+      // Sync backend-confirmed parameters. pixelSize remains the actual model pitch.
       if (result.pixelSize !== undefined && result.pixelSize !== null) {
         setPixelSize(result.pixelSize);
       }
@@ -688,6 +688,7 @@ export const useImageProcessor = () => {
     doubleSided,
     targetWidth,
     targetHeight,
+    maxDimension,
     printStack,
 
     // Filament state
@@ -709,7 +710,7 @@ export const useImageProcessor = () => {
     setPixelSize: handleSetPixelSize,
     setDetailSize,
     setWhiteBackingLayers,
-    setTargetWidth,
+    setMaxDimension,
     setBasePlateThickness,
     setDoubleSided,
     loadPreset,

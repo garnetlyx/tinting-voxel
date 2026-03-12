@@ -194,3 +194,18 @@ class TestBatchDownloadSTL:
         )
         assert response.status_code == 200
         assert "batch_stl_output.zip" in response.headers.get("content-disposition", "")
+
+    def test_allows_pixel_size_smaller_than_detail_size(self, client):
+        """Batch STL download uses local detail merging instead of rejecting the request."""
+        png_bytes = _make_png()
+        response = client.post(
+            "/api/batch/download-stl",
+            files=[("images", ("test.png", png_bytes, "image/png"))],
+            data={
+                "pixelSize": "0.2",
+                "detailSize": "0.4",
+                "layerHeight": "0.08",
+                "layerCount": "4",
+            },
+        )
+        assert response.status_code == 200

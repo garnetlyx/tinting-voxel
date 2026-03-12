@@ -77,6 +77,7 @@ async def api_batch_process(
         max_colors=maxColors,
         color_threshold=colorThreshold,
         pixel_size=pixelSize,
+        detail_size=detailSize,
     )
 
     logger.info(
@@ -106,12 +107,6 @@ async def api_batch_download_stl(
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.8),
 ):
     """Process multiple images and download all STL files as a single ZIP."""
-    if detailSize is not None and pixelSize < detailSize:
-        raise HTTPException(
-            status_code=422,
-            detail=f"pixelSize ({pixelSize}) cannot be smaller than detailSize ({detailSize})"
-        )
-
     _validate_batch_input(images)
     files = await _read_batch_files(images)
 
@@ -120,6 +115,7 @@ async def api_batch_download_stl(
         max_colors=maxColors,
         color_threshold=colorThreshold,
         pixel_size=pixelSize,
+        detail_size=detailSize,
     )
 
     if batch_result['successCount'] == 0:

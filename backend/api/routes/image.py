@@ -32,7 +32,7 @@ from services.image_processor import (
     build_simulated_print_preview,
     process_image,
 )
-from services.vector_processor import VectorProcessorConfig, process_image_vector
+from services.vector_processor import VectorProcessorConfig, process_image_vector_with_preview
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +118,8 @@ async def api_process_image(
             detail=f"Invalid processing mode: '{mode}'. Must be 'pixel' or 'svg'."
         )
 
-    # Clamp pixelSize upward to honour detailSize minimum if provided
-    # Use pixel_size directly - detail_size is now handled by pixel merging
+    # pixelSize remains the actual model scale. detailSize only controls
+    # local feature merging in pixel mode; it does not force global upscaling.
     parsed_preset, parsed_colors = _parse_filament_form_payload(
         filament_preset=filamentPreset,
         filament_colors=filamentColors,
@@ -167,38 +167,28 @@ async def api_process_image(
     else:
         img = img.convert('RGB')
 
-    # Explicit user-intended scaling if targetWidth is provided
-    if targetWidth is not None and detailSize is not None and detailSize > 0:
-        intended_pixels = int(targetWidth / detailSize)
-        if intended_pixels > 0:
-            w, h = img.size
-            new_width = intended_pixels
-            new_height = int(h * (intended_pixels / w))
-            if new_width != w or new_height != h:
-                logger.info(
-                    "SVG mode: Scaling image to user-intended targetWidth (%.1fmm / %.2fmm): %dx%d (original %dx%d)",
-                    targetWidth, detailSize, new_width, new_height, w, h
-                )
-                img = img.resize((new_width, new_height), Image.LANCZOS)
-        # Apply safety downscale with higher cap for intentional sized prints
-        img = _downscale_if_needed(img, 2048)
-    else:
-        # Standard safety downscale
-        img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
+    if targetWidth is not None:
+        logger.info(
+            "SVG mode: ignoring targetWidth=%.1fmm for image resampling; model size is controlled by pixelSize",
+            targetWidth,
+        )
+
+    # Standard safety downscale only; detailSize no longer drives global SVG resampling.
+    img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
     img_array = np.array(img)
 
     config = VectorProcessorConfig(
         epsilon=epsilon,
         min_area=minArea,
-        num_colors=numColors
+        num_colors=numColors,
+        pixel_size=pixelSize,
+        detail_size=detailSize,
     )
 
-    vector_results = process_image_vector(img_array, config)
+    vector_results, quantized = process_image_vector_with_preview(img_array, config)
 
     # Generate processed image preview (quantized colors with contour lines)
     import cv2
-    from services.vector_processor import quantize_colors
-    quantized, _ = quantize_colors(img_array, numColors)
     result_img = quantized.copy()
 
     for vr in vector_results:
@@ -233,7 +223,7 @@ async def api_process_image(
         vectorResults=vector_results,
         processedImage=processed_img_data_url,
         imageDimensions={'width': img.width, 'height': img.height},
-        pixelSize=effective_pixel_size,
+        pixelSize=pixelSize,
         detailSize=detailSize,
         printStack=print_stack,
     )

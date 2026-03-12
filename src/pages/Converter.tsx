@@ -65,6 +65,7 @@ const Converter: React.FC = () => {
     doubleSided,
     targetWidth,
     targetHeight,
+    maxDimension,
     imageDimensions,
     printStack,
 
@@ -87,7 +88,7 @@ const Converter: React.FC = () => {
     setPixelSize,
     setDetailSize,
     setWhiteBackingLayers,
-    setTargetWidth,
+    setMaxDimension,
     setBasePlateThickness,
     setDoubleSided,
     loadPreset,
@@ -153,7 +154,8 @@ const Converter: React.FC = () => {
                   onDetailSizeChange={setDetailSize}
                   targetWidth={targetWidth}
                   targetHeight={targetHeight}
-                  onTargetWidthChange={setTargetWidth}
+                  maxDimension={maxDimension}
+                  onMaxDimensionChange={setMaxDimension}
                   whiteBackingLayers={whiteBackingLayers}
                   onWhiteBackingLayersChange={setWhiteBackingLayers}
                   basePlateThickness={basePlateThickness}

@@ -10,6 +10,7 @@ from services.image_processor import (
     MAX_PROCESSING_DIMENSION,
     _downscale_if_needed,
     build_simulated_print_preview,
+    merge_small_pixels_to_neighbors,
     process_image,
 )
 
@@ -145,3 +146,70 @@ class TestProcessImageLargeHandling:
         assert result['mappedBlendPalette'][0]['pixelPercent'] >= result['mappedBlendPalette'][1]['pixelPercent']
         assert result['printStack']['whiteBackingLayers'] == 0
         assert result['printStack']['totalLayerCount'] == 4
+
+    def test_small_components_merge_without_global_scaling(self):
+        """detail_size merges local components instead of enlarging the full image."""
+        color_blocks = [
+            {'r': 255, 'g': 0, 'b': 0, 'hex': '#ff0000', 'count': 1, 'pixels': [{'x': 0, 'y': 0}]},
+            {'r': 250, 'g': 10, 'b': 10, 'hex': '#fa0a0a', 'count': 1, 'pixels': [{'x': 1, 'y': 0}]},
+            {
+                'r': 0, 'g': 0, 'b': 255, 'hex': '#0000ff', 'count': 4,
+                'pixels': [{'x': 2, 'y': 0}, {'x': 3, 'y': 0}, {'x': 4, 'y': 0}, {'x': 5, 'y': 0}],
+            },
+        ]
+
+        merged = merge_small_pixels_to_neighbors(
+            color_blocks=color_blocks,
+            width=6,
+            height=1,
+            pixel_size=0.2,
+            detail_size=0.4,
+        )
+
+        assert len(merged) == 1
+        assert merged[0]['count'] == 6
+
+    def test_single_component_image_is_preserved(self):
+        """A single-region image has no valid merge target and remains unchanged."""
+        color_blocks = [
+            {'r': 255, 'g': 0, 'b': 0, 'hex': '#ff0000', 'count': 1, 'pixels': [{'x': 0, 'y': 0}]},
+        ]
+
+        merged = merge_small_pixels_to_neighbors(
+            color_blocks=color_blocks,
+            width=1,
+            height=1,
+            pixel_size=0.2,
+            detail_size=0.4,
+        )
+
+        assert len(merged) == 1
+        assert merged[0]['count'] == 1
+
+    def test_tiny_hole_disappears(self):
+        """A sub-threshold hole is absorbed into the surrounding region."""
+        color_blocks = [
+            {
+                'r': 255, 'g': 0, 'b': 0, 'hex': '#ff0000', 'count': 8,
+                'pixels': [
+                    {'x': 0, 'y': 0}, {'x': 1, 'y': 0}, {'x': 2, 'y': 0},
+                    {'x': 0, 'y': 1}, {'x': 2, 'y': 1},
+                    {'x': 0, 'y': 2}, {'x': 1, 'y': 2}, {'x': 2, 'y': 2},
+                ],
+            },
+            {
+                'r': 0, 'g': 0, 'b': 255, 'hex': '#0000ff', 'count': 1,
+                'pixels': [{'x': 1, 'y': 1}],
+            },
+        ]
+
+        merged = merge_small_pixels_to_neighbors(
+            color_blocks=color_blocks,
+            width=3,
+            height=3,
+            pixel_size=0.2,
+            detail_size=0.4,
+        )
+
+        assert len(merged) == 1
+        assert merged[0]['count'] == 9

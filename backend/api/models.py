@@ -139,8 +139,8 @@ class ProcessImageResponse(BaseModel):
     mappedBlockColors: List["MappedBlockColor"]
     mappedBlendPalette: List["MappedBlendPaletteEntry"]
     imageDimensions: ImageDimensions
-    pixelSize: Optional[float] = None  # Effective pixel size after detailSize clamping
-    detailSize: Optional[float] = None  # Detail size used for clamping
+    pixelSize: Optional[float] = None  # Actual pixel size used for model dimensions
+    detailSize: Optional[float] = None  # Local detail merge threshold used in pixel mode
     printStack: "PrintStackInfo"
 
 

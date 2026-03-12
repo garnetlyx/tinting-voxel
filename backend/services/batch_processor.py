@@ -23,6 +23,7 @@ def process_batch_images(
     max_colors: int = 10,
     color_threshold: float = 50,
     pixel_size: float = 0.08,
+    detail_size: Optional[float] = None,
 ) -> dict:
     """
     Process multiple images and return per-image color block results.
@@ -56,6 +57,7 @@ def process_batch_images(
                 max_colors=max_colors,
                 color_threshold=color_threshold,
                 pixel_size=pixel_size,
+                detail_size=detail_size,
             )
             results.append({
                 'filename': filename,

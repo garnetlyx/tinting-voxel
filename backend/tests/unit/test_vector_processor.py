@@ -28,10 +28,18 @@ class TestVectorProcessorConfig:
 
     def test_custom_values(self):
         """Custom values should be preserved"""
-        config = VectorProcessorConfig(epsilon=5.0, min_area=200, num_colors=16)
+        config = VectorProcessorConfig(
+            epsilon=5.0,
+            min_area=200,
+            num_colors=16,
+            pixel_size=0.2,
+            detail_size=0.4,
+        )
         assert config.epsilon == 5.0
         assert config.min_area == 200
         assert config.num_colors == 16
+        assert config.pixel_size == 0.2
+        assert config.detail_size == 0.4
 
 
 class TestExtractColorMask:
@@ -222,3 +230,42 @@ class TestVectorProcessorIntegration:
 
         # Should be much less than 3600 pixels
         assert total_points < 100  # A simplified square should have ~4-8 points
+
+    def test_svg_cleanup_removes_tiny_island(self):
+        """detail_size removes a sub-threshold island before contour extraction."""
+        from services.vector_processor import process_image_vector
+
+        image = np.full((5, 5, 3), [255, 0, 0], dtype=np.uint8)
+        image[2, 2] = [0, 0, 255]
+
+        config = VectorProcessorConfig(
+            epsilon=1.0,
+            min_area=1,
+            num_colors=2,
+            pixel_size=0.2,
+            detail_size=0.4,
+        )
+        result = process_image_vector(image, config)
+
+        result_colors = {tuple(item['color']) for item in result}
+        assert (0, 0, 255) not in result_colors
+        assert (255, 0, 0) in result_colors
+
+    def test_svg_cleanup_keeps_threshold_sized_island(self):
+        """A component at the minimum threshold is preserved."""
+        from services.vector_processor import process_image_vector
+
+        image = np.full((7, 7, 3), [255, 0, 0], dtype=np.uint8)
+        image[2:5, 2:5] = [0, 0, 255]
+
+        config = VectorProcessorConfig(
+            epsilon=1.0,
+            min_area=1,
+            num_colors=2,
+            pixel_size=0.2,
+            detail_size=0.4,
+        )
+        result = process_image_vector(image, config)
+
+        result_colors = {tuple(item['color']) for item in result}
+        assert (0, 0, 255) in result_colors

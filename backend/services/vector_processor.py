@@ -8,9 +8,12 @@ Uses OpenCV for contour detection and Douglas-Peucker for simplification.
 """
 import logging
 from dataclasses import dataclass
+from typing import Optional
 
 import cv2
 import numpy as np
+
+from services.raster_cleanup import merge_small_label_regions
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,8 @@ class VectorProcessorConfig:
     epsilon: float = 2.0       # Douglas-Peucker simplification tolerance
     min_area: int = 100        # Minimum contour area in pixels
     num_colors: int = 8        # Number of colors to quantize to
+    pixel_size: float = 1.0    # Physical pixel pitch in mm
+    detail_size: Optional[float] = None  # Minimum physical feature size in mm
 
 
 def extract_color_mask(
@@ -177,11 +182,18 @@ def quantize_colors(
     Returns:
         Tuple of (quantized image, list of color tuples)
     """
-    # Reshape to list of pixels
+    quantized, _, colors = quantize_colors_with_labels(image, num_colors)
+    return quantized, colors
+
+
+def quantize_colors_with_labels(
+    image: np.ndarray,
+    num_colors: int,
+) -> tuple[np.ndarray, np.ndarray, list[tuple[int, int, int]]]:
+    """Reduce image colors and keep the per-pixel label grid."""
     pixels = image.reshape(-1, 3).astype(np.float32)
     pixels_uint8 = image.reshape(-1, 3)
 
-    # K-means clustering
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
     _, labels, _ = cv2.kmeans(
         pixels,
@@ -193,8 +205,8 @@ def quantize_colors(
     )
 
     labels_flat = labels.flatten()
+    label_grid = labels_flat.reshape(image.shape[:2]).astype(np.int32)
 
-    # For each cluster, find the most frequent original color
     colors = []
     representative_colors = np.zeros((num_colors, 3), dtype=np.uint8)
 
@@ -203,7 +215,6 @@ def quantize_colors(
         cluster_pixels = pixels_uint8[cluster_mask]
 
         if len(cluster_pixels) > 0:
-            # Find most frequent color in this cluster
             unique_colors, counts = np.unique(
                 cluster_pixels, axis=0, return_counts=True
             )
@@ -212,63 +223,54 @@ def quantize_colors(
             representative_colors[label] = representative
             colors.append(tuple(map(int, representative)))
         else:
-            # Empty cluster (rare), use black as placeholder
             colors.append((0, 0, 0))
 
-    # Reconstruct image using representative colors
     quantized = representative_colors[labels_flat].reshape(image.shape)
+    return quantized, label_grid, colors
 
-    return quantized, colors
+
+def render_quantized_labels(
+    label_grid: np.ndarray,
+    colors: list[tuple[int, int, int]],
+) -> np.ndarray:
+    """Render an RGB image from a label grid and palette."""
+    palette = np.array(colors, dtype=np.uint8)
+    return palette[label_grid]
 
 
-def process_image_vector(
+def process_image_vector_with_preview(
     image: np.ndarray,
-    config: VectorProcessorConfig
-) -> list[dict]:
-    """
-    Process image using vector contour extraction.
-
-    Full pipeline:
-    1. Quantize colors
-    2. For each color, extract contours
-    3. Simplify contours
-    4. Filter small contours
-    5. Convert to polygon format
-
-    Args:
-        image: RGB image array (H, W, 3)
-        config: Processing configuration
-
-    Returns:
-        List of dicts with 'color' and 'polygons' keys
-    """
+    config: VectorProcessorConfig,
+) -> tuple[list[dict], np.ndarray]:
+    """Vectorize a quantized image and return the cleaned preview image."""
     logger.info(
         "Processing image %dx%d with vector mode (epsilon=%.1f, min_area=%d)",
         image.shape[1], image.shape[0], config.epsilon, config.min_area
     )
 
-    # Step 1: Quantize colors
-    quantized, colors = quantize_colors(image, config.num_colors)
+    _, label_grid, colors = quantize_colors_with_labels(image, config.num_colors)
+    cleaned_labels = merge_small_label_regions(
+        labels=label_grid,
+        colors=colors,
+        pixel_size=config.pixel_size,
+        detail_size=config.detail_size,
+    )
+    quantized = render_quantized_labels(cleaned_labels, colors)
 
     results = []
     total_original_pixels = 0
     total_polygon_points = 0
 
-    # Step 2-5: Process each color
-    for color in colors:
-        # Extract mask for this color
-        mask = extract_color_mask(quantized, color)
-        pixel_count = mask.sum()
+    for label, color in enumerate(colors):
+        mask = cleaned_labels == label
+        pixel_count = int(mask.sum())
 
         if pixel_count == 0:
             continue
 
         total_original_pixels += pixel_count
 
-        # Find contours
         contours = find_contours(mask.astype(np.uint8))
-
-        # Simplify and filter
         simplified_contours = []
         for contour in contours:
             simplified = simplify_contour(contour, config.epsilon)
@@ -286,7 +288,7 @@ def process_image_vector(
             results.append({
                 'color': color,
                 'polygons': polygons,
-                'pixel_count': int(pixel_count),
+                'pixel_count': pixel_count,
                 'polygon_points': point_count
             })
 
@@ -297,4 +299,23 @@ def process_image_vector(
         (1 - total_polygon_points / max(total_original_pixels, 1)) * 100
     )
 
+    return results, quantized
+
+
+def process_image_vector(
+    image: np.ndarray,
+    config: VectorProcessorConfig
+) -> list[dict]:
+    """
+    Process image using vector contour extraction.
+
+    Full pipeline:
+    1. Quantize colors
+    2. Remove sub-threshold raster islands if detail_size requires it
+    3. For each color, extract contours
+    4. Simplify contours
+    5. Filter small contours
+    6. Convert to polygon format
+    """
+    results, _ = process_image_vector_with_preview(image, config)
     return results

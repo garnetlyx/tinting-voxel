@@ -1,7 +1,7 @@
 /**
  * Parameter adjustment panel component with mode-specific parameters
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { PrintStackInfo, ProcessingMode } from '../api/types';
 import { ModeSelector } from './ModeSelector';
 
@@ -31,7 +31,8 @@ interface ParameterPanelProps {
   // Target physical size
   targetWidth: number;
   targetHeight: number;
-  onTargetWidthChange: (value: number) => void;
+  maxDimension: number;
+  onMaxDimensionChange: (value: number) => void;
   whiteBackingLayers: number;
   onWhiteBackingLayersChange: (value: number) => void;
   // Base plate
@@ -67,6 +68,8 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   onDetailSizeChange,
   targetWidth,
   targetHeight,
+  maxDimension,
+  onMaxDimensionChange,
   whiteBackingLayers,
   onWhiteBackingLayersChange,
   basePlateThickness,
@@ -78,6 +81,26 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   processing,
   hasImage,
 }) => {
+  const formatMaxDimension = (value: number) => value.toFixed(1);
+  const [maxDimensionInput, setMaxDimensionInput] = useState(formatMaxDimension(maxDimension));
+  const [isEditingMaxDimension, setIsEditingMaxDimension] = useState(false);
+
+  useEffect(() => {
+    if (!isEditingMaxDimension) {
+      setMaxDimensionInput(formatMaxDimension(maxDimension));
+    }
+  }, [isEditingMaxDimension, maxDimension]);
+
+  const commitMaxDimension = () => {
+    setIsEditingMaxDimension(false);
+    const parsed = parseFloat(maxDimensionInput);
+    if (!Number.isFinite(parsed)) {
+      setMaxDimensionInput(formatMaxDimension(maxDimension));
+      return;
+    }
+    onMaxDimensionChange(parsed);
+  };
+
   return (
     <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-4">
       <ModeSelector
@@ -199,7 +222,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           className="w-full"
         />
         <p className="text-xs text-gray-500 mt-1">
-          Minimum physical size for details. Smaller pixel clusters will be merged with similar colors.
+          Minimum physical size for details. Smaller local regions are merged away before export in both pixel and SVG modes.
         </p>
       </div>
 
@@ -223,11 +246,36 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
 
       {targetWidth > 0 && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Target Size: {targetWidth.toFixed(1)} mm × {targetHeight.toFixed(1)} mm
+          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="maxDimension">
+            Max Dimension (Width or Height)
           </label>
+          <input
+            id="maxDimension"
+            type="number"
+            min="1"
+            max="500"
+            step="1"
+            value={maxDimensionInput}
+            onChange={(e) => {
+              setIsEditingMaxDimension(true);
+              setMaxDimensionInput(e.target.value);
+            }}
+            onFocus={() => setIsEditingMaxDimension(true)}
+            onBlur={commitMaxDimension}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.currentTarget.blur();
+              }
+              if (e.key === 'Escape') {
+                setIsEditingMaxDimension(false);
+                setMaxDimensionInput(formatMaxDimension(maxDimension));
+                e.currentTarget.blur();
+              }
+            }}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          />
           <p className="text-xs text-gray-500">
-            Physical dimensions based on pixel size. Adjust Pixel Size to change model size.
+            Current size: {targetWidth.toFixed(1)} mm × {targetHeight.toFixed(1)} mm. The shorter side follows the image proportion automatically.
           </p>
         </div>
       )}

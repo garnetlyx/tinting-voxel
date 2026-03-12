@@ -77,6 +77,12 @@ describe('processImage', () => {
       mappedBlockColors: [],
       mappedBlendPalette: [],
       imageDimensions: { width: 100, height: 100 },
+      printStack: {
+        opticalLayerCount: 4,
+        whiteBackingLayers: 1,
+        totalLayerCount: 5,
+        totalHeightMm: 0.4,
+      },
     };
     mockFetchResponse(mockResponse);
 
@@ -99,6 +105,12 @@ describe('processImage', () => {
       vectorResults: [],
       processedImage: 'data:image/png;base64,abc',
       imageDimensions: { width: 100, height: 100 },
+      printStack: {
+        opticalLayerCount: 4,
+        whiteBackingLayers: 1,
+        totalLayerCount: 5,
+        totalHeightMm: 0.4,
+      },
     };
     mockFetchResponse(mockResponse);
 
@@ -129,6 +141,12 @@ describe('processImage', () => {
       mappedBlockColors: [],
       mappedBlendPalette: [],
       imageDimensions: { width: 0, height: 0 },
+      printStack: {
+        opticalLayerCount: 4,
+        whiteBackingLayers: 1,
+        totalLayerCount: 5,
+        totalHeightMm: 0.4,
+      },
     });
 
     const controller = new AbortController();
@@ -162,6 +180,12 @@ describe('simulatePrintPreview', () => {
       processedImage: 'data:image/png;base64,sim',
       mappedBlockColors: [],
       mappedBlendPalette: [],
+      printStack: {
+        opticalLayerCount: 4,
+        whiteBackingLayers: 1,
+        totalLayerCount: 5,
+        totalHeightMm: 0.4,
+      },
     };
     mockFetchResponse(mockResponse);
 

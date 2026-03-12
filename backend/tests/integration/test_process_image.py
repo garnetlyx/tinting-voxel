@@ -3,6 +3,8 @@ Integration tests for the /api/process-image endpoint.
 """
 import io
 
+from PIL import Image
+
 
 def test_pixel_mode_success(client, tiny_png_bytes):
     """POST /api/process-image in pixel mode returns colorBlocks and image."""
@@ -34,6 +36,80 @@ def test_svg_mode_success(client, tiny_png_bytes):
     assert "vectorResults" in data
     assert "processedImage" in data
     assert "imageDimensions" in data
+
+
+def test_svg_mode_ignores_detail_size_for_global_resizing(client, tiny_png_bytes):
+    """detailSize no longer forces SVG mode to resample the full image."""
+    response = client.post(
+        "/api/process-image",
+        files={"image": ("test.png", tiny_png_bytes, "image/png")},
+        data={
+            "mode": "svg",
+            "epsilon": "1.0",
+            "minArea": "1",
+            "numColors": "4",
+            "pixelSize": "0.08",
+            "detailSize": "0.4",
+            "targetWidth": "100",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["imageDimensions"]["width"] == 4
+    assert data["imageDimensions"]["height"] == 4
+
+
+def test_svg_mode_removes_tiny_island_with_detail_size(client):
+    """SVG mode merges away a sub-threshold island before contour extraction."""
+    pixels = Image.new("RGB", (5, 5), (255, 0, 0))
+    pixels.putpixel((2, 2), (0, 0, 255))
+    image_bytes = io.BytesIO()
+    pixels.save(image_bytes, format="PNG")
+
+    response = client.post(
+        "/api/process-image",
+        files={"image": ("test.png", image_bytes.getvalue(), "image/png")},
+        data={
+            "mode": "svg",
+            "epsilon": "1.0",
+            "minArea": "1",
+            "numColors": "2",
+            "pixelSize": "0.2",
+            "detailSize": "0.4",
+        },
+    )
+
+    assert response.status_code == 200
+    colors = {tuple(result["color"]) for result in response.json()["vectorResults"]}
+    assert (0, 0, 255) not in colors
+
+
+def test_svg_mode_keeps_threshold_sized_island(client):
+    """SVG mode preserves an island that meets the detail threshold."""
+    image = Image.new("RGB", (7, 7), (255, 0, 0))
+    for x in range(2, 5):
+        for y in range(2, 5):
+            image.putpixel((x, y), (0, 0, 255))
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    response = client.post(
+        "/api/process-image",
+        files={"image": ("test.png", buffer.getvalue(), "image/png")},
+        data={
+            "mode": "svg",
+            "epsilon": "1.0",
+            "minArea": "1",
+            "numColors": "2",
+            "pixelSize": "0.2",
+            "detailSize": "0.4",
+        },
+    )
+
+    assert response.status_code == 200
+    colors = {tuple(result["color"]) for result in response.json()["vectorResults"]}
+    assert (0, 0, 255) in colors
 
 
 def test_max_colors_respected(client, tiny_png_bytes):

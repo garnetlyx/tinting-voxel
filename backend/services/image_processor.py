@@ -12,6 +12,7 @@ from PIL import Image
 from core.blend_color import Colors
 from core.color_materials import Color
 from services.print_stack import build_print_stack, resolve_white_backing_label
+from services.raster_cleanup import color_distance, merge_small_label_regions
 from services.stl_generator import compute_reference_matrices, map_color_blocks_to_blend_results
 
 logger = logging.getLogger(__name__)
@@ -123,11 +124,15 @@ def build_vector_print_stack(
     white_backing_layers: int = 1,
 ) -> dict:
     """Build stack metadata for SVG mode using the same blend mapping as export."""
-    if not vector_results:
-        raise ValueError("No vector results provided")
-
     active_colors = colors or Colors()
     resolve_white_backing_label(active_colors, white_backing_layers)
+    if not vector_results:
+        return build_print_stack(
+            layer_count=layer_count,
+            layer_height=layer_height,
+            white_backing_layers=white_backing_layers,
+        )
+
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
         layer_count, layer_height, active_colors
     )
@@ -138,17 +143,6 @@ def build_vector_print_stack(
         layer_count=layer_count,
         layer_height=layer_height,
         white_backing_layers=white_backing_layers,
-    )
-
-
-def color_distance(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
-    """
-    Calculate Euclidean distance between two RGB colors
-    """
-    return np.sqrt(
-        (c1[0] - c2[0]) ** 2 +
-        (c1[1] - c2[1]) ** 2 +
-        (c1[2] - c2[2]) ** 2
     )
 
 
@@ -312,119 +306,42 @@ def merge_small_pixels_to_neighbors(
     """
     if pixel_size >= detail_size:
         return color_blocks
-    
-    # Build a pixel map: (x, y) -> color_block_index
-    pixel_map = {}
+
+    label_grid = np.zeros((height, width), dtype=np.int32)
+    palette = [
+        (int(block['r']), int(block['g']), int(block['b']))
+        for block in color_blocks
+    ]
     for idx, block in enumerate(color_blocks):
         for pixel in block['pixels']:
-            pixel_map[(pixel['x'], pixel['y'])] = idx
-    
-    # Calculate minimum cluster size in pixels
-    scale_factor = detail_size / pixel_size
-    min_cluster_pixels = int(scale_factor * scale_factor)
-    
-    logger.info(
-        "Merging small pixel clusters: pixel_size=%.2fmm, detail_size=%.2fmm, "
-        "min_cluster=%d pixels",
-        pixel_size, detail_size, min_cluster_pixels
+            label_grid[pixel['y'], pixel['x']] = idx
+
+    cleaned_labels = merge_small_label_regions(
+        labels=label_grid,
+        colors=palette,
+        pixel_size=pixel_size,
+        detail_size=detail_size,
     )
-    
-    # Find connected components for each color
-    def get_neighbors(x, y):
-        """Get 4-connected neighbors"""
-        neighbors = []
-        for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
-            nx, ny = x + dx, y + dy
-            if 0 <= nx < width and 0 <= ny < height:
-                neighbors.append((nx, ny))
-        return neighbors
-    
-    def flood_fill(start_x, start_y, color_idx, visited):
-        """Find connected component using flood fill"""
-        stack = [(start_x, start_y)]
-        component = []
-        
-        while stack:
-            x, y = stack.pop()
-            if (x, y) in visited:
-                continue
-            if pixel_map.get((x, y)) != color_idx:
-                continue
-            
-            visited.add((x, y))
-            component.append((x, y))
-            
-            for nx, ny in get_neighbors(x, y):
-                if (nx, ny) not in visited:
-                    stack.append((nx, ny))
-        
-        return component
-    
-    # Find all connected components
-    visited = set()
-    small_components = []  # Components smaller than min_cluster_pixels
-    
-    for idx, block in enumerate(color_blocks):
-        for pixel in block['pixels']:
-            pos = (pixel['x'], pixel['y'])
-            if pos not in visited:
-                component = flood_fill(pixel['x'], pixel['y'], idx, visited)
-                if len(component) < min_cluster_pixels:
-                    small_components.append((idx, component))
-    
-    if not small_components:
-        return color_blocks
-    
-    logger.info("Found %d small components to merge", len(small_components))
-    
-    # Merge small components into nearest color-similar neighbor
-    for color_idx, component in small_components:
-        # Find neighboring colors
-        neighbor_colors = set()
-        for x, y in component:
-            for nx, ny in get_neighbors(x, y):
-                neighbor_idx = pixel_map.get((nx, ny))
-                if neighbor_idx is not None and neighbor_idx != color_idx:
-                    neighbor_colors.add(neighbor_idx)
-        
-        if not neighbor_colors:
-            continue  # Isolated component, keep as is
-        
-        # Find most color-similar neighbor
-        source_rgb = (color_blocks[color_idx]['r'], 
-                     color_blocks[color_idx]['g'], 
-                     color_blocks[color_idx]['b'])
-        
-        best_neighbor = min(
-            neighbor_colors,
-            key=lambda idx: color_distance(
-                source_rgb,
-                (color_blocks[idx]['r'], color_blocks[idx]['g'], color_blocks[idx]['b'])
-            )
-        )
-        
-        # Move pixels from source to best neighbor
-        for x, y in component:
-            pixel_map[(x, y)] = best_neighbor
-    
-    # Rebuild color_blocks from updated pixel_map
-    new_blocks = {}
-    for (x, y), idx in pixel_map.items():
-        if idx not in new_blocks:
-            new_blocks[idx] = {
-                'r': color_blocks[idx]['r'],
-                'g': color_blocks[idx]['g'],
-                'b': color_blocks[idx]['b'],
-                'hex': color_blocks[idx]['hex'],
-                'count': 0,
-                'pixels': []
-            }
-        new_blocks[idx]['pixels'].append({'x': x, 'y': y})
-        new_blocks[idx]['count'] += 1
-    
-    result = list(new_blocks.values())
+
+    rebuilt_blocks = {}
+    for y in range(height):
+        for x in range(width):
+            idx = int(cleaned_labels[y, x])
+            if idx not in rebuilt_blocks:
+                r, g, b = palette[idx]
+                rebuilt_blocks[idx] = {
+                    'r': r,
+                    'g': g,
+                    'b': b,
+                    'hex': color_blocks[idx].get('hex', f"#{r:02x}{g:02x}{b:02x}"),
+                    'count': 0,
+                    'pixels': [],
+                }
+            rebuilt_blocks[idx]['pixels'].append({'x': x, 'y': y})
+            rebuilt_blocks[idx]['count'] += 1
+
+    result = list(rebuilt_blocks.values())
     result.sort(key=lambda c: c['count'], reverse=True)
-    
     return result
 
 

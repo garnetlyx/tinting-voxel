@@ -188,6 +188,24 @@ describe('useImageProcessor', () => {
     );
   });
 
+  it('updates pixel size from the editable max dimension while preserving aspect ratio', async () => {
+    const { result } = renderHook(() => useImageProcessor());
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+
+    await act(async () => {
+      result.current.handleApplyEdit(img);
+    });
+
+    act(() => {
+      result.current.setMaxDimension(10);
+    });
+
+    expect(result.current.pixelSize).toBeCloseTo(1.25);
+    expect(result.current.targetWidth).toBeCloseTo(10);
+    expect(result.current.targetHeight).toBeCloseTo(7.5);
+    expect(result.current.maxDimension).toBeCloseTo(10);
+  });
+
   it('falls back to filamentColors after the preset is edited into a custom config', async () => {
     const { result } = renderHook(() => useImageProcessor());
 
