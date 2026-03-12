@@ -13,11 +13,11 @@ interface PresetSelectorProps {
 
 const PRESET_OPTIONS: { value: FilamentPreset | null; label: string }[] = [
   { value: null, label: 'Custom' },
-  { value: 'bambu_cmyk', label: 'Bambu CMYK' },
-  { value: 'bambu_cmyk_calibrated', label: 'Bambu CMYK Calibrated' },
-  { value: 'bambu_cmyk_phase6', label: 'Bambu CMYK Phase 6' },
+  { value: 'bambu_cmyk', label: 'Bambu CMYW' },
+  { value: 'bambu_cmyk_calibrated', label: 'Bambu CMYWK Calibrated' },
+  { value: 'bambu_cmyk_phase6', label: 'Bambu CMYWK Phase 6' },
   { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW Phase 6' },
-  { value: 'clear_cmyk', label: 'Clear CMYK' },
+  { value: 'clear_cmyk', label: 'Clear CMYW' },
 ];
 
 export const PresetSelector: React.FC<PresetSelectorProps> = ({

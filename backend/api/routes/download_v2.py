@@ -94,7 +94,7 @@ async def api_get_filament_presets(request: Request):
     presets = [
         FilamentPresetInfo(
             name="bambu_cmyk",
-            display_name="Bambu CMYK",
+            display_name="Bambu CMYW",
             colors=[
                 FilamentColorConfig(
                     name=c.name,
@@ -110,7 +110,7 @@ async def api_get_filament_presets(request: Request):
         ),
         FilamentPresetInfo(
             name="clear_cmyk",
-            display_name="Clear CMYK",
+            display_name="Clear CMYW",
             colors=[
                 FilamentColorConfig(
                     name=c.name,
@@ -126,7 +126,7 @@ async def api_get_filament_presets(request: Request):
         ),
         FilamentPresetInfo(
             name="bambu_cmyk_calibrated",
-            display_name="Bambu CMYK Calibrated",
+            display_name="Bambu CMYWK Calibrated",
             colors=[
                 FilamentColorConfig(
                     name=c.name,
@@ -142,7 +142,7 @@ async def api_get_filament_presets(request: Request):
         ),
         FilamentPresetInfo(
             name="bambu_cmyk_phase6",
-            display_name="Bambu CMYK Phase 6",
+            display_name="Bambu CMYWK Phase 6",
             colors=[
                 FilamentColorConfig(
                     name=c.name,

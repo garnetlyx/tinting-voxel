@@ -23,6 +23,13 @@ def test_get_filament_presets(client):
     assert "bambu_cmyw_phase6" in names
     assert "clear_cmyk" in names
 
+    display_names = {preset["name"]: preset["display_name"] for preset in data["presets"]}
+    assert display_names["bambu_cmyk"] == "Bambu CMYW"
+    assert display_names["bambu_cmyk_calibrated"] == "Bambu CMYWK Calibrated"
+    assert display_names["bambu_cmyk_phase6"] == "Bambu CMYWK Phase 6"
+    assert display_names["bambu_cmyw_phase6"] == "Bambu CMYW Phase 6"
+    assert display_names["clear_cmyk"] == "Clear CMYW"
+
 
 def test_get_filament_presets_exposes_calibrated_material_params(client):
     """GET /api/v2/filament-presets includes calibrated blend parameters."""
