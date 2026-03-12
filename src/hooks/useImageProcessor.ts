@@ -286,9 +286,9 @@ export const useImageProcessor = () => {
       } else {
         const svgResult = result as SVGProcessImageResponse;
         setProcessedImageUrl(svgResult.processedImage);
-        setSegmentationImageUrl(null);
+        setSegmentationImageUrl(svgResult.segmentationImage);
         setMappedBlockColors([]);
-        setMappedBlendPalette([]);
+        setMappedBlendPalette(svgResult.mappedBlendPalette);
         setVectorResults(svgResult.vectorResults);
         setColorBlocks([]);
       }

@@ -164,6 +164,49 @@ describe('useImageProcessor', () => {
     );
   });
 
+  it('stores simulated preview data returned by svg mode', async () => {
+    mockedProcessImage.mockResolvedValueOnce({
+      vectorResults: [{ color: [255, 0, 0], polygons: [], pixel_count: 48, polygon_points: 0 }],
+      processedImage: 'data:image/png;base64,svg-sim',
+      segmentationImage: 'data:image/png;base64,svg-seg',
+      mappedBlendPalette: [
+        {
+          code: 'CCMY',
+          rgb: [100, 100, 100],
+          hex: '#646464',
+          sourceRgb: [255, 0, 0],
+          sourceHex: '#FF0000',
+          pixelCount: 48,
+          pixelPercent: 100,
+        },
+      ],
+      imageDimensions: { width: 8, height: 6 },
+      printStack: {
+        opticalLayerCount: 4,
+        whiteBackingLayers: 1,
+        totalLayerCount: 5,
+        totalHeightMm: 0.4,
+      },
+    });
+
+    const { result } = renderHook(() => useImageProcessor());
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+
+    act(() => {
+      result.current.setMode('svg');
+    });
+
+    await act(async () => {
+      result.current.handleApplyEdit(img);
+    });
+
+    expect(result.current.mode).toBe('svg');
+    expect(result.current.processedImageUrl).toBe('data:image/png;base64,svg-sim');
+    expect(result.current.segmentationImageUrl).toBe('data:image/png;base64,svg-seg');
+    expect(result.current.mappedBlendPalette).toHaveLength(1);
+    expect(result.current.vectorResults).toHaveLength(1);
+  });
+
   it('preserves filamentPreset for STL downloads when a preset is selected', async () => {
     const { result } = renderHook(() => useImageProcessor());
 

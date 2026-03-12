@@ -3,6 +3,7 @@ Unit tests for image processing service, including large image handling.
 """
 from io import BytesIO
 
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -10,6 +11,7 @@ from services.image_processor import (
     MAX_PROCESSING_DIMENSION,
     _downscale_if_needed,
     build_simulated_print_preview,
+    build_vector_simulated_preview,
     merge_small_pixels_to_neighbors,
     process_image,
 )
@@ -146,6 +148,31 @@ class TestProcessImageLargeHandling:
         assert result['mappedBlendPalette'][0]['pixelPercent'] >= result['mappedBlendPalette'][1]['pixelPercent']
         assert result['printStack']['whiteBackingLayers'] == 0
         assert result['printStack']['totalLayerCount'] == 4
+
+    def test_vector_simulated_preview_returns_palette_and_image(self):
+        """SVG preview uses printable blends and reports palette coverage."""
+        quantized = np.array(
+            [
+                [[255, 0, 0], [255, 0, 0]],
+                [[0, 0, 255], [0, 0, 255]],
+            ],
+            dtype=np.uint8,
+        )
+        vector_results = [
+            {"color": (255, 0, 0), "pixel_count": 2, "polygons": [], "polygon_points": 0},
+            {"color": (0, 0, 255), "pixel_count": 2, "polygons": [], "polygon_points": 0},
+        ]
+
+        result = build_vector_simulated_preview(
+            quantized_image=quantized,
+            vector_results=vector_results,
+            white_backing_layers=0,
+        )
+
+        assert result['processedImage'].startswith('data:image/png;base64,')
+        assert len(result['mappedBlendPalette']) == 2
+        assert sum(entry['pixelCount'] for entry in result['mappedBlendPalette']) == 4
+        assert result['printStack']['whiteBackingLayers'] == 0
 
     def test_small_components_merge_without_global_scaling(self):
         """detail_size merges local components instead of enlarging the full image."""

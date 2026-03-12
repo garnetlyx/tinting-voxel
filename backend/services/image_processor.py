@@ -13,7 +13,7 @@ from core.blend_color import Colors
 from core.color_materials import Color
 from services.print_stack import build_print_stack, resolve_white_backing_label
 from services.raster_cleanup import color_distance, merge_small_label_regions
-from services.stl_generator import compute_reference_matrices, map_color_blocks_to_blend_results
+from services.stl_generator import compute_reference_matrices
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,57 @@ def _render_color_block_image(
     return _image_to_data_url(Image.fromarray(img_array))
 
 
+def _map_source_colors_to_blends(
+    source_colors: list[tuple[int, int, int]],
+    colors: Colors,
+    layer_count: int,
+    layer_height: float,
+) -> tuple[list[str], list[tuple[int, int, int]]]:
+    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
+        layer_count,
+        layer_height,
+        colors,
+    )
+    result_codes, result_rgbs = Color.map_to_nearest_color(
+        source_colors,
+        ref_code_matrix,
+        ref_rgb_matrix,
+    )
+    normalized_rgbs = [
+        tuple(int(channel) for channel in np.asarray(rgb).tolist())
+        for rgb in result_rgbs
+    ]
+    return result_codes, normalized_rgbs
+
+
+def _build_mapped_blend_palette(
+    entries: list[dict],
+    result_codes: list[str],
+    result_rgbs: list[tuple[int, int, int]],
+    total_pixels: int,
+) -> list[dict]:
+    mapped_blend_palette = []
+    for entry, code, rgb in zip(entries, result_codes, result_rgbs):
+        source_rgb = (
+            int(entry['r']),
+            int(entry['g']),
+            int(entry['b']),
+        )
+        pixel_count = int(entry['pixelCount'])
+        mapped_blend_palette.append({
+            "code": code,
+            "rgb": list(rgb),
+            "hex": _rgb_to_hex(rgb),
+            "sourceRgb": list(source_rgb),
+            "sourceHex": _rgb_to_hex(source_rgb),
+            "pixelCount": pixel_count,
+            "pixelPercent": round(pixel_count * 100.0 / total_pixels, 4),
+        })
+
+    mapped_blend_palette.sort(key=lambda entry: entry["pixelCount"], reverse=True)
+    return mapped_blend_palette
+
+
 def build_simulated_print_preview(
     color_blocks: list[dict],
     image_dimensions: dict,
@@ -68,11 +119,25 @@ def build_simulated_print_preview(
     height = image_dimensions['height']
     total_pixels = max(1, sum(block.get('count', len(block['pixels'])) for block in color_blocks))
 
-    result_codes, result_rgbs = map_color_blocks_to_blend_results(
-        color_blocks=color_blocks,
+    source_entries = [
+        {
+            "r": int(block['r']),
+            "g": int(block['g']),
+            "b": int(block['b']),
+            "pixelCount": int(block.get('count', len(block['pixels']))),
+        }
+        for block in color_blocks
+    ]
+    source_colors = [
+        (entry["r"], entry["g"], entry["b"])
+        for entry in source_entries
+    ]
+
+    result_codes, result_rgbs = _map_source_colors_to_blends(
+        source_colors=source_colors,
+        colors=active_colors,
         layer_height=layer_height,
         layer_count=layer_count,
-        colors=active_colors,
     )
 
     processed_image = _render_color_block_image(
@@ -83,31 +148,22 @@ def build_simulated_print_preview(
     )
 
     mapped_block_colors = []
-    mapped_blend_palette = []
-    for block, code, rgb in zip(color_blocks, result_codes, result_rgbs):
-        source_rgb = (int(block['r']), int(block['g']), int(block['b']))
-        pixel_count = int(block.get('count', len(block['pixels'])))
+    for code, rgb in zip(result_codes, result_rgbs):
         mapped_block_colors.append({
             "code": code,
             "rgb": list(rgb),
             "hex": _rgb_to_hex(rgb),
         })
-        mapped_blend_palette.append({
-            "code": code,
-            "rgb": list(rgb),
-            "hex": _rgb_to_hex(rgb),
-            "sourceRgb": list(source_rgb),
-            "sourceHex": _rgb_to_hex(source_rgb),
-            "pixelCount": pixel_count,
-            "pixelPercent": round(pixel_count * 100.0 / total_pixels, 4),
-        })
-
-    mapped_blend_palette.sort(key=lambda entry: entry["pixelCount"], reverse=True)
 
     return {
         "processedImage": processed_image,
         "mappedBlockColors": mapped_block_colors,
-        "mappedBlendPalette": mapped_blend_palette,
+        "mappedBlendPalette": _build_mapped_blend_palette(
+            entries=source_entries,
+            result_codes=result_codes,
+            result_rgbs=result_rgbs,
+            total_pixels=total_pixels,
+        ),
         "printStack": build_print_stack(
             layer_count=layer_count,
             layer_height=layer_height,
@@ -116,34 +172,68 @@ def build_simulated_print_preview(
     }
 
 
-def build_vector_print_stack(
+def build_vector_simulated_preview(
+    quantized_image: np.ndarray,
     vector_results: list[dict],
     colors: Optional[Colors] = None,
     layer_count: int = 4,
     layer_height: float = 0.08,
     white_backing_layers: int = 1,
 ) -> dict:
-    """Build stack metadata for SVG mode using the same blend mapping as export."""
+    """Build an image-specific print preview for SVG mode from vectorized regions."""
     active_colors = colors or Colors()
     resolve_white_backing_label(active_colors, white_backing_layers)
+
     if not vector_results:
-        return build_print_stack(
+        return {
+            "processedImage": _image_to_data_url(Image.fromarray(quantized_image)),
+            "mappedBlendPalette": [],
+            "printStack": build_print_stack(
+                layer_count=layer_count,
+                layer_height=layer_height,
+                white_backing_layers=white_backing_layers,
+            ),
+        }
+
+    source_entries = [
+        {
+            "r": int(result['color'][0]),
+            "g": int(result['color'][1]),
+            "b": int(result['color'][2]),
+            "pixelCount": int(result['pixel_count']),
+        }
+        for result in vector_results
+    ]
+    source_colors = [
+        (entry["r"], entry["g"], entry["b"])
+        for entry in source_entries
+    ]
+    result_codes, result_rgbs = _map_source_colors_to_blends(
+        source_colors=source_colors,
+        colors=active_colors,
+        layer_count=layer_count,
+        layer_height=layer_height,
+    )
+
+    simulated = quantized_image.copy()
+    for source_rgb, mapped_rgb in zip(source_colors, result_rgbs):
+        mask = np.all(quantized_image == np.array(source_rgb, dtype=np.uint8), axis=2)
+        simulated[mask] = np.array(mapped_rgb, dtype=np.uint8)
+
+    return {
+        "processedImage": _image_to_data_url(Image.fromarray(simulated)),
+        "mappedBlendPalette": _build_mapped_blend_palette(
+            entries=source_entries,
+            result_codes=result_codes,
+            result_rgbs=result_rgbs,
+            total_pixels=max(1, sum(entry["pixelCount"] for entry in source_entries)),
+        ),
+        "printStack": build_print_stack(
             layer_count=layer_count,
             layer_height=layer_height,
             white_backing_layers=white_backing_layers,
-        )
-
-    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-        layer_count, layer_height, active_colors
-    )
-    input_colors = [result['color'] for result in vector_results]
-    Color.map_to_nearest_color(input_colors, ref_code_matrix, ref_rgb_matrix)
-
-    return build_print_stack(
-        layer_count=layer_count,
-        layer_height=layer_height,
-        white_backing_layers=white_backing_layers,
-    )
+        ),
+    }
 
 
 def is_dark_neutral_color(

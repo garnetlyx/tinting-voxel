@@ -35,7 +35,11 @@ def test_svg_mode_success(client, tiny_png_bytes):
     data = response.json()
     assert "vectorResults" in data
     assert "processedImage" in data
+    assert "segmentationImage" in data
+    assert "mappedBlendPalette" in data
     assert "imageDimensions" in data
+    assert data["processedImage"].startswith("data:image/png;base64,")
+    assert data["segmentationImage"].startswith("data:image/png;base64,")
 
 
 def test_svg_mode_ignores_detail_size_for_global_resizing(client, tiny_png_bytes):

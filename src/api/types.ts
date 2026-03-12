@@ -44,7 +44,9 @@ export interface ProcessImageResponse {
 
 export interface SVGProcessImageResponse {
   vectorResults: VectorColorResult[];
-  processedImage: string;  // base64 encoded data URL
+  processedImage: string;  // simulated printable image
+  segmentationImage: string;  // quantized/vectorized source preview
+  mappedBlendPalette: MappedBlendPaletteEntry[];
   imageDimensions: ImageDimensions;
   pixelSize?: number;
   detailSize?: number;

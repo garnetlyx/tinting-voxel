@@ -104,6 +104,8 @@ describe('processImage', () => {
     const mockResponse = {
       vectorResults: [],
       processedImage: 'data:image/png;base64,abc',
+      segmentationImage: 'data:image/png;base64,seg',
+      mappedBlendPalette: [],
       imageDimensions: { width: 100, height: 100 },
       printStack: {
         opticalLayerCount: 4,

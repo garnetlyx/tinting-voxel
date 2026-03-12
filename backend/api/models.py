@@ -160,7 +160,9 @@ class VectorColorResult(BaseModel):
 class SVGProcessImageResponse(BaseModel):
     """Response model for /api/process-image endpoint in SVG mode."""
     vectorResults: List[VectorColorResult]
-    processedImage: str  # base64 encoded image
+    processedImage: str  # base64 encoded simulated print preview
+    segmentationImage: str  # base64 encoded quantized preview with contour overlay
+    mappedBlendPalette: List["MappedBlendPaletteEntry"]
     imageDimensions: ImageDimensions
     pixelSize: Optional[float] = None
     detailSize: Optional[float] = None

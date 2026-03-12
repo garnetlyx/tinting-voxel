@@ -1,7 +1,6 @@
 """
 Image processing endpoints
 """
-import base64
 import json
 import logging
 from typing import Optional
@@ -28,8 +27,9 @@ from api.validators import validate_image_upload
 from services.image_processor import (
     MAX_PROCESSING_DIMENSION,
     _downscale_if_needed,
-    build_vector_print_stack,
+    _image_to_data_url,
     build_simulated_print_preview,
+    build_vector_simulated_preview,
     process_image,
 )
 from services.vector_processor import VectorProcessorConfig, process_image_vector_with_preview
@@ -187,7 +187,7 @@ async def api_process_image(
 
     vector_results, quantized = process_image_vector_with_preview(img_array, config)
 
-    # Generate processed image preview (quantized colors with contour lines)
+    # Generate quantized/vectorized preview (quantized colors with contour lines)
     import cv2
     result_img = quantized.copy()
 
@@ -196,11 +196,7 @@ async def api_process_image(
             pts = np.array(polygon, dtype=np.int32)
             cv2.polylines(result_img, [pts], isClosed=True, color=(0, 0, 0), thickness=1)
 
-    processed_img = Image.fromarray(result_img)
-    buffered = BytesIO()
-    processed_img.save(buffered, format="PNG")
-    processed_img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-    processed_img_data_url = f"data:image/png;base64,{processed_img_base64}"
+    segmentation_image_data_url = _image_to_data_url(Image.fromarray(result_img))
 
     logger.info(
         "SVG mode - epsilon=%.1f, minArea=%d, numColors=%d",
@@ -211,7 +207,8 @@ async def api_process_image(
         img.width, img.height, len(vector_results)
     )
 
-    print_stack = build_vector_print_stack(
+    simulated_preview = build_vector_simulated_preview(
+        quantized_image=quantized,
         vector_results=vector_results,
         colors=colors,
         layer_count=layerCount,
@@ -221,11 +218,13 @@ async def api_process_image(
 
     return SVGProcessImageResponse(
         vectorResults=vector_results,
-        processedImage=processed_img_data_url,
+        processedImage=simulated_preview["processedImage"],
+        segmentationImage=segmentation_image_data_url,
+        mappedBlendPalette=simulated_preview["mappedBlendPalette"],
         imageDimensions={'width': img.width, 'height': img.height},
         pixelSize=pixelSize,
         detailSize=detailSize,
-        printStack=print_stack,
+        printStack=simulated_preview["printStack"],
     )
 
 

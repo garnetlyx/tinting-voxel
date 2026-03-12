@@ -266,14 +266,14 @@ const Converter: React.FC = () => {
                       {/* Before/After Comparison */}
                       <ImageComparison
                         originalImage={image}
-                        intermediateImageUrl={mode === 'pixel' ? segmentationImageUrl : null}
-                        intermediateLabel={mode === 'pixel' ? 'Grouped Colors' : 'Intermediate'}
+                        intermediateImageUrl={segmentationImageUrl}
+                        intermediateLabel={mode === 'pixel' ? 'Grouped Colors' : 'Vectorized Regions'}
                         processedImageUrl={processedImageUrl}
                         colorCount={resultCount}
-                        processedLabel={mode === 'pixel' ? 'Simulated Print' : 'Processed'}
+                        processedLabel="Simulated Print"
                       />
 
-                      {mode === 'pixel' && (
+                      {mappedBlendPalette.length > 0 && (
                         <MappedBlendPalette entries={mappedBlendPalette} />
                       )}
 
