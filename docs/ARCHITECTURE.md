@@ -1,6 +1,6 @@
 # Architecture
 
-**Last Updated**: 2026-03-08
+**Last Updated**: 2026-03-11
 
 ## Overview
 
@@ -97,18 +97,19 @@ img2stl/
 │   │       ├── palette.py    # Palette library
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
-│   │   ├── blend_color.py    # Color blending (Beer-Lambert model)
-│   │   ├── blend_models.py   # Alternative blend functions (kromacut, per_channel, hybrid)
-│   │   ├── calibrator.py     # Beer-Lambert parameter calibration engine
-│   │   ├── calibration_priors.py # Calibration priors and constraints
-│   │   ├── code_grid.py      # Code grid generation utilities
-│   │   ├── color_config.py   # Filament presets (single source of truth)
-│   │   ├── color_materials.py # Material property definitions
-│   │   ├── grid_sampling.py  # Grid sampling for calibration plates
-│   │   ├── plate_geometry.py # Plate geometry calculations
-│   │   ├── ramp_calibrator.py # Ramp plate calibration
-│   │   ├── structured_plate.py # Structured plate layout generation
-│   │   └── palette_library.py # Curated color palettes
+│   │   ├── blend_color.py        # Color blending (Original/Kromacut/Hybrid/Per-channel modes)
+│   │   ├── blend_models.py       # Pluggable blend functions (hybrid_per_color_k, per_channel_k)
+│   │   ├── calibrator.py         # Parameter calibration engine (16×16 plate)
+│   │   ├── ramp_calibrator.py    # Ramp plate calibration + per-color k optimizer
+│   │   ├── calibration_priors.py # k-ordering constraints, TD1S priors
+│   │   ├── color_config.py       # Filament presets single source of truth (Phase6 preset)
+│   │   ├── color_materials.py    # Material property definitions (k_rgb support)
+│   │   ├── code_grid.py          # Code grid generation utilities
+│   │   ├── grid_sampling.py      # Photo sampling for calibration plates
+│   │   ├── plate_geometry.py     # Plate geometry calculations
+│   │   ├── photo_preprocessor.py # Perspective correction, WB, glare masking
+│   │   ├── structured_plate.py   # Structured plate layout (P1S 30×26 CMYWK)
+│   │   └── palette_library.py    # Curated color palettes
 │   ├── services/         # Business logic
 │   │   ├── image_processor.py    # Image processing + auto-downscale
 │   │   ├── stl_generator.py      # STL file generation
@@ -122,13 +123,20 @@ img2stl/
 │   │   ├── print_settings_generator.py # Slicer settings JSON
 │   │   └── analytics.py         # In-memory usage analytics
 │   ├── tools/           # CLI tools
-│   │   └── calibration/ # Calibration tools
-│   │       ├── generate_plate.py       # Generate calibration plates
-│   │       ├── generate_ramp.py        # Generate ramp plates
-│   │       ├── run_calibration.py      # Run photo calibration
-│   │       └── run_ramp_calibration.py # Run ramp plate calibration
+│   │   └── calibration/ # Calibration tools (19 CLI scripts)
+│   │       ├── generate_plate.py            # 16×16 permutation plate
+│   │       ├── generate_ramp.py             # Single-color 4×5 ramp
+│   │       ├── generate_multicolor_ramp.py  # Multi-color 12×5 ramp
+│   │       ├── generate_pair_ramp.py        # Two-color 12×4 ramp
+│   │       ├── generate_structured_plate.py # P1S 30×26 CMYWK structured plate
+│   │       ├── run_calibration.py           # 16×16 plate calibration
+│   │       ├── run_ramp_calibration.py      # Ramp plate calibration
+│   │       ├── run_structured_calibration.py # Whole-plate B/W backing calibration
+│   │       ├── run_cross_validation.py      # All param sets × all photos
+│   │       ├── run_model_search.py          # New model family exploration
+│   │       └── ...                          # Additional diagnostic + utility scripts
 │   ├── config/           # Configuration
-│   └── tests/            # Test suite (573 tests, 89% coverage)
+│   └── tests/            # Test suite (818 tests, 89% coverage)
 │       └── fixtures/
 │           ├── images/        # Committed small test images (200-500px, <100KB)
 │           └── images-local/  # Gitignored large images for local manual testing
@@ -164,9 +172,12 @@ img2stl/
 | **SVG-STLGenerator** | Vector-based STL generation from SVG contours | numpy-stl, svg.path |
 | **3MFGenerator** | 3MF file generation with named color objects | trimesh, lxml |
 | **MeshOptimizer** | Greedy meshing to reduce box count, face culling | NumPy |
-| **BlendColor (core)** | Beer-Lambert model, CMYK color mixing, LAB conversion | scikit-image, NumPy |
-| **ColorConfig** | Filament presets and material properties | dataclasses |
-| **Calibrator** | Beer-Lambert parameter calibration from photos | scipy.optimize, PIL |
+| **BlendColor (core)** | Color blending (Original/Hybrid/per-color-k modes), CIEDE2000 matching | scikit-image, NumPy |
+| **BlendModels** | Pluggable blend functions (hybrid_per_color_k, hybrid_per_channel_k) | NumPy |
+| **ColorConfig** | Filament presets (BAMBU_CMYK_PHASE6_PRESET with per-color k) | dataclasses |
+| **Calibrator** | 16×16 plate calibration, per-color k support | scipy.optimize, PIL |
+| **RampCalibrator** | Ramp plate calibration, k_rgb optimizer, k-ordering constraints | scipy.optimize |
+| **CalibrationPriors** | k-ordering penalty (K>W>M>C>Y), TD1S prior | NumPy |
 | **FilamentPreview** | Color matrix preview generation | PIL, NumPy |
 | **BatchProcessor** | Multi-image batch processing | concurrent.futures |
 | **PaletteLibrary** | Curated color palette management | dataclasses |
@@ -319,8 +330,8 @@ img2stl/
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| **Color Space for Matching** | RGB Euclidean, HSV, LAB | LAB | Perceptually uniform; human vision aligns with LAB distance |
-| **Color Mixing Model** | Simple averaging, Layer stacking, Beer-Lambert | Beer-Lambert | Physically accurate for transparent filaments |
+| **Color Space for Matching** | RGB Euclidean, HSV, LAB Euclidean, CIEDE2000 | CIEDE2000 | Perceptually uniform + hue weighting for dark chromatic colors |
+| **Color Mixing Model** | Beer-Lambert scalar, Hybrid per-color k, Full K-M | Hybrid per-color k | Per-color scattering + absorption; generalizes to arbitrary filaments |
 | **Mesh Optimization** | None, Greedy meshing, Marching cubes | Greedy meshing | 70-80% reduction with simple implementation |
 | **STL Format** | ASCII STL, Binary STL | Binary STL | 5x smaller files, faster parsing |
 | **Separate vs Single STL** | Multi-color single file, Separate per color | Separate files | Slicer compatibility, manual filament swap support |
@@ -330,24 +341,32 @@ img2stl/
 
 ## Key Algorithms
 
-### 1. Beer-Lambert Color Mixing
+### 1. Hybrid Per-Color k Color Mixing
 
-The Beer-Lambert law models light transmission through transparent layers:
+The production color mixing model uses a hybrid Beer-Lambert formula with per-color scattering coefficients (simplified Kubelka-Munk):
 
 ```
-T = e^(-α × d / td)
+T_ch(c) = exp(-(scatter_alpha / td_c  +  k_c × A_ch(c)) × d)
 
 Where:
-- T = transmission rate (0-1)
-- α = absorption coefficient (default: 23)
-- d = layer thickness (mm)
-- td = transmission distance (material property)
+- T_ch    = per-channel transmission
+- scatter_alpha / td_c = base scattering (channel-neutral, handles White/Black)
+- k_c     = per-color scattering coefficient (Phase 6 calibrated)
+- A_ch(c) = per-channel absorption from filament hex color
+- d       = layer height (mm)
 ```
 
-Implementation in `blend_color.py:code_to_rgb()`:
-1. Calculate transmission rate for each layer
-2. Accumulate light loss through layers
-3. Normalize and convert to RGB
+Phase 6 calibrated k values (K > W > M > C > Y physical ordering):
+
+| Color | k | td (TD1S-mapped) |
+|-------|---|---|
+| K (Black) | 17.65 | 2.21 |
+| W (White) | 12.39 | 5.48 |
+| M (Magenta) | 8.42 | 2.22 |
+| C (Cyan) | 8.13 | 1.70 |
+| Y (Yellow) | 3.73 | 4.15 |
+
+Implementation: `blend_models.py:blend_hybrid_per_color_k()`, preset: `BAMBU_CMYK_PHASE6_PRESET`.
 
 ### 2. Greedy Meshing
 

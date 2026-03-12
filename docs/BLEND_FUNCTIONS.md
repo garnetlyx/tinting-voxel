@@ -327,12 +327,14 @@ Hybrid_td achieves 38% improvement over Original on two-color pairs.
 
 ### 16x16 permutation plate (256 four-color combinations)
 
-| Mode | Optimized dE |
-|------|-------------|
-| **Original** | **34.03** |
-| Kromacut | 38.68 |
-| Per-channel | 44.01 |
-| Hybrid | TBD |
+| Mode | Optimized dE | Notes |
+|------|-------------|-------|
+| **Original** | **34.03** | Best within scalar-T family (old photo, print_regular_0.32.png) |
+| Kromacut | 38.68 | |
+| Per-channel | 44.01 | White invisible |
+| Hybrid (global k) | 45.92 | Worse — optimizer pushes C/M td to ceiling |
+| **P6 hybrid_per_color_k** | **39.69** | Best physics-based (real plate IMG_7827, WB-corrected) |
+| P7 hybrid_per_channel_k | 39.38 | Best on primary metric but k_rgb not yet optimized |
 
 ### Optimal parameters (hybrid_td, pair ramp)
 
@@ -352,20 +354,39 @@ td_K          = 0.1     (instrument floor)
 Original (scalar T, probabilistic stacking)
     |
     |-- good single-color (dE=3.30)
-    |-- poor multi-color (dE=34.03)
+    |-- poor multi-color (dE=34.03 old plate, ~42.90 real plate WB-corrected)
     |-- root cause: scalar T can't model per-channel absorption
     |
     v
-Hybrid (per-channel T, probabilistic stacking)
+Hybrid with global k (per-channel T, probabilistic stacking)
     |
     |-- scatter_alpha/td provides base opacity (fixes White/Black)
     |-- k*A_ch provides per-channel selectivity (fixes CMY)
     |-- preserves (1-T)^2 double-pass physics
     |-- single-color: dE=3.01 (better)
     |-- two-color: dE=9.78 (38% better)
+    |-- 16×16: dE=45.92 (WORSE — global k insufficient)
     |
     v
-Next: validate on 16x16 plate, then promote to production
+Hybrid with per-color k (Phase 6, 2026-03-07)
+    |
+    |-- each filament gets independent k_c (scattering coefficient)
+    |-- B/W backing dual-calibration isolates true k values
+    |-- physically-ordered k: K > W > M > C > Y
+    |-- 16×16 real: dE=39.69 (first real improvement over P0=42.90)
+    |-- transfer score: 28.57 (best production-facing)
+    |-- production recommendation: BAMBU_CMYK_PHASE6_PRESET
+    |
+    v
+Hybrid with per-channel k per color (P7, 2026-03-10)
+    |
+    |-- k_R, k_G, k_B per filament (3N additional parameters)
+    |-- 16×16 real: dE=39.38 (marginally better than P6)
+    |-- transfer: 31.83 (worse than P6 — k_rgb values not yet optimized)
+    |
+    v
+Next: optimize k_rgb via gradient descent on training photos (Ph1, Ph2, Ph6)
+     validate on held-out Ph5; if transfer improves, promote to production
 ```
 
 ---
@@ -476,9 +497,9 @@ When K → 0 (pure scattering, no absorption): the layer becomes a diffuser.
 
 Potential improvements informed by the academic literature, ordered by complexity:
 
-### 1. Per-Color k (Near-term)
+### 1. Per-Color k — **IMPLEMENTED** (2026-03-07/10)
 
-Replace global `k` with per-color `k_c`. Each pigment has a different scatter-to-absorption ratio. Addresses the Magenta anomaly where `td_M = 299.6` in hybrid_td optimization (scatter effectively disabled). See `docs/CALIBRATION.md` Phase 3.5.
+Replace global `k` with per-color `k_c`. Each pigment has a different scatter-to-absorption ratio. Addresses the Magenta anomaly where `td_M = 299.6` in hybrid_td optimization (scatter effectively disabled). See `docs/CALIBRATION.md` Phase 6.
 
 ```
 T_ch(c) = exp(-(scatter_alpha / td_c + k_c · A_ch(c)) · d)
@@ -486,7 +507,17 @@ T_ch(c) = exp(-(scatter_alpha / td_c + k_c · A_ch(c)) · d)
 
 Parameters: scatter_alpha + N × k_c + N × td_c = 1 + 2N (11 for CMYKW).
 
-Status after model search (`2026-03-07`): this is currently the strongest pure-physics family in replay. A balanced `hybrid_per_color_k_td1s_gamma` candidate beat the production baseline on weighted transfer while also improving `16x16 real`. Important caveat: `kW` is not very meaningful in this exact formula because `A_ch(W) ≈ 0`; most of the gain comes from giving **CMY** different absorption scaling, not from “learning white.”
+**Status**: Implemented as `hybrid_per_color_k` blend mode + `BAMBU_CMYK_PHASE6_PRESET`. Best production-facing preset (16×16 dE=39.69, transfer=28.57). Important caveat: `kW` is not very meaningful in this formula because `A_ch(W) ≈ 0`; gains mainly come from per-CMY absorption scaling.
+
+### 1b. Per-Channel k Per Color — **IMPLEMENTED EXPERIMENTALLY** (2026-03-10)
+
+Extends per-color k to per-channel: `(k_R, k_G, k_B)` per filament.
+
+```
+T_ch(c) = exp(-(scatter_alpha / td_c + k_ch(c) · A_ch(c)) · d)
+```
+
+**Status**: Implemented as `hybrid_per_channel_k` + `BAMBU_CMYK_PER_CHANNEL_K_PRESET`. k_rgb values are hand-tuned guesses, not optimized. Next step: gradient descent on k_rgb using training photos.
 
 ### 2. Saunderson Correction (Medium-term)
 
