@@ -33,6 +33,11 @@ const MAX_FILAMENT_COLORS = 16;
 const MIN_COLOR_LAYERS = 4;
 const MAX_COLOR_LAYERS = 10;
 const MAX_BLEND_PERMUTATIONS = 1_000_000;
+const DEFAULT_MAX_DIMENSION_MM = 200;
+const MIN_PIXEL_SIZE_MM = 0.01;
+const MAX_PIXEL_SIZE_MM = 5.0;
+
+const clampPixelSize = (value: number) => Math.max(MIN_PIXEL_SIZE_MM, Math.min(MAX_PIXEL_SIZE_MM, value));
 
 const computeMaxLayerCount = (filamentCount: number) => {
   let maxLayerCount = MIN_COLOR_LAYERS;
@@ -41,6 +46,13 @@ const computeMaxLayerCount = (filamentCount: number) => {
     maxLayerCount = candidate;
   }
   return maxLayerCount;
+};
+
+const computeDefaultPixelSize = (widthPx: number, heightPx: number) => {
+  const longestSidePx = Math.max(widthPx, heightPx);
+  if (longestSidePx <= 0) return null;
+  const defaultMaxDimensionMm = Math.min(DEFAULT_MAX_DIMENSION_MM, longestSidePx);
+  return clampPixelSize(defaultMaxDimensionMm / longestSidePx);
 };
 
 export const useImageProcessor = () => {
@@ -105,11 +117,13 @@ export const useImageProcessor = () => {
     const clampedDimension = Math.max(1, Math.min(500, dimensionMm));
     const longestSidePx = Math.max(imageDimensions.width, imageDimensions.height);
     if (longestSidePx <= 0) return;
-    setPixelSize(Math.max(0.01, Math.min(5.0, clampedDimension / longestSidePx)));
+    shouldApplyDefaultMaxDimensionRef.current = false;
+    setPixelSize(clampPixelSize(clampedDimension / longestSidePx));
   }, [imageDimensions.height, imageDimensions.width]);
 
   const handleSetPixelSize = useCallback((value: number) => {
-    setPixelSize(Math.max(0.01, Math.min(5.0, value)));
+    shouldApplyDefaultMaxDimensionRef.current = false;
+    setPixelSize(clampPixelSize(value));
   }, []);
 
   // detailSize only controls local feature cleanup; it does not change model scale.
@@ -118,6 +132,7 @@ export const useImageProcessor = () => {
   const processAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const skipNextPreviewRefreshRef = useRef(false);
+  const shouldApplyDefaultMaxDimensionRef = useRef(false);
 
   // Load a built-in preset into filamentColors
   const loadPreset = useCallback((preset: FilamentPreset) => {
@@ -273,6 +288,16 @@ export const useImageProcessor = () => {
       if (result.detailSize !== undefined && result.detailSize !== null) {
         setDetailSize(result.detailSize);
       }
+      if (shouldApplyDefaultMaxDimensionRef.current) {
+        const defaultPixelSize = computeDefaultPixelSize(
+          result.imageDimensions.width,
+          result.imageDimensions.height
+        );
+        if (defaultPixelSize !== null) {
+          setPixelSize(defaultPixelSize);
+        }
+        shouldApplyDefaultMaxDimensionRef.current = false;
+      }
 
       if (processingMode === 'pixel') {
         const pixelResult = result as ProcessImageResponse;
@@ -382,6 +407,7 @@ export const useImageProcessor = () => {
 
   // Apply edited image from ImageEditor and start processing
   const handleApplyEdit = useCallback((editedImg: HTMLImageElement) => {
+    shouldApplyDefaultMaxDimensionRef.current = true;
     setImage(editedImg);
     setRawImage(null);
     setIsEditing(false);

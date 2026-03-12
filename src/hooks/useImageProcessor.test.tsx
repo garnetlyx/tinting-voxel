@@ -264,6 +264,49 @@ describe('useImageProcessor', () => {
     expect(result.current.maxDimension).toBeCloseTo(10);
   });
 
+  it('defaults max dimension to the processed image size when it is smaller than 200mm', async () => {
+    const { result } = renderHook(() => useImageProcessor());
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+
+    await act(async () => {
+      result.current.handleApplyEdit(img);
+    });
+
+    expect(result.current.pixelSize).toBeCloseTo(1);
+    expect(result.current.targetWidth).toBeCloseTo(8);
+    expect(result.current.targetHeight).toBeCloseTo(6);
+    expect(result.current.maxDimension).toBeCloseTo(8);
+  });
+
+  it('caps the default max dimension at 200mm for larger processed images', async () => {
+    mockedProcessImage.mockResolvedValueOnce({
+      colorBlocks: [],
+      processedImage: 'data:image/png;base64,mock',
+      segmentationImage: 'data:image/png;base64,seg',
+      mappedBlockColors: [],
+      mappedBlendPalette: [],
+      imageDimensions: { width: 800, height: 600 },
+      printStack: {
+        opticalLayerCount: 4,
+        whiteBackingLayers: 1,
+        totalLayerCount: 5,
+        totalHeightMm: 0.4,
+      },
+    });
+
+    const { result } = renderHook(() => useImageProcessor());
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+
+    await act(async () => {
+      result.current.handleApplyEdit(img);
+    });
+
+    expect(result.current.pixelSize).toBeCloseTo(0.25);
+    expect(result.current.targetWidth).toBeCloseTo(200);
+    expect(result.current.targetHeight).toBeCloseTo(150);
+    expect(result.current.maxDimension).toBeCloseTo(200);
+  });
+
   it('falls back to filamentColors after the preset is edited into a custom config', async () => {
     const { result } = renderHook(() => useImageProcessor());
 
