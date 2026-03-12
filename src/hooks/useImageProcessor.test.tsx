@@ -124,8 +124,23 @@ describe('useImageProcessor', () => {
 
     expect(result.current.filamentPreset).toBe('bambu_cmyw_phase6');
     expect(result.current.filamentColors).toHaveLength(4);
+    expect(result.current.layerCount).toBe(4);
+    expect(result.current.maxLayerCount).toBe(9);
     expect(result.current.filamentColors.some(color => color.name === 'Key')).toBe(false);
     expect(result.current.filamentColors[0].k).toBe(8.13);
+  });
+
+  it('derives a lower max layer count for filament sets with more colors and clamps the current value', () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    act(() => {
+      result.current.loadPreset('bambu_cmyk_calibrated');
+      result.current.setLayerCount(9);
+    });
+
+    expect(result.current.filamentColors).toHaveLength(5);
+    expect(result.current.maxLayerCount).toBe(8);
+    expect(result.current.layerCount).toBe(8);
   });
 
   it('sends filament config and layer settings when processing an image', async () => {

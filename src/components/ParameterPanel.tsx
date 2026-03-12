@@ -22,8 +22,11 @@ interface ParameterPanelProps {
   onNumColorsChange: (value: number) => void;
   // Shared params
   layerHeight: number;
+  layerCount: number;
+  maxLayerCount: number;
   pixelSize: number;
   onLayerHeightChange: (value: number) => void;
+  onLayerCountChange: (value: number) => void;
   onPixelSizeChange: (value: number) => void;
   // Detail size
   detailSize: number;
@@ -61,8 +64,11 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   onMinAreaChange,
   onNumColorsChange,
   layerHeight,
+  layerCount,
+  maxLayerCount,
   pixelSize,
   onLayerHeightChange,
+  onLayerCountChange,
   onPixelSizeChange,
   detailSize,
   onDetailSizeChange,
@@ -192,6 +198,24 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           </div>
         </>
       )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Color Layers: {layerCount} <span className="text-xs font-normal text-gray-500">(max {maxLayerCount} for current filament set)</span>
+        </label>
+        <input
+          type="range"
+          min="4"
+          max={maxLayerCount}
+          step="1"
+          value={layerCount}
+          onChange={(e) => onLayerCountChange(parseInt(e.target.value, 10))}
+          className="w-full"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Higher layer counts improve blend fidelity but increase compute cost exponentially with the selected filament preset or custom set.
+        </p>
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">

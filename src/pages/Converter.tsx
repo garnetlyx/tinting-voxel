@@ -60,6 +60,7 @@ const Converter: React.FC = () => {
     pixelSize,
     detailSize,
     layerCount,
+    maxLayerCount,
     whiteBackingLayers,
     basePlateThickness,
     doubleSided,
@@ -85,6 +86,7 @@ const Converter: React.FC = () => {
     setMinArea,
     setNumColors,
     setLayerHeight,
+    setLayerCount,
     setPixelSize,
     setDetailSize,
     setWhiteBackingLayers,
@@ -147,8 +149,11 @@ const Converter: React.FC = () => {
                   onMinAreaChange={setMinArea}
                   onNumColorsChange={setNumColors}
                   layerHeight={layerHeight}
+                  layerCount={layerCount}
+                  maxLayerCount={maxLayerCount}
                   pixelSize={pixelSize}
                   onLayerHeightChange={setLayerHeight}
+                  onLayerCountChange={setLayerCount}
                   onPixelSizeChange={setPixelSize}
                   detailSize={detailSize}
                   onDetailSizeChange={setDetailSize}

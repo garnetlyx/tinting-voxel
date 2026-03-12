@@ -30,6 +30,18 @@ import { buildPrintStack } from '../utils/printStack';
 
 const MIN_FILAMENT_COLORS = 4;
 const MAX_FILAMENT_COLORS = 16;
+const MIN_COLOR_LAYERS = 4;
+const MAX_COLOR_LAYERS = 10;
+const MAX_BLEND_PERMUTATIONS = 1_000_000;
+
+const computeMaxLayerCount = (filamentCount: number) => {
+  let maxLayerCount = MIN_COLOR_LAYERS;
+  for (let candidate = MIN_COLOR_LAYERS; candidate <= MAX_COLOR_LAYERS; candidate += 1) {
+    if (filamentCount ** candidate > MAX_BLEND_PERMUTATIONS) break;
+    maxLayerCount = candidate;
+  }
+  return maxLayerCount;
+};
 
 export const useImageProcessor = () => {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -62,7 +74,7 @@ export const useImageProcessor = () => {
   const [layerHeight, setLayerHeight] = useState(0.08);
   const [detailSize, setDetailSize] = useState(0.4);
   const [pixelSize, setPixelSize] = useState(0.4);
-  const [layerCount] = useState(4);
+  const [layerCount, setLayerCount] = useState(MIN_COLOR_LAYERS);
   const [whiteBackingLayers, setWhiteBackingLayers] = useState(1);
 
   // Base plate options
@@ -178,6 +190,19 @@ export const useImageProcessor = () => {
     () => (filamentPreset ? { filamentPreset } : { filamentColors }),
     [filamentColors, filamentPreset]
   );
+
+  const maxLayerCount = useMemo(
+    () => computeMaxLayerCount(filamentColors.length),
+    [filamentColors.length]
+  );
+
+  const handleSetLayerCount = useCallback((value: number) => {
+    setLayerCount(Math.max(MIN_COLOR_LAYERS, Math.min(maxLayerCount, value)));
+  }, [maxLayerCount]);
+
+  useEffect(() => {
+    setLayerCount(prev => Math.min(prev, maxLayerCount));
+  }, [maxLayerCount]);
 
   // Process image by calling backend API
   const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode) => {
@@ -689,6 +714,7 @@ export const useImageProcessor = () => {
     targetWidth,
     targetHeight,
     maxDimension,
+    maxLayerCount,
     printStack,
 
     // Filament state
@@ -707,6 +733,7 @@ export const useImageProcessor = () => {
     setMinArea,
     setNumColors,
     setLayerHeight,
+    setLayerCount: handleSetLayerCount,
     setPixelSize: handleSetPixelSize,
     setDetailSize,
     setWhiteBackingLayers,

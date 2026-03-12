@@ -19,8 +19,11 @@ describe('ParameterPanel', () => {
     onMinAreaChange: vi.fn(),
     onNumColorsChange: vi.fn(),
     layerHeight: 0.08,
+    layerCount: 4,
+    maxLayerCount: 8,
     pixelSize: 0.4,
     onLayerHeightChange: vi.fn(),
+    onLayerCountChange: vi.fn(),
     onPixelSizeChange: vi.fn(),
     detailSize: 0.4,
     onDetailSizeChange: vi.fn(),
@@ -68,5 +71,12 @@ describe('ParameterPanel', () => {
 
     await user.tab();
     expect(onMaxDimensionChange).toHaveBeenCalledWith(200);
+  });
+
+  it('shows the current filament-aware upper limit for color layers', () => {
+    render(<ParameterPanel {...defaultProps} />);
+
+    expect(screen.getByText(/Color Layers: 4/i)).toBeInTheDocument();
+    expect(screen.getByText(/\(max 8 for current filament set\)/i)).toBeInTheDocument();
   });
 });
