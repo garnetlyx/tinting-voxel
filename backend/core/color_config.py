@@ -350,12 +350,28 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
 
 
 def get_available_presets() -> List[str]:
-    """Get list of available preset names."""
+    """
+    Get list of available preset names.
+    
+    Returns only Phase 6 presets (current production presets).
+    Archived presets are still accessible via get_preset() but hidden from UI.
+    """
+    return [
+        "bambu_cmyk_phase6",
+        "bambu_cmyw_phase6",
+    ]
+
+
+def get_archived_presets() -> List[str]:
+    """
+    Get list of archived preset names.
+    
+    These presets are still functional but hidden from the UI.
+    Useful for testing, comparison, or backward compatibility.
+    """
     return [
         "bambu_cmyk",
         "bambu_cmyk_calibrated",
-        "bambu_cmyk_phase6",
-        "bambu_cmyw_phase6",
         "bambu_cmyk_per_channel_k",
         "clear_cmyk",
     ]

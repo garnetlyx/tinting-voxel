@@ -180,6 +180,7 @@ def build_vector_simulated_preview(
     layer_count: int = 4,
     layer_height: float = 0.08,
     white_backing_layers: int = 1,
+    ref_matrices: Optional[tuple] = None,  # Pre-computed (ref_code_matrix, ref_rgb_matrix)
 ) -> dict:
     """Build an image-specific print preview for SVG mode from vectorized regions."""
     active_colors = colors or Colors()
@@ -213,12 +214,28 @@ def build_vector_simulated_preview(
         (entry["r"], entry["g"], entry["b"])
         for entry in source_entries
     ]
-    result_codes, result_rgbs = _map_source_colors_to_blends(
-        source_colors=source_colors,
-        colors=active_colors,
-        layer_count=layer_count,
-        layer_height=layer_height,
-    )
+    
+    # Use pre-computed matrices if provided, otherwise compute them
+    if ref_matrices is not None:
+        ref_code_matrix, ref_rgb_matrix = ref_matrices
+        result_codes, result_rgbs = Color.map_to_nearest_color(
+            source_colors,
+            ref_code_matrix,
+            ref_rgb_matrix,
+        )
+        normalized_rgbs = [
+            tuple(int(channel) for channel in np.asarray(rgb).tolist())
+            for rgb in result_rgbs
+        ]
+    else:
+        result_codes, normalized_rgbs = _map_source_colors_to_blends(
+            source_colors=source_colors,
+            colors=active_colors,
+            layer_count=layer_count,
+            layer_height=layer_height,
+        )
+    
+    result_rgbs = normalized_rgbs
     
     # Use quantized image as background to avoid white edges from filtered regions
     # Map all quantized colors (not just vector results) to their blend equivalents
@@ -229,12 +246,25 @@ def build_vector_simulated_preview(
             if color not in unique_colors_in_quantized:
                 unique_colors_in_quantized.append(color)
     
-    all_codes, all_rgbs = _map_source_colors_to_blends(
-        source_colors=unique_colors_in_quantized,
-        colors=active_colors,
-        layer_count=layer_count,
-        layer_height=layer_height,
-    )
+    # Use pre-computed matrices if available
+    if ref_matrices is not None:
+        ref_code_matrix, ref_rgb_matrix = ref_matrices
+        all_codes, all_rgbs_raw = Color.map_to_nearest_color(
+            unique_colors_in_quantized,
+            ref_code_matrix,
+            ref_rgb_matrix,
+        )
+        all_rgbs = [
+            tuple(int(channel) for channel in np.asarray(rgb).tolist())
+            for rgb in all_rgbs_raw
+        ]
+    else:
+        all_codes, all_rgbs = _map_source_colors_to_blends(
+            source_colors=unique_colors_in_quantized,
+            colors=active_colors,
+            layer_count=layer_count,
+            layer_height=layer_height,
+        )
     
     # Build color mapping dict
     color_map = {

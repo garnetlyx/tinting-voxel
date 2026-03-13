@@ -192,41 +192,35 @@ async def api_process_image(
 
     vector_results, quantized = process_image_vector_with_preview(img_array, config)
 
-    # Render segmentation image: show quantized colors with vector outlines
-    # Map quantized colors to blend colors to avoid white edges
-    unique_colors_in_quantized = []
-    for y in range(quantized.shape[0]):
-        for x in range(quantized.shape[1]):
-            color = tuple(quantized[y, x])
-            if color not in unique_colors_in_quantized:
-                unique_colors_in_quantized.append(color)
-    
-    # Map all quantized colors to printable blends
+    # Try to get cached reference matrices for preset configurations
+    from services.matrix_cache import get_cached_matrices, set_cached_matrices
     from services.stl_generator import compute_reference_matrices
     from core.color_materials import Color
-    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-        layerCount,
-        layerHeight,
-        colors,
-    )
-    _, all_mapped_rgbs = Color.map_to_nearest_color(
-        unique_colors_in_quantized,
-        ref_code_matrix,
-        ref_rgb_matrix,
-    )
     
-    # Build color mapping
-    color_map = {
-        unique_colors_in_quantized[i]: tuple(int(c) for c in all_mapped_rgbs[i])
-        for i in range(len(unique_colors_in_quantized))
-    }
+    # Check if we're using a preset (can be cached)
+    preset_name = parsed_preset
     
-    # Create background with mapped colors
-    segmentation_img = np.zeros_like(quantized)
-    for y in range(quantized.shape[0]):
-        for x in range(quantized.shape[1]):
-            color = tuple(quantized[y, x])
-            segmentation_img[y, x] = color_map.get(color, color)
+    # Try cache first for preset configurations
+    cached = get_cached_matrices(preset_name, layerCount, layerHeight)
+    if cached is not None:
+        ref_code_matrix, ref_rgb_matrix = cached
+    else:
+        # Compute matrices
+        ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
+            layerCount,
+            layerHeight,
+            colors,
+        )
+        # Cache for preset configurations
+        if preset_name is not None:
+            set_cached_matrices(
+                preset_name, layerCount, layerHeight,
+                ref_code_matrix, ref_rgb_matrix
+            )
+
+    # Render segmentation image: show quantized colors (BEFORE mapping) with vector outlines
+    # This shows the original quantized colors, not the printable blend colors
+    segmentation_img = quantized.copy()
     
     # Render vector regions on top with outlines
     from services.vector_processor import normalize_regions, render_region_mask
@@ -238,7 +232,8 @@ async def api_process_image(
             height=img.height,
         )
         if region_mask.any():
-            fill_color = color_map.get(tuple(result['color']), tuple(result['color']))
+            # Use original quantized color (not mapped)
+            fill_color = tuple(result['color'])
             segmentation_img[region_mask] = fill_color
             
             # Draw outlines
@@ -259,6 +254,7 @@ async def api_process_image(
         img.width, img.height, len(vector_results)
     )
 
+    # Pass pre-computed reference matrices to avoid recomputation
     simulated_preview = build_vector_simulated_preview(
         quantized_image=quantized,
         vector_results=vector_results,
@@ -266,6 +262,7 @@ async def api_process_image(
         layer_count=layerCount,
         layer_height=layerHeight,
         white_backing_layers=whiteBackingLayers,
+        ref_matrices=(ref_code_matrix, ref_rgb_matrix),  # Pass pre-computed matrices
     )
 
     return SVGProcessImageResponse(

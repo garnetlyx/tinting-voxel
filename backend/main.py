@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     Application lifespan handler
-    Initialize color mapping on startup
+    Initialize color mapping on startup and warm up matrix cache
     """
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
     logger.info("Environment: %s", settings.environment)
@@ -41,6 +41,12 @@ async def lifespan(app: FastAPI):
         layer_count=settings.default_layer_count,
         layer_height=settings.default_layer_height
     )
+
+    # Warm up matrix cache for common preset configurations
+    logger.info("Warming up matrix cache for preset configurations...")
+    from services.matrix_cache import warmup_cache
+    cache_entries = warmup_cache()
+    logger.info("Matrix cache warmed up with %d entries", cache_entries)
 
     logger.info("Application startup complete")
     yield
@@ -100,6 +106,15 @@ async def analytics_middleware(request: Request, call_next):
 async def api_analytics(request: Request):
     """Get usage analytics summary."""
     return analytics.get_summary()
+
+
+# Matrix cache stats endpoint
+@app.get("/api/cache-stats", tags=["Analytics"])
+@limiter.limit("10/minute")
+async def api_cache_stats(request: Request):
+    """Get matrix cache statistics."""
+    from services.matrix_cache import get_cache_stats
+    return get_cache_stats()
 
 
 # Include routers
