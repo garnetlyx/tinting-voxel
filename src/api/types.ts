@@ -21,8 +21,14 @@ export interface ColorBlock {
 export interface VectorColorResult {
   color: [number, number, number];
   polygons: [number, number][][];
+  regions?: VectorRegion[];
   pixel_count: number;
   polygon_points: number;
+}
+
+export interface VectorRegion {
+  outer: [number, number][];
+  holes: [number, number][][];
 }
 
 export interface ImageDimensions {

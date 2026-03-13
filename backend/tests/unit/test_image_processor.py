@@ -1,6 +1,7 @@
 """
 Unit tests for image processing service, including large image handling.
 """
+import base64
 from io import BytesIO
 
 import numpy as np
@@ -23,6 +24,13 @@ def _create_image_bytes(width, height, color=(255, 0, 0), fmt='PNG'):
     buf = BytesIO()
     img.save(buf, format=fmt)
     return buf.getvalue()
+
+
+def _decode_data_url_image(data_url: str) -> np.ndarray:
+    """Decode a PNG data URL into an RGB numpy array."""
+    encoded = data_url.split(",", 1)[1]
+    image_bytes = base64.b64decode(encoded)
+    return np.array(Image.open(BytesIO(image_bytes)).convert("RGB"))
 
 
 class TestDownscaleIfNeeded:
@@ -159,8 +167,20 @@ class TestProcessImageLargeHandling:
             dtype=np.uint8,
         )
         vector_results = [
-            {"color": (255, 0, 0), "pixel_count": 2, "polygons": [], "polygon_points": 0},
-            {"color": (0, 0, 255), "pixel_count": 2, "polygons": [], "polygon_points": 0},
+            {
+                "color": (255, 0, 0),
+                "polygons": [[(0, 0), (1, 0), (1, 1), (0, 1)]],
+                "regions": [{"outer": [(0, 0), (1, 0), (1, 1), (0, 1)], "holes": []}],
+                "pixel_count": 2,
+                "polygon_points": 4,
+            },
+            {
+                "color": (0, 0, 255),
+                "polygons": [[(0, 1), (1, 1), (1, 2), (0, 2)]],
+                "regions": [{"outer": [(0, 1), (1, 1), (1, 2), (0, 2)], "holes": []}],
+                "pixel_count": 2,
+                "polygon_points": 4,
+            },
         ]
 
         result = build_vector_simulated_preview(
@@ -173,6 +193,38 @@ class TestProcessImageLargeHandling:
         assert len(result['mappedBlendPalette']) == 2
         assert sum(entry['pixelCount'] for entry in result['mappedBlendPalette']) == 4
         assert result['printStack']['whiteBackingLayers'] == 0
+
+    def test_vector_simulated_preview_uses_final_geometry_not_quantized_pixels(self):
+        """Filtered or holed geometry should drive the preview image."""
+        quantized = np.array(
+            [
+                [[255, 0, 0], [255, 0, 0], [255, 0, 0]],
+                [[255, 0, 0], [0, 0, 255], [255, 0, 0]],
+                [[255, 0, 0], [255, 0, 0], [255, 0, 0]],
+            ],
+            dtype=np.uint8,
+        )
+        vector_results = [
+            {
+                "color": (255, 0, 0),
+                "polygons": [[(0, 0), (2, 0), (2, 2), (0, 2)]],
+                "regions": [{
+                    "outer": [(0, 0), (2, 0), (2, 2), (0, 2)],
+                    "holes": [[(1, 1), (2, 1), (2, 2), (1, 2)]],
+                }],
+                "pixel_count": 8,
+                "polygon_points": 8,
+            }
+        ]
+
+        result = build_vector_simulated_preview(
+            quantized_image=quantized,
+            vector_results=vector_results,
+            white_backing_layers=0,
+        )
+
+        preview = _decode_data_url_image(result['processedImage'])
+        assert tuple(preview[1, 1]) == (255, 255, 255)
 
     def test_small_components_merge_without_global_scaling(self):
         """detail_size merges local components instead of enlarging the full image."""

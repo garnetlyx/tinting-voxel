@@ -51,9 +51,10 @@ def test_adjacent_small_components_converge_without_oscillation():
 
 def test_fallback_merge_breaks_all_small_deadlock():
     """If no stable neighbor exists, cleanup still makes bounded progress."""
-    labels = np.array([[0, 1]], dtype=np.int32)
+    labels = np.array([[0, 1, 2]], dtype=np.int32)
     colors = [
         (255, 0, 0),
+        (250, 10, 10),
         (0, 0, 255),
     ]
 

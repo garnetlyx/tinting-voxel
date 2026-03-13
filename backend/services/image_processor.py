@@ -14,6 +14,7 @@ from core.color_materials import Color
 from services.print_stack import build_print_stack, resolve_white_backing_label
 from services.raster_cleanup import color_distance, merge_small_label_regions
 from services.stl_generator import compute_reference_matrices
+from services.vector_processor import render_vector_results_image
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +184,10 @@ def build_vector_simulated_preview(
     """Build an image-specific print preview for SVG mode from vectorized regions."""
     active_colors = colors or Colors()
     resolve_white_backing_label(active_colors, white_backing_layers)
+    image_dimensions = {
+        'width': int(quantized_image.shape[1]),
+        'height': int(quantized_image.shape[0]),
+    }
 
     if not vector_results:
         return {
@@ -214,11 +219,48 @@ def build_vector_simulated_preview(
         layer_count=layer_count,
         layer_height=layer_height,
     )
-
-    simulated = quantized_image.copy()
-    for source_rgb, mapped_rgb in zip(source_colors, result_rgbs):
-        mask = np.all(quantized_image == np.array(source_rgb, dtype=np.uint8), axis=2)
-        simulated[mask] = np.array(mapped_rgb, dtype=np.uint8)
+    
+    # Use quantized image as background to avoid white edges from filtered regions
+    # Map all quantized colors (not just vector results) to their blend equivalents
+    unique_colors_in_quantized = []
+    for y in range(quantized_image.shape[0]):
+        for x in range(quantized_image.shape[1]):
+            color = tuple(quantized_image[y, x])
+            if color not in unique_colors_in_quantized:
+                unique_colors_in_quantized.append(color)
+    
+    all_codes, all_rgbs = _map_source_colors_to_blends(
+        source_colors=unique_colors_in_quantized,
+        colors=active_colors,
+        layer_count=layer_count,
+        layer_height=layer_height,
+    )
+    
+    # Build color mapping dict
+    color_map = {
+        unique_colors_in_quantized[i]: all_rgbs[i]
+        for i in range(len(unique_colors_in_quantized))
+    }
+    
+    # Create background image with mapped colors
+    background_image = np.zeros_like(quantized_image)
+    for y in range(quantized_image.shape[0]):
+        for x in range(quantized_image.shape[1]):
+            color = tuple(quantized_image[y, x])
+            background_image[y, x] = color_map.get(color, color)
+    
+    # Render vector results on top of the background
+    simulated = background_image.copy()
+    for idx, result in enumerate(vector_results):
+        from services.vector_processor import normalize_regions, render_region_mask
+        regions = normalize_regions(result)
+        region_mask = render_region_mask(
+            regions,
+            width=image_dimensions['width'],
+            height=image_dimensions['height'],
+        )
+        if region_mask.any():
+            simulated[region_mask] = result_rgbs[idx]
 
     return {
         "processedImage": _image_to_data_url(Image.fromarray(simulated)),
@@ -406,8 +448,18 @@ def merge_small_pixels_to_neighbors(
         for pixel in block['pixels']:
             label_grid[pixel['y'], pixel['x']] = idx
 
-    cleaned_labels = merge_small_label_regions(
+    # First remove thin features
+    from services.raster_cleanup import remove_thin_features
+    filtered_labels = remove_thin_features(
         labels=label_grid,
+        colors=palette,
+        pixel_size=pixel_size,
+        detail_size=detail_size,
+    )
+
+    # Then merge small regions
+    cleaned_labels = merge_small_label_regions(
+        labels=filtered_labels,
         colors=palette,
         pixel_size=pixel_size,
         detail_size=detail_size,

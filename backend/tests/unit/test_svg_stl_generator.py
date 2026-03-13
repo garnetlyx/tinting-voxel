@@ -182,6 +182,33 @@ class TestGenerateSVGSTLZip:
 
         assert len(zip_content) > 0
 
+    def test_regions_field_drives_svg_export(self):
+        """SVG export should accept region geometry without relying on legacy polygons."""
+        vector_results = [
+            {
+                'color': (255, 0, 0),
+                'polygons': [],
+                'regions': [
+                    {
+                        'outer': [(0, 0), (4, 0), (4, 4), (0, 4)],
+                        'holes': [[(1, 1), (3, 1), (3, 3), (1, 3)]],
+                    }
+                ],
+                'pixel_count': 12,
+                'polygon_points': 8,
+            }
+        ]
+
+        zip_content = generate_svg_stl_zip(
+            vector_results=vector_results,
+            layer_height=0.08,
+            pixel_size=0.08,
+            layer_count=4,
+            image_dimensions={'width': 5, 'height': 5}
+        )
+
+        assert zip_content[:2] == b'PK'
+
     def test_empty_vector_results(self):
         """Empty vector results should produce empty ZIP"""
         zip_content = generate_svg_stl_zip(

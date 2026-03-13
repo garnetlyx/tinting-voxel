@@ -14,6 +14,7 @@ from typing import Optional
 import numpy as np
 
 from core.blend_color import Color, Colors
+from services.mesh_optimizer import generate_optimized_boxes_from_grid
 from services import stl_generator
 from services.print_stack import (
     build_print_stack,
@@ -22,11 +23,13 @@ from services.print_stack import (
 )
 from services.stl_generator import (
     generate_box,
+    generate_boxes_batch,
     get_filename_prefix,
     merge_stl_meshes,
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
+from services.vector_processor import normalize_regions, render_region_mask
 
 logger = logging.getLogger(__name__)
 
@@ -300,8 +303,8 @@ def generate_svg_stl_zip(
 
     width = image_dimensions['width']
     height = image_dimensions['height']
-    total_polygons = 0
-    total_triangles = 0
+    total_regions = 0
+    total_boxes = 0
 
     # Z offset: color layers sit on top of base plate
     z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
@@ -313,7 +316,11 @@ def generate_svg_stl_zip(
 
     # Process each color group
     for idx, result in enumerate(vector_results):
-        polygons = result['polygons']
+        regions = normalize_regions(result)
+        region_grid = render_region_mask(regions, width=width, height=height)
+        if not region_grid.any():
+            continue
+        total_regions += len(regions)
         blend_code = result_codes[idx]
 
         # Generate mesh for each layer
@@ -324,27 +331,19 @@ def generate_svg_stl_zip(
             z_max = z_offset + (start_idx + group_len) * layer_height
             start_idx += group_len
 
-            # Extrude each polygon
-            for polygon in polygons:
-                if len(polygon) < 3:
-                    continue
-
-                total_polygons += 1
-
-                mesh = generate_polygon_mesh(
-                    polygon=polygon,
-                    z_min=z_min,
-                    z_max=z_max,
-                    pixel_size=pixel_size
-                )
-
-                if len(mesh) > 0:
-                    total_triangles += len(mesh)
-                    code_mesh_map[code_char].append(mesh)
+            boxes = generate_optimized_boxes_from_grid(
+                grid=region_grid,
+                pixel_size=pixel_size,
+                z_min=z_min,
+                z_max=z_max,
+            )
+            if boxes:
+                total_boxes += len(boxes)
+                code_mesh_map[code_char].append(generate_boxes_batch(boxes))
 
     logger.info(
-        "SVG STL generation: %d polygons -> %d triangles",
-        total_polygons, total_triangles
+        "SVG STL generation: %d regions -> %d boxes",
+        total_regions, total_boxes
     )
 
     # Add white backing above optical layers (reflector behind colors)
@@ -366,14 +365,12 @@ def generate_svg_stl_zip(
         front_top = z_offset + layer_count * layer_height + n_white * layer_height
 
         for idx, result in enumerate(vector_results):
-            polygons = result['polygons']
+            regions = normalize_regions(result)
+            region_grid = render_region_mask(regions, width=width, height=height)
+            if not region_grid.any():
+                continue
             blend_code = result_codes[idx]
-
-            # Mirror polygons horizontally: x -> (width - 1 - x)
-            mirrored_polygons = [
-                [(width - 1 - x, y) for x, y in polygon]
-                for polygon in polygons
-            ]
+            mirrored_grid = np.fliplr(region_grid)
 
             # Back layers are stacked on top of front, in reverse order
             start_idx = 0
@@ -383,21 +380,15 @@ def generate_svg_stl_zip(
                 z_max = front_top + (start_idx + group_len) * layer_height
                 start_idx += group_len
 
-                # Extrude each mirrored polygon
-                for polygon in mirrored_polygons:
-                    if len(polygon) < 3:
-                        continue
-
-                    mesh = generate_polygon_mesh(
-                        polygon=polygon,
-                        z_min=z_min,
-                        z_max=z_max,
-                        pixel_size=pixel_size
-                    )
-
-                    if len(mesh) > 0:
-                        total_triangles += len(mesh)
-                        code_mesh_map[code_char].append(mesh)
+                boxes = generate_optimized_boxes_from_grid(
+                    grid=mirrored_grid,
+                    pixel_size=pixel_size,
+                    z_min=z_min,
+                    z_max=z_max,
+                )
+                if boxes:
+                    total_boxes += len(boxes)
+                    code_mesh_map[code_char].append(generate_boxes_batch(boxes))
 
         logger.info("Generated double-sided print: front + mirrored back")
 

@@ -8,10 +8,12 @@ import numpy as np
 
 from services.vector_processor import (
     VectorProcessorConfig,
+    extract_regions_from_mask,
     contour_to_polygon,
     extract_color_mask,
     filter_small_contours,
     find_contours,
+    render_region_mask,
     simplify_contour,
 )
 
@@ -269,3 +271,18 @@ class TestVectorProcessorIntegration:
 
         result_colors = {tuple(item['color']) for item in result}
         assert (0, 0, 255) in result_colors
+
+    def test_extract_regions_preserves_hole_geometry(self):
+        """A donut mask should become one region with one hole."""
+        mask = np.zeros((7, 7), dtype=np.uint8)
+        mask[1:6, 1:6] = 255
+        mask[3, 3] = 0
+
+        regions = extract_regions_from_mask(mask, epsilon=0.1, min_area=1)
+
+        assert len(regions) == 1
+        assert len(regions[0]['holes']) == 1
+
+        rendered = render_region_mask(regions, width=7, height=7)
+        assert rendered[2, 2]
+        assert not rendered[3, 3]

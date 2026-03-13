@@ -6,6 +6,7 @@ import logging
 from typing import Optional
 from io import BytesIO
 
+import cv2
 import numpy as np
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from PIL import Image
@@ -32,7 +33,11 @@ from services.image_processor import (
     build_vector_simulated_preview,
     process_image,
 )
-from services.vector_processor import VectorProcessorConfig, process_image_vector_with_preview
+from services.vector_processor import (
+    VectorProcessorConfig,
+    process_image_vector_with_preview,
+    render_vector_results_image,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -187,16 +192,63 @@ async def api_process_image(
 
     vector_results, quantized = process_image_vector_with_preview(img_array, config)
 
-    # Generate quantized/vectorized preview (quantized colors with contour lines)
-    import cv2
-    result_img = quantized.copy()
+    # Render segmentation image: show quantized colors with vector outlines
+    # Map quantized colors to blend colors to avoid white edges
+    unique_colors_in_quantized = []
+    for y in range(quantized.shape[0]):
+        for x in range(quantized.shape[1]):
+            color = tuple(quantized[y, x])
+            if color not in unique_colors_in_quantized:
+                unique_colors_in_quantized.append(color)
+    
+    # Map all quantized colors to printable blends
+    from services.stl_generator import compute_reference_matrices
+    from core.color_materials import Color
+    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
+        layerCount,
+        layerHeight,
+        colors,
+    )
+    _, all_mapped_rgbs = Color.map_to_nearest_color(
+        unique_colors_in_quantized,
+        ref_code_matrix,
+        ref_rgb_matrix,
+    )
+    
+    # Build color mapping
+    color_map = {
+        unique_colors_in_quantized[i]: tuple(int(c) for c in all_mapped_rgbs[i])
+        for i in range(len(unique_colors_in_quantized))
+    }
+    
+    # Create background with mapped colors
+    segmentation_img = np.zeros_like(quantized)
+    for y in range(quantized.shape[0]):
+        for x in range(quantized.shape[1]):
+            color = tuple(quantized[y, x])
+            segmentation_img[y, x] = color_map.get(color, color)
+    
+    # Render vector regions on top with outlines
+    from services.vector_processor import normalize_regions, render_region_mask
+    for idx, result in enumerate(vector_results):
+        regions = normalize_regions(result)
+        region_mask = render_region_mask(
+            regions,
+            width=img.width,
+            height=img.height,
+        )
+        if region_mask.any():
+            fill_color = color_map.get(tuple(result['color']), tuple(result['color']))
+            segmentation_img[region_mask] = fill_color
+            
+            # Draw outlines
+            for region in regions:
+                outer = region.get('outer', [])
+                if len(outer) >= 3:
+                    outer_pts = np.round(np.array(outer, dtype=np.float32)).astype(np.int32)
+                    cv2.polylines(segmentation_img, [outer_pts], isClosed=True, color=(0, 0, 0), thickness=1)
 
-    for vr in vector_results:
-        for polygon in vr['polygons']:
-            pts = np.array(polygon, dtype=np.int32)
-            cv2.polylines(result_img, [pts], isClosed=True, color=(0, 0, 0), thickness=1)
-
-    segmentation_image_data_url = _image_to_data_url(Image.fromarray(result_img))
+    segmentation_image_data_url = _image_to_data_url(Image.fromarray(segmentation_img))
 
     logger.info(
         "SVG mode - epsilon=%.1f, minArea=%d, numColors=%d",

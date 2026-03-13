@@ -28,6 +28,100 @@ def min_region_pixels_for_detail(pixel_size: float, detail_size: Optional[float]
     return math.ceil(scale_factor * scale_factor)
 
 
+def min_linewidth_pixels_for_detail(pixel_size: float, detail_size: Optional[float]) -> int:
+    """
+    Return the minimum line width in pixels based on detail_size.
+    
+    This is used for morphological filtering to remove thin features
+    that would be unprintable with typical nozzle sizes.
+    """
+    if detail_size is None or pixel_size >= detail_size:
+        return 1
+    # Linear relationship: detail_size / pixel_size
+    return max(1, int(np.ceil(detail_size / pixel_size)))
+
+
+def remove_thin_features(
+    labels: np.ndarray,
+    colors: Sequence[tuple[int, int, int]],
+    pixel_size: float,
+    detail_size: Optional[float],
+) -> np.ndarray:
+    """
+    Remove thin features (narrow lines/edges) that are below detail_size width.
+    
+    Uses morphological opening to filter out features narrower than the threshold.
+    This is important for 3D printing where thin features may be unprintable
+    with the nozzle diameter.
+    
+    Args:
+        labels: Label grid where each pixel has a label index
+        colors: Color palette for each label
+        pixel_size: Physical size of each pixel in mm
+        detail_size: Minimum feature width in mm
+    
+    Returns:
+        Filtered label grid with thin features removed
+    """
+    min_width = min_linewidth_pixels_for_detail(pixel_size, detail_size)
+    if min_width <= 1:
+        return labels.copy()
+    
+    import cv2
+    
+    height, width = labels.shape
+    result = labels.copy()
+    
+    # Process each label separately
+    for label_idx in range(len(colors)):
+        # Create binary mask for this label
+        mask = (labels == label_idx).astype(np.uint8)
+        
+        if not mask.any():
+            continue
+        
+        # Morphological opening: erosion followed by dilation
+        # This removes features thinner than the kernel size
+        kernel_size = min_width
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+        
+        # Opening removes thin features
+        opened = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        
+        # Find pixels that were removed by opening
+        removed_pixels = (mask > 0) & (opened == 0)
+        
+        if not removed_pixels.any():
+            continue
+        
+        # For removed pixels, assign to nearest neighbor of different label
+        removed_coords = np.argwhere(removed_pixels)
+        
+        for y, x in removed_coords:
+            # Find nearest non-removed pixel with different label
+            min_dist = float('inf')
+            nearest_label = label_idx
+            
+            # Search in a small neighborhood
+            search_radius = min_width * 2
+            y_min = max(0, y - search_radius)
+            y_max = min(height, y + search_radius + 1)
+            x_min = max(0, x - search_radius)
+            x_max = min(width, x + search_radius + 1)
+            
+            for ny in range(y_min, y_max):
+                for nx in range(x_min, x_max):
+                    if result[ny, nx] != label_idx:
+                        dist = np.sqrt((ny - y)**2 + (nx - x)**2)
+                        if dist < min_dist:
+                            min_dist = dist
+                            nearest_label = result[ny, nx]
+            
+            result[y, x] = nearest_label
+    
+    return result
+
+
 def merge_small_label_regions(
     labels: np.ndarray,
     colors: Sequence[tuple[int, int, int]],
@@ -183,34 +277,82 @@ def merge_small_label_regions(
             )
             continue
 
-        fallback_candidates = [
-            component for component in sorted(
-                small_components,
-                key=lambda item: (len(item['pixels']), min((py, px) for px, py in item['pixels'])),
-            )
-            if component['neighbor_component_ids']
-        ]
-        if not fallback_candidates:
+        if not any(component['neighbor_component_ids'] for component in small_components):
             return finalize(current_labels, "Stopping small region cleanup; no eligible merge targets remain")
 
-        component = fallback_candidates[0]
-        neighbor_components = [
-            components[neighbor_id]
-            for neighbor_id in component['neighbor_component_ids']
-        ]
-        best_neighbor = min(
-            neighbor_components,
-            key=lambda candidate: (
-                color_distance(component['rgb'], candidate['rgb']),
-                -candidate['size'],
-                candidate['component_id'],
-            ),
-        )
-        for x, y in component['pixels']:
-            current_labels[y, x] = best_neighbor['label']
-        total_fallback_merged += 1
+        best_neighbor_by_component: dict[int, dict] = {}
+        for component in small_components:
+            if not component['neighbor_component_ids']:
+                continue
+            neighbor_components = [
+                components[neighbor_id]
+                for neighbor_id in component['neighbor_component_ids']
+            ]
+            best_neighbor_by_component[component['component_id']] = min(
+                neighbor_components,
+                key=lambda candidate: (
+                    color_distance(component['rgb'], candidate['rgb']),
+                    -candidate['size'],
+                    candidate['component_id'],
+                ),
+            )
+
+        resolved_representatives: dict[int, int] = {}
+
+        def cycle_representative(component_ids: list[int]) -> int:
+            return min(
+                component_ids,
+                key=lambda component_id: (
+                    -components[component_id]['size'],
+                    component_id,
+                ),
+            )
+
+        for component_id in best_neighbor_by_component:
+            if component_id in resolved_representatives:
+                continue
+
+            path: list[int] = []
+            seen_at: dict[int, int] = {}
+            current_component_id = component_id
+
+            while True:
+                if current_component_id in resolved_representatives:
+                    representative = resolved_representatives[current_component_id]
+                    break
+                if current_component_id in seen_at:
+                    cycle_ids = path[seen_at[current_component_id]:]
+                    representative = cycle_representative(cycle_ids)
+                    break
+
+                seen_at[current_component_id] = len(path)
+                path.append(current_component_id)
+                next_component = best_neighbor_by_component.get(current_component_id)
+                if next_component is None:
+                    representative = current_component_id
+                    break
+                current_component_id = next_component['component_id']
+
+            for path_component_id in path:
+                resolved_representatives[path_component_id] = representative
+
+        fallback_merge_count = 0
+        for component in small_components:
+            representative_id = resolved_representatives.get(component['component_id'], component['component_id'])
+            if representative_id == component['component_id']:
+                continue
+
+            representative = components[representative_id]
+            for x, y in component['pixels']:
+                current_labels[y, x] = representative['label']
+            fallback_merge_count += 1
+
+        if fallback_merge_count == 0:
+            return finalize(current_labels, "Stopping small region cleanup; fallback could not reduce undersized regions")
+
+        total_fallback_merged += fallback_merge_count
         logger.info(
-            "Small region cleanup round %d: fallback merged one undersized component into neighbor %d",
+            "Small region cleanup round %d: fallback batch merged %d undersized components without stable neighbors",
             round_idx,
-            best_neighbor['component_id'],
+            fallback_merge_count,
         )

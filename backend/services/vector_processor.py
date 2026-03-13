@@ -28,6 +28,15 @@ class VectorProcessorConfig:
     detail_size: Optional[float] = None  # Minimum physical feature size in mm
 
 
+def _normalize_mask(mask: np.ndarray) -> np.ndarray:
+    """Normalize a boolean/0-1 mask to uint8 0/255 for OpenCV."""
+    if mask.dtype == bool:
+        return mask.astype(np.uint8) * 255
+    if mask.max() == 1:
+        return mask.astype(np.uint8) * 255
+    return mask.astype(np.uint8)
+
+
 def extract_color_mask(
     image: np.ndarray,
     color: tuple[int, int, int],
@@ -66,11 +75,7 @@ def find_contours(mask: np.ndarray) -> list[np.ndarray]:
     Returns:
         List of contour arrays, each is (N, 2) array of points
     """
-    # Ensure uint8 format for OpenCV
-    if mask.dtype == bool:
-        mask = mask.astype(np.uint8) * 255
-    elif mask.max() == 1:
-        mask = mask * 255
+    mask = _normalize_mask(mask)
 
     contours, _ = cv2.findContours(
         mask,
@@ -85,6 +90,30 @@ def find_contours(mask: np.ndarray) -> list[np.ndarray]:
             result.append(contour.reshape(-1, 2).astype(np.float32))
 
     return result
+
+
+def find_contours_with_hierarchy(
+    mask: np.ndarray,
+) -> tuple[list[np.ndarray], Optional[np.ndarray]]:
+    """Find contours and hierarchy, preserving holes."""
+    mask = _normalize_mask(mask)
+    contours, hierarchy = cv2.findContours(
+        mask,
+        cv2.RETR_CCOMP,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+
+    result = []
+    for contour in contours:
+        if len(contour) >= 3:
+            result.append(contour.reshape(-1, 2).astype(np.float32))
+        else:
+            result.append(np.zeros((0, 2), dtype=np.float32))
+
+    if hierarchy is None:
+        return result, None
+
+    return result, hierarchy[0]
 
 
 def simplify_contour(
@@ -112,6 +141,39 @@ def simplify_contour(
     )
 
     return simplified.reshape(-1, 2)
+
+
+def simplify_contour_preserving_shape(
+    contour: np.ndarray,
+    epsilon: float,
+    clockwise: bool,
+) -> np.ndarray:
+    """Simplify a contour but fall back to the original if it degenerates."""
+    simplified = _ensure_orientation(simplify_contour(contour, epsilon), clockwise=clockwise)
+    if len(simplified) >= 3:
+        return simplified
+    return _ensure_orientation(contour.copy(), clockwise=clockwise)
+
+
+def _signed_area(contour: np.ndarray) -> float:
+    """Return the signed area of a contour."""
+    if len(contour) < 3:
+        return 0.0
+    points = contour.astype(np.float64)
+    x = points[:, 0]
+    y = points[:, 1]
+    return 0.5 * float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+
+
+def _ensure_orientation(contour: np.ndarray, clockwise: bool) -> np.ndarray:
+    """Force contour winding for stable downstream handling."""
+    if len(contour) < 3:
+        return contour
+
+    is_clockwise = _signed_area(contour) < 0
+    if is_clockwise != clockwise:
+        return contour[::-1].copy()
+    return contour
 
 
 def filter_small_contours(
@@ -161,6 +223,177 @@ def contour_to_polygon(
         (float(point[0] * pixel_size), float(point[1] * pixel_size))
         for point in contour
     ]
+
+
+def extract_regions_from_mask(
+    mask: np.ndarray,
+    epsilon: float,
+    min_area: int,
+) -> list[dict]:
+    """
+    Extract simplified vector regions from a mask.
+
+    Each region contains one exterior ring and zero or more holes.
+    Small exterior regions are filtered by ``min_area`` while holes are kept
+    if they survive simplification, so the final geometry matches the source
+    mask as closely as possible.
+    """
+    contours, hierarchy = find_contours_with_hierarchy(mask)
+    if not contours or hierarchy is None:
+        return []
+
+    regions = []
+    for idx, contour in enumerate(contours):
+        if len(contour) < 3:
+            continue
+
+        parent_idx = int(hierarchy[idx][3])
+        if parent_idx != -1:
+            continue
+
+        area = cv2.contourArea(contour.reshape(-1, 1, 2))
+        if area < min_area:
+            continue
+
+        outer = simplify_contour_preserving_shape(contour, epsilon, clockwise=False)
+
+        holes = []
+        child_idx = int(hierarchy[idx][2])
+        while child_idx != -1:
+            child = contours[child_idx]
+            if len(child) >= 3:
+                simplified_hole = simplify_contour_preserving_shape(
+                    child,
+                    epsilon,
+                    clockwise=True,
+                )
+                if len(simplified_hole) >= 3:
+                    holes.append(simplified_hole)
+            child_idx = int(hierarchy[child_idx][0])
+
+        regions.append({
+            'outer': contour_to_polygon(outer, pixel_size=1.0),
+            'holes': [contour_to_polygon(hole, pixel_size=1.0) for hole in holes],
+        })
+
+    return regions
+
+
+def normalize_regions(result: dict) -> list[dict]:
+    """Return vector regions from either the new or legacy result shape."""
+    if result.get('regions'):
+        normalized = []
+        for region in result['regions']:
+            normalized.append({
+                'outer': [
+                    (float(point[0]), float(point[1]))
+                    for point in region.get('outer', [])
+                ],
+                'holes': [
+                    [(float(point[0]), float(point[1])) for point in hole]
+                    for hole in region.get('holes', [])
+                ],
+            })
+        return normalized
+
+    return [
+        {
+            'outer': [(float(point[0]), float(point[1])) for point in polygon],
+            'holes': [],
+        }
+        for polygon in result.get('polygons', [])
+    ]
+
+
+def render_region_mask(
+    regions: list[dict],
+    width: int,
+    height: int,
+) -> np.ndarray:
+    """Rasterize vector regions back into a boolean mask."""
+    mask = np.zeros((height, width), dtype=np.uint8)
+
+    for region in regions:
+        outer = region.get('outer', [])
+        if len(outer) < 3:
+            continue
+
+        outer_pts = np.round(np.array(outer, dtype=np.float32)).astype(np.int32)
+        cv2.fillPoly(mask, [outer_pts], 255)
+
+        for hole in region.get('holes', []):
+            if len(hole) < 3:
+                continue
+            hole_pts = np.round(np.array(hole, dtype=np.float32)).astype(np.int32)
+            cv2.fillPoly(mask, [hole_pts], 0)
+
+    return mask > 0
+
+
+def count_region_points(regions: list[dict]) -> int:
+    """Count points across outer rings and holes."""
+    total = 0
+    for region in regions:
+        total += len(region.get('outer', []))
+        total += sum(len(hole) for hole in region.get('holes', []))
+    return total
+
+
+def render_vector_results_image(
+    image_dimensions: dict,
+    vector_results: list[dict],
+    fill_colors: Optional[list[tuple[int, int, int]]] = None,
+    background_color: tuple[int, int, int] = (255, 255, 255),
+    outline_color: Optional[tuple[int, int, int]] = None,
+) -> np.ndarray:
+    """Render vector results from their final geometry for preview parity."""
+    width = int(image_dimensions['width'])
+    height = int(image_dimensions['height'])
+    image = np.full((height, width, 3), background_color, dtype=np.uint8)
+
+    if not vector_results:
+        return image
+
+    for idx, result in enumerate(vector_results):
+        regions = normalize_regions(result)
+        region_mask = render_region_mask(regions, width=width, height=height)
+        if not region_mask.any():
+            continue
+        fill_rgb = (
+            fill_colors[idx]
+            if fill_colors is not None
+            else tuple(int(channel) for channel in result['color'])
+        )
+        fill_arr = np.array(fill_rgb, dtype=np.uint8)
+        image[region_mask] = fill_arr
+
+        if outline_color is not None:
+            for region in regions:
+                outer = region.get('outer', [])
+                if len(outer) < 3:
+                    continue
+
+                outer_pts = np.round(np.array(outer, dtype=np.float32)).astype(np.int32)
+                cv2.polylines(
+                    image,
+                    [outer_pts],
+                    isClosed=True,
+                    color=outline_color,
+                    thickness=1,
+                )
+                for hole in region.get('holes', []):
+                    if len(hole) < 3:
+                        continue
+                    hole_pts = np.round(np.array(hole, dtype=np.float32)).astype(np.int32)
+                    cv2.polylines(
+                        image,
+                        [hole_pts],
+                        isClosed=True,
+                        color=outline_color,
+                        thickness=1,
+                    )
+
+    return image
 
 
 def quantize_colors(
@@ -249,8 +482,19 @@ def process_image_vector_with_preview(
     )
 
     _, label_grid, colors = quantize_colors_with_labels(image, config.num_colors)
-    cleaned_labels = merge_small_label_regions(
+    
+    # First, remove thin features that would be unprintable
+    from services.raster_cleanup import remove_thin_features
+    filtered_labels = remove_thin_features(
         labels=label_grid,
+        colors=colors,
+        pixel_size=config.pixel_size,
+        detail_size=config.detail_size,
+    )
+    
+    # Then merge small isolated regions
+    cleaned_labels = merge_small_label_regions(
+        labels=filtered_labels,
         colors=colors,
         pixel_size=config.pixel_size,
         detail_size=config.detail_size,
@@ -270,25 +514,27 @@ def process_image_vector_with_preview(
 
         total_original_pixels += pixel_count
 
-        contours = find_contours(mask.astype(np.uint8))
-        simplified_contours = []
-        for contour in contours:
-            simplified = simplify_contour(contour, config.epsilon)
-            simplified_contours.append(simplified)
+        regions = extract_regions_from_mask(
+            mask=mask.astype(np.uint8),
+            epsilon=config.epsilon,
+            min_area=config.min_area,
+        )
 
-        filtered = filter_small_contours(simplified_contours, config.min_area)
-
-        # Convert to polygons
-        polygons = [contour_to_polygon(c, pixel_size=1.0) for c in filtered]
-
-        if polygons:
-            point_count = sum(len(p) for p in polygons)
+        if regions:
+            final_mask = render_region_mask(
+                regions,
+                width=image.shape[1],
+                height=image.shape[0],
+            )
+            final_pixel_count = int(final_mask.sum())
+            point_count = count_region_points(regions)
             total_polygon_points += point_count
 
             results.append({
                 'color': color,
-                'polygons': polygons,
-                'pixel_count': pixel_count,
+                'regions': regions,
+                'polygons': [region['outer'] for region in regions],
+                'pixel_count': final_pixel_count,
                 'polygon_points': point_count
             })
 

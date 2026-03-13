@@ -11,7 +11,11 @@ interface VectorColorListProps {
 export const VectorColorList: React.FC<VectorColorListProps> = ({ vectorResults }) => {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-      {vectorResults.map((result, index) => (
+      {vectorResults.map((result, index) => {
+        const regionCount = result.regions?.length ?? result.polygons.length;
+        const holeCount = result.regions?.reduce((sum, region) => sum + region.holes.length, 0) ?? 0;
+
+        return (
         <div
           key={index}
           className="border rounded-lg p-3 hover:shadow-lg transition-shadow"
@@ -26,8 +30,12 @@ export const VectorColorList: React.FC<VectorColorListProps> = ({ vectorResults 
           <div className="text-xs text-gray-500">
             {result.polygon_points} vertices
           </div>
+          <div className="text-xs text-gray-500">
+            {regionCount} regions{holeCount > 0 ? `, ${holeCount} holes` : ''}
+          </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

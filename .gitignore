@@ -59,6 +59,15 @@ backend/tools/calibration/photos/
 backend/tools/calibration/plates/
 backend/tools/calibration/results/
 
+# Temporary script reports
+*_RESULTS.md
+*_STATUS.md
+*_SUMMARY.md
+*_失败原因分析.md
+calibration_report.json
+comparison.png
+monitor_*.sh
+
 # AI Agent
 .claude/
 .mcp.json
@@ -73,3 +82,16 @@ feedback.md
 .crew/
 .playwright-mcp/
 .design/
+backend/tools/analyze_color_mapping.py
+backend/tools/analyze_frontend_response.py
+backend/tools/check_173b37.py
+backend/tools/check_263c33.py
+backend/tools/check_chroma.py
+backend/tools/check_dark_colors_in_gamut.py
+backend/tools/check_specific_colors.py
+backend/tools/find_nearest_for_color.py
+backend/tools/test_backend_version.py
+backend/tools/test_running_backend.py
+e2e/extract-color-mapping.spec.ts
+e2e/test-color-mapping-version.spec.ts
+.kiro/

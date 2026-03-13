@@ -1,9 +1,16 @@
 """
 Integration tests for the /api/process-image endpoint.
 """
+import base64
 import io
 
+import numpy as np
 from PIL import Image
+
+
+def _decode_data_url_image(data_url: str) -> np.ndarray:
+    encoded = data_url.split(",", 1)[1]
+    return np.array(Image.open(io.BytesIO(base64.b64decode(encoded))).convert("RGB"))
 
 
 def test_pixel_mode_success(client, tiny_png_bytes):
@@ -40,6 +47,7 @@ def test_svg_mode_success(client, tiny_png_bytes):
     assert "imageDimensions" in data
     assert data["processedImage"].startswith("data:image/png;base64,")
     assert data["segmentationImage"].startswith("data:image/png;base64,")
+    assert "regions" in data["vectorResults"][0]
 
 
 def test_svg_mode_ignores_detail_size_for_global_resizing(client, tiny_png_bytes):
@@ -114,6 +122,46 @@ def test_svg_mode_keeps_threshold_sized_island(client):
     assert response.status_code == 200
     colors = {tuple(result["color"]) for result in response.json()["vectorResults"]}
     assert (0, 0, 255) in colors
+
+
+def test_svg_mode_filtered_regions_are_removed_from_preview(client):
+    """
+    SVG mode: regions filtered by minArea show mapped blend color in preview.
+    
+    Previously, filtered regions showed as white. Now they show the quantized
+    color mapped to the nearest printable blend, avoiding white edges.
+    """
+    image = Image.new("RGB", (3, 3), (255, 0, 0))
+    image.putpixel((1, 1), (0, 0, 255))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    response = client.post(
+        "/api/process-image",
+        files={"image": ("test.png", buffer.getvalue(), "image/png")},
+        data={
+            "mode": "svg",
+            "epsilon": "1.0",
+            "minArea": "4",
+            "numColors": "2",
+            "pixelSize": "0.2",
+            "whiteBackingLayers": "0",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    segmentation = _decode_data_url_image(data["segmentationImage"])
+    processed = _decode_data_url_image(data["processedImage"])
+
+    # Both segmentation and processed images now show mapped blend colors
+    # (not white anymore - this is the fix for white edges bug)
+    segmentation_color = tuple(segmentation[1, 1])
+    processed_color = tuple(processed[1, 1])
+    
+    # Should not be pure white (the old buggy behavior)
+    assert segmentation_color != (255, 255, 255), "Segmentation should show mapped color, not white"
+    assert processed_color != (255, 255, 255), "Processed should show mapped color, not white"
 
 
 def test_max_colors_respected(client, tiny_png_bytes):

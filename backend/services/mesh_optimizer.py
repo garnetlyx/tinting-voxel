@@ -192,6 +192,30 @@ def generate_optimized_boxes(
     return boxes
 
 
+def generate_optimized_boxes_from_grid(
+    grid: np.ndarray,
+    pixel_size: float,
+    z_min: float,
+    z_max: float
+) -> list[tuple[tuple[float, float], tuple[float, float], tuple[float, float]]]:
+    """
+    Generate optimized boxes directly from a boolean grid.
+
+    This avoids materializing large pixel lists when geometry is already
+    available as a rasterized occupancy mask.
+    """
+    rectangles = greedy_mesh_2d(grid)
+
+    boxes = []
+    for x, y, w, h in rectangles:
+        xrange = (x * pixel_size, (x + w) * pixel_size)
+        yrange = (y * pixel_size, (y + h) * pixel_size)
+        zrange = (z_min, z_max)
+        boxes.append((xrange, yrange, zrange))
+
+    return boxes
+
+
 # =============================================================================
 # Internal Face Culling Functions
 # =============================================================================

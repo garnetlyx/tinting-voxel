@@ -149,10 +149,17 @@ class DownloadCSVRequest(BaseModel):
     colorBlocks: List[ColorBlock] = Field(..., min_length=1)
 
 
+class VectorRegion(BaseModel):
+    """A single vector region with one exterior ring and optional holes."""
+    outer: List[tuple[float, float]] = Field(..., min_length=3)
+    holes: List[List[tuple[float, float]]] = Field(default_factory=list)
+
+
 class VectorColorResult(BaseModel):
     """Vector processing result for a single color."""
-    color: tuple
-    polygons: List[List[tuple]]
+    color: tuple[int, int, int]
+    polygons: List[List[tuple[float, float]]] = Field(default_factory=list)
+    regions: List[VectorRegion] = Field(default_factory=list)
     pixel_count: int = Field(..., ge=0)
     polygon_points: int = Field(..., ge=0)
 

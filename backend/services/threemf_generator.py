@@ -5,6 +5,7 @@ Uses trimesh for 3MF export. Each filament color layer becomes a separate
 object in the 3MF file, which slicers like Bambu Studio can assign to
 different extruders.
 """
+import itertools
 import logging
 import re
 from io import BytesIO
@@ -26,7 +27,8 @@ from services.stl_generator import (
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
-from services.svg_stl_generator import generate_polygon_mesh
+from services.mesh_optimizer import generate_optimized_boxes_from_grid
+from services.vector_processor import normalize_regions, render_region_mask
 
 logger = logging.getLogger(__name__)
 
@@ -349,22 +351,27 @@ def generate_svg_3mf(
         logger.info("SVG-3MF: white backing label='%s', n_white=%d", w_label, n_white)
 
     for idx, result in enumerate(vector_results):
-        polygons = result['polygons']
+        regions = normalize_regions(result)
+        region_grid = render_region_mask(regions, width=width, height=height)
+        if not region_grid.any():
+            continue
         blend_code = result_codes[idx]
 
-        for z_idx, code_char in enumerate(blend_code):
-            z_min = z_offset + z_idx * layer_height
-            z_max = z_offset + (z_idx + 1) * layer_height
+        start_idx = 0
+        for code_char, group in itertools.groupby(blend_code):
+            group_len = len(list(group))
+            z_min = z_offset + start_idx * layer_height
+            z_max = z_offset + (start_idx + group_len) * layer_height
+            start_idx += group_len
 
-            for polygon in polygons:
-                if len(polygon) < 3:
-                    continue
-                mesh = generate_polygon_mesh(
-                    polygon=polygon, z_min=z_min, z_max=z_max,
-                    pixel_size=pixel_size
-                )
-                if len(mesh) > 0:
-                    code_mesh_map[code_char].append(mesh)
+            boxes = generate_optimized_boxes_from_grid(
+                grid=region_grid,
+                pixel_size=pixel_size,
+                z_min=z_min,
+                z_max=z_max,
+            )
+            if boxes:
+                code_mesh_map[code_char].append(generate_boxes_batch(boxes))
 
     # Add white backing above optical layers (reflector behind colors)
     if n_white > 0:
@@ -384,27 +391,28 @@ def generate_svg_3mf(
         front_top = z_offset + layer_count * layer_height + n_white * layer_height
 
         for idx, result in enumerate(vector_results):
-            polygons = result['polygons']
+            regions = normalize_regions(result)
+            region_grid = render_region_mask(regions, width=width, height=height)
+            if not region_grid.any():
+                continue
             blend_code = result_codes[idx]
+            mirrored_grid = np.fliplr(region_grid)
 
-            mirrored_polygons = [
-                [(width - 1 - x, y) for x, y in polygon]
-                for polygon in polygons
-            ]
+            start_idx = 0
+            for code_char, group in itertools.groupby(reversed(blend_code)):
+                group_len = len(list(group))
+                z_min = front_top + start_idx * layer_height
+                z_max = front_top + (start_idx + group_len) * layer_height
+                start_idx += group_len
 
-            for z_idx, code_char in enumerate(reversed(blend_code)):
-                z_min = front_top + z_idx * layer_height
-                z_max = front_top + (z_idx + 1) * layer_height
-
-                for polygon in mirrored_polygons:
-                    if len(polygon) < 3:
-                        continue
-                    mesh = generate_polygon_mesh(
-                        polygon=polygon, z_min=z_min, z_max=z_max,
-                        pixel_size=pixel_size
-                    )
-                    if len(mesh) > 0:
-                        code_mesh_map[code_char].append(mesh)
+                boxes = generate_optimized_boxes_from_grid(
+                    grid=mirrored_grid,
+                    pixel_size=pixel_size,
+                    z_min=z_min,
+                    z_max=z_max,
+                )
+                if boxes:
+                    code_mesh_map[code_char].append(generate_boxes_batch(boxes))
 
         logger.info("Generated double-sided SVG 3MF: front + mirrored back")
 
