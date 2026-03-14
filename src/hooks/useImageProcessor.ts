@@ -424,7 +424,7 @@ export const useImageProcessor = () => {
     // backend will actually return in imageDimensions.
     const imgW = editedImg.naturalWidth || editedImg.width;
     const imgH = editedImg.naturalHeight || editedImg.height;
-    const BACKEND_MAX_DIM = 1024;
+    const BACKEND_MAX_DIM = 4096;
     let processedW = imgW;
     let processedH = imgH;
     if (imgW > 0 && imgH > 0 && Math.max(imgW, imgH) > BACKEND_MAX_DIM) {

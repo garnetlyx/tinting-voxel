@@ -18,8 +18,9 @@ from services.vector_processor import render_vector_results_image
 
 logger = logging.getLogger(__name__)
 
-# Maximum dimension before auto-downscaling (preserves aspect ratio)
-MAX_PROCESSING_DIMENSION = 1024
+# Safety cap only — prevents truly pathological inputs (e.g. 100MP raw photos).
+# Normal photos are processed at full resolution; pixelSize controls physical output size.
+MAX_PROCESSING_DIMENSION = 4096
 
 
 def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
@@ -238,14 +239,19 @@ def build_vector_simulated_preview(
     result_rgbs = normalized_rgbs
     
     # Use quantized image as background to avoid white edges from filtered regions
-    # Map all quantized colors (not just vector results) to their blend equivalents
-    unique_colors_in_quantized = []
-    for y in range(quantized_image.shape[0]):
-        for x in range(quantized_image.shape[1]):
-            color = tuple(quantized_image[y, x])
-            if color not in unique_colors_in_quantized:
-                unique_colors_in_quantized.append(color)
-    
+    # Map all quantized colors (not just vector results) to their blend equivalents.
+    # Vectorized: pack RGB triples into int32 keys, find unique colors, then scatter.
+    h_q, w_q = quantized_image.shape[:2]
+    flat_q = quantized_image.reshape(-1, 3)
+    packed_q = (flat_q[:, 0].astype(np.int32) << 16
+                | flat_q[:, 1].astype(np.int32) << 8
+                | flat_q[:, 2].astype(np.int32))
+    unique_packed_q, inverse_q = np.unique(packed_q, return_inverse=True)
+    unique_colors_in_quantized = [
+        (int((p >> 16) & 0xFF), int((p >> 8) & 0xFF), int(p & 0xFF))
+        for p in unique_packed_q
+    ]
+
     # Use pre-computed matrices if available
     if ref_matrices is not None:
         ref_code_matrix, ref_rgb_matrix = ref_matrices
@@ -265,20 +271,12 @@ def build_vector_simulated_preview(
             layer_count=layer_count,
             layer_height=layer_height,
         )
-    
-    # Build color mapping dict
-    color_map = {
-        unique_colors_in_quantized[i]: all_rgbs[i]
-        for i in range(len(unique_colors_in_quantized))
-    }
-    
-    # Create background image with mapped colors
-    background_image = np.zeros_like(quantized_image)
-    for y in range(quantized_image.shape[0]):
-        for x in range(quantized_image.shape[1]):
-            color = tuple(quantized_image[y, x])
-            background_image[y, x] = color_map.get(color, color)
-    
+
+    # Build background via index scatter (no Python pixel loop)
+    mapped_palette = np.array(all_rgbs, dtype=np.uint8)  # shape (N, 3)
+    background_flat = mapped_palette[inverse_q]           # shape (H*W, 3)
+    background_image = background_flat.reshape(h_q, w_q, 3)
+
     # Render vector results on top of the background
     simulated = background_image.copy()
     for idx, result in enumerate(vector_results):
@@ -566,32 +564,31 @@ def process_image(
     img_array = np.array(img)
     pixels = img_array.reshape(-1, 3)
 
-    # Build coordinate arrays once (avoids repeated divmod in loop)
+    # Build coordinate arrays
     total_pixels = len(pixels)
     xs = np.arange(total_pixels) % width
     ys = np.arange(total_pixels) // width
 
-    # Extract unique colors with pixel positions using integer tuple keys
-    color_map = {}
+    # Vectorized unique-color extraction: encode each RGB triple as a single int32
+    # to use numpy's unique() instead of a Python dict loop.
+    packed = (pixels[:, 0].astype(np.int32) << 16
+              | pixels[:, 1].astype(np.int32) << 8
+              | pixels[:, 2].astype(np.int32))
+    unique_packed, inverse = np.unique(packed, return_inverse=True)
 
-    for i in range(total_pixels):
-        r, g, b = int(pixels[i, 0]), int(pixels[i, 1]), int(pixels[i, 2])
-        key = (r, g, b)
-
-        if key not in color_map:
-            color_map[key] = {
-                'r': r,
-                'g': g,
-                'b': b,
-                'count': 0,
-                'pixels': []
-            }
-
-        color_map[key]['count'] += 1
-        color_map[key]['pixels'].append({'x': int(xs[i]), 'y': int(ys[i])})
-
-    # Convert to list
-    color_blocks = list(color_map.values())
+    color_blocks = []
+    for idx, p in enumerate(unique_packed):
+        r = int((p >> 16) & 0xFF)
+        g = int((p >> 8) & 0xFF)
+        b = int(p & 0xFF)
+        mask = inverse == idx
+        px_xs = xs[mask]
+        px_ys = ys[mask]
+        color_blocks.append({
+            'r': r, 'g': g, 'b': b,
+            'count': int(mask.sum()),
+            'pixels': [{'x': int(x), 'y': int(y)} for x, y in zip(px_xs, px_ys)],
+        })
 
     # Step 1: Merge similar colors
     color_blocks = merge_similar_colors(color_blocks, color_threshold)
