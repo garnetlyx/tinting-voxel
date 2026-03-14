@@ -95,3 +95,4 @@ backend/tools/test_running_backend.py
 e2e/extract-color-mapping.spec.ts
 e2e/test-color-mapping-version.spec.ts
 .kiro/
+docs/ref

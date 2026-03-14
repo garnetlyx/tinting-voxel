@@ -74,7 +74,7 @@ export const useImageProcessor = () => {
   // SVG mode state
   const [vectorResults, setVectorResults] = useState<VectorColorResult[]>([]);
   const [epsilon, setEpsilon] = useState(2.0);
-  const [minArea, setMinArea] = useState(100);
+  const [minArea, setMinArea] = useState(4.0);
   const [numColors, setNumColors] = useState(8);
 
   // Shared state
@@ -84,8 +84,8 @@ export const useImageProcessor = () => {
   const [mappedBlendPalette, setMappedBlendPalette] = useState<MappedBlendPaletteEntry[]>([]);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [layerHeight, setLayerHeight] = useState(0.08);
-  const [detailSize, setDetailSize] = useState(0.4);
-  const [pixelSize, setPixelSize] = useState(0.4);
+  const [detailSize, setDetailSize] = useState(0.42);
+  const [pixelSize, setPixelSize] = useState(0.42);
   const [layerCount, setLayerCount] = useState(MIN_COLOR_LAYERS);
   const [whiteBackingLayers, setWhiteBackingLayers] = useState(1);
 
@@ -117,14 +117,22 @@ export const useImageProcessor = () => {
     const clampedDimension = Math.max(1, Math.min(500, dimensionMm));
     const longestSidePx = Math.max(imageDimensions.width, imageDimensions.height);
     if (longestSidePx <= 0) return;
-    shouldApplyDefaultMaxDimensionRef.current = false;
     setPixelSize(clampPixelSize(clampedDimension / longestSidePx));
   }, [imageDimensions.height, imageDimensions.width]);
 
   const handleSetPixelSize = useCallback((value: number) => {
-    shouldApplyDefaultMaxDimensionRef.current = false;
     setPixelSize(clampPixelSize(value));
   }, []);
+
+  // When detailSize changes, keep pixelSize in sync if it was equal to the old detailSize.
+  const handleSetDetailSize = useCallback((value: number) => {
+    setDetailSize(prev => {
+      if (pixelSize === prev) {
+        setPixelSize(clampPixelSize(value));
+      }
+      return value;
+    });
+  }, [pixelSize]);
 
   // detailSize only controls local feature cleanup; it does not change model scale.
 
@@ -132,6 +140,8 @@ export const useImageProcessor = () => {
   const processAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const skipNextPreviewRefreshRef = useRef(false);
+  // Set to true when handleApplyEdit cannot determine image dimensions upfront;
+  // handleProcessImage will then apply the default after the API returns dimensions.
   const shouldApplyDefaultMaxDimensionRef = useRef(false);
 
   // Load a built-in preset into filamentColors
@@ -220,7 +230,7 @@ export const useImageProcessor = () => {
   }, [maxLayerCount]);
 
   // Process image by calling backend API
-  const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode) => {
+  const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode, overridePixelSize?: number) => {
     // Abort any in-flight processing request
     if (processAbortRef.current) {
       processAbortRef.current.abort();
@@ -266,7 +276,7 @@ export const useImageProcessor = () => {
 
       const result = await processImage(file, {
         mode: processingMode,
-        pixelSize,
+        pixelSize: overridePixelSize ?? pixelSize,
         layerHeight,
         layerCount,
         whiteBackingLayers,
@@ -288,10 +298,12 @@ export const useImageProcessor = () => {
       if (result.detailSize !== undefined && result.detailSize !== null) {
         setDetailSize(result.detailSize);
       }
+      // Fallback: if handleApplyEdit couldn't compute default upfront (image dimensions
+      // were 0), compute it now from the backend-returned dimensions.
       if (shouldApplyDefaultMaxDimensionRef.current) {
         const defaultPixelSize = computeDefaultPixelSize(
           result.imageDimensions.width,
-          result.imageDimensions.height
+          result.imageDimensions.height,
         );
         if (defaultPixelSize !== null) {
           setPixelSize(defaultPixelSize);
@@ -407,11 +419,24 @@ export const useImageProcessor = () => {
 
   // Apply edited image from ImageEditor and start processing
   const handleApplyEdit = useCallback((editedImg: HTMLImageElement) => {
-    shouldApplyDefaultMaxDimensionRef.current = true;
+    // Compute the default pixel size upfront from the image element dimensions.
+    // If the element reports 0 (e.g. not yet loaded), fall back to computing
+    // it from the backend-returned imageDimensions after the request completes.
+    const imgW = editedImg.naturalWidth || editedImg.width;
+    const imgH = editedImg.naturalHeight || editedImg.height;
+    const defaultPixelSize = imgW > 0 && imgH > 0
+      ? computeDefaultPixelSize(imgW, imgH)
+      : null;
+    if (defaultPixelSize !== null) {
+      setPixelSize(defaultPixelSize);
+    } else {
+      // Signal that we should apply the default after the API returns dimensions
+      shouldApplyDefaultMaxDimensionRef.current = true;
+    }
     setImage(editedImg);
     setRawImage(null);
     setIsEditing(false);
-    handleProcessImage(editedImg);
+    handleProcessImage(editedImg, undefined, defaultPixelSize ?? undefined);
   }, [handleProcessImage]);
 
   // Cancel editing and revert to previous state
@@ -761,7 +786,7 @@ export const useImageProcessor = () => {
     setLayerHeight,
     setLayerCount: handleSetLayerCount,
     setPixelSize: handleSetPixelSize,
-    setDetailSize,
+    setDetailSize: handleSetDetailSize,
     setWhiteBackingLayers,
     setMaxDimension,
     setBasePlateThickness,

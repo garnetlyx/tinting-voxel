@@ -296,6 +296,9 @@ describe('useImageProcessor', () => {
 
     const { result } = renderHook(() => useImageProcessor());
     const img = new globalThis.Image() as unknown as HTMLImageElement;
+    // Simulate a large image (800×600) so the 200mm cap kicks in
+    Object.defineProperty(img, 'width', { value: 800, configurable: true });
+    Object.defineProperty(img, 'height', { value: 600, configurable: true });
 
     await act(async () => {
       result.current.handleApplyEdit(img);

@@ -120,7 +120,7 @@ describe('processImage', () => {
     const result = await processImage(file, {
       mode: 'svg',
       pixelSize: 0.08,
-      svgParams: { epsilon: 2.0, minArea: 100, numColors: 8 },
+      svgParams: { epsilon: 2.0, minArea: 4.0, numColors: 8 },
     });
 
     expect(result).toEqual(mockResponse);

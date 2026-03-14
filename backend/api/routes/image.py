@@ -101,9 +101,9 @@ async def api_process_image(
     colorThreshold: float = Form(50, ge=0, le=1000),
     pixelSize: float = Form(0.08, gt=0, le=10),
     epsilon: float = Form(2.0, gt=0, le=100),
-    minArea: int = Form(100, ge=1),
+    minArea: float = Form(4.0, gt=0, le=100),
     numColors: int = Form(8, ge=1, le=256),
-    detailSize: Optional[float] = Form(None, ge=0.2, le=0.8),
+    detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
     targetWidth: Optional[float] = Form(None, ge=1, le=500),
     layerHeight: float = Form(0.08, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
@@ -184,7 +184,7 @@ async def api_process_image(
 
     config = VectorProcessorConfig(
         epsilon=epsilon,
-        min_area=minArea,
+        min_area=max(1, int(minArea / (pixelSize * pixelSize))),  # convert mm² → px²
         num_colors=numColors,
         pixel_size=pixelSize,
         detail_size=detailSize,

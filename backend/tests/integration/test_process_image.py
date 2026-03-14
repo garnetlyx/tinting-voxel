@@ -36,7 +36,7 @@ def test_svg_mode_success(client, tiny_png_bytes):
     response = client.post(
         "/api/process-image",
         files={"image": ("test.png", tiny_png_bytes, "image/png")},
-        data={"mode": "svg", "epsilon": "1.0", "minArea": "1", "numColors": "4", "pixelSize": "0.08"},
+        data={"mode": "svg", "epsilon": "1.0", "minArea": "0.01", "numColors": "4", "pixelSize": "0.08"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -58,7 +58,7 @@ def test_svg_mode_ignores_detail_size_for_global_resizing(client, tiny_png_bytes
         data={
             "mode": "svg",
             "epsilon": "1.0",
-            "minArea": "1",
+            "minArea": "0.01",
             "numColors": "4",
             "pixelSize": "0.08",
             "detailSize": "0.4",
@@ -84,7 +84,7 @@ def test_svg_mode_removes_tiny_island_with_detail_size(client):
         data={
             "mode": "svg",
             "epsilon": "1.0",
-            "minArea": "1",
+            "minArea": "0.01",
             "numColors": "2",
             "pixelSize": "0.2",
             "detailSize": "0.4",
@@ -112,7 +112,7 @@ def test_svg_mode_keeps_threshold_sized_island(client):
         data={
             "mode": "svg",
             "epsilon": "1.0",
-            "minArea": "1",
+            "minArea": "0.01",
             "numColors": "2",
             "pixelSize": "0.2",
             "detailSize": "0.4",
@@ -142,7 +142,7 @@ def test_svg_mode_filtered_regions_are_removed_from_preview(client):
         data={
             "mode": "svg",
             "epsilon": "1.0",
-            "minArea": "4",
+            "minArea": "0.1",
             "numColors": "2",
             "pixelSize": "0.2",
             "whiteBackingLayers": "0",

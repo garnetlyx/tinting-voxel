@@ -181,19 +181,19 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Min Area: {minArea} px
+              Min Area: {minArea.toFixed(1)} mm²
             </label>
             <input
               type="range"
-              min="10"
-              max="500"
-              step="10"
+              min="0.1"
+              max="20"
+              step="0.1"
               value={minArea}
-              onChange={(e) => onMinAreaChange(parseInt(e.target.value))}
+              onChange={(e) => onMinAreaChange(parseFloat(e.target.value))}
               className="w-full"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Filters out small contours below this area
+              Filters out small contours below this physical area
             </p>
           </div>
         </>
@@ -234,19 +234,28 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Detail Size (Min Pixel): {(detailSize ?? 0).toFixed(2)} mm
+          Detail Size (Nozzle Line Width): {(detailSize ?? 0).toFixed(2)} mm
         </label>
-        <input
-          type="range"
-          min="0.2"
-          max="0.8"
-          step="0.05"
-          value={detailSize}
-          onChange={(e) => onDetailSizeChange(parseFloat(e.target.value))}
-          className="w-full"
-        />
+        <div className="flex gap-2">
+          {[0.22, 0.42, 0.62, 0.82].map((val) => (
+            <button
+              key={val}
+              onClick={() => onDetailSizeChange(val)}
+              className={`flex-1 py-1.5 text-xs rounded border transition-colors ${
+                Math.abs((detailSize ?? 0) - val) < 0.005
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-purple-400'
+              }`}
+            >
+              {val.toFixed(2)}
+              <span className="block text-gray-400 text-[10px] leading-tight" style={{color: Math.abs((detailSize ?? 0) - val) < 0.005 ? 'rgba(255,255,255,0.75)' : undefined}}>
+                {(val - 0.02).toFixed(1)}mm nozzle
+              </span>
+            </button>
+          ))}
+        </div>
         <p className="text-xs text-gray-500 mt-1">
-          Minimum physical size for details. Smaller local regions are merged away before export in both pixel and SVG modes.
+          Minimum printable feature size, generally equal to your hotend (nozzle) diameter. The slicer default line width is nozzle + 0.02 mm, which is what these presets represent. Regions narrower than this are merged into neighbors before export.
         </p>
       </div>
 
@@ -264,7 +273,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           className="w-full"
         />
         <p className="text-xs text-gray-500 mt-1">
-          Base pixel size. Can be smaller than Detail Size - small clusters will merge automatically.
+          Base pixel size. Defaults to Detail Size (1 pixel = 1 line width). If set smaller than Detail Size, the slicer's line width must be adjusted manually to match.
         </p>
       </div>
 

@@ -65,7 +65,7 @@ async def api_batch_process(
     maxColors: int = Form(10, ge=1, le=256),
     colorThreshold: float = Form(50, ge=0, le=1000),
     pixelSize: float = Form(0.08, gt=0, le=10),
-    detailSize: Optional[float] = Form(None, ge=0.2, le=0.8),
+    detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
 ):
     """Process multiple images in a single request (up to 20)."""
     _validate_batch_input(images)
@@ -104,7 +104,7 @@ async def api_batch_download_stl(
     doubleSided: bool = Form(False),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
-    detailSize: Optional[float] = Form(None, ge=0.2, le=0.8),
+    detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
 ):
     """Process multiple images and download all STL files as a single ZIP."""
     _validate_batch_input(images)

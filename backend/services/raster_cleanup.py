@@ -46,78 +46,113 @@ def remove_thin_features(
     colors: Sequence[tuple[int, int, int]],
     pixel_size: float,
     detail_size: Optional[float],
+    stroke_aspect_ratio_threshold: float = 3.0,
 ) -> np.ndarray:
     """
-    Remove thin features (narrow lines/edges) that are below detail_size width.
-    
-    Uses morphological opening to filter out features narrower than the threshold.
-    This is important for 3D printing where thin features may be unprintable
-    with the nozzle diameter.
-    
+    Remove thin features that are below detail_size width, while preserving
+    elongated strokes (outlines/borders) that happen to be thin.
+
+    Uses morphological opening to identify sub-threshold thin regions, then
+    classifies each connected component of the removed region by aspect ratio:
+
+    - Elongated (aspect_ratio >= stroke_aspect_ratio_threshold): treated as a
+      stroke/outline. Dilated back to detail_size width so it survives
+      downstream min_area filtering without disappearing.
+    - Compact (aspect_ratio < threshold): treated as noise/artifact. Pixels are
+      reassigned to the nearest neighbouring label via distance transform.
+
+    This mirrors prior art's thin-region detection + stroke-vs-fill distinction,
+    but without requiring full skeleton extraction.
+
     Args:
-        labels: Label grid where each pixel has a label index
-        colors: Color palette for each label
-        pixel_size: Physical size of each pixel in mm
-        detail_size: Minimum feature width in mm
-    
+        labels: Label grid where each pixel has a label index.
+        colors: Color palette for each label.
+        pixel_size: Physical size of each pixel in mm.
+        detail_size: Minimum feature width in mm (nozzle line width).
+        stroke_aspect_ratio_threshold: Bounding-box aspect ratio above which a
+            thin component is considered a stroke and preserved.
+
     Returns:
-        Filtered label grid with thin features removed
+        Filtered label grid.
     """
     min_width = min_linewidth_pixels_for_detail(pixel_size, detail_size)
     if min_width <= 1:
         return labels.copy()
-    
+
     import cv2
-    
+
     height, width = labels.shape
     result = labels.copy()
-    
-    # Process each label separately
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (min_width, min_width))
+
     for label_idx in range(len(colors)):
-        # Create binary mask for this label
         mask = (labels == label_idx).astype(np.uint8)
-        
         if not mask.any():
             continue
-        
-        # Morphological opening: erosion followed by dilation
-        # This removes features thinner than the kernel size
-        kernel_size = min_width
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-        
-        # Opening removes thin features
+
+        # Morphological opening: removes features narrower than min_width
         opened = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        
-        # Find pixels that were removed by opening
-        removed_pixels = (mask > 0) & (opened == 0)
-        
-        if not removed_pixels.any():
+        thin_mask = (mask > 0) & (opened == 0)
+        if not thin_mask.any():
             continue
-        
-        # For removed pixels, assign to nearest neighbor of different label
-        removed_coords = np.argwhere(removed_pixels)
-        
-        for y, x in removed_coords:
-            # Find nearest non-removed pixel with different label
-            min_dist = float('inf')
-            nearest_label = label_idx
-            
-            # Search in a small neighborhood
-            search_radius = min_width * 2
-            y_min = max(0, y - search_radius)
-            y_max = min(height, y + search_radius + 1)
-            x_min = max(0, x - search_radius)
-            x_max = min(width, x + search_radius + 1)
-            
-            for ny in range(y_min, y_max):
-                for nx in range(x_min, x_max):
-                    if result[ny, nx] != label_idx:
-                        dist = np.sqrt((ny - y)**2 + (nx - x)**2)
-                        if dist < min_dist:
-                            min_dist = dist
-                            nearest_label = result[ny, nx]
-            
-            result[y, x] = nearest_label
+
+        thin_u8 = thin_mask.astype(np.uint8)
+        num_labels, comp_map, stats, _ = cv2.connectedComponentsWithStats(thin_u8, connectivity=8)
+
+        # Accumulate which pixels to keep (strokes) vs. discard (noise)
+        stroke_pixels = np.zeros((height, width), dtype=bool)
+        noise_pixels = np.zeros((height, width), dtype=bool)
+
+        for comp_id in range(1, num_labels):
+            comp_w = int(stats[comp_id, cv2.CC_STAT_WIDTH])
+            comp_h = int(stats[comp_id, cv2.CC_STAT_HEIGHT])
+            long_side = max(comp_w, comp_h)
+            short_side = max(min(comp_w, comp_h), 1)
+            aspect_ratio = long_side / short_side
+
+            comp_mask = comp_map == comp_id
+            if aspect_ratio >= stroke_aspect_ratio_threshold:
+                # Elongated → stroke/outline: dilate to min_width so it
+                # passes downstream min_area filtering
+                comp_u8 = comp_mask.astype(np.uint8)
+                dilated = cv2.dilate(comp_u8, kernel)
+                # Only reclaim pixels that still belong to this label in the
+                # original mask (don't overwrite other labels)
+                stroke_pixels |= (dilated > 0) & (mask > 0)
+            else:
+                # Compact → noise/artifact: mark for neighbour reassignment
+                noise_pixels |= comp_mask
+
+        # Apply stroke preservation: keep these pixels under label_idx
+        if stroke_pixels.any():
+            result[stroke_pixels] = label_idx
+
+        # Apply noise removal: reassign to nearest other label via distance
+        # transform (vectorised, no Python loops)
+        if noise_pixels.any():
+            # Build a mask of "anchor" pixels: belong to a different label
+            # and were not themselves removed
+            other_mask = (result != label_idx).astype(np.uint8)
+            if not other_mask.any():
+                continue
+            # Distance transform gives, for each pixel, the distance to the
+            # nearest non-zero pixel in other_mask.  We also need the label
+            # of that nearest pixel → use label transform via Voronoi.
+            # cv2 doesn't expose label transform directly, so we use
+            # connectedComponents on other_mask to build a Voronoi map.
+            _, voronoi_labels = cv2.distanceTransformWithLabels(
+                1 - other_mask,  # foreground = pixels to fill
+                cv2.DIST_L2,
+                cv2.DIST_MASK_PRECISE,
+                labelType=cv2.DIST_LABEL_PIXEL,
+            )
+            # voronoi_labels[y,x] = flat index of nearest anchor pixel
+            # Map flat index → label value in result
+            flat_result = result.flatten()
+            nearest_label_map = flat_result[voronoi_labels.flatten() - 1].reshape(height, width)
+            result[noise_pixels] = nearest_label_map[noise_pixels]
+
+    return result
     
     return result
 

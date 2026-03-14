@@ -13,7 +13,7 @@ describe('ParameterPanel', () => {
     onMaxColorsChange: vi.fn(),
     onColorThresholdChange: vi.fn(),
     epsilon: 2,
-    minArea: 100,
+    minArea: 4.0,
     numColors: 8,
     onEpsilonChange: vi.fn(),
     onMinAreaChange: vi.fn(),

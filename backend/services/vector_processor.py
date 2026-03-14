@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class VectorProcessorConfig:
     """Configuration for vector processing pipeline."""
     epsilon: float = 2.0       # Douglas-Peucker simplification tolerance
-    min_area: int = 100        # Minimum contour area in pixels
+    min_area: int = 100        # Minimum contour area in pixels (converted from mm² by route handler)
     num_colors: int = 8        # Number of colors to quantize to
     pixel_size: float = 1.0    # Physical pixel pitch in mm
     detail_size: Optional[float] = None  # Minimum physical feature size in mm
