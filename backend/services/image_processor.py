@@ -339,49 +339,57 @@ def merge_similar_colors(colors: list[dict], threshold: float) -> list[dict]:
     """
     Merge colors that are similar within threshold.
     Distance is computed in CIELAB space for perceptual accuracy.
+
+    Uses a fast pre-quantization step to reduce the number of unique colors
+    before the O(n²) greedy merge, keeping performance acceptable even for
+    large natural photos with 200k+ unique RGB values.
     """
     if not colors:
         return colors
 
-    # Pre-convert all colors to CIELAB in one batch for efficiency
+    # --- Fast pre-quantization: bin RGB into 32-level buckets (8 bits → 5 bits) ---
+    # Colors that fall into the same bucket are merged immediately (weighted avg).
+    # This reduces 200k+ unique colors to at most 32³ = 32768 buckets in O(n).
+    QUANT_BITS = 3  # shift right by 3 → 32 levels per channel
+    bucket: dict[tuple[int, int, int], list[dict]] = {}
+    for c in colors:
+        key = (c['r'] >> QUANT_BITS, c['g'] >> QUANT_BITS, c['b'] >> QUANT_BITS)
+        bucket.setdefault(key, []).append(c)
+
+    pre_merged: list[dict] = [cluster_avg_color(v) for v in bucket.values()]
+
+    # --- CIELAB conversion in one batch ---
     rgb_array = np.array(
-        [(c['r'], c['g'], c['b']) for c in colors], dtype=np.uint8
+        [(c['r'], c['g'], c['b']) for c in pre_merged], dtype=np.uint8
     ).reshape(1, -1, 3)
-    lab_array = cv2.cvtColor(rgb_array, cv2.COLOR_RGB2Lab).reshape(-1, 3).astype(float)
+    lab_array = cv2.cvtColor(rgb_array, cv2.COLOR_RGB2Lab).reshape(-1, 3).astype(np.float32)
 
-    def _lab_dist(i: int, j: int) -> float:
-        d = lab_array[i] - lab_array[j]
-        return float(np.sqrt(np.dot(d, d)))
+    n = len(pre_merged)
+    is_dark = np.array([is_dark_neutral_color((c['r'], c['g'], c['b'])) for c in pre_merged])
 
-    merged = []
-    used = set()
+    # --- Greedy merge on the reduced set ---
+    used = np.zeros(n, dtype=bool)
+    merged: list[dict] = []
 
-    for idx, color in enumerate(colors):
-        if idx in used:
+    for idx in range(n):
+        if used[idx]:
             continue
-        used.add(idx)
+        used[idx] = True
 
-        color_rgb = (color['r'], color['g'], color['b'])
+        # Vectorised distance from idx to all remaining candidates
+        diff = lab_array[idx] - lab_array  # (n, 3)
+        dists = np.sqrt((diff * diff).sum(axis=1))  # (n,)
 
-        if is_dark_neutral_color(color_rgb):
-            dark_cluster = [color]
-            for i in range(idx + 1, len(colors)):
-                if i in used:
-                    continue
-                other_rgb = (colors[i]['r'], colors[i]['g'], colors[i]['b'])
-                if is_dark_neutral_color(other_rgb) and _lab_dist(idx, i) < threshold:
-                    dark_cluster.append(colors[i])
-                    used.add(i)
-            merged.append(cluster_avg_color(dark_cluster))
+        if is_dark[idx]:
+            mask = (~used) & is_dark & (dists < threshold)
         else:
-            cluster = [color]
-            for i in range(idx + 1, len(colors)):
-                if i in used:
-                    continue
-                if _lab_dist(idx, i) < threshold:
-                    cluster.append(colors[i])
-                    used.add(i)
-            merged.append(cluster_avg_color(cluster))
+            mask = (~used) & (dists < threshold)
+
+        cluster_indices = np.where(mask)[0]
+        used[cluster_indices] = True
+
+        cluster = [pre_merged[idx]] + [pre_merged[i] for i in cluster_indices]
+        merged.append(cluster_avg_color(cluster))
 
     return merged
 
@@ -563,31 +571,27 @@ def process_image(
     img_array = np.array(img)
     pixels = img_array.reshape(-1, 3)
 
-    # Build coordinate arrays
-    total_pixels = len(pixels)
-    xs = np.arange(total_pixels) % width
-    ys = np.arange(total_pixels) // width
-
     # Vectorized unique-color extraction: encode each RGB triple as a single int32
     # to use numpy's unique() instead of a Python dict loop.
     packed = (pixels[:, 0].astype(np.int32) << 16
               | pixels[:, 1].astype(np.int32) << 8
               | pixels[:, 2].astype(np.int32))
     unique_packed, inverse = np.unique(packed, return_inverse=True)
+    counts = np.bincount(inverse)
 
-    color_blocks = []
-    for idx, p in enumerate(unique_packed):
-        r = int((p >> 16) & 0xFF)
-        g = int((p >> 8) & 0xFF)
-        b = int(p & 0xFF)
-        mask = inverse == idx
-        px_xs = xs[mask]
-        px_ys = ys[mask]
-        color_blocks.append({
-            'r': r, 'g': g, 'b': b,
-            'count': int(mask.sum()),
-            'pixels': [{'x': int(x), 'y': int(y)} for x, y in zip(px_xs, px_ys)],
-        })
+    # Build lightweight color_blocks (count only, no pixel lists yet).
+    # Pixel lists are expensive to build for 200k+ unique colors and are only
+    # needed after we've reduced to the final small set of colors.
+    color_blocks = [
+        {
+            'r': int((p >> 16) & 0xFF),
+            'g': int((p >> 8) & 0xFF),
+            'b': int(p & 0xFF),
+            'count': int(counts[idx]),
+            'pixels': [],  # populated later after color reduction
+        }
+        for idx, p in enumerate(unique_packed)
+    ]
 
     # Step 1: Merge similar colors
     color_blocks = merge_similar_colors(color_blocks, color_threshold)
@@ -599,11 +603,56 @@ def process_image(
     main_colors = color_blocks[:max_colors]
     rest_colors = color_blocks[max_colors:]
 
-    # Step 4: Reassign remaining colors to nearest main color
+    # Step 4: Reassign remaining colors to nearest main color (count-only, no pixels yet)
     if rest_colors:
-        color_blocks = reassign_colors(main_colors, rest_colors)
+        # Vectorized reassignment: for each rest color find nearest main color by RGB distance
+        main_rgb = np.array([[c['r'], c['g'], c['b']] for c in main_colors], dtype=np.float32)
+        for tbd in rest_colors:
+            tbd_rgb = np.array([tbd['r'], tbd['g'], tbd['b']], dtype=np.float32)
+            dists = np.sum((main_rgb - tbd_rgb) ** 2, axis=1)
+            nearest = int(np.argmin(dists))
+            main_colors[nearest]['count'] += tbd['count']
+        color_blocks = main_colors
     else:
         color_blocks = main_colors
+
+    # Step 4b: Build a mapping from every unique packed color → final color index,
+    # then populate pixel lists in one pass over all pixels.
+    # For each unique color, find the nearest final color by RGB distance.
+    final_rgb = np.array([[c['r'], c['g'], c['b']] for c in color_blocks], dtype=np.float32)
+    unique_rgb = np.array(
+        [((p >> 16) & 0xFF, (p >> 8) & 0xFF, p & 0xFF) for p in unique_packed],
+        dtype=np.float32,
+    )
+    # Batch nearest-neighbor: (n_unique, 3) vs (n_final, 3)
+    # Use broadcasting; n_unique up to ~32k after pre-quant, n_final <= max_colors
+    diffs = unique_rgb[:, np.newaxis, :] - final_rgb[np.newaxis, :, :]  # (U, F, 3)
+    sq_dists = (diffs * diffs).sum(axis=2)  # (U, F)
+    unique_to_final = sq_dists.argmin(axis=1)  # (U,) index into color_blocks
+
+    # Map each pixel to its final color index via the inverse array
+    pixel_to_final = unique_to_final[inverse]  # (total_pixels,)
+
+    # Populate pixel lists and build a label map for fast rendering.
+    total_pixels = len(pixels)
+    xs = np.arange(total_pixels, dtype=np.int32) % width
+    ys = np.arange(total_pixels, dtype=np.int32) // width
+
+    # label_map[y, x] = final color index — used for fast image rendering
+    label_map = pixel_to_final.reshape(height, width)
+
+    # Build pixel lists grouped by color index (needed by downstream consumers)
+    sort_idx = np.argsort(pixel_to_final, kind='stable')
+    sorted_ci = pixel_to_final[sort_idx]
+    sorted_xs = xs[sort_idx]
+    sorted_ys = ys[sort_idx]
+    boundaries = np.searchsorted(sorted_ci, np.arange(len(color_blocks) + 1))
+    for ci in range(len(color_blocks)):
+        lo, hi = int(boundaries[ci]), int(boundaries[ci + 1])
+        gxs = sorted_xs[lo:hi].tolist()
+        gys = sorted_ys[lo:hi].tolist()
+        color_blocks[ci]['pixels'] = [{'x': x, 'y': y} for x, y in zip(gxs, gys)]
+        color_blocks[ci]['count'] = hi - lo
     
     # Step 5: Merge small pixel clusters if detail_size is specified
     if detail_size is not None and detail_size > pixel_size:
