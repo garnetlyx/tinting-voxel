@@ -172,6 +172,70 @@ def triangulate_polygon(polygon: list[tuple[float, float]]) -> list[tuple[int, i
     return triangles
 
 
+def _fill_region_gaps(
+    region_grids: list[np.ndarray],
+    width: int,
+    height: int,
+) -> list[np.ndarray]:
+    """
+    Fill unassigned pixels (gaps between vector regions) using Voronoi
+    nearest-neighbour assignment.
+
+    When contours are simplified with Douglas-Peucker and rasterized back,
+    adjacent polygons can leave 1-pixel gaps at shared boundaries. These gaps
+    produce holes in the STL mesh. This function assigns each gap pixel to
+    the nearest color region so the mesh is gap-free.
+
+    Args:
+        region_grids: Per-color boolean masks from render_region_mask.
+        width: Image width in pixels.
+        height: Image height in pixels.
+
+    Returns:
+        Updated list of boolean masks with gaps filled.
+    """
+    if not region_grids:
+        return region_grids
+
+    # Build combined assigned mask
+    combined = np.zeros((height, width), dtype=bool)
+    for grid in region_grids:
+        combined |= grid
+
+    gap_mask = ~combined
+    gap_count = int(gap_mask.sum())
+    if gap_count == 0:
+        return region_grids
+
+    logger.info("SVG-STL: filling %d gap pixels via Voronoi nearest-neighbour", gap_count)
+
+    # Build a label image: 0 = unassigned, 1..N = color index+1
+    label_img = np.zeros((height, width), dtype=np.int32)
+    for idx, grid in enumerate(region_grids):
+        label_img[grid] = idx + 1  # 1-based so 0 stays "unassigned"
+
+    # Use scipy distance transform to find, for each gap pixel, the coordinates
+    # of the nearest assigned pixel, then look up its color label.
+    from scipy.ndimage import distance_transform_edt
+    _, nearest_indices = distance_transform_edt(
+        ~combined,          # True = pixels to fill (gaps)
+        return_indices=True,
+    )
+    # nearest_indices shape: (2, H, W) — [row_indices, col_indices]
+    nearest_rows = nearest_indices[0]
+    nearest_cols = nearest_indices[1]
+    nearest_color = label_img[nearest_rows, nearest_cols]
+
+    # Assign gap pixels to their nearest color
+    result_grids = [grid.copy() for grid in region_grids]
+    for idx in range(len(region_grids)):
+        fill_mask = gap_mask & (nearest_color == idx + 1)
+        if fill_mask.any():
+            result_grids[idx] |= fill_mask
+
+    return result_grids
+
+
 def generate_polygon_mesh(
     polygon: list[tuple[float, float]],
     z_min: float,
@@ -314,13 +378,22 @@ def generate_svg_stl_zip(
     if n_white > 0:
         logger.info("SVG-STL: white backing label='%s', n_white=%d", w_label, n_white)
 
+    # Rasterize all region masks upfront, then fill inter-region gaps via
+    # Voronoi nearest-neighbour so no pixel is left unassigned (which would
+    # produce holes in the mesh).
+    region_grids = []
+    for result in vector_results:
+        regions = normalize_regions(result)
+        region_grids.append(render_region_mask(regions, width=width, height=height))
+
+    region_grids = _fill_region_gaps(region_grids, width, height)
+
     # Process each color group
     for idx, result in enumerate(vector_results):
-        regions = normalize_regions(result)
-        region_grid = render_region_mask(regions, width=width, height=height)
+        region_grid = region_grids[idx]
         if not region_grid.any():
             continue
-        total_regions += len(regions)
+        total_regions += len(normalize_regions(result))
         blend_code = result_codes[idx]
 
         # Generate mesh for each layer
@@ -365,8 +438,7 @@ def generate_svg_stl_zip(
         front_top = z_offset + layer_count * layer_height + n_white * layer_height
 
         for idx, result in enumerate(vector_results):
-            regions = normalize_regions(result)
-            region_grid = render_region_mask(regions, width=width, height=height)
+            region_grid = region_grids[idx]
             if not region_grid.any():
                 continue
             blend_code = result_codes[idx]
