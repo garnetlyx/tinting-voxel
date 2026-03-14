@@ -419,18 +419,25 @@ export const useImageProcessor = () => {
 
   // Apply edited image from ImageEditor and start processing
   const handleApplyEdit = useCallback((editedImg: HTMLImageElement) => {
-    // Compute the default pixel size upfront from the image element dimensions.
-    // If the element reports 0 (e.g. not yet loaded), fall back to computing
-    // it from the backend-returned imageDimensions after the request completes.
+    // Predict the backend-downscaled dimensions (MAX_PROCESSING_DIMENSION=1024)
+    // so we can compute the correct default pixelSize upfront, matching what the
+    // backend will actually return in imageDimensions.
     const imgW = editedImg.naturalWidth || editedImg.width;
     const imgH = editedImg.naturalHeight || editedImg.height;
-    const defaultPixelSize = imgW > 0 && imgH > 0
-      ? computeDefaultPixelSize(imgW, imgH)
+    const BACKEND_MAX_DIM = 1024;
+    let processedW = imgW;
+    let processedH = imgH;
+    if (imgW > 0 && imgH > 0 && Math.max(imgW, imgH) > BACKEND_MAX_DIM) {
+      const scale = BACKEND_MAX_DIM / Math.max(imgW, imgH);
+      processedW = Math.round(imgW * scale);
+      processedH = Math.round(imgH * scale);
+    }
+    const defaultPixelSize = processedW > 0 && processedH > 0
+      ? computeDefaultPixelSize(processedW, processedH)
       : null;
     if (defaultPixelSize !== null) {
       setPixelSize(defaultPixelSize);
     } else {
-      // Signal that we should apply the default after the API returns dimensions
       shouldApplyDefaultMaxDimensionRef.current = true;
     }
     setImage(editedImg);
