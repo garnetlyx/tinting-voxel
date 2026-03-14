@@ -423,13 +423,22 @@ def quantize_colors_with_labels(
     image: np.ndarray,
     num_colors: int,
 ) -> tuple[np.ndarray, np.ndarray, list[tuple[int, int, int]]]:
-    """Reduce image colors and keep the per-pixel label grid."""
-    pixels = image.reshape(-1, 3).astype(np.float32)
+    """Reduce image colors and keep the per-pixel label grid.
+
+    Clustering is performed in CIELAB space for perceptually uniform
+    color distances, matching human visual perception more closely than
+    RGB Euclidean distance.
+    """
     pixels_uint8 = image.reshape(-1, 3)
+
+    # Convert to CIELAB for perceptually uniform clustering
+    pixels_lab = cv2.cvtColor(
+        pixels_uint8.reshape(1, -1, 3), cv2.COLOR_RGB2Lab
+    ).reshape(-1, 3).astype(np.float32)
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
     _, labels, _ = cv2.kmeans(
-        pixels,
+        pixels_lab,
         num_colors,
         None,
         criteria,

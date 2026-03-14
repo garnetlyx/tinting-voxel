@@ -7,6 +7,7 @@ from io import BytesIO
 from typing import Callable, Optional
 
 import numpy as np
+import cv2
 from PIL import Image
 
 from core.blend_color import Colors
@@ -336,11 +337,24 @@ def cluster_avg_color(cluster: list[dict]) -> dict:
 
 def merge_similar_colors(colors: list[dict], threshold: float) -> list[dict]:
     """
-    Merge colors that are similar within threshold
+    Merge colors that are similar within threshold.
+    Distance is computed in CIELAB space for perceptual accuracy.
     """
+    if not colors:
+        return colors
+
+    # Pre-convert all colors to CIELAB in one batch for efficiency
+    rgb_array = np.array(
+        [(c['r'], c['g'], c['b']) for c in colors], dtype=np.uint8
+    ).reshape(1, -1, 3)
+    lab_array = cv2.cvtColor(rgb_array, cv2.COLOR_RGB2Lab).reshape(-1, 3).astype(float)
+
+    def _lab_dist(i: int, j: int) -> float:
+        d = lab_array[i] - lab_array[j]
+        return float(np.sqrt(np.dot(d, d)))
+
     merged = []
     used = set()
-    dark = []
 
     for idx, color in enumerate(colors):
         if idx in used:
@@ -349,40 +363,25 @@ def merge_similar_colors(colors: list[dict], threshold: float) -> list[dict]:
 
         color_rgb = (color['r'], color['g'], color['b'])
 
-        # Handle dark neutral colors with threshold check (same as non-dark)
         if is_dark_neutral_color(color_rgb):
             dark_cluster = [color]
-
             for i in range(idx + 1, len(colors)):
                 if i in used:
                     continue
-
-                other_color = colors[i]
-                other_rgb = (other_color['r'], other_color['g'], other_color['b'])
-
-                if is_dark_neutral_color(other_rgb) and color_distance(color_rgb, other_rgb) < threshold:
-                    dark_cluster.append(other_color)
+                other_rgb = (colors[i]['r'], colors[i]['g'], colors[i]['b'])
+                if is_dark_neutral_color(other_rgb) and _lab_dist(idx, i) < threshold:
+                    dark_cluster.append(colors[i])
                     used.add(i)
-
-            avg = cluster_avg_color(dark_cluster)
-            merged.append(avg)
+            merged.append(cluster_avg_color(dark_cluster))
         else:
             cluster = [color]
-
             for i in range(idx + 1, len(colors)):
                 if i in used:
                     continue
-
-                other_color = colors[i]
-                other_rgb = (other_color['r'], other_color['g'], other_color['b'])
-
-                if color_distance(color_rgb, other_rgb) < threshold:
-                    cluster.append(other_color)
+                if _lab_dist(idx, i) < threshold:
+                    cluster.append(colors[i])
                     used.add(i)
-
-            # Calculate average color for cluster
-            avg = cluster_avg_color(cluster)
-            merged.append(avg)
+            merged.append(cluster_avg_color(cluster))
 
     return merged
 

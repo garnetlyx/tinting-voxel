@@ -7,17 +7,23 @@ import time
 from typing import Optional, Sequence
 
 import numpy as np
+import cv2
 
 logger = logging.getLogger(__name__)
 
 
 def color_distance(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
-    """Calculate Euclidean distance between two RGB colors."""
-    return float(np.sqrt(
-        (c1[0] - c2[0]) ** 2 +
-        (c1[1] - c2[1]) ** 2 +
-        (c1[2] - c2[2]) ** 2
-    ))
+    """Calculate perceptual distance between two RGB colors using CIELAB space.
+
+    CIELAB is a perceptually uniform color space where equal numerical
+    distances correspond to equal perceived color differences, unlike RGB
+    Euclidean distance which is not perceptually uniform.
+    """
+    rgb1 = np.array([[list(c1)]], dtype=np.uint8)
+    rgb2 = np.array([[list(c2)]], dtype=np.uint8)
+    lab1 = cv2.cvtColor(rgb1, cv2.COLOR_RGB2Lab)[0, 0].astype(float)
+    lab2 = cv2.cvtColor(rgb2, cv2.COLOR_RGB2Lab)[0, 0].astype(float)
+    return float(np.sqrt(np.sum((lab1 - lab2) ** 2)))
 
 
 def min_region_pixels_for_detail(pixel_size: float, detail_size: Optional[float]) -> int:
