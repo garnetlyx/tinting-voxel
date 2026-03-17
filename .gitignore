@@ -30,6 +30,7 @@ Thumbs.db
 *.temp
 
 # Python
+backend/.hypothesis/
 backend/.venv/
 backend/*/__pycache__/
 backend/__pycache__/

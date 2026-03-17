@@ -1,0 +1,245 @@
+/**
+ * Parameter search modal component.
+ * Manages four phases: config → running → results | error
+ */
+import React, { useEffect, useState } from 'react';
+import type { SearchResultItem } from '../api/paramSearch';
+import type { ParamSearchPhase } from '../hooks/useParamSearch';
+import type { ParamSearchProgress } from '../api/paramSearch';
+
+const PRESET_OPTIONS = [
+  { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW Phase 6' },
+  { value: 'bambu_cmyk_phase6', label: 'Bambu CMYWK Phase 6' },
+  { value: 'bambu_cmyk', label: 'Bambu CMYW' },
+  { value: 'bambu_cmyk_calibrated', label: 'Bambu CMYWK Calibrated' },
+  { value: 'clear_cmyk', label: 'Clear CMYW' },
+];
+
+interface ParamSearchModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  phase: ParamSearchPhase;
+  progress: ParamSearchProgress | null;
+  results: SearchResultItem[];
+  error: string | null;
+  onStart: (targetLongestEdgeMm: number, preset: string) => void;
+  onApplyParams: (params: Record<string, number>, mode: string) => void;
+}
+
+export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
+  isOpen,
+  onClose,
+  phase,
+  progress,
+  results,
+  error,
+  onStart,
+  onApplyParams,
+}) => {
+  const [targetSize, setTargetSize] = useState(100);
+  const [preset, setPreset] = useState('bambu_cmyw_phase6');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const top5 = results.slice(0, 5);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      role="dialog"
+      aria-modal="true"
+      aria-label="自动优化参数"
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-800">自动优化参数</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="关闭"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6">
+          {/* Phase 1: Config */}
+          {phase === 'config' && (
+            <div className="space-y-5">
+              <p className="text-sm text-gray-600">
+                优化器将对多种参数组合运行图像处理，并按相似度排名。
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="targetSize">
+                  目标最长边尺寸 (mm)
+                </label>
+                <input
+                  id="targetSize"
+                  type="number"
+                  min={10}
+                  max={500}
+                  step={10}
+                  value={targetSize}
+                  onChange={(e) => setTargetSize(Number(e.target.value))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  pixel_size 将由此值除以图像最长边像素数自动推导。
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="presetSelect">
+                  色丝预设
+                </label>
+                <select
+                  id="presetSelect"
+                  value={preset}
+                  onChange={(e) => setPreset(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  {PRESET_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={() => onStart(targetSize, preset)}
+                className="w-full py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+              >
+                开始优化
+              </button>
+            </div>
+          )}
+
+          {/* Phase 2: Running */}
+          {phase === 'running' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">正在搜索最优参数，请稍候…</p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>进度</span>
+                  <span>
+                    {progress ? `${progress.completed} / ${progress.total}` : '—'}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className="bg-purple-600 h-3 rounded-full transition-all duration-300"
+                    style={{
+                      width: progress && progress.total > 0
+                        ? `${Math.round((progress.completed / progress.total) * 100)}%`
+                        : '0%',
+                    }}
+                  />
+                </div>
+                {progress && (
+                  <p className="text-xs text-gray-500">
+                    当前最优 MAE: {progress.bestMae.toFixed(2)}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+            </div>
+          )}
+
+          {/* Phase 3: Results */}
+          {phase === 'results' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                找到 {results.length} 个结果，点击卡片应用参数。
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {top5.map((r) => (
+                  <button
+                    key={`${r.rank}-${r.mode}`}
+                    onClick={() => {
+                      onApplyParams(r.params, r.mode);
+                      onClose();
+                    }}
+                    className={`text-left rounded-xl border p-3 hover:border-purple-400 hover:shadow-md transition-all ${
+                      r.rank === 1 ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-semibold text-purple-700">#{r.rank}</span>
+                      <span className="text-xs text-gray-500 uppercase">{r.mode}</span>
+                      {r.rank === 1 && (
+                        <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                          最优
+                        </span>
+                      )}
+                    </div>
+                    <img
+                      src={r.previewImage}
+                      alt={`rank ${r.rank} preview`}
+                      className="w-full rounded-lg mb-2 object-cover"
+                      style={{ maxHeight: 120 }}
+                    />
+                    <p className="text-xs text-gray-600 mb-1">MAE: {r.mae.toFixed(2)}</p>
+                    <div className="text-xs text-gray-500 space-y-0.5">
+                      {Object.entries(r.params).map(([k, v]) => (
+                        <div key={k} className="flex justify-between">
+                          <span>{k}</span>
+                          <span className="font-mono">{typeof v === 'number' ? v.toFixed(2) : v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                关闭
+              </button>
+            </div>
+          )}
+
+          {/* Phase 4: Error */}
+          {phase === 'error' && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+                <p className="text-sm text-red-700">{error ?? '优化失败，请重试。'}</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => onStart(targetSize, preset)}
+                  className="flex-1 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  重试
+                </button>
+                <button
+                  onClick={onClose}
+                  className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ParamSearchModal;

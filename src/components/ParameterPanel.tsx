@@ -48,6 +48,7 @@ interface ParameterPanelProps {
   onReprocess: () => void;
   processing: boolean;
   hasImage: boolean;
+  onAutoOptimize?: () => void;
 }
 
 export const ParameterPanel: React.FC<ParameterPanelProps> = ({
@@ -86,6 +87,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   onReprocess,
   processing,
   hasImage,
+  onAutoOptimize,
 }) => {
   const formatMaxDimension = (value: number) => value.toFixed(1);
   const [maxDimensionInput, setMaxDimensionInput] = useState(formatMaxDimension(maxDimension));
@@ -379,6 +381,16 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400"
         >
           {processing ? 'Processing...' : 'Reprocess'}
+        </button>
+      )}
+
+      {hasImage && onAutoOptimize && (
+        <button
+          onClick={onAutoOptimize}
+          disabled={processing}
+          className="w-full py-2 border border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          自动优化参数
         </button>
       )}
     </div>

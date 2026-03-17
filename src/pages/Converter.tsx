@@ -1,9 +1,11 @@
 /**
  * Main converter page component
  */
-import React, { useState } from 'react';
-import { Settings, Palette, Image as ImageIcon, Layers } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Settings, Palette, Image as ImageIcon, Layers, Loader2 } from 'lucide-react';
 import { useImageProcessor } from '../hooks/useImageProcessor';
+import { useParamSearch } from '../hooks/useParamSearch';
+import { useBackendReady } from '../hooks/useBackendReady';
 import {
   ErrorMessage,
   LoadingSpinner,
@@ -21,6 +23,7 @@ import {
   ThreeDPreview,
   BatchProcessor,
   PaletteLibrary,
+  ParamSearchModal,
 } from '../components';
 
 type AppMode = 'single' | 'batch';
@@ -112,6 +115,23 @@ const Converter: React.FC = () => {
     deleteColorBlock,
   } = useImageProcessor();
 
+  const backendReady = useBackendReady();
+  const paramSearch = useParamSearch();
+  const [paramSearchOpen, setParamSearchOpen] = useState(false);
+  const [showParamSearchPrompt, setShowParamSearchPrompt] = useState(false);
+  // Track whether the current processing run was triggered by a fresh image upload
+  const pendingParamSearchPromptRef = useRef(false);
+
+  // Show the prompt once processing completes after a fresh upload
+  useEffect(() => {
+    if (!processing && hasResults && pendingParamSearchPromptRef.current) {
+      pendingParamSearchPromptRef.current = false;
+      setShowParamSearchPrompt(true);
+    }
+  }, [processing, hasResults]);
+  // Track the last uploaded File so we can pass it to the param search API
+  const imageFileRef = useRef<File | null>(null);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
       <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto">
@@ -131,7 +151,17 @@ const Converter: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+          {/* Backend warming-up banner */}
+          {!backendReady && (
+            <div className="mb-6 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+              <Loader2 className="w-5 h-5 animate-spin shrink-0" />
+              <span className="text-sm font-medium">
+                服务器正在预热中，请稍候… / Server is warming up, please wait…
+              </span>
+            </div>
+          )}
+
+          <div className={`grid grid-cols-1 xl:grid-cols-12 gap-8 ${!backendReady ? 'pointer-events-none opacity-50' : ''}`}>
             {/* Left Sidebar: Parameter Panel */}
             {showSettings && (
               <div className="xl:col-span-4 space-y-6">
@@ -171,6 +201,11 @@ const Converter: React.FC = () => {
                   onReprocess={handleReprocess}
                   processing={processing}
                   hasImage={image !== null}
+                  onAutoOptimize={() => {
+                    setShowParamSearchPrompt(false);
+                    paramSearch.openConfig();
+                    setParamSearchOpen(true);
+                  }}
                 />
                 <div className="p-4 bg-gray-50 rounded-lg space-y-4">
                   <FilamentConfigPanel
@@ -242,13 +277,27 @@ const Converter: React.FC = () => {
               {appMode === 'single' && (
                 <div className="space-y-6">
                   {/* Image Uploader */}
-                  <ImageUploader onImageUpload={handleImageUpload} onFileDrop={handleFile} />
+                  <ImageUploader
+                    onImageUpload={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) imageFileRef.current = file;
+                      handleImageUpload(e);
+                    }}
+                    onFileDrop={(file) => {
+                      imageFileRef.current = file;
+                      handleFile(file);
+                    }}
+                  />
 
                   {/* Image Editor (crop/resize) */}
                   {isEditing && rawImage && (
                     <ImageEditor
                       image={rawImage}
-                      onApply={handleApplyEdit}
+                      onApply={(editedImg) => {
+                        setShowParamSearchPrompt(false);
+                        pendingParamSearchPromptRef.current = true;
+                        handleApplyEdit(editedImg);
+                      }}
                       onCancel={handleCancelEdit}
                       disabled={processing}
                     />
@@ -263,6 +312,33 @@ const Converter: React.FC = () => {
                   {/* Results */}
                   {!processing && !isEditing && hasResults && (
                     <div className="space-y-6">
+
+                      {/* Param search prompt */}
+                      {showParamSearchPrompt && (
+                        <div className="flex items-center justify-between gap-4 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3">
+                          <p className="text-sm text-purple-800">
+                            是否要自动优化参数以获得更好的效果？
+                          </p>
+                          <div className="flex gap-2 shrink-0">
+                            <button
+                              onClick={() => {
+                                setShowParamSearchPrompt(false);
+                                paramSearch.openConfig();
+                                setParamSearchOpen(true);
+                              }}
+                              className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                            >
+                              优化参数
+                            </button>
+                            <button
+                              onClick={() => setShowParamSearchPrompt(false)}
+                              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                              跳过
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       {/* Before/After Comparison */}
                       <ImageComparison
                         originalImage={image}
@@ -353,6 +429,46 @@ const Converter: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Param Search Modal */}
+      <ParamSearchModal
+        isOpen={paramSearchOpen}
+        onClose={() => {
+          setParamSearchOpen(false);
+          paramSearch.reset();
+        }}
+        phase={paramSearch.phase === 'idle' ? 'config' : paramSearch.phase}
+        progress={paramSearch.progress}
+        results={paramSearch.results}
+        error={paramSearch.error}
+        onStart={(targetLongestEdgeMm, preset) => {
+          if (!image || !imageFileRef.current) return;
+          paramSearch.startSearch(
+            imageFileRef.current,
+            {
+              targetLongestEdgeMm,
+              preset,
+              mode,
+              layerCount,
+              strategy: 'random',
+              nTrials: 20,
+            },
+            imageDimensions,
+          );
+        }}
+        onApplyParams={(params, resultMode) => {
+          // Apply returned params to the relevant state setters
+          if ('max_colors' in params) setMaxColors(params.max_colors);
+          if ('color_threshold' in params) setColorThreshold(params.color_threshold);
+          if ('num_colors' in params) setNumColors(params.num_colors);
+          if ('epsilon' in params) setEpsilon(params.epsilon);
+          if ('min_area' in params) setMinArea(params.min_area);
+          if ('detail_size' in params) setDetailSize(params.detail_size);
+          if ('white_backing_layers' in params) setWhiteBackingLayers(params.white_backing_layers);
+          if (resultMode === 'pixel' || resultMode === 'svg') setMode(resultMode);
+          handleReprocess();
+        }}
+      />
     </div>
   );
 };

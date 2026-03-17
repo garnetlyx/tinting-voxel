@@ -375,6 +375,46 @@ class MappedBlockColor(BaseModel):
     hex: str
 
 
+class ParamSearchRequest(BaseModel):
+    """Multipart form fields for POST /api/param-search."""
+    preset: str
+    mode: str = "pixel"
+    strategy: str = "grid"
+    n_trials: int = Field(50, ge=1, le=500)
+    seed: Optional[int] = None
+    layer_count: int = Field(4, ge=1, le=10)
+    layer_height: float = Field(0.08, gt=0, le=10)
+    pixel_size: float = Field(0.42, gt=0, le=10)
+    top_n: int = Field(10, ge=1, le=50)
+
+
+class SearchResultItem(BaseModel):
+    """Single evaluated parameter combination."""
+    rank: int
+    mode: str
+    params: dict
+    mae: float
+    preview_image: str  # data URL (base64 PNG)
+
+
+class ParamSearchResponse(BaseModel):
+    """Response for POST /api/param-search."""
+    job_id: str
+    results: List[SearchResultItem]
+    total_evaluated: int
+    elapsed_seconds: float
+
+
+class ProgressEvent(BaseModel):
+    """SSE payload for /api/param-search/progress/{job_id}."""
+    job_id: str
+    completed: int
+    total: int
+    best_mae: float
+    status: str  # "running", "complete", "error"
+    error: Optional[str] = None
+
+
 class PaginationInfo(BaseModel):
     """Pagination metadata for paginated responses."""
     page: int

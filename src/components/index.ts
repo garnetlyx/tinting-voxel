@@ -21,3 +21,4 @@ export { ImageEditor } from './ImageEditor';
 export { ThreeDPreview } from './ThreeDPreview';
 export { BatchProcessor } from './BatchProcessor';
 export { PaletteLibrary } from './PaletteLibrary';
+export { ParamSearchModal } from './ParamSearchModal';

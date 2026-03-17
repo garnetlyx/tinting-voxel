@@ -14,7 +14,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from api.rate_limiter import limiter
-from api.routes import batch, download, download_v2, filament, health, image, palette
+from api.routes import batch, download, download_v2, filament, health, image, palette, param_search
 from config.settings import get_cors_origins, settings
 from services.analytics import analytics
 from services.stl_generator import initialize_color_mapping
@@ -125,6 +125,7 @@ app.include_router(download_v2.router)
 app.include_router(filament.router)
 app.include_router(batch.router)
 app.include_router(palette.router)
+app.include_router(param_search.router)
 
 # Serve static frontend files in production (when ./static exists)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
