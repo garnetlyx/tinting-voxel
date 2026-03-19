@@ -53,22 +53,34 @@ def remove_thin_features(
     pixel_size: float,
     detail_size: Optional[float],
     stroke_aspect_ratio_threshold: float = 3.0,
+    stroke_fill_density_threshold: float = 0.30,
 ) -> np.ndarray:
     """
     Remove thin features that are below detail_size width, while preserving
     elongated strokes (outlines/borders) that happen to be thin.
 
     Uses morphological opening to identify sub-threshold thin regions, then
-    classifies each connected component of the removed region by aspect ratio:
+    classifies each connected component of the removed region using two metrics:
 
-    - Elongated (aspect_ratio >= stroke_aspect_ratio_threshold): treated as a
-      stroke/outline. Dilated back to detail_size width so it survives
-      downstream min_area filtering without disappearing.
-    - Compact (aspect_ratio < threshold): treated as noise/artifact. Pixels are
-      reassigned to the nearest neighbouring label via distance transform.
+    1. Aspect ratio (long_side / short_side): elongated single lines score high.
+    2. Fill density (pixel_count / bounding_box_area): connected networks of thin
+       lines (e.g. stained-glass borders) span a large bounding box but fill only
+       a small fraction of it, giving a low fill density.
 
-    This mirrors prior art's thin-region detection + stroke-vs-fill distinction,
-    but without requiring full skeleton extraction.
+    A component is treated as a stroke/outline if EITHER metric fires:
+      - aspect_ratio >= stroke_aspect_ratio_threshold  (individual thin line)
+      - fill_density <= stroke_fill_density_threshold  (sparse connected network)
+
+    Otherwise it is treated as noise and reassigned to the nearest neighbour.
+
+    This correctly handles three cases without any color-specific logic:
+      ┌──────────────────────────────┬──────────────┬──────────────┬──────────┐
+      │ Case                         │ aspect_ratio │ fill_density │ Result   │
+      ├──────────────────────────────┼──────────────┼──────────────┼──────────┤
+      │ Individual thin line 1×100px │ 100 ≥ 3.0    │ 1.0          │ Stroke ✓ │
+      │ Connected border network     │ ~1.0         │ ~0.01–0.10   │ Stroke ✓ │
+      │ Compact noise blob           │ ~1.0         │ ~0.5–1.0     │ Noise  ✓ │
+      └──────────────────────────────┴──────────────┴──────────────┴──────────┘
 
     Args:
         labels: Label grid where each pixel has a label index.
@@ -77,6 +89,9 @@ def remove_thin_features(
         detail_size: Minimum feature width in mm (nozzle line width).
         stroke_aspect_ratio_threshold: Bounding-box aspect ratio above which a
             thin component is considered a stroke and preserved.
+        stroke_fill_density_threshold: Fill density (pixels / bbox area) at or
+            below which a thin component is considered a sparse stroke network
+            and preserved, regardless of aspect ratio.
 
     Returns:
         Filtered label grid.
@@ -116,10 +131,21 @@ def remove_thin_features(
             short_side = max(min(comp_w, comp_h), 1)
             aspect_ratio = long_side / short_side
 
+            # Fill density: fraction of bounding box actually occupied by pixels.
+            # A connected network of thin lines (e.g. stained-glass border) spans
+            # a large bounding box but fills only a small fraction of it.
+            pixel_count = int(stats[comp_id, cv2.CC_STAT_AREA])
+            bbox_area = max(comp_w * comp_h, 1)
+            fill_density = pixel_count / bbox_area
+
             comp_mask = comp_map == comp_id
-            if aspect_ratio >= stroke_aspect_ratio_threshold:
-                # Elongated → stroke/outline: dilate to min_width so it
-                # passes downstream min_area filtering
+            is_stroke = (
+                aspect_ratio >= stroke_aspect_ratio_threshold
+                or fill_density <= stroke_fill_density_threshold
+            )
+            if is_stroke:
+                # Stroke/outline (individual line OR sparse connected network):
+                # dilate to min_width so it passes downstream min_area filtering.
                 comp_u8 = comp_mask.astype(np.uint8)
                 dilated = cv2.dilate(comp_u8, kernel)
                 # Only reclaim pixels that still belong to this label in the
@@ -158,8 +184,6 @@ def remove_thin_features(
             nearest_label_map = flat_result[voronoi_labels.flatten() - 1].reshape(height, width)
             result[noise_pixels] = nearest_label_map[noise_pixels]
 
-    return result
-    
     return result
 
 

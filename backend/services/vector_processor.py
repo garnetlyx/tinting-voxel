@@ -425,20 +425,80 @@ def quantize_colors_with_labels(
 ) -> tuple[np.ndarray, np.ndarray, list[tuple[int, int, int]]]:
     """Reduce image colors and keep the per-pixel label grid.
 
-    Clustering is performed in CIELAB space for perceptually uniform
-    color distances, matching human visual perception more closely than
-    RGB Euclidean distance.
+    Clustering uses a hue-priority feature space so that colors with the same
+    hue angle cluster together regardless of lightness or chroma magnitude.
+
+    Feature vector per pixel (4D):
+        [L * W_L,  C * W_C,  cos(h) * W_H,  sin(h) * W_H]
+
+    where L = CIELAB lightness, C = chroma = sqrt(a²+b²), h = arctan2(b, a).
+    Hue terms are zeroed for neutral pixels (C < 8) AND for very dark pixels
+    (L < 20), so near-black border pixels with JPEG color noise cluster
+    together as a single "black" rather than splitting across hue clusters.
+
+    Why unit hue direction instead of C·cos(h) / C·sin(h):
+    - A dark muted blue (low C) and a bright saturated blue (high C) share
+      the same hue angle → same (cos h, sin h) → cluster together.
+    - With C·cos(h), the chroma magnitude difference dominates and splits them.
+    - W_H = 60 makes a 25° hue difference ≈ 26 units (dominant signal).
+    - W_C = 0.5 makes full chroma range ≈ 64 units (secondary).
+    - W_L = 0.2 makes full lightness range ≈ 20 units (tertiary).
     """
     pixels_uint8 = image.reshape(-1, 3)
 
-    # Convert to CIELAB for perceptually uniform clustering
-    pixels_lab = cv2.cvtColor(
+    # Convert to CIELAB
+    # cv2 COLOR_RGB2Lab encodes: L in [0,255] (maps to [0,100]),
+    # a and b in [0,255] (maps to [-128,127] via offset 128).
+    pixels_lab_raw = cv2.cvtColor(
         pixels_uint8.reshape(1, -1, 3), cv2.COLOR_RGB2Lab
     ).reshape(-1, 3).astype(np.float32)
 
+    L = pixels_lab_raw[:, 0] * (100.0 / 255.0)   # 0–100
+    a = pixels_lab_raw[:, 1] - 128.0              # -128–127
+    b = pixels_lab_raw[:, 2] - 128.0              # -128–127
+    C = np.sqrt(a * a + b * b)    # chroma
+    h = np.arctan2(b, a)          # hue angle in radians
+
+    # Hue-priority feature space: [L, C, cos(h), sin(h)]
+    #
+    # Using unit hue direction (cos h, sin h) rather than chroma-scaled
+    # (C·cos h, C·sin h) ensures that two colors at the same hue angle
+    # cluster together regardless of their chroma magnitude.  A dark muted
+    # blue (low C) and a bright saturated blue (high C) share the same hue
+    # direction and therefore land in the same cluster.
+    #
+    # Hue terms are suppressed (zeroed) when EITHER:
+    #   - C < NEUTRAL_C: truly neutral/achromatic pixel (hue is undefined)
+    #   - L < DARK_L:    very dark pixel whose slight color cast is JPEG
+    #                    compression noise, not a meaningful hue difference.
+    #                    Without this, near-black border pixels (e.g. RGB
+    #                    [28,6,8], C≈10) get split across hue clusters instead
+    #                    of merging into a single "black" cluster.
+    #
+    # Weight rationale:
+    #   W_H = 60  → hue direction dominates; a 25° hue difference ≈ 26 units
+    #   W_C = 0.5 → chroma is secondary; full chroma range (0–128) ≈ 64 units
+    #   W_L = 0.2 → lightness is tertiary; full L range (0–100) ≈ 20 units
+    NEUTRAL_C = 8.0
+    DARK_L = 20.0   # suppress hue for very dark pixels (JPEG noise)
+    W_L = 0.2
+    W_C = 0.5
+    W_H = 60.0
+
+    hue_active = (C >= NEUTRAL_C) & (L >= DARK_L)
+    cos_h = np.where(hue_active, np.cos(h), 0.0).astype(np.float32)
+    sin_h = np.where(hue_active, np.sin(h), 0.0).astype(np.float32)
+
+    pixels_lch_weighted = np.stack([
+        L * W_L,
+        C * W_C,
+        cos_h * W_H,
+        sin_h * W_H,
+    ], axis=1).astype(np.float32)
+
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
     _, labels, _ = cv2.kmeans(
-        pixels_lab,
+        pixels_lch_weighted,
         num_colors,
         None,
         criteria,

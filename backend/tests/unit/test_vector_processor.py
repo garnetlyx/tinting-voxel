@@ -286,3 +286,88 @@ class TestVectorProcessorIntegration:
         rendered = render_region_mask(regions, width=7, height=7)
         assert rendered[2, 2]
         assert not rendered[3, 3]
+
+
+# ---------------------------------------------------------------------------
+# Fix 1: hue-priority LCh clustering
+# ---------------------------------------------------------------------------
+
+class TestHuePriorityQuantization:
+    """quantize_colors_with_labels should separate hues before lightness."""
+
+    def test_same_hue_different_lightness_same_cluster(self):
+        """
+        Two blues with the same hue angle but different lightness should land
+        in the same cluster when there are more hue regions than clusters.
+
+        This is the real-world scenario: an image has 7 distinct color regions
+        but the user requests 6 clusters. The two blues share the same hue
+        (h ≈ -80° in CIELAB) but differ in lightness (L=62 vs L=25). Plain
+        CIELAB k-means can split them because the L difference is large; the
+        hue-weighted LCh feature space keeps them together by down-weighting L.
+
+        Colors used:
+          cornflower (100,149,237): L=62, C=50, h=-80°
+          dark cornflower (40,59,94): L=25, C=23, h=-80°  ← same hue, darker
+        """
+        from services.vector_processor import quantize_colors_with_labels
+
+        H, W = 70, 60
+        image = np.zeros((H, W, 3), dtype=np.uint8)
+
+        # 7 hue regions (10 rows each): 5 distinct hues + 2 same-hue blue variants
+        image[0:10, :] = (220, 30, 30)    # Red       h≈+36°
+        image[10:20, :] = (30, 180, 30)   # Green     h≈+137°
+        image[20:30, :] = (100, 149, 237) # Light blue (cornflower) h≈-80°
+        image[30:40, :] = (40, 59, 94)    # Dark cornflower         h≈-80°
+        image[40:50, :] = (220, 200, 30)  # Yellow    h≈+97°
+        image[50:60, :] = (10, 10, 10)    # Black     (neutral)
+        image[60:70, :] = (200, 100, 200) # Magenta   h≈-30°
+
+        # Request 6 clusters for 7 regions → the two same-hue blues must merge
+        _, label_grid, colors = quantize_colors_with_labels(image, num_colors=6)
+
+        light_blue_label = int(label_grid[25, 30])
+        dark_blue_label = int(label_grid[35, 30])
+
+        assert light_blue_label == dark_blue_label, (
+            f"Same-hue blues (light cluster {light_blue_label}, dark cluster "
+            f"{dark_blue_label}) should merge when clusters < hue regions. "
+            f"Palette: {colors}"
+        )
+
+    def test_different_hues_different_clusters(self):
+        """Red and blue must always be in different clusters."""
+        from services.vector_processor import quantize_colors_with_labels
+
+        H, W = 20, 40
+        image = np.zeros((H, W, 3), dtype=np.uint8)
+        image[:, :20] = (200, 20, 20)   # Red
+        image[:, 20:] = (20, 20, 200)   # Blue
+
+        _, label_grid, _ = quantize_colors_with_labels(image, num_colors=2)
+
+        red_label = int(label_grid[10, 5])
+        blue_label = int(label_grid[10, 35])
+
+        assert red_label != blue_label, (
+            "Red and blue must be assigned to different clusters"
+        )
+
+    def test_neutral_colors_still_separate(self):
+        """Black and white (neutral, C≈0) must still be in different clusters."""
+        from services.vector_processor import quantize_colors_with_labels
+
+        H, W = 20, 40
+        image = np.zeros((H, W, 3), dtype=np.uint8)
+        image[:, :20] = (5, 5, 5)       # Black
+        image[:, 20:] = (250, 250, 250) # White
+
+        _, label_grid, _ = quantize_colors_with_labels(image, num_colors=2)
+
+        black_label = int(label_grid[10, 5])
+        white_label = int(label_grid[10, 35])
+
+        assert black_label != white_label, (
+            "Black and white must be assigned to different clusters"
+        )
