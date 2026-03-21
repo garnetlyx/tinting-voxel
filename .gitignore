@@ -97,3 +97,5 @@ e2e/extract-color-mapping.spec.ts
 e2e/test-color-mapping-version.spec.ts
 .kiro/
 docs/ref
+docs/archive/
+docs/SESSION_LOG.md
