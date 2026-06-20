@@ -73,8 +73,8 @@ monitor_*.sh
 .claude/
 .mcp.json
 
-# Code Review (local only)
-docs/EVAL.md
+# Project lifecycle (local only)
+.project/
 
 # Docker
 .dockerignore
@@ -98,7 +98,6 @@ e2e/test-color-mapping-version.spec.ts
 .kiro/
 docs/ref
 docs/archive/
-docs/SESSION_LOG.md
 .hypothesis/
 .sisyphus/
 .omo/

@@ -1,475 +1,432 @@
 # Product Requirements Document (PRD)
 
 **Product Name**: img2stl
-**Version**: 1.0
-**Last Updated**: 2026-03-08
-**Status**: In Development
+**Version**: 2.0
+**Last Updated**: 2026-06-19
+**Status**: In Development — feature-complete beyond original MVP, calibration research ongoing
 
 ---
 
 ## 1. Overview
 
 ### 1.1 Product Vision
-Transform any image into physically accurate, multi-color 3D-printable STL files using CMYK color separation and optical color mixing principles. Enable makers, artists, and engineers to create vibrant, full-color 3D prints using transparent filaments.
+
+Transform any image into physically accurate, multi-color 3D-printable files
+using **N-color** filament separation and optical color mixing principles
+(Beer-Lambert law). Enable makers, artists, and engineers to create vibrant,
+full-color 3D prints using standard transparent filaments on any multi-material
+FDM printer (Bambu Lab AMS, Prusa MMU, tool-changers, manual filament swaps).
 
 ### 1.2 Problem Statement
-Current 3D printing solutions for color images face limitations:
-- Multi-material printers are expensive and require complex calibration
-- Color accuracy is poor with simple layer stacking
-- File sizes are bloated with inefficient mesh generation
-- No tools exist that map colors using optical physics (Beer-Lambert law)
 
-img2stl solves these problems by:
-- Using scientifically-grounded color mixing models based on light transmission
-- Generating optimized STL files with greedy meshing (reducing file size by up to 80%)
-- Providing real-time parameter adjustment and preview
-- Supporting standard CMYK primary colors for predictable results
+Current 3D-printing color solutions face a combination of limitations:
+
+- Multi-material printers are expensive and require complex calibration.
+- Color accuracy is poor with simple layer stacking.
+- File sizes are bloated with inefficient mesh generation.
+- Most tools cannot generalize: swapping a filament means reprinting a full
+  calibration board (e.g. existing tools' 5⁴=625-cell LUT per filament set).
+- No tool combines an optical-physics color model with a full web UI, REST
+  API, and arbitrary-filament configurability.
+
+img2stl solves these by:
+
+- Using a scientifically-grounded color mixing model based on light
+  transmission (Beer-Lambert / hybrid per-channel Kubelka-Munk variant).
+- Generating optimized meshes with greedy meshing (70–80% box-count
+  reduction).
+- Supporting **any N-color filament configuration (4–16 colors)** with
+  user-defined hex values and per-color transmission/scattering parameters.
+- Calibrating model parameters against a single printed-and-photographed test
+  plate rather than a full permutation board, so the model generalizes to new
+  filament combinations without re-measuring every combo.
 
 ### 1.3 Goals & Success Metrics
+
 | Goal | Metric | Target |
 |------|--------|--------|
-| Accurate color reproduction | Delta-E color difference | < 10 (perceptually acceptable) |
-| File size optimization | STL file size reduction | > 70% vs naive boxing |
-| Processing performance | Image processing time | < 5s for 512x512px |
+| Accurate color reproduction | CIELAB Delta-E vs printed plate | < 10 perceptually acceptable; current best P6 dE=39.69 on 16×16 plate |
+| File size optimization | STL box-count reduction | 70–80% vs naive per-pixel boxing |
+| Processing performance | Image processing time | < 5s for 512×512px |
 | User adoption | Active users | 100 users/month (6 months) |
-| Export success rate | Successful STL downloads | > 95% |
+| Export success rate | Successful downloads | > 95% |
+| Test health | Backend test pass rate | > 95% across 800+ tests |
 
 ---
 
 ## 2. Users & Personas
 
 ### 2.1 Target Users
-- Hobbyist 3D printing enthusiasts
-- Product designers prototyping with color
-- Artists exploring new mediums
-- Educators teaching optics and additive manufacturing
-- Professional makers requiring color prototypes
+
+- Hobbyist 3D-printing enthusiasts (Bambu Lab P1S / X1C with AMS).
+- Product designers prototyping with color.
+- Artists exploring new physical mediums.
+- Educators teaching optics and additive manufacturing.
+- Etsy / online sellers producing custom lithophane-style gifts in batches.
+- Researchers exploring transparent-filament color models.
 
 ### 2.2 User Personas
 
-#### Persona 1: Alex - Hobbyist Maker
-- **Background**: 3D printing enthusiast with Bambu Lab P1S, comfortable with technical tools
-- **Goals**: Create colorful decorative prints and gifts without buying a multi-material system
-- **Pain Points**: Existing tools produce bland single-color prints or require expensive upgrades
-- **Usage Context**: Weekend projects, experimenting with transparent PETG filaments
+#### Persona 1 — Alex, Hobbyist Maker
+- Bambu Lab P1S, comfortable with technical tools.
+- Wants colorful decorative prints without buying a multi-material upgrade.
+- Uses the curated palette library and the 3D preview to iterate before
+  printing.
 
-#### Persona 2: Jordan - Product Designer
-- **Background**: Industrial designer prototyping consumer products
-- **Goals**: Quickly validate color schemes and visual appearance before manufacturing
-- **Pain Points**: Traditional CAD tools don't support image-based color mapping, prototype services are slow
-- **Usage Context**: Design validation during working hours, needs fast iteration
+#### Persona 2 — Jordan, Product Designer
+- Industrial designer prototyping consumer products.
+- Needs fast iteration and configurable N-color filaments to match brand
+  palettes; uses batch processing for variant studies.
 
-#### Persona 3: Sam - STEM Educator
-- **Background**: High school physics/engineering teacher with classroom 3D printer
-- **Goals**: Demonstrate optical color mixing and additive manufacturing principles
-- **Pain Points**: Lack of educational tools that connect theory (Beer-Lambert law) to practice
-- **Usage Context**: Classroom demonstrations, student projects
+#### Persona 3 — Sam, STEM Educator
+- Classroom 3D printer, demonstrates optical color mixing.
+- Uses CSV export and the Beer-Lambert model walkthroughs as teaching
+  material.
+
+#### Persona 4 — Mira, Etsy Seller
+- Produces 10–20 custom prints per week.
+- Uses batch processing (up to 20 images) and print-settings export to feed
+  directly into Bambu Studio.
 
 ---
 
 ## 3. Use Cases & Scenarios
 
 ### 3.1 Core Use Cases
-| ID | Use Case | Priority | User |
-|----|----------|----------|------|
-| UC-01 | Convert photo to layered CMYK STL files | P1 | All |
-| UC-02 | Adjust color extraction parameters | P1 | Alex, Jordan |
-| UC-03 | Preview processed image before export | P1 | All |
-| UC-04 | Download optimized STL files as ZIP | P1 | All |
-| UC-05 | Export color data as CSV for analysis | P2 | Jordan, Sam |
-| UC-06 | Customize layer height and pixel size | P1 | Jordan |
-| UC-07 | Process images up to 512x512px | P1 | All |
+
+| ID | Use Case | Priority |
+|----|----------|----------|
+| UC-01 | Convert photo to layered N-color STL/3MF files | P1 |
+| UC-02 | Configure 4–16 filament primaries (hex + transmission) | P1 |
+| UC-03 | Preview processed image + 3D WebGL render before export | P1 |
+| UC-04 | Download optimized output (STL ZIP, 3MF, SVG-STL, CSV) | P1 |
+| UC-05 | Export slicer print-settings JSON | P1 |
+| UC-06 | Process a batch of up to 20 images | P2 |
+| UC-07 | Auto-search best processing parameters for an image | P2 |
+| UC-08 | Use curated color palette as a starting point | P2 |
+| UC-09 | Calibrate Beer-Lambert parameters against a printed plate | P2 (internal CLI) |
 
 ### 3.2 User Flows
 
-#### Flow 1: Basic Image-to-STL Conversion
-1. User uploads image file (PNG, JPG, etc.)
-2. System processes image with default parameters (maxColors=10, threshold=50)
-3. System displays extracted color blocks and processed preview
-4. User reviews color accuracy in side-by-side comparison
-5. User downloads ZIP containing 4 STL files (C, M, Y, W layers)
-6. User prints files sequentially with corresponding filament colors
+#### Flow 1 — Basic Image-to-Mesh Conversion
+1. User uploads PNG/JPG (≤10MB, auto-downscaled past 1024px).
+2. Backend extracts dominant colors via K-means in CIELAB space.
+3. Backend maps colors to the configured N-color set using the hybrid
+   per-channel-k Beer-Lambert model with CIEDE2000 distance.
+4. Frontend shows side-by-side original vs. simulated print + 3D WebGL
+   preview.
+5. User downloads STL ZIP / 3MF / CSV / print settings.
 
-#### Flow 2: Parameter Tuning for Quality
-1. User uploads complex image with many colors
-2. System processes with default parameters
-3. User observes color blocks don't match original well
-4. User increases maxColors to 15, adjusts colorThreshold to 30
-5. User clicks "Reprocess" to regenerate with new parameters
-6. System updates preview and color blocks
-7. User iterates until satisfied, then downloads
+#### Flow 2 — N-Color Filament Configuration
+1. User picks a preset (Bambu CMYK, Clear CMYK, Phase6, per-channel-k).
+2. User edits hex values / per-color `k` and `td` parameters.
+3. Filament preview matrix regenerates showing achievable color gamut.
+4. Configuration persists across sessions via localStorage.
 
-#### Flow 3: Educational Demonstration
-1. Teacher uploads simple gradient image
-2. System extracts CMYK layers
-3. Teacher downloads CSV to show color mapping data
-4. Class examines how RGB colors map to CMYK combinations
-5. Students print layers and observe optical color mixing
-6. Teacher uses physical prints to explain Beer-Lambert law
+#### Flow 3 — Batch Processing
+1. User drops up to 20 images.
+2. Each image is processed with shared settings.
+3. User downloads a single STL ZIP per image or a combined batch download.
+
+#### Flow 4 — Parameter Search (auto-tune)
+1. User uploads an image and opens the parameter-search modal.
+2. Backend warms up, then sweeps `maxColors` / `colorThreshold` combinations.
+3. User picks the variant with the best perceived preview and proceeds to
+   export.
+
+#### Flow 5 — Calibration (internal)
+1. Operator prints the 16×16 permutation plate or the P1S structured CMYWK
+   plate.
+2. Operator photographs the plate under diffuse light and crops to grid.
+3. CLI (`run_calibration.py` / `run_structured_calibration.py`) optimizes
+   `alpha` (and optionally `td` per color / `k_rgb` per channel) to minimize
+   perceptual error vs the photo.
+4. Optimized values are promoted into a preset in `color_config.py`.
 
 ---
 
 ## 4. Feature Scope
 
-### 4.1 In Scope (Must Have - MVP)
-- [x] **Image Upload**: Support PNG, JPG, JPEG formats up to 10MB
-- [x] **Color Extraction**: K-means clustering for dominant color detection
-- [x] **CMYK Mapping**: Map extracted colors to CMYK primaries using LAB color space
-- [x] **Beer-Lambert Model**: Calculate layered color mixing using optical physics
-- [x] **STL Generation**: Generate separate STL files for C, M, Y, W layers
-- [x] **Greedy Meshing**: Optimize mesh by merging adjacent pixels (reduce file size 70%+)
-- [x] **Parameter Controls**:
-  - maxColors (1-20): number of dominant colors to extract
-  - colorThreshold (0-100): sensitivity for color merging
-  - layerHeight (0.01-1.0mm): thickness of each layer
-  - pixelSize (0.01-1.0mm): XY dimension of each pixel
-- [x] **Real-time Preview**: Side-by-side comparison of original vs processed image
-- [x] **CSV Export**: Export color block data for analysis
-- [x] **ZIP Download**: Package all STL files into single archive
+### 4.1 Shipped (current state)
 
-### 4.2 In Scope (Nice to Have - Post-MVP)
-- [ ] **Custom Color Profiles**: Allow users to define custom CMYK primaries (hex values)
-- [ ] **Transmission Distance Tuning**: Adjust Beer-Lambert parameters per color
-- [ ] **Batch Processing**: Process multiple images in one session
-- [ ] **3D Preview**: WebGL preview of layered STL files
-- [ ] **Image Pre-processing**: Auto-crop, resize, filters
-- [ ] **Color Palette Library**: Save/load favorite color configurations
-- [ ] **Print Settings Export**: Generate slicer config files (e.g., for Bambu Studio)
-- [ ] **Advanced Metrics**: Display color accuracy metrics (Delta-E)
+**Image input**
+- PNG / JPG / JPEG / BMP / GIF / WebP upload with magic-byte validation
+- Auto-downscale past `MAX_PROCESSING_DIMENSION` (4096px)
+- Canvas crop/resize editor (frontend)
+- Drag-and-drop + click upload
+
+**Color processing**
+- K-means clustering (vectorized, CIELAB distance) for color extraction
+- N-color mapping via hybrid per-channel-k Beer-Lambert model
+- CIEDE2000 perceptual matching with hue-preservation for dark chromatic colors
+- 6 filament presets (Bambu CMYK, Calibrated, Phase6 CMYK/CMYW, Clear CMYK,
+  per-channel-k)
+- Curated palette library (10 palettes, 3 categories)
+- Filament preview matrix with pagination for large N
+
+**Output formats**
+- V1: STL ZIP (CMYW), CSV, SVG-STL ZIP
+- V2: N-color STL ZIP, N-color SVG-STL, **3MF** (named color objects, trimesh
+  + lxml), **SVG-3MF**, print-settings JSON
+- Greedy meshing (70–80% box-count reduction), face culling
+- Double-sided print support
+
+**UX**
+- Side-by-side original/processed comparison
+- 3D WebGL preview (three.js InstancedMesh, orbit controls, material caching)
+- Parameter panel (maxColors, colorThreshold, layerHeight, pixelSize, detail
+  presets with nozzle-line-width defaults)
+- Batch processor UI (up to 20 images)
+- Filament config panel + preset manager
+- Palette library selector
+- Parameter-search modal with backend warmup UX
+- Color adjustment panel
+
+**Infrastructure / API**
+- FastAPI app with V1 + V2 routes, param-search, batch, palette, filament,
+  health, analytics
+- `slowapi` rate limiting on all endpoints
+- `@handle_api_errors` standardized error handling
+- File upload validators (extension, size, magic bytes)
+- In-memory usage analytics
+- Docker multi-stage build + Railway / Fly.io / docker-compose configs
+
+**Calibration tooling**
+- 19+ CLI scripts under `backend/tools/calibration/`
+- 16×16 permutation plate, ramp plates, structured P1S 30×26 CMYWK plate
+- Photo preprocessor (perspective correction, white balance, glare masking)
+- Cross-validation replay benchmark, model-search explorer
+- Hybrid per-color-k and per-channel-k optimizers
+- Per-color `k` physical-ordering prior (K > W > M > C > Y), TD1S power-law
+  remapping
+
+**Quality**
+- ~818 backend tests (89% coverage), 86 frontend Vitest tests, 25 Playwright
+  E2E tests
+- QA regression suite (R1–R16) documenting 190+ bugs fixed
+
+### 4.2 In Progress / Planned
+
+- **Black (K) filament toggle** — add CMYWK 5-color support; current model
+  cannot reach true black at 0.08mm layer height (see TODO).
+- **k_rgb optimization for P7** — gradient descent on training photos; promote
+  if transfer score beats P6.
+- **Max-dimension preset chips** in the frontend (180 / 250 / 300mm).
+- **Production hardening** — thread locks on global matrices, bounded
+  analytics, non-root Docker user (see TODO P0/P1).
 
 ### 4.3 Out of Scope
-- **Vector Image Support**: SVG/PDF inputs (raster images only)
-- **Non-CMYK Color Systems**: RGB-only or spot color workflows
-- **Direct Slicer Integration**: Plugin for PrusaSlicer/Cura (requires separate project)
-- **Physical Material Calibration**: Per-filament tuning (assumes standard transparent PETG)
-- **Texture Mapping**: Complex surface patterns beyond flat color blocks
-- **Multi-page STL**: Single-file multi-color STL (incompatible with most slicers)
+
+- Direct in-slicer plugin (Bambu Studio / PrusaSlicer / Cura) — handled via
+  exported 3MF + print-settings JSON instead.
+- Cloud user accounts / saved profiles (deferred to a later phase).
+- GPU acceleration (cuML) — not critical at current scale.
+- Palette-specific empirical codebooks as the primary runtime path — kept as
+  diagnostics only; the generalized parametric model remains the runtime.
 
 ---
 
 ## 5. UI/UX Requirements
 
 ### 5.1 Design Principles
-- **Simplicity First**: Core workflow should be achievable in 3 clicks (upload, adjust, download)
-- **Immediate Feedback**: Show processing status and preview updates in real-time
-- **Progressive Disclosure**: Advanced parameters hidden by default, accessible via settings toggle
-- **Visual Clarity**: Side-by-side image comparison for easy quality assessment
-- **Forgiving**: Allow users to adjust and reprocess without re-uploading image
 
-### 5.2 Key Screens/Views
-| Screen | Purpose | Key Elements |
-|--------|---------|--------------|
-| Main Converter | Primary workspace | Image uploader, parameter panel, preview comparison, download buttons |
-| Parameter Panel | Adjust extraction settings | Sliders for maxColors, colorThreshold, layerHeight, pixelSize |
-| Image Comparison | Visual validation | Original image (left), processed preview (right) |
-| Color Blocks List | Show extracted colors | Color swatches, RGB values, pixel counts, hex codes |
-| Download Section | Export results | CSV button, STL ZIP button, loading states |
+- **Simplicity first**: core flow is upload → tune → download.
+- **Immediate feedback**: live preview, debounced parameter updates,
+  background warmup for long jobs.
+- **Progressive disclosure**: advanced parameters and filament config hidden
+  by default.
+- **Forgiving**: re-process without re-uploading; persistent filament config.
+
+### 5.2 Key Screens
+
+| Screen | Purpose |
+|--------|---------|
+| Converter | Main workspace: upload, parameter panel, preview, downloads |
+| Parameter Panel | maxColors, colorThreshold, layerHeight, pixelSize, detail presets |
+| Filament Config Panel | N-color preset + per-color hex / k / td editing |
+| Filament Preview | Achievable color gamut matrix |
+| Image Comparison | Original vs simulated print |
+| 3D Preview | three.js WebGL render with orbit controls |
+| Batch Processor | Multi-image queue + shared settings |
+| Palette Library | Curated palette picker |
+| Image Editor | Canvas crop / resize |
+| Parameter Search Modal | Auto-tune sweep with progress |
 
 ### 5.3 Interaction Patterns
-- **Drag-and-Drop Upload**: Primary image upload method (click fallback)
-- **Live Parameter Updates**: Sliders update values in real-time with debouncing
-- **Manual Reprocess**: Explicit "Reprocess" button to avoid excessive API calls
-- **Loading States**: Spinner overlay during processing with progress indication
-- **Error Handling**: Friendly error messages for upload failures, processing errors
-- **Responsive Layout**: Single-column mobile, two-column desktop
+
+- Drag-and-drop upload (with click fallback).
+- Debounced live parameter updates + explicit "Reprocess".
+- Loading spinners / progress for long jobs (param-search, batch).
+- Friendly, granular error messages.
+- Single-column mobile, multi-column desktop.
 
 ---
 
 ## 6. Technical Requirements
 
 ### 6.1 Platform & Compatibility
-- **Frontend**: Modern browsers with ES6+ support (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
-- **Backend**: Python 3.8+ runtime
-- **Deployment**: Docker containerizable, cloud-ready (AWS, Vercel, Railway)
-- **File Support**: PNG, JPG, JPEG (max 10MB per image)
-- **Image Size**: Up to 1024x1024px (512x512px recommended for performance)
+
+- **Frontend**: Modern browsers with ES6+ + WebGL (Chrome 90+, Firefox 88+,
+  Safari 14+, Edge 90+).
+- **Backend**: Python 3.8+ runtime (type hints throughout).
+- **Deployment**: Docker, Railway, Fly.io, or self-hosted.
+- **File support**: PNG, JPG, JPEG, BMP, GIF, WebP (≤10MB; auto-downscaled
+  past 4096px).
 
 ### 6.2 Performance Requirements
+
 | Metric | Requirement |
 |--------|-------------|
-| Image Processing Time | < 5s for 512x512px, < 15s for 1024x1024px |
-| STL Generation Time | < 10s for 256x256px mesh with greedy optimization |
-| API Response Time | < 500ms (excluding processing) |
-| Frontend Load Time | < 2s on 3G connection |
-| Memory Usage (Backend) | < 512MB RAM per concurrent request |
-| File Size | < 5MB per STL file after optimization |
+| Image processing | < 5s for 512×512, < 15s for 1024×1024 |
+| STL generation | < 10s for 256×256 mesh with greedy optimization |
+| API response (excl. processing) | < 500ms |
+| Frontend load | < 2s on 3G |
+| Memory per request | < 512MB |
+| Per STL file size | < 5MB after optimization |
 
 ### 6.3 Security Requirements
-- **File Validation**: Verify uploaded files are valid images (magic number check)
-- **Size Limits**: Reject files > 10MB to prevent DoS
-- **Input Sanitization**: Validate all parameter inputs (range checks)
-- **CORS Configuration**: Restrict origins to trusted domains
-- **No Persistent Storage**: Delete temporary files after processing
-- **Rate Limiting**: Max 10 requests/minute per IP (future)
+
+- File validation: magic-byte check, extension allow-list, size cap.
+- Input sanitization: Pydantic validators with bounds on all parameters.
+- CORS restricted to configured origins; methods limited to
+  GET/POST/OPTIONS.
+- CSV injection prevention (`csv.QUOTE_ALL`).
+- Path-traversal protection on SPA static serving.
+- Rate limiting (`slowapi`, 10/min default).
+- No persistent storage of user data.
 
 ### 6.4 Data Requirements
-- **No User Data Storage**: Stateless processing, no database required
-- **Temporary File Handling**: Images stored in memory during processing, cleaned up immediately
-- **Export Format**:
-  - STL: Binary STL format (smaller than ASCII)
-  - CSV: UTF-8 encoding, standard column headers
-  - ZIP: Standard ZIP compression, maximum compatibility
+
+- Stateless processing — no database.
+- Temporary images held in-memory and cleaned up immediately.
+- In-memory analytics (to be bounded — see TODO P0).
 
 ---
 
 ## 7. Constraints & Assumptions
 
 ### 7.1 Constraints
-- **Technical**:
-  - Python backend limits concurrent processing (CPU-bound)
-  - Browser memory limits large image uploads
-  - STL file format doesn't support embedded color data (requires separate files)
-- **Business**:
-  - No budget for cloud infrastructure (local/self-hosted deployment)
-  - Single developer team (limited maintenance bandwidth)
-- **Resource**:
-  - Open-source dependencies only (no licensed libraries)
-  - No user authentication/accounts (MVP)
+
+- Python backend limits concurrent CPU-bound processing.
+- Browser memory limits very large image uploads.
+- STL format does not embed color — separate per-color files or 3MF objects
+  required.
+- Single-developer bandwidth.
 
 ### 7.2 Assumptions
-- **User has 3D printer** capable of filament swapping (manual or AMS)
-- **User has transparent CMYK filaments** (standard Bambu Lab or similar)
-- **Users understand basic 3D printing** (know how to import/slice STL files)
-- **Beer-Lambert model is accurate** for common transparent PETG filaments
-- **Greedy meshing** doesn't compromise print quality (minimal artifacts)
-- **LAB color space** provides perceptually accurate color matching
+
+- User has a multi-material FDM printer (AMS / MMU / tool-changer / manual
+  swap).
+- User has transparent CMYK (and optionally additional) filaments.
+- User understands basic slicing workflow.
+- The hybrid per-channel-k Beer-Lambert model generalizes within a filament
+  family (validated for Bambu CMYK transparent PETG).
 
 ### 7.3 Dependencies
-- **External Libraries**:
-  - FastAPI (backend framework)
-  - numpy-stl (STL mesh generation)
-  - scikit-learn (K-means clustering)
-  - Pillow (image processing)
-  - React 19 (frontend framework)
-  - Vite (build tool)
-- **Infrastructure**:
-  - Node.js 18+ (frontend build)
-  - Python 3.8+ (backend runtime)
-  - Modern browser with File API support
+
+- **Backend**: FastAPI, numpy-stl, Pillow, scikit-learn, scikit-image,
+  trimesh, lxml, slowapi, pydantic.
+- **Frontend**: React 19, TypeScript (strict), Vite, Tailwind CSS, three.js,
+  lucide-react.
+- **Testing**: pytest, Vitest, Playwright.
 
 ---
 
 ## 8. Release Planning
 
-### 8.1 MVP Scope (v1.0 - Current)
-**Goal**: Functional image-to-STL converter with core features
+### 8.1 v1.0 — Original MVP (shipped 2026-01)
+CMYK-only conversion, greedy meshing, STL/CSV export, parameter UI,
+real-time preview, comprehensive test suite.
 
-**Features**:
-- [x] Image upload (PNG, JPG)
-- [x] K-means color extraction
-- [x] CMYK color mapping (Beer-Lambert model)
-- [x] Layered STL generation with greedy meshing
-- [x] Parameter adjustment UI (maxColors, colorThreshold, layerHeight, pixelSize)
-- [x] Real-time preview
-- [x] CSV export
-- [x] ZIP download
-- [x] Comprehensive test suite (unit + integration)
-- [x] Documentation (README, SETUP, CLAUDE)
+### 8.2 v1.x — Post-MVP polish (shipped)
+Custom color profiles, advanced error handling, image editor, 3MF output,
+base plate, color adjustment, progress bars.
 
-**Status**: Feature-complete, in testing
+### 8.3 v2.0 — N-color + Calibration (current)
+Dynamic 4–16 color support, V2 API (STL / SVG-STL / 3MF / SVG-3MF / print
+settings), batch processing, palette library, 3D WebGL preview, double-sided,
+param search, Docker/cloud deploy, full calibration suite (Phase 6 / Phase 7
+per-channel-k).
 
-### 8.2 Future Phases
+### 8.4 Future phases
 
-| Phase | Features | Priority | Target |
-|-------|----------|----------|--------|
-| **Phase 1.1** (Post-MVP Polish) | - Custom CMYK color profiles<br>- Advanced error handling<br>- Processing progress bar<br>- Image pre-processing (crop, resize) | P2 | Q2 2026 |
-| **Phase 2** (Enhancement) | - 3D preview (WebGL)<br>- Batch processing<br>- Color palette library<br>- Print settings export | P2 | Q3 2026 |
-| **Phase 3** (Scale) | - User accounts<br>- Cloud deployment<br>- API rate limiting<br>- Usage analytics<br>- Docker containerization | P3 | Q4 2026 |
-| **Phase 4** (Ecosystem) | - Slicer plugins (Bambu Studio, PrusaSlicer)<br>- Material calibration wizard<br>- Community color profiles<br>- Mobile app | P3 | 2027+ |
+| Phase | Features | Target |
+|-------|----------|--------|
+| 2.1 Accuracy | k_rgb optimization, promote P6/P7 to default, CMYWK black filament | Q3 2026 |
+| 2.2 Hardening | Thread locks, bounded analytics, non-root Docker, SVG complexity caps | Q3 2026 |
+| 3 Ecosystem | Slicer-preset partnerships, filament manufacturer profiles, community palette submissions | Q4 2026 |
+| 4 Scale | User accounts, cloud-saved profiles, monitoring (Prometheus), error tracking (Sentry) | 2027+ |
 
 ---
 
-## 9. Current Implementation Status
+## 9. API Reference (summary)
 
-### 9.1 Backend (Python/FastAPI)
-**Status**: ✅ Implemented
+### V1 (legacy)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/process-image` | Process image (pixel/SVG modes) |
+| POST | `/api/download-csv` | Color data CSV |
+| POST | `/api/download-stl` | STL ZIP (default CMYK) |
+| POST | `/api/download-svg-stl` | SVG-mode STL ZIP |
 
-**Completed**:
-- FastAPI application with modular routes (`/api/process-image`, `/api/download-csv`, `/api/download-stl`)
-- Pydantic models for request/response validation
-- Image processing service (K-means clustering, color extraction)
-- STL generation service with Beer-Lambert color mixing
-- CSV generation service
-- Mesh optimization service (greedy meshing)
-- Vector processing utilities
-- Configuration management (environment-based settings)
-- Health check endpoint
-- CORS middleware for cross-origin requests
-- Comprehensive test suite (pytest, 90%+ coverage)
+### V2 (N-color)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v2/download-stl` | N-color STL ZIP |
+| POST | `/api/v2/download-svg-stl` | N-color SVG-mode STL |
+| POST | `/api/v2/download-3mf` | 3MF with named color objects |
+| POST | `/api/v2/download-svg-3mf` | SVG-mode 3MF |
+| POST | `/api/v2/print-settings` | Slicer print-settings JSON |
+| GET  | `/api/v2/filament-presets` | Available presets |
 
-**Key Files**:
-- `backend/main.py`: FastAPI app initialization, lifespan management
-- `backend/core/blend_color.py`: Beer-Lambert color model, CMYK mapping (678 lines)
-- `backend/services/stl_generator.py`: STL mesh generation, color mapping
-- `backend/services/mesh_optimizer.py`: Greedy meshing algorithm
-- `backend/api/models.py`: Request/response schemas
-- `backend/tests/`: Unit and integration tests
+### Other
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/filament-preview` | Color gamut matrix |
+| POST | `/api/batch/process` | Batch (≤20 images) |
+| POST | `/api/batch/download-stl` | Batch STL download |
+| POST | `/api/param-search` | Auto parameter sweep |
+| GET  | `/api/param-search/progress/{job_id}` | Sweep progress |
+| GET  | `/api/palettes/` | List palettes |
+| GET  | `/api/palettes/{id}` | Get palette |
+| GET  | `/api/analytics` | Usage analytics |
+| GET  | `/api/cache-stats` | Reference-matrix cache stats |
+| GET  | `/health` | Health check |
 
-### 9.2 Frontend (React/TypeScript)
-**Status**: ✅ Implemented
-
-**Completed**:
-- React 19 with TypeScript (strict mode)
-- Vite build system with HMR
-- Custom hook for image processing logic (`useImageProcessor`)
-- Modular component architecture
-- Parameter panel with live controls
-- Image uploader with drag-and-drop
-- Side-by-side image comparison
-- Color blocks visualization
-- Download buttons (CSV, STL)
-- Loading states and error handling
-- Tailwind CSS styling
-- API proxy configuration
-
-**Key Files**:
-- `src/pages/Converter.tsx`: Main page component
-- `src/hooks/useImageProcessor.ts`: Processing logic and state management
-- `src/components/`: UI components (ImageUploader, ParameterPanel, etc.)
-- `src/api/client.ts`: API integration layer
-
-### 9.3 Infrastructure
-**Status**: 🟡 Partial
-
-**Completed**:
-- [x] Git repository with conventional commits
-- [x] README and setup documentation
-- [x] Development scripts (npm run dev, backend scripts)
-- [x] Python virtual environment setup
-- [x] Requirements.txt with pinned versions
-- [x] Basic .gitignore configuration
-- [x] Test suite with pytest
-
-**Pending**:
-- [ ] Docker containerization (Dockerfile, docker-compose)
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Cloud deployment configuration
-- [ ] Production environment variables
-- [ ] Logging and monitoring setup
-- [ ] Performance benchmarking suite
-
----
-
-## 10. API Reference
-
-### 10.1 POST /api/process-image
-**Purpose**: Process uploaded image and extract color blocks
-
-**Request**:
-- Content-Type: `multipart/form-data`
-- Parameters:
-  - `image`: File (required) - Image file
-  - `maxColors`: int (default: 10) - Max colors to extract
-  - `colorThreshold`: float (default: 50) - Color merge threshold
-  - `pixelSize`: float (default: 0.08) - Pixel size in mm
-
-**Response** (200 OK):
-```json
-{
-  "colorBlocks": [
-    {
-      "r": 128, "g": 64, "b": 200,
-      "count": 1234,
-      "pixels": [{"x": 10, "y": 20}, ...],
-      "hex": "#8040c8"
-    }
-  ],
-  "processedImage": "data:image/png;base64,...",
-  "imageDimensions": {"width": 208, "height": 208}
-}
-```
-
-### 10.2 POST /api/download-csv
-**Purpose**: Download color data as CSV
-
-**Request**:
-```json
-{
-  "colorBlocks": [...]
-}
-```
-
-**Response** (200 OK):
-- Content-Type: `text/csv`
-- Filename: `color_blocks.csv`
-
-### 10.3 POST /api/download-stl
-**Purpose**: Generate and download layered STL files
-
-**Request**:
-```json
-{
-  "colorBlocks": [...],
-  "layerHeight": 0.08,
-  "pixelSize": 0.08,
-  "layerCount": 4,
-  "imageDimensions": {"width": 208, "height": 208}
-}
-```
-
-**Response** (200 OK):
-- Content-Type: `application/zip`
-- Filename: `CMYW_{width}x{height}x{total_height}.zip`
-- Contents: `CMYW_..._C.stl`, `CMYW_..._M.stl`, `CMYW_..._Y.stl`, `CMYW_..._W.stl`
-
-### 10.4 GET /api/health
-**Purpose**: Health check endpoint
-
-**Response** (200 OK):
-```json
-{
-  "status": "healthy",
-  "version": "1.0.0"
-}
-```
+Full OpenAPI spec at `/docs` when the backend is running.
 
 ---
 
 ## Appendix
 
 ### A. Glossary
+
 | Term | Definition |
 |------|------------|
-| **Beer-Lambert Law** | Optical physics law describing light absorption/transmission through layers |
-| **CMYK** | Cyan, Magenta, Yellow, Key (black) - subtractive color model |
-| **Greedy Meshing** | Optimization algorithm that merges adjacent identical pixels into larger boxes |
-| **K-means Clustering** | Machine learning algorithm for grouping similar colors |
-| **LAB Color Space** | Perceptually uniform color space (L=lightness, a/b=color axes) |
-| **STL** | Standard Tessellation Language - 3D mesh file format |
-| **AMS** | Automatic Material System (Bambu Lab filament changer) |
-| **Delta-E** | Perceptual color difference metric (< 1 = imperceptible, < 10 = acceptable) |
+| **Beer-Lambert Law** | Optical physics law describing light absorption/transmission through layers: `T = exp(−α·d/td)` |
+| **Hybrid per-channel-k** | Production blend model: per-channel transmission with per-color scattering coefficient `k_c` |
+| **CMYK / CMYWK** | Subtractive color models (Cyan, Magenta, Yellow, White/[Key]) |
+| **Greedy Meshing** | Algorithm merging adjacent identical pixels into larger rectangles |
+| **K-means** | Clustering algorithm for grouping similar colors |
+| **CIELAB / CIEDE2000** | Perceptually uniform color space / perceptual difference metric |
+| **3MF** | 3D Manufacturing Format — modern mesh format supporting color/material metadata |
+| **AMS / MMU** | Automatic Material System (Bambu) / Multi-Material Unit (Prusa) |
+| **TD1S** | Single-parameter transmission-distance power-law remapping used in calibration |
+| **Phase 6 / Phase 7** | Calibration generations: Phase 6 = per-color k; Phase 7 = per-channel k_rgb |
 
 ### B. References
-- [Beer-Lambert Law](https://en.wikipedia.org/wiki/Beer%E2%80%93Lambert_law) - Optical transmission physics
-- [CIELAB Color Space](https://en.wikipedia.org/wiki/CIELAB_color_space) - Perceptual color matching
-- [Greedy Meshing](https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/) - Mesh optimization technique
-- [STL Format Specification](https://en.wikipedia.org/wiki/STL_(file_format)) - 3D mesh file format
+
+- [Beer-Lambert Law](https://en.wikipedia.org/wiki/Beer%E2%80%93Lambert_law)
+- [CIELAB Color Space](https://en.wikipedia.org/wiki/CIELAB_color_space)
+- [CIEDE2000](https://en.wikipedia.org/wiki/Color_difference#CIEDE2000)
+- [Greedy Meshing](https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/)
+- [3MF Specification](https://3mf.io/specification/)
+- [Kubelka-Munk theory](https://en.wikipedia.org/wiki/Kubelka%E2%80%93Munk_theory)
 
 ### C. Change Log
-| Date | Version | Changes | Author |
-|------|---------|---------|--------|
-| 2026-01-27 | 1.0 | Initial PRD created from existing codebase | Claude |
-| 2026-01-21 | 0.9 | MVP features implemented, greedy meshing added | [TBD] |
-| [TBD] | 0.1 | Project initiated | [TBD] |
 
----
-
-## Notes
-
-### Technical Highlights
-1. **Beer-Lambert Model**: Unlike simple layer stacking, img2stl uses optical physics to predict how light transmits through transparent layers, producing accurate color mixing
-2. **Greedy Meshing**: Reduces STL file sizes by 70-80% by merging adjacent pixels into larger boxes, critical for large images
-3. **LAB Color Space**: Ensures perceptually accurate color matching (humans perceive colors logarithmically, not linearly)
-4. **Stateless Architecture**: No database required, all processing in-memory for simplicity and scalability
-
-### Design Decisions
-- **Separate STL Files**: Most slicers don't support multi-color single files; separate files allow manual filament swaps
-- **Default 4 Layers**: Balances color depth with print time; more layers = better color but longer prints
-- **CMYK (not RGB)**: Transparent filaments use subtractive color mixing (like printing), not additive (like screens)
-- **No Authentication**: MVP prioritizes functionality over user management; can add later if needed
-
-### Future Considerations
-- **GPU Acceleration**: For image processing and K-means clustering (scikit-learn supports cuML)
-- **WebAssembly**: Port Beer-Lambert calculations to WASM for client-side processing
-- **Progressive Web App**: Enable offline usage with cached resources
-- **Material Database**: Community-contributed filament transmission profiles for better accuracy
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-06-19 | 2.0 | PRD rewritten to reflect N-color V2 API, batch, 3MF, palette library, 3D preview, calibration system (Phase 6/7), ~818 backend tests |
+| 2026-03-08 | 1.1 | Calibration section, presets, CLI workflow |
+| 2026-01-27 | 1.0 | Initial PRD from existing codebase |
