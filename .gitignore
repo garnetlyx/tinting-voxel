@@ -99,3 +99,6 @@ e2e/test-color-mapping-version.spec.ts
 docs/ref
 docs/archive/
 docs/SESSION_LOG.md
+.hypothesis/
+.sisyphus/
+.omo/
