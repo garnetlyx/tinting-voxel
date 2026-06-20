@@ -64,7 +64,7 @@ img2stl/
 │   ├── config/           # Configuration (settings, constants)
 │   ├── tools/calibration/ # Calibration CLI (19+ scripts, photos, plates, results)
 │   ├── scripts/          # Debug / one-off utility scripts
-│   └── tests/            # Test suite (868 tests, 89% coverage)
+│   └── tests/            # Test suite (878 tests, 89% coverage)
 │       ├── unit/             # Unit tests
 │       ├── integration/      # Integration tests
 │       ├── performance/      # Performance tests
@@ -177,7 +177,7 @@ docker compose up --build  # Build and run
 ## Testing
 
 ```bash
-# Backend (868 tests, 89% coverage)
+# Backend (878 tests, 89% coverage)
 cd backend && pytest -v
 
 # Frontend (Vitest, 12 test files)

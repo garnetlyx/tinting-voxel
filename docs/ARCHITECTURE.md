@@ -136,7 +136,7 @@ img2stl/
 │   │       ├── run_model_search.py          # New model family exploration
 │   │       └── ...                          # Additional diagnostic + utility scripts
 │   ├── config/           # Configuration
-│   └── tests/            # Test suite (818 tests, 89% coverage)
+│   └── tests/            # Test suite (878 tests, 89% coverage)
 │       └── fixtures/
 │           ├── images/        # Committed small test images (200-500px, <100KB)
 │           └── images-local/  # Gitignored large images for local manual testing
@@ -153,7 +153,7 @@ img2stl/
 │   │   └── UploadDropzone.tsx    # Drag-and-drop upload
 │   ├── hooks/            # Custom hooks
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (25 tests)
+├── e2e/                  # Playwright E2E tests (8 spec files, 45 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config

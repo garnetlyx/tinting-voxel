@@ -1,20 +1,24 @@
 # img2stl
 
-Transform images into physically accurate, multi-color 3D-printable STL files using CMYK color separation and optical color mixing (Beer-Lambert law).
+Transform images into physically accurate, multi-color 3D-printable files using N-color filament separation and optical color mixing (Beer-Lambert law). Supports 4–16 configurable filament colors, STL/3MF/SVG output, batch processing, and an integrated calibration CLI.
 
 ## Features
 
-- **Scientific Color Mixing** - Beer-Lambert optical model for accurate transparent filament color blending
-- **CMYK Layer Generation** - Separate STL files for Cyan, Magenta, Yellow, White layers
+- **Scientific Color Mixing** - Beer-Lambert optical model (hybrid per-channel-k) for accurate transparent filament color blending
+- **N-Color Support (4–16 colors)** - Configurable filament primaries with custom hex values and per-color transmission/scattering parameters
+- **Multiple Output Formats** - STL ZIP, SVG-STL, **3MF** (with named color objects), SVG-3MF, CSV, and slicer print-settings JSON
+- **Batch Processing** - Process up to 20 images in one run
+- **Palette Library** - 10 curated color palettes across 3 categories
+- **3D WebGL Preview** - three.js render with orbit controls before export
+- **Parameter Auto-Search** - Sweep maxColors / colorThreshold combinations and pick the best variant
 - **Greedy Meshing Optimization** - 70-80% file size reduction vs naive pixel-to-box approach
-- **Real-time Preview** - Side-by-side comparison of original vs processed image
-- **Flexible Parameters** - Adjust maxColors, colorThreshold, layerHeight, pixelSize
-- **Export Options** - ZIP download (4 STL files) + CSV color data export
+- **Calibration CLI** - Optimize Beer-Lambert parameters against printed test plates (Phase 6/7 per-channel-k models)
 
 ## Tech Stack
 
-- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS
-- **Backend**: Python 3 + FastAPI + numpy-stl + PIL + scikit-learn
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + three.js
+- **Backend**: Python 3 + FastAPI + numpy-stl + PIL + scikit-learn + trimesh + lxml
+- **Testing**: pytest (878 backend tests, 89% coverage), Vitest (frontend), Playwright (E2E)
 
 ## Project Structure
 
@@ -94,38 +98,37 @@ npm run dev:backend   # Backend only (port 8000)
 ## Usage
 
 1. Upload an image (PNG, JPG)
-2. Adjust parameters (optional):
+2. Optionally configure N-color filaments (presets or custom hex / k / td values)
+3. Adjust processing parameters:
    - **maxColors**: Number of colors to extract (1-20)
    - **colorThreshold**: Color merge sensitivity (0-100)
    - **layerHeight**: Layer thickness in mm (0.01-1.0)
    - **pixelSize**: Pixel physical size in mm (0.01-1.0)
-3. Preview the processed image
-4. Download STL ZIP or CSV data
+4. Preview the processed image and 3D WebGL render
+5. Download STL ZIP / 3MF / SVG-STL / CSV / print-settings JSON
 
 ## API Endpoints
 
-### 1. POST /api/process-image
-Process uploaded image and extract color blocks.
+Full endpoint list (22 routes across V1, V2 N-color, batch, palette, param-search, health) is in [AGENTS.md](AGENTS.md). Highlights:
 
-**Request**:
-- `image`: File
-- `maxColors`: int (default 10)
-- `colorThreshold`: float (default 50)
-- `pixelSize`: float (default 0.08)
+### V1 (legacy CMYK)
 
-### 2. POST /api/download-stl
-Generate and download STL files.
+- `POST /api/process-image` — extract color blocks (pixel/SVG modes)
+- `POST /api/simulate-preview` — simulated print preview (vector mode)
+- `POST /api/download-csv` — color data CSV
+- `POST /api/download-stl` — STL ZIP (default CMYK)
+- `POST /api/download-svg-stl` — SVG-mode STL ZIP
 
-**Request JSON**:
-```json
-{
-  "colorBlocks": [...],
-  "layerHeight": 0.08,
-  "pixelSize": 0.08,
-  "layerCount": 4,
-  "imageDimensions": {"width": 208, "height": 208}
-}
-```
+### V2 (N-color)
+
+- `POST /api/v2/download-stl` — N-color STL ZIP
+- `POST /api/v2/download-svg-stl` — N-color SVG-mode STL
+- `POST /api/v2/download-3mf` — 3MF with named color objects
+- `POST /api/v2/download-svg-3mf` — SVG-mode 3MF
+- `POST /api/v2/print-settings` — slicer print-settings JSON
+- `GET  /api/v2/filament-presets` — available filament presets
+
+Interactive OpenAPI docs at `/docs` when the backend is running.
 
 ## Troubleshooting
 
@@ -220,10 +223,10 @@ See [`backend/tools/calibration/README.md`](backend/tools/calibration/README.md)
 
 ## How It Works
 
-1. **Color Extraction** - K-means clustering extracts dominant colors from image
-2. **CMYK Mapping** - Colors mapped to CMYK primaries using LAB color space (perceptually uniform)
-3. **Beer-Lambert Model** - Calculates light transmission through transparent layers
-4. **STL Generation** - Creates layered 3D mesh with greedy meshing optimization
+1. **Color Extraction** - K-means clustering extracts dominant colors from image (CIELAB distance, vectorized)
+2. **N-Color Mapping** - Colors mapped to configured filament primaries using CIEDE2000 perceptual matching with hue preservation for dark chromatic colors
+3. **Beer-Lambert Model** - Hybrid per-channel-k optical model calculates light transmission through transparent layers
+4. **Mesh Generation** - Creates layered 3D mesh with greedy meshing optimization (70-80% box-count reduction)
 
 ## License
 
