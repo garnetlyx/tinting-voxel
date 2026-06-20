@@ -21,13 +21,15 @@ img2stl/
 │   │   ├── models.py     # Pydantic data models (FilamentConfigMixin)
 │   │   ├── error_handlers.py  # @handle_api_errors decorator
 │   │   ├── validators.py # File upload validation
+│   │   ├── rate_limiter.py # slowapi limiter instance
 │   │   └── routes/       # Route handlers
 │   │       ├── image.py      # Image processing (pixel/SVG modes)
 │   │       ├── download.py   # V1 download endpoints (CSV, STL)
-│   │       ├── download_v2.py # V2 N-color endpoints (STL, SVG-STL, 3MF, print settings)
+│   │       ├── download_v2.py # V2 N-color endpoints (STL, SVG-STL, 3MF, SVG-3MF, print settings)
 │   │       ├── filament.py   # Filament preview
 │   │       ├── batch.py      # Batch processing (up to 20 images)
 │   │       ├── palette.py    # Palette library
+│   │       ├── param_search.py # Param search SSE + top-N results
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py    # Color blending (Beer-Lambert model)
@@ -59,12 +61,17 @@ img2stl/
 │   │   ├── svg_stl_generator.py  # SVG-mode STL generation
 │   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
 │   │   └── vector_processor.py   # Vector/contour processing
-│   ├── config/           # Configuration
+│   ├── config/           # Configuration (settings, constants)
+│   ├── tools/calibration/ # Calibration CLI (19+ scripts, photos, plates, results)
+│   ├── scripts/          # Debug / one-off utility scripts
 │   └── tests/            # Test suite (868 tests, 89% coverage)
+│       ├── unit/             # Unit tests
+│       ├── integration/      # Integration tests
+│       ├── performance/      # Performance tests
 │       ├── fixtures/
 │       │   ├── images/        # Committed small test images (200-500px, <100KB)
 │       │   └── images-local/  # Gitignored large images for local manual testing
-│       └── calibration/      # Calibration photos, CLI runner, results
+│       └── test_calibration_qa.py # Calibration QA regression test
 ├── src/                  # React frontend
 │   ├── main.tsx          # Entry point
 │   ├── pages/            # Page components
