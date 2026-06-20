@@ -22,24 +22,25 @@ Transform images into physically accurate, multi-color 3D-printable STL files us
 img2stl/
 ├── backend/
 │   ├── main.py                  # FastAPI application entry
-│   ├── blend_color.py           # Core color algorithms
+│   ├── core/                    # Core algorithms (blend_color, calibrator, presets)
 │   ├── api/
-│   │   ├── models.py           # Pydantic data models
+│   │   ├── models.py            # Pydantic data models
+│   │   ├── routes/              # Route handlers (image, download, batch, palette, ...)
 │   │   └── __init__.py
-│   ├── services/
-│   │   ├── image_processor.py  # Image processing service
-│   │   ├── stl_generator.py    # STL generation service
-│   │   ├── csv_generator.py    # CSV export service
-│   │   └── __init__.py
+│   ├── services/                # Business logic (image_processor, stl_generator, ...)
+│   ├── config/                  # Settings, constants
+│   ├── tools/calibration/       # Beer-Lambert calibration CLI
 │   └── requirements.txt
-├── src/
-│   ├── main.tsx                # React entry point
-│   ├── image_to_stl_converter.tsx  # Main component
-│   ├── api/
-│   │   ├── client.ts           # API client
-│   │   └── types.ts            # TypeScript types
+├── src/                         # React frontend
+│   ├── main.tsx                 # Entry point
+│   ├── pages/Converter.tsx      # Main page component
+│   ├── components/              # UI components
+│   ├── hooks/                   # Custom hooks
+│   ├── api/                     # API client + types
 │   └── index.css
-├── vite.config.ts              # Vite config (includes API proxy)
+├── docs/                        # PRD, ARCHITECTURE
+├── e2e/                         # Playwright E2E tests
+├── vite.config.ts               # Vite config (includes API proxy)
 ├── package.json
 └── index.html
 ```
@@ -165,7 +166,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 - [Product Requirements (PRD)](docs/PRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Project Instructions](CLAUDE.md)
+- [Project Instructions](AGENTS.md)
 
 ## Calibration
 
@@ -186,15 +187,15 @@ cd backend
 source .venv/bin/activate
 
 # Alpha-only (fast, recommended first step)
-python -m tests.calibration.run_calibration \
-  --photo tests/calibration/print_regular_0.32.png \
+python -m tools.calibration.run_calibration \
+  --photo tools/calibration/photos/print_regular_0.32.png \
   --preset bambu \
   --mode alpha \
   --gen-alpha 23
 
 # Alpha + per-color td (slower, global optimizer)
-python -m tests.calibration.run_calibration \
-  --photo tests/calibration/print_clear_3.36.png \
+python -m tools.calibration.run_calibration \
+  --photo tools/calibration/photos/print_clear_3.36.png \
   --preset clear \
   --mode alpha_td
 ```
@@ -210,12 +211,12 @@ python -m tests.calibration.run_calibration \
 | `--preset` | `bambu` or `clear` | `bambu` |
 | `--mode` | `alpha` (1 param, L-BFGS-B) or `alpha_td` (5 params, differential evolution) | `alpha` |
 | `--gen-alpha` | Alpha used when generating the printed test plate | auto-detect |
-| `--output` | Output directory | `tests/calibration/results/` |
+| `--output` | Output directory | `tools/calibration/results/` |
 | `--grid-size` | Grid dimensions | `16` |
 | `--layer-height` | Layer height in mm | `0.08` |
 | `--layer-count` | Number of layers | `4` |
 
-See [`backend/tests/calibration/README.md`](backend/tests/calibration/README.md) for full details.
+See [`backend/tools/calibration/README.md`](backend/tools/calibration/README.md) for full details.
 
 ## How It Works
 

@@ -31,32 +31,39 @@ img2stl/
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py    # Color blending (Beer-Lambert model)
+│   │   ├── blend_models.py   # Pluggable blend functions (hybrid per-channel-k)
 │   │   ├── calibrator.py     # Beer-Lambert parameter calibration engine
 │   │   ├── ramp_calibrator.py # Ramp plate calibration + per-color k optimizer
-│   │   ├── blend_models.py   # Pluggable blend functions (hybrid per-channel-k)
 │   │   ├── calibration_priors.py # k-ordering constraints, TD1S priors
-│   │   ├── photo_preprocessor.py # Perspective correction, WB, glare masking
-│   │   ├── structured_plate.py # P1S 30x26 CMYWK structured plate layout
+│   │   ├── code_grid.py      # Code grid generation utilities
 │   │   ├── color_config.py   # Filament presets (single source of truth)
-│   │   └── palette_library.py # Curated color palettes
+│   │   ├── color_materials.py # Material property definitions (k_rgb support)
+│   │   ├── grid_sampling.py  # Photo sampling for calibration plates
+│   │   ├── palette_library.py # Curated color palettes
+│   │   ├── photo_preprocessor.py # Perspective correction, WB, glare masking
+│   │   ├── plate_geometry.py # Plate geometry calculations
+│   │   └── structured_plate.py # P1S 30x26 CMYWK structured plate layout
 │   ├── services/         # Business logic
+│   │   ├── analytics.py         # In-memory usage analytics
+│   │   ├── batch_processor.py    # Multi-image batch processing
+│   │   ├── csv_generator.py      # CSV export
+│   │   ├── filament_preview.py   # Color matrix preview
 │   │   ├── image_processor.py    # Image processing + auto-downscale
+│   │   ├── matrix_cache.py       # Reference-matrix cache (powers /api/cache-stats)
+│   │   ├── mesh_optimizer.py     # Greedy meshing optimization
+│   │   ├── param_search_service.py # Auto parameter sweep engine
+│   │   ├── print_settings_generator.py # Slicer settings JSON
+│   │   ├── print_stack.py       # Print stack modeling
+│   │   ├── raster_cleanup.py    # Raster post-processing cleanup
 │   │   ├── stl_generator.py      # STL file generation
 │   │   ├── svg_stl_generator.py  # SVG-mode STL generation
 │   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
-│   │   ├── csv_generator.py      # CSV export
-│   │   ├── mesh_optimizer.py     # Greedy meshing optimization
-│   │   ├── vector_processor.py   # Vector/contour processing
-│   │   ├── batch_processor.py    # Multi-image batch processing
-│   │   ├── filament_preview.py   # Color matrix preview
-│   │   ├── print_settings_generator.py # Slicer settings JSON
-│   │   ├── param_search_service.py # Auto parameter sweep engine
-│   │   └── analytics.py         # In-memory usage analytics
+│   │   └── vector_processor.py   # Vector/contour processing
 │   ├── config/           # Configuration
 │   └── tests/            # Test suite (868 tests, 89% coverage)
-│       └── fixtures/
-│           ├── images/        # Committed small test images (200-500px, <100KB)
-│           └── images-local/  # Gitignored large images for local manual testing
+│       ├── fixtures/
+│       │   ├── images/        # Committed small test images (200-500px, <100KB)
+│       │   └── images-local/  # Gitignored large images for local manual testing
 │       └── calibration/      # Calibration photos, CLI runner, results
 ├── src/                  # React frontend
 │   ├── main.tsx          # Entry point
@@ -69,7 +76,7 @@ img2stl/
 │   │   └── ImageEditor.tsx       # Canvas crop/resize editor
 │   ├── hooks/            # Custom hooks
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (8 spec files, 37 tests)
+├── e2e/                  # Playwright E2E tests (8 spec files, 45 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config
@@ -167,7 +174,7 @@ cd backend && pytest -v
 # Frontend (Vitest, 12 test files)
 npm test
 
-# E2E (8 spec files, 37 tests)
+# E2E (8 spec files, 45 tests)
 npx playwright test
 ```
 
