@@ -137,6 +137,7 @@ docker compose up --build  # Build and run
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/process-image` | Process image (pixel/SVG modes) |
+| POST | `/api/simulate-preview` | Simulated print preview (vector mode) |
 | POST | `/api/download-csv` | Download color data as CSV |
 | POST | `/api/download-stl` | Generate STL ZIP (default CMYK) |
 | POST | `/api/download-svg-stl` | Generate SVG-mode STL ZIP |
@@ -163,7 +164,8 @@ docker compose up --build  # Build and run
 | GET | `/api/palettes/{id}` | Get specific palette |
 | GET | `/api/analytics` | Usage analytics |
 | GET | `/api/cache-stats` | Reference-matrix cache stats |
-| GET | `/health` | Health check |
+| GET | `/api/health` | Health check |
+| GET | `/api/health/detailed` | Detailed health check (per-subsystem status) |
 
 ## Code Conventions
 

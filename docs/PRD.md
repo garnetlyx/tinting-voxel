@@ -50,7 +50,7 @@ img2stl solves these by:
 | Processing performance | Image processing time | < 5s for 512×512px |
 | User adoption | Active users | 100 users/month (6 months) |
 | Export success rate | Successful downloads | > 95% |
-| Test health | Backend test pass rate | > 95% across 800+ tests |
+| Test health | Backend test pass rate | > 95% across 868 tests |
 
 ---
 
@@ -201,7 +201,7 @@ img2stl solves these by:
   remapping
 
 **Quality**
-- ~818 backend tests (89% coverage), 86 frontend Vitest tests, 25 Playwright
+- ~868 backend tests (89% coverage), 86 frontend Vitest tests, 45 Playwright
   E2E tests
 - QA regression suite (R1–R16) documenting 190+ bugs fixed
 
@@ -365,6 +365,7 @@ per-channel-k).
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/process-image` | Process image (pixel/SVG modes) |
+| POST | `/api/simulate-preview` | Simulated print preview (vector mode) |
 | POST | `/api/download-csv` | Color data CSV |
 | POST | `/api/download-stl` | STL ZIP (default CMYK) |
 | POST | `/api/download-svg-stl` | SVG-mode STL ZIP |
@@ -391,7 +392,8 @@ per-channel-k).
 | GET  | `/api/palettes/{id}` | Get palette |
 | GET  | `/api/analytics` | Usage analytics |
 | GET  | `/api/cache-stats` | Reference-matrix cache stats |
-| GET  | `/health` | Health check |
+| GET  | `/api/health` | Health check |
+| GET  | `/api/health/detailed` | Detailed health check (per-subsystem status) |
 
 Full OpenAPI spec at `/docs` when the backend is running.
 
@@ -427,6 +429,6 @@ Full OpenAPI spec at `/docs` when the backend is running.
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-06-19 | 2.0 | PRD rewritten to reflect N-color V2 API, batch, 3MF, palette library, 3D preview, calibration system (Phase 6/7), ~818 backend tests |
+| 2026-06-19 | 2.0 | PRD rewritten to reflect N-color V2 API, batch, 3MF, palette library, 3D preview, calibration system (Phase 6/7), 868 backend tests |
 | 2026-03-08 | 1.1 | Calibration section, presets, CLI workflow |
 | 2026-01-27 | 1.0 | Initial PRD from existing codebase |
