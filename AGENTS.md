@@ -32,6 +32,11 @@ img2stl/
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py    # Color blending (Beer-Lambert model)
 │   │   ├── calibrator.py     # Beer-Lambert parameter calibration engine
+│   │   ├── ramp_calibrator.py # Ramp plate calibration + per-color k optimizer
+│   │   ├── blend_models.py   # Pluggable blend functions (hybrid per-channel-k)
+│   │   ├── calibration_priors.py # k-ordering constraints, TD1S priors
+│   │   ├── photo_preprocessor.py # Perspective correction, WB, glare masking
+│   │   ├── structured_plate.py # P1S 30x26 CMYWK structured plate layout
 │   │   ├── color_config.py   # Filament presets (single source of truth)
 │   │   └── palette_library.py # Curated color palettes
 │   ├── services/         # Business logic
@@ -45,9 +50,10 @@ img2stl/
 │   │   ├── batch_processor.py    # Multi-image batch processing
 │   │   ├── filament_preview.py   # Color matrix preview
 │   │   ├── print_settings_generator.py # Slicer settings JSON
+│   │   ├── param_search_service.py # Auto parameter sweep engine
 │   │   └── analytics.py         # In-memory usage analytics
 │   ├── config/           # Configuration
-│   └── tests/            # Test suite (573 tests, 89% coverage)
+│   └── tests/            # Test suite (868 tests, 89% coverage)
 │       └── fixtures/
 │           ├── images/        # Committed small test images (200-500px, <100KB)
 │           └── images-local/  # Gitignored large images for local manual testing
@@ -63,7 +69,7 @@ img2stl/
 │   │   └── ImageEditor.tsx       # Canvas crop/resize editor
 │   ├── hooks/            # Custom hooks
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (25 tests)
+├── e2e/                  # Playwright E2E tests (8 spec files, 37 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config
@@ -127,6 +133,7 @@ docker compose up --build  # Build and run
 | POST | `/api/v2/download-stl` | STL ZIP with configurable colors |
 | POST | `/api/v2/download-svg-stl` | SVG-mode STL with configurable colors |
 | POST | `/api/v2/download-3mf` | 3MF file with named color objects |
+| POST | `/api/v2/download-svg-3mf` | SVG-mode 3MF with configurable colors |
 | POST | `/api/v2/print-settings` | JSON print settings for slicers |
 | GET | `/api/v2/filament-presets` | List available filament presets |
 
@@ -136,9 +143,12 @@ docker compose up --build  # Build and run
 | POST | `/api/filament-preview` | Color matrix preview |
 | POST | `/api/batch/process` | Batch process up to 20 images |
 | POST | `/api/batch/download-stl` | Batch STL download |
+| POST | `/api/param-search` | Run parameter search, return top-N results |
+| GET | `/api/param-search/progress/{job_id}` | SSE stream of search progress events |
 | GET | `/api/palettes/` | List color palettes |
 | GET | `/api/palettes/{id}` | Get specific palette |
 | GET | `/api/analytics` | Usage analytics |
+| GET | `/api/cache-stats` | Reference-matrix cache stats |
 | GET | `/health` | Health check |
 
 ## Code Conventions
@@ -151,13 +161,13 @@ docker compose up --build  # Build and run
 ## Testing
 
 ```bash
-# Backend (514 tests, 90% coverage)
+# Backend (868 tests, 89% coverage)
 cd backend && pytest -v
 
-# Frontend (86 tests)
+# Frontend (Vitest, 12 test files)
 npm test
 
-# E2E (25 tests)
+# E2E (8 spec files, 37 tests)
 npx playwright test
 ```
 
@@ -184,22 +194,22 @@ npx playwright test
 
 ## Calibration
 
-Internal CLI tool for optimizing Beer-Lambert model parameters (`alpha`, `td`) against photos of printed test plates. See [`backend/tests/calibration/README.md`](backend/tests/calibration/README.md) for full docs.
+Internal CLI tool for optimizing Beer-Lambert model parameters (`alpha`, `td`) against photos of printed test plates. See [`backend/tools/calibration/README.md`](backend/tools/calibration/README.md) for full docs.
 
 ```bash
 cd backend
 source .venv/bin/activate
 
 # Alpha-only calibration (fast, 1 parameter)
-python -m tests.calibration.run_calibration \
-  --photo tests/calibration/print_regular_0.32.png \
+python -m tools.calibration.run_calibration \
+  --photo tools/calibration/photos/print_regular_0.32.png \
   --preset bambu \
   --mode alpha \
   --gen-alpha 23
 
 # Alpha + td calibration (slower, 5 parameters)
-python -m tests.calibration.run_calibration \
-  --photo tests/calibration/print_clear_3.36.png \
+python -m tools.calibration.run_calibration \
+  --photo tools/calibration/photos/print_clear_3.36.png \
   --preset clear \
   --mode alpha_td
 ```
