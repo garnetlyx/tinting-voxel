@@ -101,3 +101,6 @@ docs/archive/
 .hypothesis/
 .sisyphus/
 .omo/
+# Research gallery samples: large regenerable artifacts (see docs/research/generate_gallery.py)
+docs/research/samples/**/*.zip
+docs/research/samples/**/*_source.*
