@@ -104,3 +104,8 @@ docs/archive/
 # Research gallery samples: large regenerable artifacts (see docs/research/generate_gallery.py)
 docs/research/samples/**/*.zip
 docs/research/samples/**/*_source.*
+docs/SESSION_LOG.md
+
+# LaTeX build artifacts for figures
+docs/figures/*.aux
+docs/figures/*.log
