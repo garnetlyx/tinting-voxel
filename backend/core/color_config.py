@@ -250,8 +250,26 @@ BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
 
 CLEAR_CMYK_PRESET: List[ColorConfig] = [
     ColorConfig(name="Cyan", hex="#0089cd", transmission_distance=60.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Magenta", hex="#e75d4a", transmission_distance=100.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Yellow", hex="#f6d449", transmission_distance=70.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Magenta", hex="#ff7762", transmission_distance=100.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Yellow", hex="#dcc25c", transmission_distance=70.0, alpha=12.0, k=10.0),
+    ColorConfig(name="White", hex="#FFFFFF", transmission_distance=200.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Grey", hex="#676563", transmission_distance=7.3, alpha=12.0, k=10.0),
+]
+
+# 4-color clear filament subsets for 4-extruder printers.
+# CMYG: primary mixing with translucent grey for dark tones (main calibration set).
+CLEAR_CMYG_PRESET: List[ColorConfig] = [
+    ColorConfig(name="Cyan", hex="#0089cd", transmission_distance=60.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Magenta", hex="#ff7762", transmission_distance=100.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Yellow", hex="#dcc25c", transmission_distance=70.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Grey", hex="#676563", transmission_distance=7.3, alpha=12.0, k=10.0),
+]
+
+# CMYW: primary mixing with clear white as transparent substrate (validation set).
+CLEAR_CMYW_PRESET: List[ColorConfig] = [
+    ColorConfig(name="Cyan", hex="#0089cd", transmission_distance=60.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Magenta", hex="#ff7762", transmission_distance=100.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Yellow", hex="#dcc25c", transmission_distance=70.0, alpha=12.0, k=10.0),
     ColorConfig(name="White", hex="#FFFFFF", transmission_distance=200.0, alpha=12.0, k=10.0),
 ]
 
@@ -345,6 +363,8 @@ def get_preset(name: str) -> Optional[List[ColorConfig]]:
         "bambu_cmyw_phase6": BAMBU_CMYW_PHASE6_PRESET,
         "bambu_cmyk_per_channel_k": BAMBU_CMYK_PER_CHANNEL_K_PRESET,
         "clear_cmyk": CLEAR_CMYK_PRESET,
+        "clear_cmyg": CLEAR_CMYG_PRESET,
+        "clear_cmyw": CLEAR_CMYW_PRESET,
     }
     return presets.get(alias_map.get(normalized, normalized))
 
