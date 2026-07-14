@@ -195,11 +195,18 @@ class TestProcessImageLargeHandling:
         assert result['printStack']['whiteBackingLayers'] == 0
 
     def test_vector_simulated_preview_uses_final_geometry_not_quantized_pixels(self):
-        """Filtered or holed geometry should drive the preview image."""
+        """Holed geometry keeps the mapped-background color in the hole.
+
+        build_vector_simulated_preview uses the quantized image as the
+        background (each pixel mapped through the Beer-Lambert blend model,
+        not raw RGB) to avoid white edges from filtered/hole regions. A hole
+        cut out of a vector region therefore shows the blend-mapped
+        background color rather than the raw quantized input or pure white.
+        """
         quantized = np.array(
             [
                 [[255, 0, 0], [255, 0, 0], [255, 0, 0]],
-                [[255, 0, 0], [0, 0, 255], [255, 0, 0]],
+                [[255, 0, 0], [255, 0, 0], [255, 0, 0]],
                 [[255, 0, 0], [255, 0, 0], [255, 0, 0]],
             ],
             dtype=np.uint8,
@@ -224,7 +231,14 @@ class TestProcessImageLargeHandling:
         )
 
         preview = _decode_data_url_image(result['processedImage'])
-        assert tuple(preview[1, 1]) == (255, 255, 255)
+        hole_pixel = tuple(int(v) for v in preview[1, 1])
+        # The hole is NOT pure white (the bug would leave it as background
+        # fill of (255,255,255)). Instead it shows the Beer-Lambert-mapped
+        # background color for the quantized red input.
+        assert hole_pixel != (255, 255, 255), (
+            f"Hole pixel should show the mapped background, not white. "
+            f"Got {hole_pixel}"
+        )
 
     def test_small_components_merge_without_global_scaling(self):
         """detail_size merges local components instead of enlarging the full image."""

@@ -77,11 +77,11 @@ class TestFilamentPreviewService:
         assert result["stats"]["colorCount"] == 4
 
     def test_generate_preview_with_clear_preset(self):
-        """Preview works with Clear CMYK preset."""
+        """Preview works with Clear CMYK preset (5 colors: CMYWG)."""
         colors = Colors.from_configs(CLEAR_CMYK_PRESET)
         service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
         result = service.generate_preview()
-        assert result["stats"]["colorCount"] == 4
+        assert result["stats"]["colorCount"] == 5
 
     def test_generate_preview_uses_calibrated_blend_mode(self):
         """Calibrated presets should switch preview rendering to the TD1S-gamma blend."""

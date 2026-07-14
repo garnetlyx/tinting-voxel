@@ -74,10 +74,10 @@ class TestPresets:
         assert set(labels) == {'C', 'M', 'Y', 'W'}
 
     def test_clear_cmyk_preset_exists(self):
-        """CLEAR_CMYK_PRESET has 4 colors."""
-        assert len(CLEAR_CMYK_PRESET) == 4
+        """CLEAR_CMYK_PRESET has 5 colors (CMYWK includes grey for dark tones)."""
+        assert len(CLEAR_CMYK_PRESET) == 5
         labels = [c.label for c in CLEAR_CMYK_PRESET]
-        assert set(labels) == {'C', 'M', 'Y', 'W'}
+        assert set(labels) == {'C', 'M', 'Y', 'W', 'G'}
 
     def test_get_preset_bambu(self):
         """get_preset returns BAMBU_CMYK_PRESET for 'bambu_cmyk'."""
@@ -115,13 +115,15 @@ class TestPresets:
         assert get_preset("unknown_preset") is None
 
     def test_get_available_presets(self):
-        """get_available_presets returns list of preset names."""
+        """get_available_presets returns the production (Phase 6) preset names."""
         presets = get_available_presets()
-        assert "bambu_cmyk" in presets
-        assert "bambu_cmyk_calibrated" in presets
-        assert "bambu_cmyk_phase6" in presets
-        assert "bambu_cmyw_phase6" in presets
-        assert "clear_cmyk" in presets
+        # Production only exposes Phase 6 presets; legacy presets live in
+        # get_archived_presets() and remain accessible via get_preset().
+        assert presets == ["bambu_cmyk_phase6", "bambu_cmyw_phase6"]
+        # Archived presets are still retrievable by name.
+        assert get_preset("bambu_cmyk") is BAMBU_CMYK_PRESET
+        assert get_preset("bambu_cmyk_calibrated") is BAMBU_CMYK_CALIBRATED_PRESET
+        assert get_preset("clear_cmyk") is CLEAR_CMYK_PRESET
 
 
 class TestColorsFromConfigs:

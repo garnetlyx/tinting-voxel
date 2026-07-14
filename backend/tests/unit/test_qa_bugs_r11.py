@@ -246,30 +246,65 @@ class TestQA113AlphaInconsistency:
         )
 
 
-# -- QA-114: SVG physical_height doesn't account for double_sided ------------
-# File: backend/services/svg_stl_generator.py:301
-# Even once QA-107 is fixed, the physical_height used for filenames
-# should be doubled for double-sided mode (as stl_generator.py does).
+# -- QA-114: SVG physical_height must account for double_sided ------------
+# The SVG generator now delegates physical_height to build_print_stack()
+# (services/print_stack.py), which correctly doubles the optical layer
+# count in double-sided mode. The filename in the produced ZIP must
+# therefore reflect the doubled height.
 
 class TestQA114SVGPhysicalHeightDoubleSided:
-    """SVG STL filename doesn't account for doubled height in double-sided mode."""
+    """SVG STL filename must reflect the doubled height in double-sided mode."""
 
     def test_physical_height_includes_both_sides(self):
-        """In double-sided mode, physical height calculation should account for both sides."""
-        from services import svg_stl_generator
-        source = inspect.getsource(svg_stl_generator.generate_svg_stl_zip)
+        """Double-sided ZIP filenames must carry a doubled physical height."""
+        import zipfile
+        from io import BytesIO
+        from services.svg_stl_generator import generate_svg_stl_zip
 
-        has_doubled = (
-            'layer_count * 2' in source or
-            'effective_layer_count' in source or
-            '2 *' in source
+        vector_results = [
+            {
+                'color': (0, 255, 255),
+                'polygons': [[(0, 0), (10, 0), (10, 10), (0, 10)]],
+                'pixel_count': 100,
+                'polygon_points': 4,
+            }
+        ]
+        image_dims = {'width': 10, 'height': 10}
+        colors = Colors()
+
+        single = generate_svg_stl_zip(
+            vector_results=vector_results,
+            layer_height=0.08,
+            pixel_size=0.08,
+            layer_count=4,
+            image_dimensions=image_dims,
+            colors=colors,
+            double_sided=False,
+        )
+        double = generate_svg_stl_zip(
+            vector_results=vector_results,
+            layer_height=0.08,
+            pixel_size=0.08,
+            layer_count=4,
+            image_dimensions=image_dims,
+            colors=colors,
+            double_sided=True,
         )
 
-        assert has_doubled, (
-            f"BUG QA-114: generate_svg_stl_zip does not calculate "
-            f"physical_height accounting for double-sided mode. "
-            f"Pixel-mode uses `layer_count * 2 if double_sided`, but SVG mode "
-            f"always uses `layer_count * layer_height`, producing wrong filenames."
+        def _height_from_zip(data: bytes) -> float:
+            with zipfile.ZipFile(BytesIO(data)) as zf:
+                name = zf.namelist()[0]
+            # Filename pattern: PREFIX_WxHxHEIGHT_CODE.stl
+            stem = name.rsplit('.stl', 1)[0]
+            height_str = stem.rsplit('x', 1)[1].split('_', 1)[0]
+            return float(height_str)
+
+        single_h = _height_from_zip(single)
+        double_h = _height_from_zip(double)
+
+        assert double_h > single_h, (
+            f"BUG QA-114: double-sided SVG ZIP physical height ({double_h}) "
+            f"must exceed single-sided ({single_h})."
         )
 
 

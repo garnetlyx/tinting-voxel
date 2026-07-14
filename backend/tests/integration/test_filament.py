@@ -38,7 +38,7 @@ def test_filament_preview_with_clear_preset(client):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["stats"]["colorCount"] == 4
+    assert data["stats"]["colorCount"] == 5
 
 
 def test_filament_preview_with_custom_colors(client):
