@@ -110,3 +110,15 @@ docs/SESSION_LOG.md
 docs/figures/*.aux
 docs/figures/*.log
 docs/research/samples/
+
+# LaTeX build artifacts for paper submission (keep main.pdf tracked)
+docs/research/submission/main.aux
+docs/research/submission/main.bbl
+docs/research/submission/main.bcf
+docs/research/submission/main.blg
+docs/research/submission/main.fdb_latexmk
+docs/research/submission/main.fls
+docs/research/submission/main.log
+docs/research/submission/main.out
+docs/research/submission/main.run.xml
+docs/research/submission/main.xdv
