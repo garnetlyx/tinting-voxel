@@ -109,3 +109,4 @@ docs/SESSION_LOG.md
 # LaTeX build artifacts for figures
 docs/figures/*.aux
 docs/figures/*.log
+docs/research/samples/
