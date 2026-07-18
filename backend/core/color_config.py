@@ -248,29 +248,37 @@ BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
     ),
 ]
 
+# Clear filament parameters from staircase v2 calibration (2026-07-17).
+# Source: docs/research/results/staircase-KX-A/<material>/v2/staircase_report_v2.json
+# Hex = WB-corrected thickest-step color; td/k = least-squares fit of the
+# hybrid_per_color_k decay rate (alpha/td + k*A_ch) to the measured per-channel
+# rates ln(10)/td_ch (thin-range fit, d <= 3mm). Clear filaments have negligible
+# neutral scattering, so td saturates at the 200.0 cap and color separation is
+# carried by k. Grey (Panchroma) has no staircase yet: hex/td are TD1S values.
+# See docs/CLEAR_CALIBRATION.md "Preset Update" for derivation and residuals.
 CLEAR_CMYK_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan", hex="#0089cd", transmission_distance=60.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Magenta", hex="#ff7762", transmission_distance=100.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Yellow", hex="#dcc25c", transmission_distance=70.0, alpha=12.0, k=10.0),
-    ColorConfig(name="White", hex="#FFFFFF", transmission_distance=200.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Grey", hex="#676563", transmission_distance=7.3, alpha=12.0, k=10.0),
+    ColorConfig(name="Cyan", hex="#4C72A0", transmission_distance=200.0, alpha=12.0, k=1.93),  # Ziro Light Cyan Clear
+    ColorConfig(name="Magenta", hex="#CE5E53", transmission_distance=200.0, alpha=12.0, k=1.44),  # iSANMATE Light Pink
+    ColorConfig(name="Yellow", hex="#D8B695", transmission_distance=200.0, alpha=12.0, k=0.67),  # Sunlu Transparent Yellow
+    ColorConfig(name="White", hex="#D9D6C5", transmission_distance=110.4, alpha=12.0, k=0.11),  # Kingroon Transparent PLA
+    ColorConfig(name="Grey", hex="#676563", transmission_distance=7.3, alpha=12.0, k=10.0),  # Panchroma (staircase pending)
 ]
 
 # 4-color clear filament subsets for 4-extruder printers.
 # CMYG: primary mixing with translucent grey for dark tones (main calibration set).
 CLEAR_CMYG_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan", hex="#0089cd", transmission_distance=60.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Magenta", hex="#ff7762", transmission_distance=100.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Yellow", hex="#dcc25c", transmission_distance=70.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Cyan", hex="#4C72A0", transmission_distance=200.0, alpha=12.0, k=1.93),
+    ColorConfig(name="Magenta", hex="#CE5E53", transmission_distance=200.0, alpha=12.0, k=1.44),
+    ColorConfig(name="Yellow", hex="#D8B695", transmission_distance=200.0, alpha=12.0, k=0.67),
     ColorConfig(name="Grey", hex="#676563", transmission_distance=7.3, alpha=12.0, k=10.0),
 ]
 
 # CMYW: primary mixing with clear white as transparent substrate (validation set).
 CLEAR_CMYW_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan", hex="#0089cd", transmission_distance=60.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Magenta", hex="#ff7762", transmission_distance=100.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Yellow", hex="#dcc25c", transmission_distance=70.0, alpha=12.0, k=10.0),
-    ColorConfig(name="White", hex="#FFFFFF", transmission_distance=200.0, alpha=12.0, k=10.0),
+    ColorConfig(name="Cyan", hex="#4C72A0", transmission_distance=200.0, alpha=12.0, k=1.93),
+    ColorConfig(name="Magenta", hex="#CE5E53", transmission_distance=200.0, alpha=12.0, k=1.44),
+    ColorConfig(name="Yellow", hex="#D8B695", transmission_distance=200.0, alpha=12.0, k=0.67),
+    ColorConfig(name="White", hex="#D9D6C5", transmission_distance=110.4, alpha=12.0, k=0.11),
 ]
 
 # Experimental per-channel k preset (2026-03-10).

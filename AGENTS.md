@@ -236,6 +236,23 @@ Key parameters:
 
 Output: `calibration_report.json` + `comparison.png` (3-panel: photo / original / optimized)
 
+## Research Data Conventions
+
+### File naming (docs/research/)
+
+- Photos: `<SAMPLE-ID>_<backing>_<seq>.JPG` (e.g., `PLATE-08-KX-A_white_01.JPG`). `seq` indexes the physical print, not repeat photos; a white/black pair of the same print shares `seq`.
+- Sample IDs: `<PLATE-ID>-<PRINTER>-<rev>` (e.g., `PLATE-06-H2C-A`). Plate designs and physical prints are registered in `docs/research/SAMPLE_CATALOG.md` — add a registry row for every new print.
+- Printer codes: `P1S` (Bambu P1S), `H2C` (Bambu H2C), `KX` (Anycubic Kobra X).
+- Process-variant suffix (clear track): `_cross` = solid-infill rotation ON (crossed layers), `_aligned` = rotation OFF (parallel lines). Append before the extension, e.g. `PLATE-08-KX-A_white_01_cross.JPG`, `staircase-kx-ziro-b-cyan-1_cross.JPG`.
+- ASCII only; hyphens/underscores as separators. Never use colons, spaces, or ad-hoc suffixes like ` copy` in tracked filenames (colons break Windows checkouts).
+
+### Printers and process conditioning
+
+- Opaque Bambu CMYK(WK) plates print on the H2C (Bambu Studio, 0.08 mm print layers; one 0.32 mm color layer = 4 print layers). Early experiments used the P1S.
+- Transparent/clear filaments print on the Anycubic Kobra X — clear PLA is too brittle for the AMS feed path (Anycubic slicer, 0.28 mm print layers; one 0.84 mm color layer = 3 print layers).
+- Archive the as-printed slicer project per print: `docs/research/plates/cmyk-blend-h2c.3mf` (H2C opaque), `docs/research/plates/cmyk_blend_clear-kx.3mf` (KX clear). If a setting changes between prints, save a new copy — do not overwrite the config a previous sample was printed with.
+- Calibrated parameters (td/alpha/k presets) are **process-conditioned**: they are valid for the filament × printer × profile combination they were fitted on. The blend model consumes total stack thickness only; layer height, infill direction, and slicer differences are absorbed into the fitted parameters, so calibration prints and application prints must share the same profile (in particular: solid-infill rotation OFF / aligned lines for clear plates).
+
 ## Common Tasks
 
 ### Adding a new API endpoint
