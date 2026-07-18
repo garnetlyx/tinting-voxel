@@ -701,10 +701,14 @@ class TestColorsInit:
     """Tests for Colors initialization variants."""
 
     def test_clear_mode(self):
+        from core.color_config import CLEAR_CMYK_PRESET
         colors = Colors(clear=True)
         assert len(colors) == 4
-        # Clear mode has higher transmission distances
-        assert colors['C'].td == 60
+        # Clear mode mirrors the CLEAR_CMYK_PRESET source of truth
+        preset_c = next(c for c in CLEAR_CMYK_PRESET if c.label == 'C')
+        assert colors['C'].td == preset_c.transmission_distance
+        # Clear filaments are more translucent than the opaque set
+        assert colors['C'].td > Colors()['C'].td
 
     def test_names_subset(self):
         colors = Colors(names=['C', 'M'])
