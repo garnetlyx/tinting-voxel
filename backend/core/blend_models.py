@@ -17,6 +17,7 @@ VALID_BLEND_MODES = {
     "kromacut",
     "per_channel",
     "hybrid",
+    "beer_lambert_td_rgb",
     *HYBRID_PER_COLOR_BLEND_MODES,
 }
 
@@ -52,6 +53,7 @@ def _build_color_map_from_key(color_key: tuple) -> dict:
         td_scale = item[5] if len(item) >= 6 else Color.DEFAULT_TD_SCALE
         td_gamma = item[6] if len(item) >= 7 else Color.DEFAULT_TD_GAMMA
         k_rgb = item[7] if len(item) >= 8 else None
+        td_rgb = item[8] if len(item) >= 9 else None
         c = Color(
             label,
             td,
@@ -59,6 +61,7 @@ def _build_color_map_from_key(color_key: tuple) -> dict:
             alpha=alpha,
             k=k,
             k_rgb=k_rgb,
+            td_rgb=td_rgb,
             td_scale=td_scale,
             td_gamma=td_gamma,
         )
@@ -187,6 +190,48 @@ def _blend_per_channel(
         else:
             absorption = color.get_absorption()
             t_ch = np.exp(-absorption * layer_height / td)
+        filament_rgb = np.array(color.rgb, dtype=np.float64)
+        result = filament_rgb * (1.0 - t_ch) + result * t_ch
+
+    return tuple(np.clip(result, 0, 255))
+
+
+def _blend_beer_lambert_td_rgb(
+    code: str,
+    layer_height: float,
+    color_map: dict,
+    k_residual: float = 0.0,
+    background_rgb: Optional[tuple] = None,
+) -> tuple:
+    """Per-channel measured-TD transmission (Phase-8 staircase mode).
+
+    Each layer attenuates channel ch by t_ch = 10^(-d / td_rgb[ch]); layers
+    composite sequentially over the backing with the filament's nominal RGB
+    as the opaque limit. td_rgb values come from direct staircase
+    measurement in the app's round-trip gamma-space convention, so no
+    per-channel parameters are fitted. Colors without td_rgb fall back to
+    their scalar td on all three channels (e.g. a grey with only a TD1S
+    reading). The optional scalar k_residual * A_ch term models residual
+    pigment attenuation beyond the measured TD; it defaults to 0 because
+    td_rgb already carries the spectral information.
+    """
+    layer_height = _coerce_layer_height(layer_height)
+    LN10 = np.log(10)
+    result = _normalize_background_rgb(background_rgb) * 255.0
+
+    for c in code:
+        color = color_map[c]
+        td_rgb = getattr(color, "td_rgb", None)
+        if td_rgb is not None:
+            td_ch = np.array(td_rgb, dtype=np.float64)
+        else:
+            td_ch = np.full(3, float(color.td), dtype=np.float64)
+        with np.errstate(divide="ignore"):
+            rate = np.where(td_ch > 0, LN10 * layer_height / td_ch, np.inf)
+        if k_residual > 0.0:
+            rate = rate + k_residual * color.get_absorption() * layer_height
+        t_ch = np.exp(-rate)
+        t_ch = np.clip(np.nan_to_num(t_ch, nan=0.0), 0.0, 1.0)
         filament_rgb = np.array(color.rgb, dtype=np.float64)
         result = filament_rgb * (1.0 - t_ch) + result * t_ch
 
@@ -443,6 +488,13 @@ def _blend_by_mode(
         )
     if blend_mode == "per_channel":
         return _blend_per_channel(
+            code,
+            layer_height,
+            color_map,
+            background_rgb=background_rgb,
+        )
+    if blend_mode == "beer_lambert_td_rgb":
+        return _blend_beer_lambert_td_rgb(
             code,
             layer_height,
             color_map,

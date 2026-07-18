@@ -30,6 +30,7 @@ class ColorConfig:
     alpha: float = 12.0
     k: float = 10.0  # Scattering coefficient (fallback when k_rgb not provided)
     k_rgb: Optional[tuple] = None  # Per-channel scattering (k_R, k_G, k_B)
+    td_rgb: Optional[tuple] = None  # Measured per-channel TD (td_R, td_G, td_B), mm
     td_scale: float = 1.0
     td_gamma: float = 1.0
 
@@ -70,6 +71,16 @@ class ColorConfig:
                 f"k (scattering coefficient) must be non-negative and finite, got {self.k}"
             )
 
+        if self.td_rgb is not None:
+            if len(self.td_rgb) != 3:
+                raise ValueError(
+                    f"td_rgb must be a 3-tuple (td_R, td_G, td_B), got {self.td_rgb}"
+                )
+            for i, td_ch in enumerate(self.td_rgb):
+                if not math.isfinite(td_ch) or td_ch <= 0:
+                    raise ValueError(
+                        f"td_rgb[{i}] must be finite and > 0, got {td_ch}"
+                    )
         if self.k_rgb is not None:
             if len(self.k_rgb) != 3:
                 raise ValueError(

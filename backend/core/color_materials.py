@@ -30,6 +30,7 @@ class Color:
         alpha=DEFAULT_ALPHA,
         k=DEFAULT_K,
         k_rgb=None,
+        td_rgb=None,
         td_scale=DEFAULT_TD_SCALE,
         td_gamma=DEFAULT_TD_GAMMA,
         display_name=None,
@@ -99,6 +100,17 @@ class Color:
         self.alpha = alpha
         self.k = k
         self.k_rgb = tuple(float(x) for x in k_rgb) if k_rgb is not None else None
+        if td_rgb is not None:
+            if len(td_rgb) != 3:
+                raise ValueError(
+                    f"td_rgb must be a 3-tuple (td_R, td_G, td_B), got {td_rgb}"
+                )
+            for i, td_ch in enumerate(td_rgb):
+                if not np.isfinite(float(td_ch)) or float(td_ch) <= 0:
+                    raise ValueError(
+                        f"td_rgb[{i}] must be finite and > 0, got {td_ch}"
+                    )
+        self.td_rgb = tuple(float(x) for x in td_rgb) if td_rgb is not None else None
         self.td_scale = td_scale
         self.td_gamma = td_gamma
         self.display_name = display_name
@@ -387,6 +399,7 @@ class Colors:
                 alpha=config.alpha,
                 k=config.k,
                 k_rgb=config.k_rgb,
+                td_rgb=getattr(config, "td_rgb", None),
                 td_scale=config.td_scale,
                 td_gamma=config.td_gamma,
             )
