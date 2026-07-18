@@ -122,3 +122,15 @@ docs/research/submission/main.log
 docs/research/submission/main.out
 docs/research/submission/main.run.xml
 docs/research/submission/main.xdv
+
+# LaTeX build artifacts under submission subdirs (scf2026 etc.)
+docs/research/submission/**/*.aux
+docs/research/submission/**/*.bbl
+docs/research/submission/**/*.bcf
+docs/research/submission/**/*.blg
+docs/research/submission/**/*.fdb_latexmk
+docs/research/submission/**/*.fls
+docs/research/submission/**/*.log
+docs/research/submission/**/*.out
+docs/research/submission/**/*.run.xml
+docs/research/submission/**/*.xdv
