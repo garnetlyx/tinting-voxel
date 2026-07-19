@@ -134,3 +134,10 @@ docs/research/submission/**/*.log
 docs/research/submission/**/*.out
 docs/research/submission/**/*.run.xml
 docs/research/submission/**/*.xdv
+
+# LaTeX build artifacts for research figures
+docs/research/figures/*.aux
+docs/research/figures/*.log
+docs/research/figures/*.fdb_latexmk
+docs/research/figures/*.fls
+docs/research/figures/*.synctex.gz
