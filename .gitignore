@@ -141,3 +141,6 @@ docs/research/figures/*.log
 docs/research/figures/*.fdb_latexmk
 docs/research/figures/*.fls
 docs/research/figures/*.synctex.gz
+
+# Built artifact package (reproduce with backend/scripts/build_artifact_package.py)
+docs/research/submission/scf2026/artifact_package.zip
