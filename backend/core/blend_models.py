@@ -360,6 +360,48 @@ def _blend_hybrid_per_color(
     return tuple(np.clip(rgb * 255, 0, 255))
 
 
+def _blend_hybrid_per_color_sequential(
+    code: str,
+    layer_height: float,
+    color_map: dict,
+    scatter_alpha: float = 5.0,
+    k_map: Optional[dict] = None,
+    default_k: float = 10.0,
+    background_rgb: Optional[tuple] = None,
+) -> tuple:
+    """Ablation: identical per-layer transmission as `_blend_hybrid_per_color`,
+    but composited by sequential linear interpolation from the backing
+    (result = nominal_rgb*(1-t) + result*t) instead of the light-loss
+    allocation of Eqs. 4--8. Isolates whether the allocation stacking form
+    contributes beyond the hybrid transmission itself.
+    """
+    if not color_map:
+        return (255.0, 255.0, 255.0)
+    layer_height = _coerce_layer_height(layer_height)
+    n = len(code)
+    if n == 0:
+        return (255.0, 255.0, 255.0)
+    if not np.isfinite(scatter_alpha) or scatter_alpha <= 0:
+        raise ValueError(
+            f"scatter_alpha must be finite and positive, got {scatter_alpha}"
+        )
+    k_map = k_map or {}
+    result = _normalize_background_rgb(background_rgb) * 255.0
+    for c in code:
+        color = color_map[c]
+        td = color.td
+        if td <= 0:
+            t_ch = np.zeros(3)
+        else:
+            scatter = scatter_alpha / td
+            k_c = float(k_map.get(c, default_k))
+            t_ch = np.exp(-(scatter + k_c * color.get_absorption()) * layer_height)
+            t_ch = np.clip(t_ch, 0, 1)
+        filament_rgb = np.array(color.rgb, dtype=np.float64)
+        result = filament_rgb * (1.0 - t_ch) + result * t_ch
+    return tuple(np.clip(result, 0, 255))
+
+
 def _blend_hybrid_per_channel_k(
     code: str,
     layer_height: float,
