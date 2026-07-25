@@ -55,10 +55,8 @@ test-results/
 # Large local test images (not committed)
 backend/tests/fixtures/images-local/
 
-# Calibration data (photos, generated plates, results)
-backend/tools/calibration/photos/
-backend/tools/calibration/plates/
-backend/tools/calibration/results/
+# Calibration photos, generated plates, and results are intentionally tracked
+# for research provenance and reproducibility.
 
 # Temporary script reports
 *_RESULTS.md
@@ -68,6 +66,17 @@ backend/tools/calibration/results/
 calibration_report.json
 comparison.png
 monitor_*.sh
+
+# Calibration provenance overrides the temporary-report rules above.
+!backend/tools/calibration/**/*_RESULTS.md
+!backend/tools/calibration/**/*_STATUS.md
+!backend/tools/calibration/**/*_SUMMARY.md
+!backend/tools/calibration/**/calibration_report.json
+!backend/tools/calibration/**/comparison.png
+!backend/tools/calibration/**/monitor_*.sh
+
+# Runtime-only calibration locks contain no research data.
+backend/tools/calibration/**/*.lock
 
 # AI Agent
 .claude/
