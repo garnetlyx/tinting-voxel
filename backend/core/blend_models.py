@@ -196,6 +196,53 @@ def _blend_per_channel(
     return tuple(np.clip(result, 0, 255))
 
 
+def _compose_light_loss_allocation(
+    code: str,
+    transmissions: list,
+    color_map: dict,
+    background_rgb: Optional[tuple] = None,
+) -> tuple:
+    """Compose any per-layer transmission with the paper's Eqs. 4--8.
+
+    Calibration modes may change how each layer's transmission is measured
+    or parameterized.  They must not silently change the forward stacking
+    rule.  Keeping allocation here makes the shared formula explicit for
+    regular-filament hybrid fits, clear-filament staircase TDs, and arbitrary
+    RANDMIX filaments.
+    """
+    n = len(code)
+    if n == 0:
+        return (255.0, 255.0, 255.0)
+    if len(transmissions) != n:
+        raise ValueError(
+            f"Expected {n} layer transmissions, got {len(transmissions)}"
+        )
+
+    background = _normalize_background_rgb(background_rgb)
+    remain = np.ones(3)
+    light_loss = np.zeros((n + 1, 3))
+    for i, transmission in enumerate(transmissions):
+        t_ch = np.broadcast_to(
+            np.asarray(transmission, dtype=np.float64),
+            (3,),
+        )
+        t_ch = np.clip(np.nan_to_num(t_ch, nan=0.0), 0.0, 1.0)
+        light_loss[i] = remain * (1.0 - t_ch)
+        remain *= t_ch
+    light_loss[n] = remain
+
+    total = light_loss.sum(axis=0)
+    total = np.where(total > 0, total, 1.0)
+    light_loss /= total
+
+    backing_weight = light_loss[n]
+    rgb = np.ones(3)
+    for i, label in enumerate(code):
+        rgb -= color_map[label].get_absorption() * light_loss[i]
+    rgb = backing_weight * background + (1.0 - backing_weight) * rgb
+    return tuple(np.clip(rgb * 255.0, 0.0, 255.0))
+
+
 def _blend_beer_lambert_td_rgb(
     code: str,
     layer_height: float,
@@ -205,20 +252,18 @@ def _blend_beer_lambert_td_rgb(
 ) -> tuple:
     """Per-channel measured-TD transmission (Phase-8 staircase mode).
 
-    Each layer attenuates channel ch by t_ch = 10^(-d / td_rgb[ch]); layers
-    composite sequentially over the backing with the filament's nominal RGB
-    as the opaque limit. td_rgb values come from direct staircase
-    measurement in the app's round-trip gamma-space convention, so no
-    per-channel parameters are fitted. Colors without td_rgb fall back to
-    their scalar td on all three channels (e.g. a grey with only a TD1S
-    reading). The optional scalar k_residual * A_ch term models residual
-    pigment attenuation beyond the measured TD; it defaults to 0 because
-    td_rgb already carries the spectral information.
+    Each layer attenuates channel ch by t_ch = 10^(-d / td_rgb[ch]), then the
+    resulting transmissions are composed with the same light-loss-allocation
+    forward formula used by the regular-filament hybrid model (paper
+    Eqs. 4--8). td_rgb values come from direct staircase measurement in the
+    app's round-trip gamma-space convention, so no per-channel parameters are
+    fitted. Colors without td_rgb fall back to their scalar td on all three
+    channels. The optional scalar k_residual * A_ch term models residual
+    pigment attenuation beyond measured TD; it defaults to 0.
     """
     layer_height = _coerce_layer_height(layer_height)
     LN10 = np.log(10)
-    result = _normalize_background_rgb(background_rgb) * 255.0
-
+    transmissions = []
     for c in code:
         color = color_map[c]
         td_rgb = getattr(color, "td_rgb", None)
@@ -232,10 +277,14 @@ def _blend_beer_lambert_td_rgb(
             rate = rate + k_residual * color.get_absorption() * layer_height
         t_ch = np.exp(-rate)
         t_ch = np.clip(np.nan_to_num(t_ch, nan=0.0), 0.0, 1.0)
-        filament_rgb = np.array(color.rgb, dtype=np.float64)
-        result = filament_rgb * (1.0 - t_ch) + result * t_ch
+        transmissions.append(t_ch)
 
-    return tuple(np.clip(result, 0, 255))
+    return _compose_light_loss_allocation(
+        code,
+        transmissions,
+        color_map,
+        background_rgb=background_rgb,
+    )
 
 
 def _blend_hybrid(
@@ -247,7 +296,6 @@ def _blend_hybrid(
     background_rgb: Optional[tuple] = None,
 ) -> tuple:
     layer_height = _coerce_layer_height(layer_height)
-    background = _normalize_background_rgb(background_rgb)
     n = len(code)
     if n == 0:
         return (255.0, 255.0, 255.0)
@@ -279,25 +327,12 @@ def _blend_hybrid(
             t_ch = np.clip(t_ch, 0, 1)
         transmissions.append(t_ch)
 
-    remain = np.ones(3)
-    array_size = max(n, 4) + 1
-    light_loss = np.zeros((array_size, 3))
-    for i, t_ch in enumerate(transmissions):
-        light_loss[i] = remain * (1.0 - t_ch)
-        remain *= t_ch
-    light_loss[n] = remain
-
-    total = light_loss.sum(axis=0)
-    total = np.where(total > 0, total, 1.0)
-    light_loss /= total
-
-    bg = light_loss[n]
-    rgb = np.ones(3)
-    for i, c in enumerate(code):
-        color = color_map[c]
-        rgb -= color.get_absorption() * light_loss[i]
-    rgb = bg * background + (1.0 - bg) * rgb
-    return tuple(np.clip(rgb * 255, 0, 255))
+    return _compose_light_loss_allocation(
+        code,
+        transmissions,
+        color_map,
+        background_rgb=background_rgb,
+    )
 
 
 def _blend_hybrid_per_color(
@@ -313,7 +348,6 @@ def _blend_hybrid_per_color(
     if not color_map:
         return (255.0, 255.0, 255.0)
     layer_height = _coerce_layer_height(layer_height)
-    background = _normalize_background_rgb(background_rgb)
     n = len(code)
     if n == 0:
         return (255.0, 255.0, 255.0)
@@ -339,25 +373,12 @@ def _blend_hybrid_per_color(
             t_ch = np.clip(t_ch, 0, 1)
         transmissions.append(t_ch)
 
-    remain = np.ones(3)
-    array_size = max(n, 4) + 1
-    light_loss = np.zeros((array_size, 3))
-    for i, t_ch in enumerate(transmissions):
-        light_loss[i] = remain * (1.0 - t_ch)
-        remain *= t_ch
-    light_loss[n] = remain
-
-    total = light_loss.sum(axis=0)
-    total = np.where(total > 0, total, 1.0)
-    light_loss /= total
-
-    bg = light_loss[n]
-    rgb = np.ones(3)
-    for i, c in enumerate(code):
-        color = color_map[c]
-        rgb -= color.get_absorption() * light_loss[i]
-    rgb = bg * background + (1.0 - bg) * rgb
-    return tuple(np.clip(rgb * 255, 0, 255))
+    return _compose_light_loss_allocation(
+        code,
+        transmissions,
+        color_map,
+        background_rgb=background_rgb,
+    )
 
 
 def _blend_hybrid_per_color_sequential(
@@ -423,7 +444,6 @@ def _blend_hybrid_per_channel_k(
     if not color_map:
         return (255.0, 255.0, 255.0)
     layer_height = _coerce_layer_height(layer_height)
-    background = _normalize_background_rgb(background_rgb)
     n = len(code)
     if n == 0:
         return (255.0, 255.0, 255.0)
@@ -456,25 +476,12 @@ def _blend_hybrid_per_channel_k(
             t_ch = np.clip(t_ch, 0, 1)
         transmissions.append(t_ch)
 
-    remain = np.ones(3)
-    array_size = max(n, 4) + 1
-    light_loss = np.zeros((array_size, 3))
-    for i, t_ch in enumerate(transmissions):
-        light_loss[i] = remain * (1.0 - t_ch)
-        remain *= t_ch
-    light_loss[n] = remain
-
-    total = light_loss.sum(axis=0)
-    total = np.where(total > 0, total, 1.0)
-    light_loss /= total
-
-    bg = light_loss[n]
-    rgb = np.ones(3)
-    for i, c in enumerate(code):
-        color = color_map[c]
-        rgb -= color.get_absorption() * light_loss[i]
-    rgb = bg * background + (1.0 - bg) * rgb
-    return tuple(np.clip(rgb * 255, 0, 255))
+    return _compose_light_loss_allocation(
+        code,
+        transmissions,
+        color_map,
+        background_rgb=background_rgb,
+    )
 
 
 def _build_k_map(color_map: dict) -> dict[str, float]:

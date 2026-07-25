@@ -59,12 +59,14 @@ class TestBlend:
 
     def test_scalar_fallback_when_td_rgb_missing(self, cyan_map):
         # Grey has no td_rgb: transmission must be channel-neutral, so the
-        # result interpolates between backing white and the filament color.
+        # measured transmission enters the paper's loss-allocation formula.
         r, g, b = _blend_by_mode("G", 0.08, cyan_map,
                                  blend_mode="beer_lambert_td_rgb")
         grey = cyan_map["G"]
         t = np.exp(-np.log(10) * 0.08 / 7.3)
-        expected = np.array(grey.rgb) * (1 - t) + 255.0 * t
+        absorption = grey.get_absorption()
+        # One layer on white: Eq. 8 reduces to 1 - A * (1 - T)^2.
+        expected = 255.0 * (1.0 - absorption * (1.0 - t) ** 2)
         assert np.allclose((r, g, b), expected, atol=1e-6)
 
     def test_thick_stack_approaches_filament_color(self, cyan_map):
