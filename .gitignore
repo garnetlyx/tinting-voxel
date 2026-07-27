@@ -57,6 +57,9 @@ backend/tests/fixtures/images-local/
 
 # Calibration photos, generated plates, and results are intentionally tracked
 # for research provenance and reproducibility.
+# Sony P06-D 16-bit analysis PNGs are deterministic local derivatives of the
+# hash-pinned ARW inputs and exceed GitHub's per-file size limit.
+docs/research/photos/sony-a7m4/p06-d/*.png
 
 # Temporary script reports
 *_RESULTS.md
