@@ -61,6 +61,16 @@ backend/tests/fixtures/images-local/
 # hash-pinned ARW inputs and exceed GitHub's per-file size limit.
 docs/research/photos/sony-a7m4/p06-d/*.png
 
+# RANDMIX5 16-bit Sony analysis PNGs exceed GitHub's 100 MB per-file limit.
+# Only the *-8bit.png derivatives are tracked; recover 16-bit originals from
+# Dropbox version history or regenerate from ARW if needed locally.
+docs/research/photos/sony-a7m4/randmix5/randmix5-b.png
+docs/research/photos/sony-a7m4/randmix5/randmix5-w.png
+docs/research/photos/sony-a7m4/randmix5/randmix5-bw-split-colorchecker.png
+docs/research/photos/sony-a7m4/randmix5-x3/randmix5-b.png
+docs/research/photos/sony-a7m4/randmix5-x3/randmix5-w.png
+docs/research/photos/sony-a7m4/randmix5-x3/randmix5-bw-split-colorchecker.png
+
 # Temporary script reports
 *_RESULTS.md
 *_STATUS.md
