@@ -99,7 +99,6 @@ backend/tools/calibration/**/*.lock
 .project/
 
 # Docker
-.dockerignore
 docker-compose.override.yml
 feedback.md
 .crew/

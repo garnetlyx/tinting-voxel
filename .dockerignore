@@ -1,0 +1,40 @@
+# Dependencies / build outputs (frontend is built in a separate stage)
+node_modules/
+dist/
+build/
+
+# Python virtualenvs and caches
+backend/.venv/
+.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Tests are not needed in the runtime image
+backend/tests/
+
+# Research surface (removed from this repo; kept as a defensive guard)
+backend/tools/
+backend/scripts/
+
+# Docs and local research data
+docs/
+
+# VCS / IDE / OS
+.git/
+.github/
+.vscode/
+.idea/
+.DS_Store
+
+# Markdown (README is re-added explicitly if needed by the build)
+*.md
+
+# E2E and test artifacts
+e2e/
+test-results/
+playwright-report/
