@@ -3,7 +3,7 @@
 **Product Name**: tinting-voxel
 **Version**: 2.0
 **Last Updated**: 2026-06-19
-**Status**: In Development — feature-complete beyond original MVP, calibration research ongoing
+**Status**: In Development — feature-complete beyond original MVP; model calibration lives in the calibration-tooling repo
 
 ---
 
@@ -50,7 +50,7 @@ tinting-voxel solves these by:
 | Processing performance | Image processing time | < 5s for 512×512px |
 | User adoption | Active users | 100 users/month (6 months) |
 | Export success rate | Successful downloads | > 95% |
-| Test health | Backend test pass rate | > 95% across 878 tests |
+| Test health | Backend test pass rate | > 95% across ~670 tests |
 
 ---
 
@@ -104,7 +104,6 @@ tinting-voxel solves these by:
 | UC-06 | Process a batch of up to 20 images | P2 |
 | UC-07 | Auto-search best processing parameters for an image | P2 |
 | UC-08 | Use curated color palette as a starting point | P2 |
-| UC-09 | Calibrate Beer-Lambert parameters against a printed plate | P2 (internal CLI) |
 
 ### 3.2 User Flows
 
@@ -134,14 +133,10 @@ tinting-voxel solves these by:
 3. User picks the variant with the best perceived preview and proceeds to
    export.
 
-#### Flow 5 — Calibration (internal)
-1. Operator prints the 16×16 permutation plate or the P1S structured CMYWK
-   plate.
-2. Operator photographs the plate under diffuse light and crops to grid.
-3. CLI (`run_calibration.py` / `run_structured_calibration.py`) optimizes
-   `alpha` (and optionally `td` per color / `k_rgb` per channel) to minimize
-   perceptual error vs the photo.
-4. Optimized values are promoted into a preset in `color_config.py`.
+> **Calibration** (fitting `alpha`/`td`/`k` against printed plates) is not part
+> of this product. It lives in the companion **calibration-tooling** repo,
+> which mounts this repo's `backend/` as the `engine` submodule and promotes
+> fitted values into presets in `core/color_config.py`.
 
 ---
 
@@ -191,29 +186,20 @@ tinting-voxel solves these by:
 - In-memory usage analytics
 - Docker multi-stage build + Railway / Fly.io / docker-compose configs
 
-**Calibration tooling**
-- 19+ CLI scripts under `backend/tools/calibration/`
-- 16×16 permutation plate, ramp plates, structured P1S 30×26 CMYWK plate
-- Photo preprocessor (perspective correction, white balance, glare masking)
-- Cross-validation replay benchmark, model-search explorer
-- Hybrid per-color-k and per-channel-k optimizers
-- Per-color `k` physical-ordering prior (K > W > M > C > Y), TD1S power-law
-  remapping
-
 **Quality**
-- ~878 backend tests (89% coverage), 86 frontend Vitest tests, 45 Playwright
-  E2E tests
-- QA regression suite (R1–R16) documenting 190+ bugs fixed
+- ~670 backend tests, ~118 frontend Vitest tests, 35 Playwright E2E tests (6 spec files)
+- QA regression suite (R1–R16+) documenting 190+ bugs fixed
 
 ### 4.2 In Progress / Planned
 
 - **Black (K) filament toggle** — add CMYWK 5-color support; current model
   cannot reach true black at 0.08mm layer height (see TODO).
-- **k_rgb optimization for P7** — gradient descent on training photos; promote
-  if transfer score beats P6.
 - **Max-dimension preset chips** in the frontend (180 / 250 / 300mm).
 - **Production hardening** — thread locks on global matrices, bounded
   analytics, non-root Docker user (see TODO P0/P1).
+
+Parameter fitting (k_rgb / per-channel-k optimization against printed
+plates) is tracked in the calibration-tooling repo, not here.
 
 ### 4.3 Out of Scope
 
@@ -342,17 +328,17 @@ real-time preview, comprehensive test suite.
 Custom color profiles, advanced error handling, image editor, 3MF output,
 base plate, color adjustment, progress bars.
 
-### 8.3 v2.0 — N-color + Calibration (current)
+### 8.3 v2.0 — N-color engine (current)
 Dynamic 4–16 color support, V2 API (STL / SVG-STL / 3MF / SVG-3MF / print
 settings), batch processing, palette library, 3D WebGL preview, double-sided,
-param search, Docker/cloud deploy, full calibration suite (Phase 6 / Phase 7
-per-channel-k).
+param search, Docker/cloud deploy. Calibration suite split into the
+calibration-tooling repo.
 
 ### 8.4 Future phases
 
 | Phase | Features | Target |
 |-------|----------|--------|
-| 2.1 Accuracy | k_rgb optimization, promote P6/P7 to default, CMYWK black filament | Q3 2026 |
+| 2.1 Accuracy | CMYWK black filament; promote research-fitted presets to default | Q3 2026 |
 | 2.2 Hardening | Thread locks, bounded analytics, non-root Docker, SVG complexity caps | Q3 2026 |
 | 3 Ecosystem | Slicer-preset partnerships, filament manufacturer profiles, community palette submissions | Q4 2026 |
 | 4 Scale | User accounts, cloud-saved profiles, monitoring (Prometheus), error tracking (Sentry) | 2027+ |
@@ -429,6 +415,7 @@ Full OpenAPI spec at `/docs` when the backend is running.
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-08-14 | 2.1 | Renamed to tinting-voxel; calibration CLI/research data split into calibration-tooling; docs aligned to post-split state |
 | 2026-06-19 | 2.0 | PRD rewritten to reflect N-color V2 API, batch, 3MF, palette library, 3D preview, calibration system (Phase 6/7), 878 backend tests |
 | 2026-03-08 | 1.1 | Calibration section, presets, CLI workflow |
 | 2026-01-27 | 1.0 | Initial PRD from existing codebase |

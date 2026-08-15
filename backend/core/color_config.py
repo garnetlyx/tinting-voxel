@@ -260,7 +260,7 @@ BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
 ]
 
 # Clear filament parameters from staircase v2 calibration (2026-07-17).
-# Source: docs/research/results/staircase-KX-A/<material>/v2/staircase_report_v2.json
+# Source: calibration-tooling repo, data/results/staircase-KX-A/<material>/v2/staircase_report_v2.json
 # Hex = WB-corrected thickest-step color; td/k = least-squares fit of the
 # hybrid_per_color_k decay rate (alpha/td + k*A_ch) to the measured per-channel
 # rates ln(10)/td_ch (thin-range fit, d <= 3mm). Clear filaments have negligible

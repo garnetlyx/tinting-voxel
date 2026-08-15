@@ -1,6 +1,6 @@
 # tinting-voxel
 
-Transform images into physically accurate, multi-color 3D-printable files using N-color filament separation and optical color mixing (Beer-Lambert law). Supports 4–16 configurable filament colors, STL/3MF/SVG output, batch processing, and an integrated calibration CLI.
+Transform images into physically accurate, multi-color 3D-printable files using N-color filament separation and optical color mixing (Beer-Lambert law). Supports 4–16 configurable filament colors, STL/3MF/SVG output, batch processing, and parameter auto-search.
 
 ## Features
 
@@ -12,13 +12,13 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 - **3D WebGL Preview** - three.js render with orbit controls before export
 - **Parameter Auto-Search** - Sweep maxColors / colorThreshold combinations and pick the best variant
 - **Greedy Meshing Optimization** - 70-80% file size reduction vs naive pixel-to-box approach
-- **Calibration CLI** - Optimize Beer-Lambert parameters against printed test plates (Phase 6/7 per-channel-k models)
+- **Research-Backed Parameters** - Beer-Lambert parameters fitted against printed test plates in the companion [calibration-tooling](https://github.com/garnetlyx/calibration-tooling) repo
 
 ## Tech Stack
 
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + three.js
 - **Backend**: Python 3 + FastAPI + numpy-stl + PIL + scikit-learn + trimesh + lxml
-- **Testing**: pytest (878 backend tests, 89% coverage), Vitest (frontend), Playwright (E2E)
+- **Testing**: pytest (~670 backend tests), Vitest (frontend), Playwright (E2E)
 
 ## Project Structure
 
@@ -26,14 +26,13 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 tinting-voxel/
 ├── backend/
 │   ├── main.py                  # FastAPI application entry
-│   ├── core/                    # Core algorithms (blend_color, calibrator, presets)
+│   ├── core/                    # Core algorithms (blend_color, presets, code grid)
 │   ├── api/
 │   │   ├── models.py            # Pydantic data models
 │   │   ├── routes/              # Route handlers (image, download, batch, palette, ...)
 │   │   └── __init__.py
 │   ├── services/                # Business logic (image_processor, stl_generator, ...)
 │   ├── config/                  # Settings, constants
-│   ├── tools/calibration/       # Beer-Lambert calibration CLI
 │   └── requirements.txt
 ├── src/                         # React frontend
 │   ├── main.tsx                 # Entry point
@@ -169,57 +168,12 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 - [Product Requirements (PRD)](docs/PRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Blend Functions](docs/BLEND_FUNCTIONS.md)
 - [Project Instructions](AGENTS.md)
 
-## Calibration
+## Calibration & Research
 
-The Beer-Lambert model uses two key parameters per filament:
-- **alpha** -- absorption coefficient (`T = exp(-alpha * d / td)`)
-- **td** -- transmission distance (material property)
-
-These can be calibrated against photos of physical test prints to minimize perceptual color error (CIELAB Delta-E).
-
-### Workflow
-
-1. **Print a test plate** -- 16x16 grid of all 256 CMYW permutations
-2. **Photograph** -- diffuse lighting, straight-on, crop to grid boundaries
-3. **Run calibration** -- CLI optimizes parameters to match the photo
-
-```bash
-cd backend
-source .venv/bin/activate
-
-# Alpha-only (fast, recommended first step)
-python -m tools.calibration.run_calibration \
-  --photo tools/calibration/photos/print_regular_0.32.png \
-  --preset bambu \
-  --mode alpha \
-  --gen-alpha 23
-
-# Alpha + per-color td (slower, global optimizer)
-python -m tools.calibration.run_calibration \
-  --photo tools/calibration/photos/print_clear_3.36.png \
-  --preset clear \
-  --mode alpha_td
-```
-
-4. **Review output** -- `calibration_report.json` (metrics, per-color errors, worst codes) + `comparison.png` (3-panel: photo / original model / optimized model)
-5. **Update presets** -- apply optimal values in `backend/core/color_config.py`
-
-### CLI Options
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--photo` | Path to calibration photo | (required) |
-| `--preset` | `bambu` or `clear` | `bambu` |
-| `--mode` | `alpha` (1 param, L-BFGS-B) or `alpha_td` (5 params, differential evolution) | `alpha` |
-| `--gen-alpha` | Alpha used when generating the printed test plate | auto-detect |
-| `--output` | Output directory | `tools/calibration/results/` |
-| `--grid-size` | Grid dimensions | `16` |
-| `--layer-height` | Layer height in mm | `0.08` |
-| `--layer-count` | Number of layers | `4` |
-
-See [`backend/tools/calibration/README.md`](backend/tools/calibration/README.md) for full details.
+Beer-Lambert parameters (`alpha`, `td`, per-color `k`) in the filament presets are fitted against photos of printed test plates. The calibration CLI, plate generation tools, research data, and internal notes live in the companion repo **[calibration-tooling](https://github.com/garnetlyx/calibration-tooling)**, which mounts this repo's `backend/` as the `engine` submodule. Fitted values are promoted into presets in `backend/core/color_config.py` here.
 
 ## How It Works
 

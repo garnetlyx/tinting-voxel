@@ -99,16 +99,11 @@ tinting-voxel/
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py        # Color blending (Original/Kromacut/Hybrid/Per-channel modes)
 │   │   ├── blend_models.py       # Pluggable blend functions (hybrid_per_color_k, per_channel_k)
-│   │   ├── calibrator.py         # Parameter calibration engine (16×16 plate)
-│   │   ├── ramp_calibrator.py    # Ramp plate calibration + per-color k optimizer
-│   │   ├── calibration_priors.py # k-ordering constraints, TD1S priors
 │   │   ├── color_config.py       # Filament presets single source of truth (Phase6 preset)
 │   │   ├── color_materials.py    # Material property definitions (k_rgb support)
 │   │   ├── code_grid.py          # Code grid generation utilities
-│   │   ├── grid_sampling.py      # Photo sampling for calibration plates
+│   │   ├── grid_sampling.py      # Code-grid RGB assembly for blend fitting
 │   │   ├── plate_geometry.py     # Plate geometry calculations
-│   │   ├── photo_preprocessor.py # Perspective correction, WB, glare masking
-│   │   ├── structured_plate.py   # Structured plate layout (P1S 30×26 CMYWK)
 │   │   └── palette_library.py    # Curated color palettes
 │   ├── services/         # Business logic
 │   │   ├── image_processor.py    # Image processing + auto-downscale
@@ -121,26 +116,17 @@ tinting-voxel/
 │   │   ├── batch_processor.py    # Multi-image batch processing
 │   │   ├── filament_preview.py   # Color matrix preview
 │   │   ├── print_settings_generator.py # Slicer settings JSON
+│   │   ├── print_settings_generator.py # Slicer settings JSON
+│   │   ├── print_stack.py       # Print stack modeling
+│   │   ├── raster_cleanup.py    # Raster post-processing cleanup
+│   │   ├── matrix_cache.py      # Reference-matrix cache (powers /api/cache-stats)
+│   │   ├── param_search_service.py # Auto parameter sweep engine
 │   │   └── analytics.py         # In-memory usage analytics
-│   ├── tools/           # CLI tools
-│   │   └── calibration/ # Calibration tools (19 CLI scripts)
-│   │       ├── generate_plate.py            # 16×16 permutation plate
-│   │       ├── generate_ramp.py             # Single-color 4×5 ramp
-│   │       ├── generate_multicolor_ramp.py  # Multi-color 12×5 ramp
-│   │       ├── generate_pair_ramp.py        # Two-color 12×4 ramp
-│   │       ├── generate_structured_plate.py # P1S 30×26 CMYWK structured plate
-│   │       ├── run_calibration.py           # 16×16 plate calibration
-│   │       ├── run_ramp_calibration.py      # Ramp plate calibration
-│   │       ├── run_structured_calibration.py # Whole-plate B/W backing calibration
-│   │       ├── run_cross_validation.py      # All param sets × all photos
-│   │       ├── run_model_search.py          # New model family exploration
-│   │       └── ...                          # Additional diagnostic + utility scripts
 │   ├── config/           # Configuration
-│   └── tests/            # Test suite (878 tests, 89% coverage)
+│   └── tests/            # Test suite (~670 tests)
 │       └── fixtures/
 │           ├── images/        # Committed small test images (200-500px, <100KB)
 │           └── images-local/  # Gitignored large images for local manual testing
-│       └── calibration/      # Calibration photos, CLI runner, results
 ├── src/                  # React frontend
 │   ├── main.tsx          # Entry point
 │   ├── pages/            # Page components
@@ -175,9 +161,6 @@ tinting-voxel/
 | **BlendColor (core)** | Color blending (Original/Hybrid/per-color-k modes), CIEDE2000 matching | scikit-image, NumPy |
 | **BlendModels** | Pluggable blend functions (hybrid_per_color_k, hybrid_per_channel_k) | NumPy |
 | **ColorConfig** | Filament presets (BAMBU_CMYK_PHASE6_PRESET with per-color k) | dataclasses |
-| **Calibrator** | 16×16 plate calibration, per-color k support | scipy.optimize, PIL |
-| **RampCalibrator** | Ramp plate calibration, k_rgb optimizer, k-ordering constraints | scipy.optimize |
-| **CalibrationPriors** | k-ordering penalty (K>W>M>C>Y), TD1S prior | NumPy |
 | **FilamentPreview** | Color matrix preview generation | PIL, NumPy |
 | **BatchProcessor** | Multi-image batch processing | concurrent.futures |
 | **PaletteLibrary** | Curated color palette management | dataclasses |

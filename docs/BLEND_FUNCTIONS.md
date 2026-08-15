@@ -3,7 +3,7 @@
 Mathematical reference for all color blending algorithms in tinting-voxel. Each function computes the perceived RGB color of stacked translucent filament layers on a white backing.
 
 **Implementation**: `backend/core/blend_color.py`
-**Calibration data**: see [`docs/CALIBRATION.md`](CALIBRATION.md)
+**Calibration data**: see the calibration-tooling repo (calibration CLI, photos, fitted results)
 
 ## Notation
 
@@ -499,7 +499,7 @@ Potential improvements informed by the academic literature, ordered by complexit
 
 ### 1. Per-Color k — **IMPLEMENTED** (2026-03-07/10)
 
-Replace global `k` with per-color `k_c`. Each pigment has a different scatter-to-absorption ratio. Addresses the Magenta anomaly where `td_M = 299.6` in hybrid_td optimization (scatter effectively disabled). See `docs/CALIBRATION.md` Phase 6.
+Replace global `k` with per-color `k_c`. Each pigment has a different scatter-to-absorption ratio. Addresses the Magenta anomaly where `td_M = 299.6` in hybrid_td optimization (scatter effectively disabled). Fitting data in the calibration-tooling repo (Phase 6).
 
 ```
 T_ch(c) = exp(-(scatter_alpha / td_c + k_c · A_ch(c)) · d)

@@ -34,17 +34,11 @@ tinting-voxel/
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py    # Color blending (Beer-Lambert model)
 │   │   ├── blend_models.py   # Pluggable blend functions (hybrid per-channel-k)
-│   │   ├── calibrator.py     # Beer-Lambert parameter calibration engine
-│   │   ├── ramp_calibrator.py # Ramp plate calibration + per-color k optimizer
-│   │   ├── calibration_priors.py # k-ordering constraints, TD1S priors
 │   │   ├── code_grid.py      # Code grid generation utilities
 │   │   ├── color_config.py   # Filament presets (single source of truth)
 │   │   ├── color_materials.py # Material property definitions (k_rgb support)
-│   │   ├── grid_sampling.py  # Photo sampling for calibration plates
-│   │   ├── palette_library.py # Curated color palettes
-│   │   ├── photo_preprocessor.py # Perspective correction, WB, glare masking
-│   │   ├── plate_geometry.py # Plate geometry calculations
-│   │   └── structured_plate.py # P1S 30x26 CMYWK structured plate layout
+│   │   ├── grid_sampling.py  # Code-grid RGB assembly for blend fitting
+│   │   └── palette_library.py # Curated color palettes
 │   ├── services/         # Business logic
 │   │   ├── analytics.py         # In-memory usage analytics
 │   │   ├── batch_processor.py    # Multi-image batch processing
@@ -62,16 +56,13 @@ tinting-voxel/
 │   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
 │   │   └── vector_processor.py   # Vector/contour processing
 │   ├── config/           # Configuration (settings, constants)
-│   ├── tools/calibration/ # Calibration CLI (19+ scripts, photos, plates, results)
-│   ├── scripts/          # Debug / one-off utility scripts
-│   └── tests/            # Test suite (878 tests, 89% coverage)
+│   └── tests/            # Test suite (~670 tests)
 │       ├── unit/             # Unit tests
 │       ├── integration/      # Integration tests
 │       ├── performance/      # Performance tests
-│       ├── fixtures/
-│       │   ├── images/        # Committed small test images (200-500px, <100KB)
-│       │   └── images-local/  # Gitignored large images for local manual testing
-│       └── test_calibration_qa.py # Calibration QA regression test
+│       └── fixtures/
+│           ├── images/        # Committed small test images (200-500px, <100KB)
+│           └── images-local/  # Gitignored large images for local manual testing
 ├── src/                  # React frontend
 │   ├── main.tsx          # Entry point
 │   ├── pages/            # Page components
@@ -83,7 +74,7 @@ tinting-voxel/
 │   │   └── ImageEditor.tsx       # Canvas crop/resize editor
 │   ├── hooks/            # Custom hooks
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (8 spec files, 45 tests)
+├── e2e/                  # Playwright E2E tests (6 spec files, 35 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config
@@ -177,13 +168,13 @@ docker compose up --build  # Build and run
 ## Testing
 
 ```bash
-# Backend (878 tests, 89% coverage)
+# Backend (~670 tests)
 cd backend && pytest -v
 
 # Frontend (Vitest, 12 test files)
 npm test
 
-# E2E (8 spec files, 45 tests)
+# E2E (6 spec files, 35 tests)
 npx playwright test
 ```
 
@@ -208,50 +199,11 @@ npx playwright test
 - File validation (extension, size, magic bytes) in `validators.py`
 - `Colors.from_configs()` creates N-color configurations from `ColorConfig` list
 
-## Calibration
+## Calibration & Research
 
-Internal CLI tool for optimizing Beer-Lambert model parameters (`alpha`, `td`) against photos of printed test plates. See [`backend/tools/calibration/README.md`](backend/tools/calibration/README.md) for full docs.
+Beer-Lambert parameter calibration (alpha/td/k fitting against printed test plates), plate generation CLI, research data, and internal notes live in the companion repo **calibration-tooling** (`github.com/garnetlyx/calibration-tooling`, which mounts this repo's `backend/` as the `engine` submodule). This repo consumes calibration results only, as presets in `core/color_config.py`.
 
-```bash
-cd backend
-source .venv/bin/activate
-
-# Alpha-only calibration (fast, 1 parameter)
-python -m tools.calibration.run_calibration \
-  --photo tools/calibration/photos/print_regular_0.32.png \
-  --preset bambu \
-  --mode alpha \
-  --gen-alpha 23
-
-# Alpha + td calibration (slower, 5 parameters)
-python -m tools.calibration.run_calibration \
-  --photo tools/calibration/photos/print_clear_3.36.png \
-  --preset clear \
-  --mode alpha_td
-```
-
-Key parameters:
-- `alpha` -- absorption coefficient in `T = exp(-alpha * d / td)`, default `12.0`
-- `td` -- per-color transmission distance (material property)
-
-Output: `calibration_report.json` + `comparison.png` (3-panel: photo / original / optimized)
-
-## Research Data Conventions
-
-### File naming (docs/research/)
-
-- Photos: `<SAMPLE-ID>_<backing>_<seq>.JPG` (e.g., `PLATE-08-KX-A_white_01.JPG`). `seq` indexes the physical print, not repeat photos; a white/black pair of the same print shares `seq`.
-- Sample IDs: `<PLATE-ID>-<PRINTER>-<rev>` (e.g., `PLATE-06-H2C-A`). Plate designs and physical prints are registered in `docs/research/SAMPLE_CATALOG.md` — add a registry row for every new print.
-- Printer codes: `P1S` (Bambu P1S), `H2C` (Bambu H2C), `KX` (Anycubic Kobra X).
-- Process-variant suffix (clear track): `_cross` = solid-infill rotation ON (crossed layers), `_aligned` = rotation OFF (parallel lines). Append before the extension, e.g. `PLATE-08-KX-A_white_01_cross.JPG`, `staircase-kx-ziro-b-cyan-1_cross.JPG`.
-- ASCII only; hyphens/underscores as separators. Never use colons, spaces, or ad-hoc suffixes like ` copy` in tracked filenames (colons break Windows checkouts).
-
-### Printers and process conditioning
-
-- Opaque Bambu CMYK(WK) plates print on the H2C (Bambu Studio, 0.08 mm print layers; one 0.32 mm color layer = 4 print layers). Early experiments used the P1S.
-- Transparent/clear filaments print on the Anycubic Kobra X — clear PLA is too brittle for the AMS feed path (Anycubic slicer, 0.28 mm print layers; one 0.84 mm color layer = 3 print layers).
-- Archive the as-printed slicer project per print: `docs/research/plates/cmyk-blend-h2c.3mf` (H2C opaque), `docs/research/plates/cmyk_blend_clear-kx.3mf` (KX clear). If a setting changes between prints, save a new copy — do not overwrite the config a previous sample was printed with.
-- Calibrated parameters (td/alpha/k presets) are **process-conditioned**: they are valid for the filament × printer × profile combination they were fitted on. The blend model consumes total stack thickness only; layer height, infill direction, and slicer differences are absorbed into the fitted parameters, so calibration prints and application prints must share the same profile (in particular: solid-infill rotation OFF / aligned lines for clear plates).
+Calibrated parameters (td/alpha/k presets) are **process-conditioned**: they are valid for the filament × printer × profile combination they were fitted on, so calibration prints and application prints must share the same slicer profile.
 
 ## Common Tasks
 

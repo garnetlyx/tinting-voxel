@@ -55,41 +55,12 @@ test-results/
 # Large local test images (not committed)
 backend/tests/fixtures/images-local/
 
-# Calibration photos, generated plates, and results are intentionally tracked
-# for research provenance and reproducibility.
-# Sony P06-D 16-bit analysis PNGs are deterministic local derivatives of the
-# hash-pinned ARW inputs and exceed GitHub's per-file size limit.
-docs/research/photos/sony-a7m4/p06-d/*.png
-
-# RANDMIX5 16-bit Sony analysis PNGs exceed GitHub's 100 MB per-file limit.
-# Only the *-8bit.png derivatives are tracked; recover 16-bit originals from
-# Dropbox version history or regenerate from ARW if needed locally.
-docs/research/photos/sony-a7m4/randmix5/randmix5-b.png
-docs/research/photos/sony-a7m4/randmix5/randmix5-w.png
-docs/research/photos/sony-a7m4/randmix5/randmix5-bw-split-colorchecker.png
-docs/research/photos/sony-a7m4/randmix5-x3/randmix5-b.png
-docs/research/photos/sony-a7m4/randmix5-x3/randmix5-w.png
-docs/research/photos/sony-a7m4/randmix5-x3/randmix5-bw-split-colorchecker.png
-
 # Temporary script reports
 *_RESULTS.md
 *_STATUS.md
 *_SUMMARY.md
 *_失败原因分析.md
-calibration_report.json
-comparison.png
 monitor_*.sh
-
-# Calibration provenance overrides the temporary-report rules above.
-!backend/tools/calibration/**/*_RESULTS.md
-!backend/tools/calibration/**/*_STATUS.md
-!backend/tools/calibration/**/*_SUMMARY.md
-!backend/tools/calibration/**/calibration_report.json
-!backend/tools/calibration/**/comparison.png
-!backend/tools/calibration/**/monitor_*.sh
-
-# Runtime-only calibration locks contain no research data.
-backend/tools/calibration/**/*.lock
 
 # AI Agent
 .claude/
@@ -104,16 +75,6 @@ feedback.md
 .crew/
 .playwright-mcp/
 .design/
-backend/tools/analyze_color_mapping.py
-backend/tools/analyze_frontend_response.py
-backend/tools/check_173b37.py
-backend/tools/check_263c33.py
-backend/tools/check_chroma.py
-backend/tools/check_dark_colors_in_gamut.py
-backend/tools/check_specific_colors.py
-backend/tools/find_nearest_for_color.py
-backend/tools/test_backend_version.py
-backend/tools/test_running_backend.py
 e2e/extract-color-mapping.spec.ts
 e2e/test-color-mapping-version.spec.ts
 .kiro/
@@ -122,46 +83,3 @@ docs/archive/
 .hypothesis/
 .sisyphus/
 .omo/
-# Research gallery samples: large regenerable artifacts (see docs/research/generate_gallery.py)
-docs/research/samples/**/*.zip
-docs/research/samples/**/*_source.*
-docs/SESSION_LOG.md
-
-# LaTeX build artifacts for figures
-docs/figures/*.aux
-docs/figures/*.log
-docs/research/samples/
-
-# LaTeX build artifacts for paper submission (keep main.pdf tracked)
-docs/research/submission/main.aux
-docs/research/submission/main.bbl
-docs/research/submission/main.bcf
-docs/research/submission/main.blg
-docs/research/submission/main.fdb_latexmk
-docs/research/submission/main.fls
-docs/research/submission/main.log
-docs/research/submission/main.out
-docs/research/submission/main.run.xml
-docs/research/submission/main.xdv
-
-# LaTeX build artifacts under submission subdirs (scf2026 etc.)
-docs/research/submission/**/*.aux
-docs/research/submission/**/*.bbl
-docs/research/submission/**/*.bcf
-docs/research/submission/**/*.blg
-docs/research/submission/**/*.fdb_latexmk
-docs/research/submission/**/*.fls
-docs/research/submission/**/*.log
-docs/research/submission/**/*.out
-docs/research/submission/**/*.run.xml
-docs/research/submission/**/*.xdv
-
-# LaTeX build artifacts for research figures
-docs/research/figures/*.aux
-docs/research/figures/*.log
-docs/research/figures/*.fdb_latexmk
-docs/research/figures/*.fls
-docs/research/figures/*.synctex.gz
-
-# Built artifact package (reproduce with backend/scripts/build_artifact_package.py)
-docs/research/submission/scf2026/artifact_package.zip
