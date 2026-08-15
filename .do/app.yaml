@@ -1,4 +1,4 @@
-name: img2stl
+name: tinting-voxel
 services:
   - name: web
     dockerfile_path: /Dockerfile

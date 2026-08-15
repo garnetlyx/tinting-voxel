@@ -1,4 +1,4 @@
-# img2stl
+# tinting-voxel
 
 Transform images into physically accurate, multi-color 3D-printable files using N-color filament separation and optical color mixing (Beer-Lambert law). Supports 4–16 configurable filament colors, STL/3MF/SVG output, batch processing, and an integrated calibration CLI.
 
@@ -23,7 +23,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 ## Project Structure
 
 ```
-img2stl/
+tinting-voxel/
 ├── backend/
 │   ├── main.py                  # FastAPI application entry
 │   ├── core/                    # Core algorithms (blend_color, calibrator, presets)
@@ -60,8 +60,8 @@ img2stl/
 
 ```bash
 # Clone repository
-git clone https://github.com/garnetlyx/img2stl.git
-cd img2stl
+git clone https://github.com/garnetlyx/tinting-voxel.git
+cd tinting-voxel
 
 # Backend setup (Windows)
 cd backend

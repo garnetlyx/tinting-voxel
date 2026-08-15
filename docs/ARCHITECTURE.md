@@ -4,7 +4,7 @@
 
 ## Overview
 
-img2stl is a web application that converts images into layered 3D-printable STL files using CMYK color separation and optical physics-based color mixing. The system uses a client-server architecture with a React frontend and Python backend.
+tinting-voxel is a web application that converts images into layered 3D-printable STL files using CMYK color separation and optical physics-based color mixing. The system uses a client-server architecture with a React frontend and Python backend.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -81,7 +81,7 @@ img2stl is a web application that converts images into layered 3D-printable STL 
 ## Directory Structure
 
 ```
-img2stl/
+tinting-voxel/
 ├── backend/              # Python FastAPI backend
 │   ├── main.py           # Application entry point
 │   ├── api/              # API routes and models

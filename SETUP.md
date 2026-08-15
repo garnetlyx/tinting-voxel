@@ -72,7 +72,7 @@ src/
 
 ```bash
 git clone <repository-url>
-cd img2stl
+cd tinting-voxel
 ```
 
 ### 2. Backend Setup
@@ -251,7 +251,7 @@ Generate and download STL files merged by primary colors
 ## Project Structure
 
 ```
-img2stl/
+tinting-voxel/
 ├── backend/
 │   ├── main.py                  # FastAPI application entry
 │   ├── blend_color.py           # Core color algorithms

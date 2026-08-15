@@ -4,8 +4,8 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { FilamentColorConfig } from '../api/types';
 
-const STORAGE_KEY = 'img2stl_filament_presets';
-const LAST_PRESET_KEY = 'img2stl_last_preset';
+const STORAGE_KEY = 'tinting-voxel_filament_presets';
+const LAST_PRESET_KEY = 'tinting-voxel_last_preset';
 
 export interface SavedPreset {
   id: string;

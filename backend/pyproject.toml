@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "img2stl-engine"
+name = "tinting-voxel-engine"
 version = "0.1.0"
-description = "Forward color/optics engine (Beer-Lambert blend model) shared by the img2stl product and research calibration tooling"
+description = "Forward color/optics engine (Beer-Lambert blend model) shared by the tinting-voxel product and research calibration tooling"
 requires-python = ">=3.12"
 dynamic = ["dependencies"]
 

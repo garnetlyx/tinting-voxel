@@ -1,7 +1,7 @@
 # fly.toml - Fly.io deployment configuration
 # Deploy with: fly launch --no-deploy && fly deploy
 
-app = "img2stl"
+app = "tinting-voxel"
 primary_region = "sjc"
 
 [build]

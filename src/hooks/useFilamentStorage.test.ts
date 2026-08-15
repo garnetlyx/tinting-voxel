@@ -3,8 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useFilamentStorage } from './useFilamentStorage';
 import type { FilamentColorConfig } from '../api/types';
 
-const STORAGE_KEY = 'img2stl_filament_presets';
-const LAST_PRESET_KEY = 'img2stl_last_preset';
+const STORAGE_KEY = 'tinting-voxel_filament_presets';
+const LAST_PRESET_KEY = 'tinting-voxel_last_preset';
 
 const sampleColors: FilamentColorConfig[] = [
   { name: 'Cyan', hex: '#0086D6', transmission_distance: 3.0 },

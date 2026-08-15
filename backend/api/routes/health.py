@@ -14,7 +14,7 @@ async def health_check() -> dict[str, str]:
     """
     return {
         "status": "healthy",
-        "service": "img2stl-api"
+        "service": "tinting-voxel-api"
     }
 
 
@@ -26,6 +26,6 @@ async def detailed_health_check() -> dict:
     """
     return {
         "status": "healthy",
-        "service": "img2stl-api",
+        "service": "tinting-voxel-api",
         "version": "1.0.0"
     }

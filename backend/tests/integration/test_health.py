@@ -9,7 +9,7 @@ def test_health_check_returns_healthy(client):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["service"] == "img2stl-api"
+    assert data["service"] == "tinting-voxel-api"
 
 
 def test_detailed_health_returns_system_info(client):

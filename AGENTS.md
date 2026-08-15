@@ -1,4 +1,4 @@
-# img2stl - Project Instructions
+# tinting-voxel - Project Instructions
 
 ## Overview
 
@@ -14,7 +14,7 @@ Image-to-STL/3MF color block converter that transforms images into layered 3D-pr
 ## Project Structure
 
 ```
-img2stl/
+tinting-voxel/
 ├── backend/              # Python FastAPI backend
 │   ├── main.py           # Application entry point
 │   ├── api/              # API routes and models

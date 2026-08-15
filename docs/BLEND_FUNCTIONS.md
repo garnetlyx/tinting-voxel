@@ -1,6 +1,6 @@
 # Color Blending Functions
 
-Mathematical reference for all color blending algorithms in img2stl. Each function computes the perceived RGB color of stacked translucent filament layers on a white backing.
+Mathematical reference for all color blending algorithms in tinting-voxel. Each function computes the perceived RGB color of stacked translucent filament layers on a white backing.
 
 **Implementation**: `backend/core/blend_color.py`
 **Calibration data**: see [`docs/CALIBRATION.md`](CALIBRATION.md)

@@ -1,6 +1,6 @@
 # Product Requirements Document (PRD)
 
-**Product Name**: img2stl
+**Product Name**: tinting-voxel
 **Version**: 2.0
 **Last Updated**: 2026-06-19
 **Status**: In Development — feature-complete beyond original MVP, calibration research ongoing
@@ -29,7 +29,7 @@ Current 3D-printing color solutions face a combination of limitations:
 - No tool combines an optical-physics color model with a full web UI, REST
   API, and arbitrary-filament configurability.
 
-img2stl solves these by:
+tinting-voxel solves these by:
 
 - Using a scientifically-grounded color mixing model based on light
   transmission (Beer-Lambert / hybrid per-channel Kubelka-Munk variant).

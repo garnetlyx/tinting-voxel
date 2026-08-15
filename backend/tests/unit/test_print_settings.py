@@ -25,7 +25,7 @@ class TestGeneratePrintSettings:
         )
         data = json.loads(result)
         assert data['version'] == '1.0'
-        assert data['generator'] == 'img2stl'
+        assert data['generator'] == 'tinting-voxel'
         assert 'print_settings' in data
         assert 'object_dimensions' in data
         assert 'filament' in data

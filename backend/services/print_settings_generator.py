@@ -77,7 +77,7 @@ def generate_print_settings(
 
     settings = {
         "version": "1.0",
-        "generator": "img2stl",
+        "generator": "tinting-voxel",
         "print_settings": {
             "layer_height": layer_height,
             "layer_count": layer_count,
