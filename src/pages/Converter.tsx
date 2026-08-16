@@ -140,7 +140,7 @@ const Converter: React.FC = () => {
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
               <Palette className="w-8 h-8 text-purple-600" />
-              Image to STL Color Block Converter
+              Tinting Voxel · Image to STL Color Block Converter
             </h1>
             <button
               onClick={() => setShowSettings(!showSettings)}
