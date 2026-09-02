@@ -4,7 +4,6 @@ QA Bug Tests - Failing tests that demonstrate real bugs found during QA review.
 Each test targets a specific verified bug. Tests are expected to FAIL while
 the bug is present. Once fixed, they should pass.
 
-Bug IDs correspond to entries in docs/TASKS.md QA section.
 """
 import itertools
 import sys

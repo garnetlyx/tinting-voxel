@@ -426,7 +426,7 @@ class TestQA62ThreeMFPresetColorMap:
 
 # -- QA-63: DownloadButtons CSV/PrintSettings not disabled during processing --
 
-# Frontend-only bug - documented in TASKS.md
+# Frontend-only bug
 # CSV button (line 34) and PrintSettings button (line 62) lack disabled={processing}
 # STL and 3MF buttons correctly have disabled={processing}
 # This allows users to trigger concurrent downloads during STL/3MF generation

@@ -14,6 +14,7 @@ services:
       - key: LOG_LEVEL
         value: INFO
       - key: CORS_ORIGINS
+        # Replace with your production frontend URL before deploying
         value: https://your-app.example.com
     health_check:
       http_path: /api/health

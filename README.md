@@ -12,7 +12,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 - **3D WebGL Preview** - three.js render with orbit controls before export
 - **Parameter Auto-Search** - Sweep maxColors / colorThreshold combinations and pick the best variant
 - **Greedy Meshing Optimization** - 70-80% file size reduction vs naive pixel-to-box approach
-- **Research-Backed Parameters** - Beer-Lambert parameters fitted against printed test plates in the companion [calibration-tooling](https://github.com/garnetlyx/calibration-tooling) repo
+- **Research-Backed Parameters** - Beer-Lambert parameters fitted against photos of printed test plates
 
 ## Tech Stack
 
@@ -171,9 +171,9 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - [Blend Functions](docs/BLEND_FUNCTIONS.md)
 - [Project Instructions](AGENTS.md)
 
-## Calibration & Research
+## Calibration
 
-Beer-Lambert parameters (`alpha`, `td`, per-color `k`) in the filament presets are fitted against photos of printed test plates. The calibration CLI, plate generation tools, research data, and internal notes live in the companion repo **[calibration-tooling](https://github.com/garnetlyx/calibration-tooling)**, which mounts this repo's `backend/` as the `engine` submodule. Fitted values are promoted into presets in `backend/core/color_config.py` here.
+Beer-Lambert parameters (`alpha`, `td`, per-color `k`) in the filament presets are fitted offline against photos of printed test plates. Fitted values are promoted into presets in `backend/core/color_config.py` here.
 
 ## How It Works
 
@@ -184,4 +184,4 @@ Beer-Lambert parameters (`alpha`, `td`, per-color `k`) in the filament presets a
 
 ## License
 
-ISC
+Apache-2.0. See [LICENSE](LICENSE).

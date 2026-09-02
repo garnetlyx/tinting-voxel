@@ -3,7 +3,7 @@
 **Product Name**: tinting-voxel
 **Version**: 2.0
 **Last Updated**: 2026-06-19
-**Status**: In Development — feature-complete beyond original MVP; model calibration lives in the calibration-tooling repo
+**Status**: In Development — feature-complete beyond original MVP
 
 ---
 
@@ -134,9 +134,8 @@ tinting-voxel solves these by:
    export.
 
 > **Calibration** (fitting `alpha`/`td`/`k` against printed plates) is not part
-> of this product. It lives in the companion **calibration-tooling** repo,
-> which mounts this repo's `backend/` as the `engine` submodule and promotes
-> fitted values into presets in `core/color_config.py`.
+> of this product. It is performed offline, and fitted values are promoted
+> into presets in `core/color_config.py`.
 
 ---
 
@@ -199,7 +198,7 @@ tinting-voxel solves these by:
   analytics, non-root Docker user (see TODO P0/P1).
 
 Parameter fitting (k_rgb / per-channel-k optimization against printed
-plates) is tracked in the calibration-tooling repo, not here.
+plates) is performed offline, outside this repo.
 
 ### 4.3 Out of Scope
 
@@ -331,8 +330,7 @@ base plate, color adjustment, progress bars.
 ### 8.3 v2.0 — N-color engine (current)
 Dynamic 4–16 color support, V2 API (STL / SVG-STL / 3MF / SVG-3MF / print
 settings), batch processing, palette library, 3D WebGL preview, double-sided,
-param search, Docker/cloud deploy. Calibration suite split into the
-calibration-tooling repo.
+param search, Docker/cloud deploy. Calibration performed offline.
 
 ### 8.4 Future phases
 
@@ -415,7 +413,7 @@ Full OpenAPI spec at `/docs` when the backend is running.
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-08-14 | 2.1 | Renamed to tinting-voxel; calibration CLI/research data split into calibration-tooling; docs aligned to post-split state |
+| 2026-08-14 | 2.1 | Calibration CLI/research data split out of this repo; docs aligned to post-split state |
 | 2026-06-19 | 2.0 | PRD rewritten to reflect N-color V2 API, batch, 3MF, palette library, 3D preview, calibration system (Phase 6/7), 878 backend tests |
 | 2026-03-08 | 1.1 | Calibration section, presets, CLI workflow |
 | 2026-01-27 | 1.0 | Initial PRD from existing codebase |

@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "tinting-voxel-engine"
 version = "0.1.0"
 description = "Forward color/optics engine (Beer-Lambert blend model) shared by the tinting-voxel product and research calibration tooling"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.12"
 dynamic = ["dependencies"]
 

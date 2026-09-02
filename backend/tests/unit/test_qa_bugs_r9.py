@@ -450,7 +450,7 @@ class TestQA83SVGSTLEndpointNoDoubleSided:
 # The backend validates properly, but the frontend gives no feedback
 # for invalid uploads until processing fails.
 
-# Frontend-only bug, documented in TASKS.md
+# Frontend-only bug
 
 
 # -- QA-87: BlendTestGenerator.save_stl_mesh uses os.mkdir not os.makedirs --------
