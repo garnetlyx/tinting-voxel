@@ -1,5 +1,5 @@
 /**
- * E2E tests for the param search (自动优化参数) modal.
+ * E2E tests for the param search (Auto-Optimize Parameters) modal.
  * Covers: button visibility, modal open/close, config phase UI.
  * Does NOT run a full search (too slow for E2E); mocks the API response.
  */
@@ -11,44 +11,44 @@ test.describe('Param Search Modal', () => {
     await page.goto('/');
   });
 
-  test('自动优化参数 button is hidden before image upload', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /自动优化参数/ })).not.toBeVisible();
+  test('Auto-Optimize Parameters button is hidden before image upload', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /Auto-Optimize Parameters/ })).not.toBeVisible();
   });
 
-  test('自动优化参数 button appears after processing an image', async ({ page }) => {
+  test('Auto-Optimize Parameters button appears after processing an image', async ({ page }) => {
     await uploadAndProcess(page);
-    await expect(page.getByRole('button', { name: /自动优化参数/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Auto-Optimize Parameters/ })).toBeVisible();
   });
 
-  test('clicking 自动优化参数 opens the modal with config phase', async ({ page }) => {
+  test('clicking Auto-Optimize Parameters opens the modal with config phase', async ({ page }) => {
     await uploadAndProcess(page);
 
-    await page.getByRole('button', { name: /自动优化参数/ }).click();
+    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
 
     // Modal should be visible
-    await expect(page.getByRole('dialog', { name: /自动优化参数/ })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /Auto-Optimize Parameters/ })).toBeVisible();
 
     // Config phase elements
-    await expect(page.getByLabel(/目标最长边尺寸/)).toBeVisible();
-    await expect(page.getByLabel(/色丝预设/)).toBeVisible();
-    await expect(page.getByRole('button', { name: /开始优化/ })).toBeVisible();
+    await expect(page.getByLabel(/Target longest edge/)).toBeVisible();
+    await expect(page.getByLabel(/Filament preset/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Start Optimization/ })).toBeVisible();
   });
 
   test('modal closes when clicking the ✕ button', async ({ page }) => {
     await uploadAndProcess(page);
-    await page.getByRole('button', { name: /自动优化参数/ }).click();
+    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    // Click the header close button (aria-label="关闭")
-    await page.getByRole('button', { name: '关闭' }).first().click();
+    // Click the header close button (aria-label="Close")
+    await page.getByRole('button', { name: 'Close' }).first().click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
   test('modal closes on Escape key', async ({ page }) => {
     await uploadAndProcess(page);
-    await page.getByRole('button', { name: /自动优化参数/ }).click();
+    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -59,26 +59,26 @@ test.describe('Param Search Modal', () => {
 
   test('preset selector has expected options', async ({ page }) => {
     await uploadAndProcess(page);
-    await page.getByRole('button', { name: /自动优化参数/ }).click();
+    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
 
-    const select = page.getByLabel(/色丝预设/);
+    const select = page.getByLabel(/Filament preset/);
     await expect(select).toBeVisible();
 
     // Check a few preset options exist
     await expect(select.locator('option', { hasText: 'Bambu CMYW Phase 6' })).toHaveCount(1);
-    await expect(select.locator('option', { hasText: 'Clear CMYW' })).toHaveCount(1);
+    await expect(select.locator('option', { hasText: 'Clear CMYWG' })).toHaveCount(1);
   });
 
   test('target size input accepts numeric input', async ({ page }) => {
     await uploadAndProcess(page);
-    await page.getByRole('button', { name: /自动优化参数/ }).click();
+    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
 
-    const sizeInput = page.getByLabel(/目标最长边尺寸/);
+    const sizeInput = page.getByLabel(/Target longest edge/);
     await sizeInput.fill('150');
     await expect(sizeInput).toHaveValue('150');
   });
 
-  test('clicking 开始优化 transitions to running phase', async ({ page }) => {
+  test('clicking Start Optimization transitions to running phase', async ({ page }) => {
     // Intercept the param-search API to return a mock response immediately
     await page.route('**/api/param-search', async (route) => {
       await route.fulfill({
@@ -111,13 +111,13 @@ test.describe('Param Search Modal', () => {
     });
 
     await uploadAndProcess(page);
-    await page.getByRole('button', { name: /自动优化参数/ }).click();
-    await page.getByRole('button', { name: /开始优化/ }).click();
+    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
+    await page.getByRole('button', { name: /Start Optimization/ }).click();
 
     // Should show running or results phase (mock completes instantly)
     // Either the progress bar or results cards should appear
     await expect(
-      page.getByText(/正在搜索最优参数/).or(page.getByText(/找到.*个结果/))
+      page.getByText(/Searching for optimal parameters/).or(page.getByText(/Found \d+ results/))
     ).toBeVisible({ timeout: 5_000 });
   });
 });

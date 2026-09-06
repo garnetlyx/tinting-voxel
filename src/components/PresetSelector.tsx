@@ -17,7 +17,7 @@ const PRESET_OPTIONS: { value: FilamentPreset | null; label: string }[] = [
   { value: 'bambu_cmyk_calibrated', label: 'Bambu CMYWK Calibrated' },
   { value: 'bambu_cmyk_phase6', label: 'Bambu CMYWK Phase 6' },
   { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW Phase 6' },
-  { value: 'clear_cmyk', label: 'Clear CMYW' },
+  { value: 'clear_cmyk', label: 'Clear CMYWG' },
 ];
 
 export const PresetSelector: React.FC<PresetSelectorProps> = ({

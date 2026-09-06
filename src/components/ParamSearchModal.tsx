@@ -12,7 +12,7 @@ const PRESET_OPTIONS = [
   { value: 'bambu_cmyk_phase6', label: 'Bambu CMYWK Phase 6' },
   { value: 'bambu_cmyk', label: 'Bambu CMYW' },
   { value: 'bambu_cmyk_calibrated', label: 'Bambu CMYWK Calibrated' },
-  { value: 'clear_cmyk', label: 'Clear CMYW' },
+  { value: 'clear_cmyk', label: 'Clear CMYWG' },
 ];
 
 interface ParamSearchModalProps {
@@ -57,16 +57,16 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       aria-modal="true"
-      aria-label="自动优化参数"
+      aria-label="Auto-Optimize Parameters"
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">自动优化参数</h2>
+          <h2 className="text-xl font-semibold text-gray-800">Auto-Optimize Parameters</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="关闭"
+            aria-label="Close"
           >
             ✕
           </button>
@@ -77,12 +77,13 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
           {phase === 'config' && (
             <div className="space-y-5">
               <p className="text-sm text-gray-600">
-                优化器将对多种参数组合运行图像处理，并按相似度排名。
+                The optimizer runs image processing across multiple parameter
+                combinations and ranks them by similarity.
               </p>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="targetSize">
-                  目标最长边尺寸 (mm)
+                  Target longest edge (mm)
                 </label>
                 <input
                   id="targetSize"
@@ -95,13 +96,14 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  pixel_size 将由此值除以图像最长边像素数自动推导。
+                  pixel_size is derived automatically as this value divided by
+                  the image's longest edge in pixels.
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="presetSelect">
-                  色丝预设
+                  Filament preset
                 </label>
                 <select
                   id="presetSelect"
@@ -119,7 +121,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                 onClick={() => onStart(targetSize, preset)}
                 className="w-full py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
               >
-                开始优化
+                Start Optimization
               </button>
             </div>
           )}
@@ -127,10 +129,10 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
           {/* Phase 2: Running */}
           {phase === 'running' && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">正在搜索最优参数，请稍候…</p>
+              <p className="text-sm text-gray-600">Searching for optimal parameters, please wait...</p>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm text-gray-600">
-                  <span>进度</span>
+                  <span>Progress</span>
                   <span>
                     {progress ? `${progress.completed} / ${progress.total}` : '—'}
                   </span>
@@ -147,7 +149,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                 </div>
                 {progress && (
                   <p className="text-xs text-gray-500">
-                    当前最优 MAE: {progress.bestMae.toFixed(2)}
+                    Current best MAE: {progress.bestMae.toFixed(2)}
                   </p>
                 )}
               </div>
@@ -155,7 +157,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                 onClick={onClose}
                 className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                取消
+                Cancel
               </button>
             </div>
           )}
@@ -164,7 +166,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
           {phase === 'results' && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
-                找到 {results.length} 个结果，点击卡片应用参数。
+                Found {results.length} results. Click a card to apply its parameters.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {top5.map((r) => (
@@ -183,7 +185,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                       <span className="text-xs text-gray-500 uppercase">{r.mode}</span>
                       {r.rank === 1 && (
                         <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                          最优
+                          Best
                         </span>
                       )}
                     </div>
@@ -209,7 +211,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                 onClick={onClose}
                 className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                关闭
+                Close
               </button>
             </div>
           )}
@@ -218,20 +220,20 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
           {phase === 'error' && (
             <div className="space-y-4">
               <div className="rounded-lg bg-red-50 border border-red-200 p-4">
-                <p className="text-sm text-red-700">{error ?? '优化失败，请重试。'}</p>
+                <p className="text-sm text-red-700">{error ?? 'Optimization failed. Please try again.'}</p>
               </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => onStart(targetSize, preset)}
                   className="flex-1 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >
-                  重试
+                  Retry
                 </button>
                 <button
                   onClick={onClose}
                   className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  关闭
+                  Close
                 </button>
               </div>
             </div>

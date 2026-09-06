@@ -18,6 +18,6 @@ describe('PresetSelector', () => {
     expect(options).toContain('Bambu CMYWK Calibrated');
     expect(options).toContain('Bambu CMYWK Phase 6');
     expect(options).toContain('Bambu CMYW Phase 6');
-    expect(options).toContain('Clear CMYW');
+    expect(options).toContain('Clear CMYWG');
   });
 });

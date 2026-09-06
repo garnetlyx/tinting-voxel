@@ -59,7 +59,6 @@ backend/tests/fixtures/images-local/
 *_RESULTS.md
 *_STATUS.md
 *_SUMMARY.md
-*_失败原因分析.md
 monitor_*.sh
 
 # AI Agent

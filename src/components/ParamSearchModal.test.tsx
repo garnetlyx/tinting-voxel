@@ -40,9 +40,9 @@ describe('ParamSearchModal', () => {
   it('config step renders preset selector and size input', () => {
     render(<ParamSearchModal {...baseProps} phase="config" />);
 
-    expect(screen.getByLabelText(/目标最长边尺寸/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/色丝预设/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /开始优化/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/target longest edge/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/filament preset/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /start optimization/i })).toBeInTheDocument();
   });
 
   it('config step calls onStart with size and preset when confirmed', async () => {
@@ -51,7 +51,7 @@ describe('ParamSearchModal', () => {
 
     render(<ParamSearchModal {...baseProps} phase="config" onStart={onStart} />);
 
-    await user.click(screen.getByRole('button', { name: /开始优化/i }));
+    await user.click(screen.getByRole('button', { name: /start optimization/i }));
 
     expect(onStart).toHaveBeenCalledOnce();
     const [size, preset] = onStart.mock.calls[0];
@@ -111,9 +111,9 @@ describe('ParamSearchModal', () => {
     );
 
     expect(screen.getByText('Network timeout')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /重试/i })).toBeInTheDocument();
-    // Two "关闭" buttons exist: the header ✕ (aria-label) and the body close button
-    expect(screen.getAllByRole('button', { name: /关闭/i })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+    // Two "Close" buttons exist: the header ✕ (aria-label) and the body close button
+    expect(screen.getAllByRole('button', { name: /close/i })).toHaveLength(2);
   });
 
   it('does not render when isOpen is false', () => {

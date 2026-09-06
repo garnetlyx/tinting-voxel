@@ -390,7 +390,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           disabled={processing}
           className="w-full py-2 border border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          自动优化参数
+          Auto-Optimize Parameters
         </button>
       )}
     </div>

@@ -156,7 +156,7 @@ const Converter: React.FC = () => {
             <div className="mb-6 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
               <Loader2 className="w-5 h-5 animate-spin shrink-0" />
               <span className="text-sm font-medium">
-                服务器正在预热中，请稍候… / Server is warming up, please wait…
+                Server is warming up, please wait...
               </span>
             </div>
           )}
@@ -317,7 +317,7 @@ const Converter: React.FC = () => {
                       {showParamSearchPrompt && (
                         <div className="flex items-center justify-between gap-4 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3">
                           <p className="text-sm text-purple-800">
-                            是否要自动优化参数以获得更好的效果？
+                            Want to auto-optimize parameters for better results?
                           </p>
                           <div className="flex gap-2 shrink-0">
                             <button
@@ -328,13 +328,13 @@ const Converter: React.FC = () => {
                               }}
                               className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                             >
-                              优化参数
+                              Optimize
                             </button>
                             <button
                               onClick={() => setShowParamSearchPrompt(false)}
                               className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
                             >
-                              跳过
+                              Skip
                             </button>
                           </div>
                         </div>
