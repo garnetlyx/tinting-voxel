@@ -14,9 +14,10 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from api.rate_limiter import limiter
-from api.routes import batch, download, download_v2, filament, health, image, palette, param_search
+from api.routes import bug_report, batch, download, download_v2, filament, health, image, palette, param_search
 from config.settings import get_cors_origins, settings
 from services.analytics import analytics
+from services.bug_report import install_bug_report_logging
 from services.stl_generator import initialize_color_mapping
 
 # Configure logging
@@ -25,6 +26,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+install_bug_report_logging()
 
 
 @asynccontextmanager
@@ -119,6 +121,7 @@ async def api_cache_stats(request: Request):
 
 # Include routers
 app.include_router(health.router)
+app.include_router(bug_report.router)
 app.include_router(image.router)
 app.include_router(download.router)
 app.include_router(download_v2.router)

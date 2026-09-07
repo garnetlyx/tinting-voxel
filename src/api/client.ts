@@ -1,7 +1,10 @@
 /**
  * API client for backend communication
  */
+import { recordBugReportLog } from '../utils/bugReport';
 import type {
+  BugReportRequest,
+  BugReportResponse,
   ProcessImageResponse,
   SVGProcessImageResponse,
   ProcessImageParams,
@@ -27,6 +30,7 @@ const API_BASE_URL = '/api';
  * FastAPI validation errors return detail as an array of objects
  */
 async function getErrorDetail(response: Response, fallback: string): Promise<string> {
+  recordBugReportLog('error', `API request failed (${response.status}): ${response.url || fallback}`);
   try {
     const body = await response.json();
     const detail = body.detail;
@@ -403,4 +407,32 @@ export async function getPaletteLibrary(
   }
 
   return response.json();
+}
+
+/** Submit feedback with a bounded timeout and actionable retry messages. */
+export async function submitBugReport(body: BugReportRequest, signal?: AbortSignal): Promise<BugReportResponse> {
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  if (signal?.aborted) controller.abort();
+  const timer = window.setTimeout(() => controller.abort(), 25000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/bug-report`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: controller.signal,
+    });
+    if (response.status === 429) throw new Error('Too many reports. Please try again in an hour.');
+    if (!response.ok) throw new Error(await getErrorDetail(response, 'Could not send your report. Please try again.'));
+    const result: BugReportResponse = await response.json();
+    if (result.success !== true || typeof result.reportId !== 'string' || !result.reportId) {
+      throw new Error('The server did not confirm your report. Please try again.');
+    }
+    return result;
+  } catch (error) {
+    if (controller.signal.aborted && !signal?.aborted) throw new Error('Sending timed out. Please try again.');
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
+  }
 }

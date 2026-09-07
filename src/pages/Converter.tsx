@@ -7,6 +7,7 @@ import { useImageProcessor } from '../hooks/useImageProcessor';
 import { useParamSearch } from '../hooks/useParamSearch';
 import { useBackendReady } from '../hooks/useBackendReady';
 import {
+  BugReportButton,
   ErrorMessage,
   LoadingSpinner,
   ImageUploader,
@@ -429,6 +430,13 @@ const Converter: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <BugReportButton context={{
+        appMode, mode, pixelSize, layerHeight, layerCount, whiteBackingLayers,
+        basePlateThickness, doubleSided, imageWidth: imageDimensions.width,
+        imageHeight: imageDimensions.height, colorCount: resultCount,
+        filamentPreset, processing, error,
+      }} />
 
       {/* Param Search Modal */}
       <ParamSearchModal

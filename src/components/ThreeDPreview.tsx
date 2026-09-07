@@ -4,6 +4,7 @@
  */
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as THREE from 'three';
+import { BUG_REPORT_CAPTURE_EVENT } from '../utils/bugReport';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { ColorBlock, ImageDimensions, MappedBlockColor, PrintStackInfo } from '../api/types';
 import { Eye, EyeOff, RotateCcw, Maximize2, Layers } from 'lucide-react';
@@ -217,6 +218,9 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
     };
     controls.addEventListener('change', updateClipping);
 
+    const captureFrame = () => renderer.render(scene, camera);
+    document.addEventListener(BUG_REPORT_CAPTURE_EVENT, captureFrame);
+
     // Animation loop
     const animate = () => {
       animFrameRef.current = requestAnimationFrame(animate);
@@ -236,6 +240,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener(BUG_REPORT_CAPTURE_EVENT, captureFrame);
       cancelAnimationFrame(animFrameRef.current);
       controls.removeEventListener('change', updateClipping);
       controls.dispose();

@@ -9,6 +9,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 - **Multiple Output Formats** - STL ZIP, SVG-STL, **3MF** (with named color objects), SVG-3MF, CSV, and slicer print-settings JSON
 - **Batch Processing** - Process up to 20 images in one run
 - **Palette Library** - 10 curated color palettes across 3 categories
+- **Bug Reports** - In-app feedback with optional page screenshots, conversion settings, and diagnostic logs
 - **3D WebGL Preview** - three.js render with orbit controls before export
 - **Parameter Auto-Search** - Sweep maxColors / colorThreshold combinations and pick the best variant
 - **Greedy Meshing Optimization** - 70-80% file size reduction vs naive pixel-to-box approach
@@ -128,6 +129,37 @@ Full endpoint list (22 routes across V1, V2 N-color, batch, palette, param-searc
 - `GET  /api/v2/filament-presets` — available filament presets
 
 Interactive OpenAPI docs at `/docs` when the backend is running.
+
+## Bug Reports
+
+Use the bug button at the bottom right to send a report. A description is optional;
+browser details, current conversion settings, and recent errors are included.
+Screenshots are opt-in and include only the current page view (including any visible
+uploaded image and 3D preview), excluding the report dialog.
+
+`POST /api/bug-report` accepts a description (up to 1,000 characters), a bounded
+`frontendContext`, and an optional PNG/JPEG data URL (up to 5 MB). Requests are limited
+to 6 MB and three submissions per hour per client IP, using the existing API limiter.
+The response contains `success`, `reportId`, and `delivery` (`stored` or `email`).
+
+Reports are saved as private JSON files under `BUG_REPORT_STORAGE_DIR` (default:
+`bug-reports/`, relative to the backend working directory). A report is acknowledged
+only after its file has been written. Configure a **persistent directory outside
+`static/`** in production and manage its retention and backups; ephemeral disks will
+lose reports on redeployment. The directory is not served by the application.
+
+To also receive email, set these **backend-only** environment variables:
+
+- `RESEND_API_KEY`: your Resend API key.
+- `RESEND_FROM`: a sender on your verified Resend domain.
+- `BUG_REPORT_EMAIL_TO`: the recipient inbox.
+
+These are the same email settings used by `ai-judge`. Emails include the description,
+converter/browser details, up to 50 recent application log lines, and the optional
+screenshot attachment. Failed or unconfigured email delivery leaves the saved report
+available locally. Common credential patterns, URL query strings,
+and image payloads are filtered from automatic diagnostics; the original image is
+not collected unless it is visible in a screenshot the user selects.
 
 ## Troubleshooting
 

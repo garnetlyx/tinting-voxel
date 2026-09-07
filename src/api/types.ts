@@ -426,3 +426,49 @@ export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
     { name: 'White', hex: '#FFFFFF', transmission_distance: 200.0 },
   ],
 };
+
+// User-submitted bug reports contain diagnostics, never the source image by default.
+export interface ConverterBugReportState {
+  appMode: 'single' | 'batch';
+  mode: ProcessingMode;
+  pixelSize: number;
+  layerHeight: number;
+  layerCount: number;
+  whiteBackingLayers: number;
+  basePlateThickness: number;
+  doubleSided: boolean;
+  imageWidth: number;
+  imageHeight: number;
+  colorCount: number;
+  filamentPreset: string | null;
+  processing: boolean;
+  error: string | null;
+}
+
+export interface BugReportLog {
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  timestamp: string;
+}
+
+export interface BugReportContext {
+  url: string;
+  userAgent: string;
+  language: string;
+  timestamp: string;
+  viewport: { width: number; height: number };
+  converter: ConverterBugReportState;
+  debugLogs: BugReportLog[];
+}
+
+export interface BugReportRequest {
+  description: string;
+  frontendContext: BugReportContext;
+  screenshot?: string;
+}
+
+export interface BugReportResponse {
+  success: boolean;
+  reportId: string;
+  delivery: 'email' | 'stored';
+}

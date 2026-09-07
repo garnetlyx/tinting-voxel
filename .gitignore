@@ -82,3 +82,7 @@ docs/archive/
 .hypothesis/
 .sisyphus/
 .omo/
+
+# Private user-submitted bug reports
+bug-reports/
+backend/bug-reports/

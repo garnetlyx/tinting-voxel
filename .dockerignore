@@ -38,3 +38,6 @@ docs/
 e2e/
 test-results/
 playwright-report/
+
+# Private user-submitted feedback must never enter an image build.
+**/bug-reports/

@@ -4,7 +4,7 @@ Supports both development and production (cloud) environments
 """
 import os
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -46,6 +46,12 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
+
+    # Bug reports are saved locally before optional email delivery.
+    bug_report_storage_dir: str = "bug-reports"
+    resend_api_key: SecretStr = SecretStr("")
+    resend_from: str = "onboarding@resend.dev"
+    bug_report_email_to: str = ""
 
     # Cloud deployment settings
     # Set these via environment variables in production

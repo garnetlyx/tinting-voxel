@@ -491,3 +491,49 @@ class PaletteLibraryResponse(BaseModel):
     """Response model for palette library listing."""
     palettes: List[PaletteInfo]
     categories: dict
+
+
+class BugReportLog(BaseModel):
+    """One bounded browser diagnostic entry."""
+    level: str = Field(..., pattern=r'^(info|warn|error)$')
+    message: str = Field(..., max_length=1000)
+    timestamp: str = Field(..., max_length=50)
+
+
+class BugReportViewport(BaseModel):
+    width: int = Field(0, ge=0, le=100000)
+    height: int = Field(0, ge=0, le=100000)
+
+
+class BugReportConverterState(BaseModel):
+    """Allowlisted conversion details; no source files or pixel payloads."""
+    appMode: str = Field('single', pattern=r'^(single|batch)$')
+    mode: ProcessingMode = ProcessingMode.PIXEL
+    pixelSize: float = Field(0, ge=0, le=1000)
+    layerHeight: float = Field(0, ge=0, le=1000)
+    layerCount: int = Field(0, ge=0, le=10000)
+    whiteBackingLayers: int = Field(0, ge=0, le=10000)
+    basePlateThickness: float = Field(0, ge=0, le=10000)
+    doubleSided: bool = False
+    imageWidth: int = Field(0, ge=0, le=100000)
+    imageHeight: int = Field(0, ge=0, le=100000)
+    colorCount: int = Field(0, ge=0, le=1000000)
+    filamentPreset: Optional[str] = Field(None, max_length=100)
+    processing: bool = False
+    error: Optional[str] = Field(None, max_length=1000)
+
+
+class BugReportContext(BaseModel):
+    url: str = Field('', max_length=2000)
+    userAgent: str = Field('', max_length=500)
+    language: str = Field('', max_length=40)
+    timestamp: str = Field('', max_length=50)
+    viewport: BugReportViewport = Field(default_factory=BugReportViewport)
+    converter: BugReportConverterState = Field(default_factory=BugReportConverterState)
+    debugLogs: List[BugReportLog] = Field(default_factory=list, max_length=100)
+
+
+class BugReportRequest(BaseModel):
+    description: str = Field('', max_length=1000)
+    frontendContext: BugReportContext = Field(default_factory=BugReportContext)
+    screenshot: Optional[str] = Field(None, max_length=5 * 1024 * 1024)
