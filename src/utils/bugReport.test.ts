@@ -50,6 +50,28 @@ describe('Bug report diagnostics', () => {
 });
 
 describe('Bug report screenshot', () => {
+  it('preserves slider positions in the screenshot without changing live controls', async () => {
+    document.body.innerHTML = '<div id="root"><input type="range" min="10" max="20" value="15"><input type="range" value="100"><input type="password" value="private"></div>';
+    document.querySelectorAll('input[type="range"]').forEach(input => {
+      vi.spyOn(input, 'getBoundingClientRect').mockReturnValue({ width: 116, height: 16 } as DOMRect);
+    });
+    vi.mocked(html2canvas).mockImplementation(async (_target, options) => {
+      const clone = document.implementation.createHTMLDocument();
+      clone.body.innerHTML = document.body.innerHTML;
+      await options!.onclone!(clone, clone.body);
+      expect(clone.querySelector('input[type="range"]')).toBeNull();
+      const controls = clone.querySelector('#root')!.children;
+      expect((controls[0].lastElementChild as HTMLElement).style.left).toBe('50px');
+      expect((controls[1].lastElementChild as HTMLElement).style.left).toBe('100px');
+      expect(clone.querySelector<HTMLInputElement>('input[type="password"]')!.value).toBe('');
+      return { toDataURL: () => 'data:image/jpeg;base64,small' } as HTMLCanvasElement;
+    });
+    await captureBugReportScreenshot();
+    expect(document.querySelectorAll('input[type="range"]')).toHaveLength(2);
+    expect(document.querySelector<HTMLInputElement>('input[type="password"]')!.value).toBe('private');
+    document.body.innerHTML = '';
+  });
+
   it('uses a viewport crop and refreshes WebGL before capturing canvas images', async () => {
     document.body.innerHTML = '<div id="root"><canvas></canvas></div>';
     const screenshot = 'data:image/jpeg;base64,small';
