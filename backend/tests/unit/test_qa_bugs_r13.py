@@ -210,12 +210,11 @@ class TestQA130SPAPathTraversal:
 class TestQA131HealthEndpointInfoLeakage:
     """Health detailed endpoint exposes system info without auth."""
 
-    def test_detailed_health_no_version_leak(self):
+    @pytest.mark.asyncio
+    async def test_detailed_health_no_version_leak(self):
         """Detailed health should not expose Python version or platform release."""
         from api.routes.health import detailed_health_check
-        import asyncio
-
-        result = asyncio.get_event_loop().run_until_complete(detailed_health_check())
+        result = await detailed_health_check()
 
         # These fields should NOT be present (or should require auth)
         has_python_version = 'python_version' in result

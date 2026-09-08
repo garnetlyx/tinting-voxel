@@ -1,22 +1,13 @@
 """Bug reports must be saved before success and never send real email in tests."""
 import base64
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from api.routes import bug_report as route
 from config.settings import settings
-from main import app
-
-
-@pytest.fixture(scope='module')
-def client():
-    # Report submission does not use the expensive optical-matrix cache.
-    with patch('services.matrix_cache.warmup_cache', return_value=0), TestClient(app) as test_client:
-        yield test_client
 
 
 @pytest.fixture(autouse=True)

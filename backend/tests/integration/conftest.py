@@ -3,6 +3,8 @@ Integration test fixtures for FastAPI TestClient.
 """
 import io
 import struct
+from functools import partial
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,12 +12,19 @@ from PIL import Image
 
 from api.rate_limiter import limiter
 from main import app
+from services.matrix_cache import warmup_cache
 
 
 @pytest.fixture(scope="module")
 def client():
-    """Module-scoped TestClient with lifespan events."""
-    with TestClient(app) as c:
+    """Run the real lifespan with a small matrix warmup for API tests."""
+    # Full preset enumeration is exponential and repeated for every test module.
+    # Keep the startup/cache path real, using a 16-combination configuration.
+    test_warmup = partial(
+        warmup_cache, preset_names=['bambu_cmyw_phase6'],
+        layer_counts=[2], layer_heights=[0.08],
+    )
+    with patch('services.matrix_cache.warmup_cache', test_warmup), TestClient(app) as c:
         yield c
 
 
