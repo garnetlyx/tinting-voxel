@@ -14,7 +14,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 - **3D WebGL Preview** - three.js render with orbit controls before export
 - **Parameter Auto-Search** - Sweep maxColors / colorThreshold combinations and pick the best variant
 - **Greedy Meshing Optimization** - 70-80% file size reduction vs naive pixel-to-box approach
-- **Research-Backed Parameters** - Beer-Lambert parameters fitted against photos of printed test plates
+- **Research-Backed Parameters** - Beer-Lambert parameters fitted against photos of printed test plates; model and calibration published as a [preprint](https://doi.org/10.31224/7794)
 
 ## Tech Stack
 
@@ -203,12 +203,17 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 - [Product Requirements (PRD)](docs/PRD.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Blend Functions](docs/BLEND_FUNCTIONS.md)
 - [Project Instructions](AGENTS.md)
 
 ## Calibration
 
 Beer-Lambert parameters (`alpha`, `td`, per-color `k`) in the filament presets are fitted offline against photos of printed test plates. Fitted values are promoted into presets in `backend/core/color_config.py` here.
+
+The forward model, the staircase / dual-backing measurement procedure, and the validation behind these presets are published as a preprint:
+
+> Garnet Liu. *Predicting Stacked-Filament Color from Independently Measured Filament Properties.* EngXiv preprint, September 2026. [doi:10.31224/7794](https://doi.org/10.31224/7794) (CC BY 4.0)
+
+Summary: per-filament properties (nominal RGB, per-channel transmission distance, effective attenuation coefficient `k`, shared scattering prefactor `alpha`) compose into stack color through a loss-allocation stacking rule. Staircase-measured per-channel TDs predict unseen transparent stacks fit-free at 18.6 vs 47.2 ΔE00; eight scalars fitted on one dual-backing plate carry five arbitrary filaments at 6.9 ΔE00; on ColorChecker prints the model reaches 16.69 vs 30.92 ΔE00 for the community TD-table formula. The full blend-mode mathematical reference lives in the companion research repository (`tinting-voxel-research/docs/BLEND_FUNCTIONS.md`). Note that calibrated parameters are **process-conditioned**: valid only for the filament × printer × profile combination they were fitted on, so calibration and application prints must share the same slicer profile.
 
 ## How It Works
 
