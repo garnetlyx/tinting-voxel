@@ -17,7 +17,7 @@
   "uploading": "正在上传图片…",
   "processingColors": "正在处理颜色…",
   "generatingStl": "正在生成 STL 文件…",
-  "title": "Tinting Voxel · 图片转 STL 彩色色块工具",
+  "title": "Tinting Voxel · 图片转 STL 混色工具",
   "optimizationPrompt": "要自动优化参数以获得更好的效果吗？",
   "serverStarting": "服务正在启动，请稍候…",
   "simulatedPrint": "打印效果模拟",
