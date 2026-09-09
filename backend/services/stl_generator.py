@@ -232,7 +232,7 @@ def initialize_color_mapping(
     Args:
         layer_count: Number of layers for color blending
         layer_height: Height of each layer in mm
-        colors: Optional Colors instance. If None, uses default CMYK.
+        colors: Optional Colors instance. If None, uses default Phase 6 CMYW.
     """
     global _reference_code_matrix, _reference_rgb_matrix, _blend_generator, _current_colors
 

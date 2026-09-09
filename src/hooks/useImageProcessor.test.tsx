@@ -134,7 +134,7 @@ describe('useImageProcessor', () => {
     const { result } = renderHook(() => useImageProcessor());
 
     act(() => {
-      result.current.loadPreset('bambu_cmyk_calibrated');
+      result.current.loadPreset('clear_cmywg');
       result.current.setLayerCount(9);
     });
 
@@ -345,7 +345,7 @@ describe('useImageProcessor', () => {
     const { result } = renderHook(() => useImageProcessor());
 
     act(() => {
-      result.current.loadPreset('bambu_cmyk_calibrated');
+      result.current.loadPreset('bambu_cmyw_phase6');
       result.current.updateFilamentColor(0, {
         name: 'Cyan',
         hex: '#3D79C6',
@@ -363,10 +363,10 @@ describe('useImageProcessor', () => {
           expect.objectContaining({
             name: 'Cyan',
             transmission_distance: 2.1,
-            alpha: 5.751822945330163,
-            k: 1.2085100532667932,
-            td_scale: 1.0056869820712098,
-            td_gamma: 0.4543363851088494,
+            alpha: 8.08,
+            k: 8.13,
+            td_scale: 1.48,
+            td_gamma: 0.20,
           }),
         ]),
       })

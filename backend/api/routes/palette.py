@@ -2,17 +2,14 @@
 Color palette library endpoints.
 """
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from api.models import PaletteColorInfo, PaletteInfo, PaletteLibraryResponse
 from api.rate_limiter import limiter
 from core.palette_library import (
     ALL_PALETTES,
-    CATEGORIES,
     get_palette,
-    get_palettes_by_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,12 +23,12 @@ def _palette_to_info(entry) -> PaletteInfo:
         id=entry.id,
         name=entry.name,
         description=entry.description,
-        category=entry.category,
         colors=[
             PaletteColorInfo(
                 name=c.name,
                 hex=c.hex,
                 transmission_distance=c.transmission_distance,
+                alpha=c.alpha, k=c.k, td_scale=c.td_scale, td_gamma=c.td_gamma,
             )
             for c in entry.colors
         ],
@@ -42,29 +39,15 @@ def _palette_to_info(entry) -> PaletteInfo:
 @limiter.limit("30/minute")
 async def api_list_palettes(
     request: Request,
-    category: Optional[str] = Query(None, description="Filter by category"),
 ):
     """
     List available color palettes.
 
-    Optionally filter by category: standard, artistic, specialty.
-
     Returns:
-        PaletteLibraryResponse with palettes and category descriptions
+        PaletteLibraryResponse with the two supported filament palettes
     """
-    if category:
-        if category not in CATEGORIES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unknown category: '{category}'. Available: {', '.join(CATEGORIES.keys())}",
-            )
-        palettes = get_palettes_by_category(category)
-    else:
-        palettes = ALL_PALETTES
-
     return PaletteLibraryResponse(
-        palettes=[_palette_to_info(p) for p in palettes],
-        categories=CATEGORIES,
+        palettes=[_palette_to_info(p) for p in ALL_PALETTES],
     )
 
 

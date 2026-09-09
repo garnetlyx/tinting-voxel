@@ -41,7 +41,7 @@ def get_cached_matrices(
     Get cached reference matrices for a preset configuration.
     
     Args:
-        preset_name: Name of the preset (e.g., "bambu_cmyk")
+        preset_name: Name of the preset (e.g., "bambu_cmyw_phase6")
         layer_count: Number of color layers
         layer_height: Height of each layer in mm
         
@@ -138,7 +138,7 @@ def warmup_cache(
     from core.color_config import get_available_presets
     
     if preset_names is None:
-        # Warm up all available presets (Phase 6 only by default)
+        # Warm up all available presets
         preset_names = get_available_presets()
     
     if layer_counts is None:

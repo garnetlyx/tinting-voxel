@@ -61,7 +61,7 @@ async def api_download_stl(request: Request, body: DownloadSTLRequest):
     color_blocks = [block.model_dump() for block in body.colorBlocks]
     image_dimensions = body.imageDimensions.model_dump()
 
-    # V1 always uses default CMYK colors
+    # V1 always uses default Phase 6 CMYW colors
     zip_content = generate_stl_zip(
         color_blocks=color_blocks,
         layer_height=body.layerHeight,
@@ -94,7 +94,7 @@ async def api_download_svg_stl(request: Request, body: DownloadSVGSTLRequest):
     vector_results = [result.model_dump() for result in body.vectorResults]
     image_dimensions = body.imageDimensions.model_dump()
 
-    # V1 always uses default CMYK colors
+    # V1 always uses default Phase 6 CMYW colors
     zip_content = generate_svg_stl_zip(
         vector_results=vector_results,
         layer_height=body.layerHeight,

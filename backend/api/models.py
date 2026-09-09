@@ -81,11 +81,8 @@ class FilamentColorConfig(BaseModel):
 
 class FilamentPreset(str, Enum):
     """Available filament presets."""
-    BAMBU_CMYK = "bambu_cmyk"
-    BAMBU_CMYK_CALIBRATED = "bambu_cmyk_calibrated"
-    BAMBU_CMYK_PHASE6 = "bambu_cmyk_phase6"
     BAMBU_CMYW_PHASE6 = "bambu_cmyw_phase6"
-    CLEAR_CMYK = "clear_cmyk"
+    CLEAR_CMYWG = "clear_cmywg"
 
 
 class PixelCoordinate(BaseModel):
@@ -471,11 +468,8 @@ class BatchProcessResponse(BaseModel):
     errorCount: int
 
 
-class PaletteColorInfo(BaseModel):
-    """Color info within a palette entry."""
-    name: str
-    hex: str
-    transmission_distance: float
+class PaletteColorInfo(FilamentColorConfig):
+    """Palette colors use the same complete material contract as presets."""
 
 
 class PaletteInfo(BaseModel):
@@ -483,14 +477,12 @@ class PaletteInfo(BaseModel):
     id: str
     name: str
     description: str
-    category: str
     colors: List[PaletteColorInfo]
 
 
 class PaletteLibraryResponse(BaseModel):
     """Response model for palette library listing."""
     palettes: List[PaletteInfo]
-    categories: dict
 
 
 class BugReportLog(BaseModel):

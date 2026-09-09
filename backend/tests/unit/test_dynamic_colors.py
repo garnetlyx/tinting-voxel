@@ -8,9 +8,8 @@ import pytest
 
 from core.blend_color import Color, Colors
 from core.color_config import (
-    BAMBU_CMYK_PRESET,
-    BAMBU_CMYK_CALIBRATED_PRESET,
-    CLEAR_CMYK_PRESET,
+    BAMBU_CMYW_PHASE6_PRESET,
+    CLEAR_CMYWG_PRESET,
     ColorConfig,
     get_available_presets,
     get_preset,
@@ -67,32 +66,28 @@ class TestColorConfig:
 class TestPresets:
     """Tests for preset color configurations."""
 
-    def test_bambu_cmyk_preset_exists(self):
-        """BAMBU_CMYK_PRESET has 4 colors."""
-        assert len(BAMBU_CMYK_PRESET) == 4
-        labels = [c.label for c in BAMBU_CMYK_PRESET]
+    def test_bambu_cmyw_phase6_preset_exists(self):
+        """BAMBU_CMYW_PHASE6_PRESET has 4 colors."""
+        assert len(BAMBU_CMYW_PHASE6_PRESET) == 4
+        labels = [c.label for c in BAMBU_CMYW_PHASE6_PRESET]
         assert set(labels) == {'C', 'M', 'Y', 'W'}
 
-    def test_clear_cmyk_preset_exists(self):
-        """CLEAR_CMYK_PRESET has 5 colors (CMYWK includes grey for dark tones)."""
-        assert len(CLEAR_CMYK_PRESET) == 5
-        labels = [c.label for c in CLEAR_CMYK_PRESET]
+    def test_clear_cmywg_preset_exists(self):
+        """CLEAR_CMYWG_PRESET has 5 colors (CMYWG includes grey for dark tones)."""
+        assert len(CLEAR_CMYWG_PRESET) == 5
+        labels = [c.label for c in CLEAR_CMYWG_PRESET]
         assert set(labels) == {'C', 'M', 'Y', 'W', 'G'}
 
     def test_get_preset_bambu(self):
-        """get_preset returns BAMBU_CMYK_PRESET for 'bambu_cmyk'."""
-        preset = get_preset("bambu_cmyk")
-        assert preset == BAMBU_CMYK_PRESET
+        """get_preset returns BAMBU_CMYW_PHASE6_PRESET for 'bambu_cmyw_phase6'."""
+        preset = get_preset("bambu_cmyw_phase6")
+        assert preset == BAMBU_CMYW_PHASE6_PRESET
 
     def test_get_preset_clear(self):
-        """get_preset returns CLEAR_CMYK_PRESET for 'clear_cmyk'."""
-        preset = get_preset("clear_cmyk")
-        assert preset == CLEAR_CMYK_PRESET
+        """get_preset returns CLEAR_CMYWG_PRESET for 'clear_cmywg'."""
+        preset = get_preset("clear_cmywg")
+        assert preset == CLEAR_CMYWG_PRESET
 
-    def test_get_preset_calibrated(self):
-        """get_preset returns calibrated preset for 'bambu_cmyk_calibrated'."""
-        preset = get_preset("bambu_cmyk_calibrated")
-        assert preset == BAMBU_CMYK_CALIBRATED_PRESET
 
     def test_get_preset_phase6_cmyw(self):
         """get_preset returns Phase 6 CMYW preset for 'bambu_cmyw_phase6'."""
@@ -101,29 +96,10 @@ class TestPresets:
         assert len(preset) == 4
         assert {color.label for color in preset} == {"C", "M", "Y", "W"}
 
-    def test_get_preset_case_insensitive(self):
-        """get_preset is case-insensitive."""
-        assert get_preset("BAMBU_CMYK") == BAMBU_CMYK_PRESET
-
-    def test_get_preset_aliases(self):
-        """Short preset aliases resolve to the concrete preset names."""
-        assert get_preset("bambu") == BAMBU_CMYK_PRESET
-        assert get_preset("clear") == CLEAR_CMYK_PRESET
 
     def test_get_preset_invalid_returns_none(self):
         """get_preset returns None for unknown presets."""
         assert get_preset("unknown_preset") is None
-
-    def test_get_available_presets(self):
-        """get_available_presets returns the production (Phase 6) preset names."""
-        presets = get_available_presets()
-        # Production only exposes Phase 6 presets; legacy presets live in
-        # get_archived_presets() and remain accessible via get_preset().
-        assert presets == ["bambu_cmyk_phase6", "bambu_cmyw_phase6"]
-        # Archived presets are still retrievable by name.
-        assert get_preset("bambu_cmyk") is BAMBU_CMYK_PRESET
-        assert get_preset("bambu_cmyk_calibrated") is BAMBU_CMYK_CALIBRATED_PRESET
-        assert get_preset("clear_cmyk") is CLEAR_CMYK_PRESET
 
 
 class TestColorsFromConfigs:
@@ -146,7 +122,7 @@ class TestColorsFromConfigs:
 
     def test_from_configs_with_preset(self):
         """from_configs works with preset configurations."""
-        colors = Colors.from_configs(BAMBU_CMYK_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
 
         assert len(colors) == 4
         assert set(colors.get_labels()) == {'C', 'M', 'Y', 'W'}
@@ -177,20 +153,20 @@ class TestColorsFromConfigs:
 
     def test_from_configs_preserves_alpha_and_k(self):
         """from_configs preserves calibrated per-material alpha/k parameters."""
-        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
 
-        assert colors["C"].alpha == pytest.approx(5.751822945330163)
-        assert colors["C"].k == pytest.approx(1.2085100532667932)
-        assert colors["C"].td_scale == pytest.approx(1.0056869820712098)
-        assert colors["C"].td_gamma == pytest.approx(0.4543363851088494)
-        assert colors["K"].alpha == pytest.approx(5.751822945330163)
-        assert colors["K"].k == pytest.approx(5.440433103311526)
+        assert colors["C"].alpha == pytest.approx(8.08)
+        assert colors["C"].k == pytest.approx(8.13)
+        assert colors["C"].td_scale == pytest.approx(1.48)
+        assert colors["C"].td_gamma == pytest.approx(0.20)
+        assert colors["W"].alpha == pytest.approx(8.08)
+        assert colors["W"].k == pytest.approx(12.39)
 
     def test_from_configs_exposes_shared_blend_alpha(self):
         """Calibrated presets should surface their learned global alpha."""
-        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
 
-        assert colors.get_blend_alpha() == pytest.approx(5.751822945330163)
+        assert colors.get_blend_alpha() == pytest.approx(8.08)
 
     def test_get_blend_alpha_rejects_inconsistent_values(self):
         """Mixed alphas are invalid because the blend kernel uses one global alpha."""
@@ -354,11 +330,11 @@ class TestBackwardCompatibility:
 
     def test_calibrated_colors_use_td1s_gamma_blend(self):
         """Calibrated presets must enable the TD1S gamma hybrid blend."""
-        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
         initialize_color_mapping(layer_count=4, layer_height=0.08, colors=colors)
 
         from services import stl_generator
         assert stl_generator._blend_generator.blend_mode == "hybrid_per_color_k_td1s_gamma"
         assert stl_generator._blend_generator.alpha == pytest.approx(
-            BAMBU_CMYK_CALIBRATED_PRESET[0].alpha
+            BAMBU_CMYW_PHASE6_PRESET[0].alpha
         )

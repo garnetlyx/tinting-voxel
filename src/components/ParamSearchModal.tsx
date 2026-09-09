@@ -10,13 +10,7 @@ import type { SearchResultItem } from '../api/paramSearch';
 import type { ParamSearchPhase } from '../hooks/useParamSearch';
 import type { ParamSearchProgress } from '../api/paramSearch';
 
-const PRESET_OPTIONS = [
-  { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW Phase 6' },
-  { value: 'bambu_cmyk_phase6', label: 'Bambu CMYWK Phase 6' },
-  { value: 'bambu_cmyk', label: 'Bambu CMYW' },
-  { value: 'bambu_cmyk_calibrated', label: 'Bambu CMYWK Calibrated' },
-  { value: 'clear_cmyk', label: 'Clear CMYWG' },
-];
+import { FILAMENT_PRESET_OPTIONS, DEFAULT_FILAMENT_PRESET } from '../api/types';
 
 interface ParamSearchModalProps {
   isOpen: boolean;
@@ -44,7 +38,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
   const presetLabel = usePresetLabel();
   const parameterLabel = useParameterLabel();
   const [targetSize, setTargetSize] = useState(100);
-  const [preset, setPreset] = useState('bambu_cmyw_phase6');
+  const [preset, setPreset] = useState<string>(DEFAULT_FILAMENT_PRESET);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -108,7 +102,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                   onChange={(e) => setPreset(e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
-                  {PRESET_OPTIONS.map((o) => (
+                  {FILAMENT_PRESET_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{presetLabel(o.value, o.label)}</option>
                   ))}
                 </select>

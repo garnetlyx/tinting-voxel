@@ -8,7 +8,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 - **N-Color Support (4–16 colors)** - Arbitrary color codes with custom hex values and per-color transmission/scattering parameters
 - **Multiple Output Formats** - STL ZIP, SVG-STL, **3MF** (with named color objects), SVG-3MF, CSV, and slicer print-settings JSON
 - **Batch Processing** - Process up to 20 images in one run
-- **Palette Library** - 10 curated color palettes across 3 categories
+- **Palette Library** - Two built-in filament configurations, sharing the preset parameters
 - **Interface Languages** - English and Simplified Chinese with automatic detection, persistent switching, and feature-based translation resources
 - **Bug Reports** - In-app feedback with optional page screenshots, conversion settings, and diagnostic logs
 - **3D WebGL Preview** - three.js render with orbit controls before export
@@ -100,7 +100,7 @@ npm run dev:backend   # Backend only (port 8000)
 ## Usage
 
 1. Upload an image (PNG, JPG)
-2. Optionally configure N-color filaments (presets or custom hex / k / td values)
+2. Choose Bambu CMYW Phase 6 (default) or Clear CMYWG, or configure custom N-color filaments (hex / k / td values).
 3. Adjust processing parameters:
    - **maxColors**: Number of colors to extract (1-20)
    - **colorThreshold**: Color merge sensitivity (0-100)
@@ -118,7 +118,7 @@ Full endpoint list (22 routes across V1, V2 N-color, batch, palette, param-searc
 - `POST /api/process-image` — extract color blocks (pixel/SVG modes)
 - `POST /api/simulate-preview` — simulated print preview (vector mode)
 - `POST /api/download-csv` — color data CSV
-- `POST /api/download-stl` — STL ZIP (default CMYK)
+- `POST /api/download-stl` — STL ZIP (default Phase 6 CMYW)
 - `POST /api/download-svg-stl` — SVG-mode STL ZIP
 
 ### V2 (N-color)

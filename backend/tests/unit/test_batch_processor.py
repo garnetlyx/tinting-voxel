@@ -192,11 +192,11 @@ class TestGenerateBatchStlZip:
     def test_custom_colors(self):
         """Custom Colors instance is used."""
         from core.blend_color import Colors
-        from core.color_config import BAMBU_CMYK_PRESET
+        from core.color_config import BAMBU_CMYW_PHASE6_PRESET
 
         files = [('test.png', _create_test_image())]
         batch = process_batch_images(files)
-        colors = Colors.from_configs(BAMBU_CMYK_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
 
         zip_bytes = generate_batch_stl_zip(
             batch_results=batch['results'],

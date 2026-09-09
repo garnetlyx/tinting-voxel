@@ -38,7 +38,7 @@ tinting-voxel/
 │   │   ├── color_config.py   # Filament presets (single source of truth)
 │   │   ├── color_materials.py # Material property definitions (k_rgb support)
 │   │   ├── grid_sampling.py  # Code-grid RGB assembly for blend fitting
-│   │   └── palette_library.py # Curated color palettes
+│   │   └── palette_library.py # Supported filament palettes
 │   ├── services/         # Business logic
 │   │   ├── analytics.py         # In-memory usage analytics
 │   │   ├── batch_processor.py    # Multi-image batch processing
@@ -130,7 +130,7 @@ docker compose up --build  # Build and run
 | POST | `/api/process-image` | Process image (pixel/SVG modes) |
 | POST | `/api/simulate-preview` | Simulated print preview (vector mode) |
 | POST | `/api/download-csv` | Download color data as CSV |
-| POST | `/api/download-stl` | Generate STL ZIP (default CMYK) |
+| POST | `/api/download-stl` | Generate STL ZIP (default Phase 6 CMYW) |
 | POST | `/api/download-svg-stl` | Generate SVG-mode STL ZIP |
 
 ### V2 (N-Color Support)

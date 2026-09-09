@@ -3,7 +3,7 @@ import { useLocalizedMessage } from '../i18n/messages';
 import { useTranslation } from '../i18n';
 /**
  * Palette library browser component.
- * Displays curated color palettes organized by category with color swatches.
+ * Displays the supported filament configurations with color swatches.
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -25,7 +25,6 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
   const [library, setLibrary] = useState<PaletteLibraryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const abortRef = React.useRef<AbortController | null>(null);
 
@@ -41,7 +40,7 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const data = await getPaletteLibrary(selectedCategory ?? undefined, controller.signal);
+        const data = await getPaletteLibrary(controller.signal);
         setLibrary(data);
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -62,18 +61,13 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
         abortRef.current.abort();
       }
     };
-  }, [isExpanded, selectedCategory]);
+  }, [isExpanded]);
 
   const handleApply = useCallback((palette: PaletteInfo) => {
-    const colors: FilamentColorConfig[] = palette.colors.map(c => ({
-      name: c.name,
-      hex: c.hex,
-      transmission_distance: c.transmission_distance,
-    }));
+    const colors: FilamentColorConfig[] = palette.colors.map(c => ({ ...c }));
     onApplyPalette(colors);
   }, [onApplyPalette]);
 
-  const categoryNames: Record<string, string> = library?.categories ?? {};
 
   return (
     <div className="border border-gray-200 rounded-lg">
@@ -89,31 +83,6 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
 
       {isExpanded && (
         <div className="px-4 pb-4 space-y-3">
-          {/* Category Filter */}
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setSelectedCategory(null)}
-              className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                selectedCategory === null
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >{t('palettes:all')}</button>
-            {Object.keys(categoryNames).map((key) => (
-              <button
-                key={key}
-                onClick={() => setSelectedCategory(key)}
-                className={`px-3 py-1 text-xs rounded-full transition-colors capitalize ${
-                  selectedCategory === key
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {paletteText(key, key)}
-              </button>
-            ))}
-          </div>
-
           {/* Loading */}
           {loading && (
             <div className="flex items-center justify-center py-4">
@@ -136,7 +105,6 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <h4 className="text-sm font-medium text-gray-800">{paletteText(`${palette.id}_name`, palette.name)}</h4>
-                    <span className="text-xs text-gray-400 capitalize">{paletteText(palette.category, palette.category)}</span>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">{paletteText(`${palette.id}_description`, palette.description)}</p>
 

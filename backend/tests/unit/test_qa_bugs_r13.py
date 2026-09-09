@@ -544,14 +544,14 @@ class TestQA139PaletteGetCaseSensitive:
         from core.palette_library import get_palette
 
         # Lowercase should work
-        result_lower = get_palette("bambu_cmyk")
-        assert result_lower is not None, "get_palette('bambu_cmyk') should find palette"
+        result_lower = get_palette("bambu_cmyw_phase6")
+        assert result_lower is not None, "get_palette('bambu_cmyw_phase6') should find palette"
 
         # Uppercase/mixed case should also work (like get_preset does)
-        result_upper = get_palette("BAMBU_CMYK")
+        result_upper = get_palette("BAMBU_CMYW_PHASE6")
 
         assert result_upper is not None, (
-            "BUG QA-139: get_palette('BAMBU_CMYK') returns None because "
+            "BUG QA-139: get_palette('BAMBU_CMYW_PHASE6') returns None because "
             "it uses exact match. get_preset in color_config.py uses "
             ".lower() for case-insensitive lookup. These should be consistent."
         )
@@ -565,15 +565,15 @@ class TestQA140PaletteDataDrift:
     """Palette data is duplicated from color_config, can drift out of sync."""
 
     def test_palette_matches_preset_data(self):
-        """Palette bambu_cmyk colors should match BAMBU_CMYK_PRESET exactly."""
-        from core.color_config import BAMBU_CMYK_PRESET
+        """Palette bambu_cmyw_phase6 colors should match BAMBU_CMYW_PHASE6_PRESET exactly."""
+        from core.color_config import BAMBU_CMYW_PHASE6_PRESET
         from core.palette_library import get_palette
 
-        palette = get_palette("bambu_cmyk")
+        palette = get_palette("bambu_cmyw_phase6")
         assert palette is not None
 
         preset_data = {c.name: (c.hex, c.transmission_distance)
-                       for c in BAMBU_CMYK_PRESET}
+                       for c in BAMBU_CMYW_PHASE6_PRESET}
         palette_data = {c.name: (c.hex, c.transmission_distance)
                         for c in palette.colors}
 
@@ -675,7 +675,7 @@ class TestQA143PaletteMutableGlobalState:
         import copy
         from core.palette_library import get_palette
 
-        palette1 = get_palette("bambu_cmyk")
+        palette1 = get_palette("bambu_cmyw_phase6")
         assert palette1 is not None
         original_count = len(palette1.colors)
 
@@ -689,7 +689,7 @@ class TestQA143PaletteMutableGlobalState:
             )
 
             # Get the palette again
-            palette2 = get_palette("bambu_cmyk")
+            palette2 = get_palette("bambu_cmyw_phase6")
             assert palette2 is not None
 
             assert len(palette2.colors) == original_count, (

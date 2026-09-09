@@ -3,11 +3,8 @@ import { useTranslation } from './index';
 
 // Only system preset IDs have translated labels. Arbitrary colors retain their own codes.
 const presetKeys = {
-  bambu_cmyk: 'filaments:bambu_cmyk',
-  bambu_cmyk_calibrated: 'filaments:bambu_cmyk_calibrated',
-  bambu_cmyk_phase6: 'filaments:bambu_cmyk_phase6',
   bambu_cmyw_phase6: 'filaments:bambu_cmyw_phase6',
-  clear_cmyk: 'filaments:clear_cmyk',
+  clear_cmywg: 'filaments:clear_cmywg',
 } as const;
 
 export function usePresetLabel() {

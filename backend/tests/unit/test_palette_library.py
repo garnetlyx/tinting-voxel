@@ -5,10 +5,7 @@ import pytest
 
 from core.palette_library import (
     ALL_PALETTES,
-    CATEGORIES,
-    get_all_categories,
     get_palette,
-    get_palettes_by_category,
 )
 
 
@@ -17,7 +14,7 @@ class TestPaletteLibrary:
 
     def test_all_palettes_not_empty(self):
         """Library has at least one palette."""
-        assert len(ALL_PALETTES) > 0
+        assert [p.id for p in ALL_PALETTES] == ["bambu_cmyw_phase6", "clear_cmywg"]
 
     def test_all_palettes_have_unique_ids(self):
         """All palette IDs are unique."""
@@ -54,46 +51,18 @@ class TestPaletteLibrary:
                     f"Palette '{p.id}', color '{c.name}' has td={c.transmission_distance}"
                 )
 
-    def test_all_palettes_have_valid_category(self):
-        """All palettes belong to a known category."""
-        for p in ALL_PALETTES:
-            assert p.category in CATEGORIES, (
-                f"Palette '{p.id}' has unknown category: {p.category}"
-            )
 
     def test_get_palette_found(self):
         """Get an existing palette by ID."""
-        palette = get_palette("bambu_cmyk")
+        palette = get_palette("bambu_cmyw_phase6")
         assert palette is not None
-        assert palette.id == "bambu_cmyk"
-        assert palette.name == "Bambu CMYK"
+        assert palette.id == "bambu_cmyw_phase6"
+        assert palette.name == "Bambu CMYW Phase 6"
 
     def test_get_palette_not_found(self):
         """Get a non-existent palette returns None."""
         assert get_palette("nonexistent") is None
 
-    def test_get_palettes_by_category(self):
-        """Filter palettes by category."""
-        standard = get_palettes_by_category("standard")
-        assert len(standard) >= 2
-        assert all(p.category == "standard" for p in standard)
-
-    def test_get_palettes_by_category_empty(self):
-        """Unknown category returns empty list."""
-        assert get_palettes_by_category("unknown") == []
-
-    def test_get_all_categories(self):
-        """Get all category names."""
-        cats = get_all_categories()
-        assert "standard" in cats
-        assert "artistic" in cats
-        assert "specialty" in cats
-
-    def test_categories_descriptions(self):
-        """Category descriptions are non-empty strings."""
-        for cat, desc in CATEGORIES.items():
-            assert isinstance(desc, str)
-            assert len(desc) > 0
 
     def test_palette_colors_are_valid_color_configs(self):
         """Palette colors can be used with Colors.from_configs."""

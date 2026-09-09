@@ -73,7 +73,7 @@ class TestQA68AllDownloadsSendBothPresetAndColors:
                 pixelSize=0.08,
                 layerCount=4,
                 imageDimensions={"width": 4, "height": 4},
-                filamentPreset="bambu_cmyk",
+                filamentPreset="bambu_cmyw_phase6",
                 filamentColors=[
                     {"name": "Cyan", "hex": "#0086D6", "transmission_distance": 3.0},
                     {"name": "Magenta", "hex": "#EC008C", "transmission_distance": 1.9},
@@ -93,7 +93,7 @@ class TestQA68AllDownloadsSendBothPresetAndColors:
                 pixelSize=0.08,
                 layerCount=4,
                 imageDimensions={"width": 4, "height": 4},
-                filamentPreset="bambu_cmyk",
+                filamentPreset="bambu_cmyw_phase6",
                 filamentColors=[
                     {"name": "Cyan", "hex": "#0086D6", "transmission_distance": 3.0},
                     {"name": "Magenta", "hex": "#EC008C", "transmission_distance": 1.9},

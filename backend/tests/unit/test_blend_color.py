@@ -17,7 +17,7 @@ from core.blend_color import (
     _blend_hybrid,
     _blend_hybrid_per_color,
 )
-from core.color_config import BAMBU_CMYK_CALIBRATED_PRESET, ColorConfig
+from core.color_config import BAMBU_CMYW_PHASE6_PRESET, ColorConfig
 
 
 class TestColorGetLabel:
@@ -382,7 +382,7 @@ class TestHybridPerColorBlend:
         ["hybrid_calibrated", "hybrid_per_color_k_td1s_gamma"],
     )
     def test_calibrated_mode_aliases_share_same_kernel(self, blend_mode):
-        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
         generator = BlendTestGenerator(
             colors=colors,
             layer_height=0.08,
@@ -404,7 +404,7 @@ class TestHybridPerColorBlend:
         )
 
     def test_hybrid_per_color_k_ignores_td_gamma_remap(self):
-        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
         per_color_mode = BlendTestGenerator(
             colors=colors,
             layer_height=0.08,
@@ -701,11 +701,11 @@ class TestColorsInit:
     """Tests for Colors initialization variants."""
 
     def test_clear_mode(self):
-        from core.color_config import CLEAR_CMYK_PRESET
+        from core.color_config import CLEAR_CMYWG_PRESET
         colors = Colors(clear=True)
-        assert len(colors) == 4
-        # Clear mode mirrors the CLEAR_CMYK_PRESET source of truth
-        preset_c = next(c for c in CLEAR_CMYK_PRESET if c.label == 'C')
+        assert len(colors) == 5
+        # Clear mode mirrors the CLEAR_CMYWG_PRESET source of truth
+        preset_c = next(c for c in CLEAR_CMYWG_PRESET if c.label == 'C')
         assert colors['C'].td == preset_c.transmission_distance
         # Clear filaments are more translucent than the opaque set
         assert colors['C'].td > Colors()['C'].td

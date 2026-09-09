@@ -104,122 +104,7 @@ class ColorConfig:
         return self.name[0].upper()
 
 
-# Preset definitions for common filament configurations
-BAMBU_CMYK_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan", hex="#3D79C6", transmission_distance=3.0, alpha=12.0, k=10.0),
-    ColorConfig(name="Magenta", hex="#B3356E", transmission_distance=1.9, alpha=12.0, k=10.0),
-    ColorConfig(name="Yellow", hex="#FFE665", transmission_distance=2.5, alpha=12.0, k=10.0),
-    ColorConfig(name="White", hex="#FFFFFF", transmission_distance=7.2, alpha=12.0, k=10.0),
-]
-
-# Replay benchmark winner (2026-03-07).
-# Uses raw TD1S measurements plus a learned td_scale * td^td_gamma remap and
-# per-color k values. This is the strongest production-facing candidate in
-# docs/CALIBRATION.md because it improves real-plate replay without collapsing
-# transfer on the ramp/pair benchmarks.
-BAMBU_CMYK_CALIBRATED_PRESET: List[ColorConfig] = [
-    ColorConfig(
-        name="Cyan",
-        hex="#3D79C6",
-        transmission_distance=2.0,
-        alpha=5.751822945330163,
-        k=1.2085100532667932,
-        td_scale=1.0056869820712098,
-        td_gamma=0.4543363851088494,
-    ),
-    ColorConfig(
-        name="Magenta",
-        hex="#B3356E",
-        transmission_distance=2.9,
-        alpha=5.751822945330163,
-        k=0.35481383708372416,
-        td_scale=1.0056869820712098,
-        td_gamma=0.4543363851088494,
-    ),
-    ColorConfig(
-        name="Yellow",
-        hex="#FFE665",
-        transmission_distance=5.0,
-        alpha=5.751822945330163,
-        k=8.401071443503248,
-        td_scale=1.0056869820712098,
-        td_gamma=0.4543363851088494,
-    ),
-    ColorConfig(
-        name="White",
-        hex="#FFFFFF",
-        transmission_distance=6.1,
-        alpha=5.751822945330163,
-        k=6.523686193460801,
-        td_scale=1.0056869820712098,
-        td_gamma=0.4543363851088494,
-    ),
-    ColorConfig(
-        name="Key",
-        hex="#0B0F0C",
-        transmission_distance=0.1,
-        alpha=5.751822945330163,
-        k=5.440433103311526,
-        td_scale=1.0056869820712098,
-        td_gamma=0.4543363851088494,
-    ),
-]
-
-# Phase 6 B/W backing calibration (2026-03-07).
-# Uses physically-ordered k values derived from black/white backing dual-calibration.
-# These k values follow the correct physical ordering: K > W > M > C > Y.
-# See docs/CALIBRATION.md "Phase 6" section for full derivation.
-BAMBU_CMYK_PHASE6_PRESET: List[ColorConfig] = [
-    ColorConfig(
-        name="Cyan",
-        hex="#3D79C6",
-        transmission_distance=2.0,  # TD1S sensor value
-        alpha=8.08,  # scatter_alpha from Phase 6
-        k=8.13,  # Per-color scattering coefficient (Phase 6)
-        td_scale=1.48,  # TD1S power-law scaling
-        td_gamma=0.20,
-    ),
-    ColorConfig(
-        name="Magenta",
-        hex="#B3356E",
-        transmission_distance=2.9,  # TD1S sensor value
-        alpha=8.08,
-        k=8.42,  # Phase 6 k value
-        td_scale=1.48,
-        td_gamma=0.20,
-    ),
-    ColorConfig(
-        name="Yellow",
-        hex="#FFE665",
-        transmission_distance=5.0,  # TD1S sensor value
-        alpha=8.08,
-        k=3.73,  # Phase 6 k value (most translucent)
-        td_scale=1.48,
-        td_gamma=0.20,
-    ),
-    ColorConfig(
-        name="White",
-        hex="#FFFFFF",
-        transmission_distance=6.1,  # TD1S sensor value
-        alpha=8.08,
-        k=12.39,  # Phase 6 k value (high TiO₂ scattering)
-        td_scale=1.48,
-        td_gamma=0.20,
-    ),
-    ColorConfig(
-        name="Key",
-        hex="#0B0F0C",
-        transmission_distance=0.1,  # TD1S sensor value (near-zero for black)
-        alpha=8.08,
-        k=17.65,  # Phase 6 k value (near-perfect opacity)
-        td_scale=1.48,
-        td_gamma=0.20,
-    ),
-]
-
-# Phase 6 image-preview variant without K.
-# Keeps the same Phase 6 CMYW parameters while removing the black channel so
-# image mapping stays comparable to the legacy 4-color workflows.
+# Phase 6 CMYW calibration.
 BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
     ColorConfig(
         name="Cyan",
@@ -267,7 +152,7 @@ BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
 # neutral scattering, so td saturates at the 200.0 cap and color separation is
 # carried by k. Grey (Panchroma) has no staircase yet: hex/td are TD1S values.
 # See docs/CLEAR_CALIBRATION.md "Preset Update" for derivation and residuals.
-CLEAR_CMYK_PRESET: List[ColorConfig] = [
+CLEAR_CMYWG_PRESET: List[ColorConfig] = [
     ColorConfig(name="Cyan", hex="#4C72A0", transmission_distance=200.0, alpha=12.0, k=1.93),  # Ziro Light Cyan Clear
     ColorConfig(name="Magenta", hex="#CE5E53", transmission_distance=200.0, alpha=12.0, k=1.44),  # iSANMATE Light Pink
     ColorConfig(name="Yellow", hex="#D8B695", transmission_distance=200.0, alpha=12.0, k=0.67),  # Sunlu Transparent Yellow
@@ -275,142 +160,22 @@ CLEAR_CMYK_PRESET: List[ColorConfig] = [
     ColorConfig(name="Grey", hex="#676563", transmission_distance=7.3, alpha=12.0, k=10.0),  # Panchroma (staircase pending)
 ]
 
-# 4-color clear filament subsets for 4-extruder printers.
-# CMYG: primary mixing with translucent grey for dark tones (main calibration set).
-CLEAR_CMYG_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan", hex="#4C72A0", transmission_distance=200.0, alpha=12.0, k=1.93),
-    ColorConfig(name="Magenta", hex="#CE5E53", transmission_distance=200.0, alpha=12.0, k=1.44),
-    ColorConfig(name="Yellow", hex="#D8B695", transmission_distance=200.0, alpha=12.0, k=0.67),
-    ColorConfig(name="Grey", hex="#676563", transmission_distance=7.3, alpha=12.0, k=10.0),
-]
+PRESETS = {
+    "bambu_cmyw_phase6": BAMBU_CMYW_PHASE6_PRESET,
+    "clear_cmywg": CLEAR_CMYWG_PRESET,
+}
 
-# CMYW: primary mixing with clear white as transparent substrate (validation set).
-CLEAR_CMYW_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan", hex="#4C72A0", transmission_distance=200.0, alpha=12.0, k=1.93),
-    ColorConfig(name="Magenta", hex="#CE5E53", transmission_distance=200.0, alpha=12.0, k=1.44),
-    ColorConfig(name="Yellow", hex="#D8B695", transmission_distance=200.0, alpha=12.0, k=0.67),
-    ColorConfig(name="White", hex="#D9D6C5", transmission_distance=110.4, alpha=12.0, k=0.11),
-]
-
-# Experimental per-channel k preset (2026-03-10).
-# Uses per-channel scattering coefficients (k_R, k_G, k_B) to model
-# channel-selective scattering behavior identified in error analysis.
-#
-# Key observations from docs/CALIBRATION.md:
-# - Cyan R channel reflects (negative absorption) → low k_R
-# - Magenta G channel absorbs strongly → high k_G
-# - Yellow B channel absorbs strongly → high k_B, low k_R/k_G
-#
-# Note: This is an experimental preset. Values need calibration optimization.
-BAMBU_CMYK_PER_CHANNEL_K_PRESET: List[ColorConfig] = [
-    ColorConfig(
-        name="Cyan",
-        hex="#3D79C6",
-        transmission_distance=2.0,
-        alpha=8.08,
-        k=8.13,  # Fallback scalar k
-        k_rgb=(2.0, 10.0, 12.0),  # R reflects (low), G/B absorb (moderate-high)
-        td_scale=1.48,
-        td_gamma=0.20,
-    ),
-    ColorConfig(
-        name="Magenta",
-        hex="#B3356E",
-        transmission_distance=2.9,
-        alpha=8.08,
-        k=8.42,
-        k_rgb=(8.0, 15.0, 6.0),  # G absorbs strongly (high), R/B moderate
-        td_scale=1.48,
-        td_gamma=0.20,
-    ),
-    ColorConfig(
-        name="Yellow",
-        hex="#FFE665",
-        transmission_distance=5.0,
-        alpha=8.08,
-        k=3.73,
-        k_rgb=(1.0, 2.0, 10.0),  # B absorbs (high), R/G reflect (low)
-        td_scale=1.48,
-        td_gamma=0.20,
-    ),
-    ColorConfig(
-        name="White",
-        hex="#FFFFFF",
-        transmission_distance=6.1,
-        alpha=8.08,
-        k=12.39,
-        k_rgb=(12.39, 12.39, 12.39),  # Uniform TiO₂ scattering
-        td_scale=1.48,
-        td_gamma=0.20,
-    ),
-    ColorConfig(
-        name="Key",
-        hex="#0B0F0C",
-        transmission_distance=0.1,
-        alpha=8.08,
-        k=17.65,
-        k_rgb=(17.65, 17.65, 17.65),  # Near-perfect opacity
-        td_scale=1.48,
-        td_gamma=0.20,
-    ),
-]
+PRESET_DISPLAY_NAMES = {
+    "bambu_cmyw_phase6": "Bambu CMYW Phase 6",
+    "clear_cmywg": "Clear CMYWG",
+}
 
 
 def get_preset(name: str) -> Optional[List[ColorConfig]]:
-    """
-    Get a preset color configuration by name.
-
-    Args:
-        name: Preset name ("bambu_cmyk", "bambu_cmyk_calibrated",
-              "bambu_cmyk_phase6", "bambu_cmyw_phase6",
-              "bambu_cmyk_per_channel_k", or "clear_cmyk")
-
-    Returns:
-        List of ColorConfig or None if preset not found
-    """
-    if name is None:
-        return None
-    normalized = name.lower()
-    alias_map = {
-        "bambu": "bambu_cmyk",
-        "clear": "clear_cmyk",
-    }
-    presets = {
-        "bambu_cmyk": BAMBU_CMYK_PRESET,
-        "bambu_cmyk_calibrated": BAMBU_CMYK_CALIBRATED_PRESET,
-        "bambu_cmyk_phase6": BAMBU_CMYK_PHASE6_PRESET,
-        "bambu_cmyw_phase6": BAMBU_CMYW_PHASE6_PRESET,
-        "bambu_cmyk_per_channel_k": BAMBU_CMYK_PER_CHANNEL_K_PRESET,
-        "clear_cmyk": CLEAR_CMYK_PRESET,
-        "clear_cmyg": CLEAR_CMYG_PRESET,
-        "clear_cmyw": CLEAR_CMYW_PRESET,
-    }
-    return presets.get(alias_map.get(normalized, normalized))
+    """Resolve a canonical preset ID; unknown IDs are not remapped."""
+    return PRESETS.get(name)
 
 
 def get_available_presets() -> List[str]:
-    """
-    Get list of available preset names.
-    
-    Returns only Phase 6 presets (current production presets).
-    Archived presets are still accessible via get_preset() but hidden from UI.
-    """
-    return [
-        "bambu_cmyk_phase6",
-        "bambu_cmyw_phase6",
-    ]
-
-
-def get_archived_presets() -> List[str]:
-    """
-    Get list of archived preset names.
-    
-    These presets are still functional but hidden from the UI.
-    Useful for testing, comparison, or backward compatibility.
-    """
-    return [
-        "bambu_cmyk",
-        "bambu_cmyk_calibrated",
-        "bambu_cmyk_per_channel_k",
-        "clear_cmyk",
-    ]
+    """Return all supported built-in presets."""
+    return list(PRESETS)

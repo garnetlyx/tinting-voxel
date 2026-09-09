@@ -196,7 +196,7 @@ describe('simulatePrintPreview', () => {
       imageDimensions: { width: 10, height: 10 },
       layerHeight: 0.08,
       layerCount: 4,
-      filamentPreset: 'bambu_cmyk',
+      filamentPreset: 'bambu_cmyw_phase6',
     });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -238,7 +238,7 @@ describe('downloadCSV', () => {
 
 describe('getFilamentPresets', () => {
   it('fetches presets from V2 API', async () => {
-    const mockPresets = { presets: [{ name: 'bambu_cmyk', display_name: 'Bambu', colors: [] }] };
+    const mockPresets = { presets: [{ name: 'bambu_cmyw_phase6', display_name: 'Bambu', colors: [] }] };
     mockFetchResponse(mockPresets);
 
     const result = await getFilamentPresets();
@@ -405,8 +405,8 @@ describe('batchDownloadSTL', () => {
 });
 
 describe('getPaletteLibrary', () => {
-  it('fetches palettes without category filter', async () => {
-    const mockPalettes = { palettes: [], categories: {} };
+  it('fetches the palette catalog', async () => {
+    const mockPalettes = { palettes: [] };
     mockFetchResponse(mockPalettes);
 
     const result = await getPaletteLibrary();
@@ -417,23 +417,4 @@ describe('getPaletteLibrary', () => {
     expect(result).toEqual(mockPalettes);
   });
 
-  it('fetches palettes with category filter', async () => {
-    mockFetchResponse({ palettes: [], categories: {} });
-
-    await getPaletteLibrary('standard');
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/api/palettes/?category=standard',
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('encodes category parameter', async () => {
-    mockFetchResponse({ palettes: [], categories: {} });
-
-    await getPaletteLibrary('my category');
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      '/api/palettes/?category=my%20category',
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
 });

@@ -4,20 +4,16 @@ import { render, screen } from '@testing-library/react';
 import { PresetSelector } from './PresetSelector';
 
 describe('PresetSelector', () => {
-  it('shows corrected CMYW and CMYWK labels for built-in presets', () => {
+  it('shows only the two built-in presets and custom mode', () => {
     render(
       <PresetSelector
-        selectedPreset="bambu_cmyk"
+        selectedPreset="bambu_cmyw_phase6"
         onPresetChange={vi.fn()}
       />
     );
 
     const options = screen.getAllByRole('option').map((option) => option.textContent);
 
-    expect(options).toContain('Bambu CMYW');
-    expect(options).toContain('Bambu CMYWK Calibrated');
-    expect(options).toContain('Bambu CMYWK Phase 6');
-    expect(options).toContain('Bambu CMYW Phase 6');
-    expect(options).toContain('Clear CMYWG');
+    expect(options).toEqual(['Custom', 'Bambu CMYW Phase 6', 'Clear CMYWG']);
   });
 });

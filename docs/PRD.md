@@ -117,7 +117,7 @@ tinting-voxel solves these by:
 5. User downloads STL ZIP / 3MF / CSV / print settings.
 
 #### Flow 2 — N-Color Filament Configuration
-1. User picks a preset (Bambu CMYK, Clear CMYK, Phase6, per-channel-k).
+1. User picks a preset (Bambu CMYW Phase 6 or Clear CMYWG).
 2. User edits generic color codes (unique A–Z letters), hex values, and transmission distance. Codes identify arbitrary colors; they do not constrain the palette to CMYK.
 3. Filament preview matrix regenerates showing achievable color gamut.
 4. Configuration persists across sessions via localStorage.
@@ -153,9 +153,9 @@ tinting-voxel solves these by:
 - K-means clustering (vectorized, CIELAB distance) for color extraction
 - N-color mapping via hybrid per-channel-k Beer-Lambert model
 - CIEDE2000 perceptual matching with hue-preservation for dark chromatic colors
-- 6 filament presets (Bambu CMYK, Calibrated, Phase6 CMYK/CMYW, Clear CMYK,
-  per-channel-k)
-- Curated palette library (10 palettes, 3 categories)
+- Two built-in filament presets: Bambu CMYW Phase 6 (default) and Clear CMYWG.
+  Custom configurations remain supported; removed preset IDs are rejected.
+- Palette browser for the two supported filament configurations
 - Filament preview matrix with pagination for large N
 
 **Output formats**
@@ -361,7 +361,7 @@ param search, Docker/cloud deploy. Calibration performed offline.
 | POST | `/api/process-image` | Process image (pixel/SVG modes) |
 | POST | `/api/simulate-preview` | Simulated print preview (vector mode) |
 | POST | `/api/download-csv` | Color data CSV |
-| POST | `/api/download-stl` | STL ZIP (default CMYK) |
+| POST | `/api/download-stl` | STL ZIP (default Phase 6 CMYW) |
 | POST | `/api/download-svg-stl` | SVG-mode STL ZIP |
 
 ### V2 (N-color)

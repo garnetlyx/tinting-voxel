@@ -390,17 +390,13 @@ export async function batchDownloadSTL(
 const API_PALETTE_BASE_URL = '/api/palettes';
 
 /**
- * Get all palettes from the library, optionally filtered by category
+ * Get both supported filament palettes
  */
 export async function getPaletteLibrary(
-  category?: string,
   signal?: AbortSignal
 ): Promise<PaletteLibraryResponse> {
-  const url = category
-    ? `${API_PALETTE_BASE_URL}/?category=${encodeURIComponent(category)}`
-    : `${API_PALETTE_BASE_URL}/`;
 
-  const response = await fetch(url, { method: 'GET', signal });
+  const response = await fetch(`${API_PALETTE_BASE_URL}/`, { method: 'GET', signal });
 
   if (!response.ok) {
     throw new Error(await getErrorDetail(response, 'Failed to load palette library'));

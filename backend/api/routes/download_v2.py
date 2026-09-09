@@ -22,13 +22,11 @@ from api.models import (
 )
 from core.blend_color import Colors
 from core.color_config import (
-    BAMBU_CMYK_PRESET,
-    BAMBU_CMYK_CALIBRATED_PRESET,
-    BAMBU_CMYK_PHASE6_PRESET,
     BAMBU_CMYW_PHASE6_PRESET,
-    CLEAR_CMYK_PRESET,
     ColorConfig,
     get_preset,
+    PRESETS,
+    PRESET_DISPLAY_NAMES,
 )
 from services.print_settings_generator import generate_print_settings
 from services.stl_generator import generate_stl_zip
@@ -47,7 +45,7 @@ def get_colors_from_request(
     """
     Get Colors instance from request parameters.
 
-    Priority: filament_colors > filament_preset > default CMYK
+    Priority: filament_colors > filament_preset > default Phase 6 CMYW
 
     Args:
         filament_preset: Optional preset name
@@ -78,9 +76,8 @@ def get_colors_from_request(
         if preset_configs:
             return Colors.from_configs(preset_configs)
 
-    # Fall back to the default image-preview Phase 6 CMYK preset (with Key/black)
-    default_configs = get_preset(FilamentPreset.BAMBU_CMYK_PHASE6.value)
-    return Colors.from_configs(default_configs) if default_configs else Colors()
+    # Fall back to the default image-preview Phase 6 CMYW preset
+    return Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
 
 
 @router.get("/filament-presets", response_model=FilamentPresetsResponse)
@@ -93,85 +90,15 @@ async def api_get_filament_presets(request: Request):
     """
     presets = [
         FilamentPresetInfo(
-            name="bambu_cmyk",
-            display_name="Bambu CMYW",
-            colors=[
-                FilamentColorConfig(
-                    name=c.name,
-                    hex=c.hex,
-                    transmission_distance=c.transmission_distance,
-                    alpha=c.alpha,
-                    k=c.k,
-                    td_scale=c.td_scale,
-                    td_gamma=c.td_gamma,
-                )
-                for c in BAMBU_CMYK_PRESET
-            ]
-        ),
-        FilamentPresetInfo(
-            name="clear_cmyk",
-            display_name="Clear CMYW",
-            colors=[
-                FilamentColorConfig(
-                    name=c.name,
-                    hex=c.hex,
-                    transmission_distance=c.transmission_distance,
-                    alpha=c.alpha,
-                    k=c.k,
-                    td_scale=c.td_scale,
-                    td_gamma=c.td_gamma,
-                )
-                for c in CLEAR_CMYK_PRESET
-            ]
-        ),
-        FilamentPresetInfo(
-            name="bambu_cmyk_calibrated",
-            display_name="Bambu CMYWK Calibrated",
-            colors=[
-                FilamentColorConfig(
-                    name=c.name,
-                    hex=c.hex,
-                    transmission_distance=c.transmission_distance,
-                    alpha=c.alpha,
-                    k=c.k,
-                    td_scale=c.td_scale,
-                    td_gamma=c.td_gamma,
-                )
-                for c in BAMBU_CMYK_CALIBRATED_PRESET
-            ]
-        ),
-        FilamentPresetInfo(
-            name="bambu_cmyk_phase6",
-            display_name="Bambu CMYWK Phase 6",
-            colors=[
-                FilamentColorConfig(
-                    name=c.name,
-                    hex=c.hex,
-                    transmission_distance=c.transmission_distance,
-                    alpha=c.alpha,
-                    k=c.k,
-                    td_scale=c.td_scale,
-                    td_gamma=c.td_gamma,
-                )
-                for c in BAMBU_CMYK_PHASE6_PRESET
-            ]
-        ),
-        FilamentPresetInfo(
-            name="bambu_cmyw_phase6",
-            display_name="Bambu CMYW Phase 6",
-            colors=[
-                FilamentColorConfig(
-                    name=c.name,
-                    hex=c.hex,
-                    transmission_distance=c.transmission_distance,
-                    alpha=c.alpha,
-                    k=c.k,
-                    td_scale=c.td_scale,
-                    td_gamma=c.td_gamma,
-                )
-                for c in BAMBU_CMYW_PHASE6_PRESET
-            ]
-        ),
+            name=name,
+            display_name=PRESET_DISPLAY_NAMES[name],
+            colors=[FilamentColorConfig(
+                name=c.name, hex=c.hex,
+                transmission_distance=c.transmission_distance,
+                alpha=c.alpha, k=c.k, td_scale=c.td_scale, td_gamma=c.td_gamma,
+            ) for c in configs],
+        )
+        for name, configs in PRESETS.items()
     ]
     return FilamentPresetsResponse(presets=presets)
 
@@ -360,13 +287,13 @@ async def api_print_settings(request: Request, body: PrintSettingsRequest):
                 for c in preset_configs
             ]
     else:
-        for c in BAMBU_CMYK_PRESET:
+        for c in BAMBU_CMYW_PHASE6_PRESET:
             filament_colors_dicts.append({
                 'name': c.name,
                 'hex': c.hex,
                 'transmission_distance': c.transmission_distance,
             })
-        preset_name = 'bambu_cmyk'
+        preset_name = 'bambu_cmyw_phase6'
 
     image_dimensions = body.imageDimensions.model_dump()
 

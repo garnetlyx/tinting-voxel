@@ -13,7 +13,7 @@ import type {
   FilamentPreset,
   FilamentColorConfig,
 } from '../api/types';
-import { DEFAULT_PRESETS } from '../api/types';
+import { DEFAULT_PRESETS, DEFAULT_FILAMENT_PRESET } from '../api/types';
 import type { ProcessingStage } from '../components/LoadingSpinner';
 import {
   processImage,
@@ -96,9 +96,9 @@ export const useImageProcessor = () => {
   const [doubleSided, setDoubleSided] = useState(false);
 
   // Filament color state
-  const [filamentPreset, setFilamentPreset] = useState<FilamentPreset | null>('bambu_cmyw_phase6');
+  const [filamentPreset, setFilamentPreset] = useState<FilamentPreset | null>(DEFAULT_FILAMENT_PRESET);
   const [filamentColors, setFilamentColors] = useState<FilamentColorConfig[]>(
-    [...DEFAULT_PRESETS['bambu_cmyw_phase6']]
+    [...DEFAULT_PRESETS[DEFAULT_FILAMENT_PRESET]]
   );
 
   // Filament preset storage (localStorage persistence)

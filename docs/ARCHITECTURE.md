@@ -105,7 +105,7 @@ tinting-voxel/
 │   │   ├── code_grid.py          # Code grid generation utilities
 │   │   ├── grid_sampling.py      # Code-grid RGB assembly for blend fitting
 │   │   ├── plate_geometry.py     # Plate geometry calculations
-│   │   └── palette_library.py    # Curated color palettes
+│   │   └── palette_library.py    # Supported filament palettes
 │   ├── services/         # Business logic
 │   │   ├── image_processor.py    # Image processing + auto-downscale
 │   │   ├── stl_generator.py      # STL file generation
@@ -163,7 +163,7 @@ tinting-voxel/
 | **MeshOptimizer** | Greedy meshing to reduce box count, face culling | NumPy |
 | **BlendColor (core)** | Color blending (Original/Hybrid/per-color-k modes), CIEDE2000 matching | scikit-image, NumPy |
 | **BlendModels** | Pluggable blend functions (hybrid_per_color_k, hybrid_per_channel_k) | NumPy |
-| **ColorConfig** | Filament presets (BAMBU_CMYK_PHASE6_PRESET with per-color k) | dataclasses |
+| **ColorConfig** | Filament presets (BAMBU_CMYW_PHASE6_PRESET with per-color k) | dataclasses |
 | **FilamentPreview** | Color matrix preview generation | PIL, NumPy |
 | **BatchProcessor** | Multi-image batch processing | concurrent.futures |
 | **PaletteLibrary** | Curated color palette management | dataclasses |
@@ -406,17 +406,18 @@ Where:
 - d       = layer height (mm)
 ```
 
-Phase 6 calibrated k values (K > W > M > C > Y physical ordering):
+Phase 6 CMYW calibrated values (W > M > C > Y scattering order):
 
-| Color | k | td (TD1S-mapped) |
+| Color | k | Raw transmission distance (mm) |
 |-------|---|---|
-| K (Black) | 17.65 | 2.21 |
-| W (White) | 12.39 | 5.48 |
-| M (Magenta) | 8.42 | 2.22 |
-| C (Cyan) | 8.13 | 1.70 |
-| Y (Yellow) | 3.73 | 4.15 |
+| W (White) | 12.39 | 6.1 |
+| M (Magenta) | 8.42 | 2.9 |
+| C (Cyan) | 8.13 | 2.0 |
+| Y (Yellow) | 3.73 | 5.0 |
 
-Implementation: `blend_models.py:blend_hybrid_per_color_k()`, preset: `BAMBU_CMYK_PHASE6_PRESET`.
+All four colors use alpha 8.08 and TD mapping `1.48 * td ** 0.20`.
+
+Implementation: `blend_models.py:blend_hybrid_per_color_k()`, preset: `BAMBU_CMYW_PHASE6_PRESET`.
 
 ### 2. Greedy Meshing
 
@@ -479,3 +480,22 @@ Groups similar colors using scikit-learn's MiniBatchKMeans:
 3. **Task Queue**: Celery/Redis for large image async processing
 4. **Caching**: Redis cache for repeated color mappings
 5. **CDN**: Static asset delivery for frontend
+
+### Built-in filament catalog
+
+The only built-in presets are `bambu_cmyw_phase6` (four colors, default) and
+`clear_cmywg` (five colors: CMYWG). `core/color_config.py` owns the canonical
+registry used by preset lookup, enumeration, API responses, and cache warmup.
+Removed presets have no aliases, archives, or fallback mappings. Unknown IDs
+are rejected. Download, batch, and default color construction use Phase 6 CMYW.
+The palette library's standard entries reference these same definitions.
+Frontend initialization is checked against a shared catalog fixture, which is
+also checked against the backend definitions; transparent material parameters
+must not diverge between the browser and server. Custom colors remain supported.
+
+Palette API responses and application preserve the full material configuration
+(alpha, k, TD scale and gamma), matching direct preset selection. The frontend
+shares one preset option list between settings and automatic parameter search.
+
+The palette browser exposes only these same two configurations. Category
+filtering and all other built-in palette definitions have been removed.

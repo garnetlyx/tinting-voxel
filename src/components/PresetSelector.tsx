@@ -5,7 +5,7 @@ import { useTranslation } from '../i18n';
  */
 import React from 'react';
 import type { FilamentPreset } from '../api/types';
-import { DEFAULT_PRESETS } from '../api/types';
+import { DEFAULT_PRESETS, FILAMENT_PRESET_OPTIONS } from '../api/types';
 
 interface PresetSelectorProps {
   selectedPreset: FilamentPreset | null;
@@ -15,11 +15,7 @@ interface PresetSelectorProps {
 
 const PRESET_OPTIONS: { value: FilamentPreset | null; label: string }[] = [
   { value: null, label: 'Custom' },
-  { value: 'bambu_cmyk', label: 'Bambu CMYW' },
-  { value: 'bambu_cmyk_calibrated', label: 'Bambu CMYWK Calibrated' },
-  { value: 'bambu_cmyk_phase6', label: 'Bambu CMYWK Phase 6' },
-  { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW Phase 6' },
-  { value: 'clear_cmyk', label: 'Clear CMYWG' },
+  ...FILAMENT_PRESET_OPTIONS,
 ];
 
 export const PresetSelector: React.FC<PresetSelectorProps> = ({

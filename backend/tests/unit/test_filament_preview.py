@@ -7,9 +7,8 @@ import pytest
 
 from core.blend_color import Colors
 from core.color_config import (
-    BAMBU_CMYK_CALIBRATED_PRESET,
-    BAMBU_CMYK_PRESET,
-    CLEAR_CMYK_PRESET,
+    BAMBU_CMYW_PHASE6_PRESET,
+    CLEAR_CMYWG_PRESET,
     ColorConfig,
 )
 from services.filament_preview import FilamentPreviewService
@@ -70,29 +69,29 @@ class TestFilamentPreviewService:
         assert result["stats"]["combinationCount"] == 256
 
     def test_generate_preview_with_bambu_preset(self):
-        """Preview works with Bambu CMYK preset."""
-        colors = Colors.from_configs(BAMBU_CMYK_PRESET)
+        """Preview works with Bambu CMYW Phase 6 preset."""
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
         service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
         result = service.generate_preview()
         assert result["stats"]["colorCount"] == 4
 
     def test_generate_preview_with_clear_preset(self):
-        """Preview works with Clear CMYK preset (5 colors: CMYWG)."""
-        colors = Colors.from_configs(CLEAR_CMYK_PRESET)
+        """Preview works with Clear CMYWG preset (5 colors: CMYWG)."""
+        colors = Colors.from_configs(CLEAR_CMYWG_PRESET)
         service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
         result = service.generate_preview()
         assert result["stats"]["colorCount"] == 5
 
     def test_generate_preview_uses_calibrated_blend_mode(self):
         """Calibrated presets should switch preview rendering to the TD1S-gamma blend."""
-        colors = Colors.from_configs(BAMBU_CMYK_CALIBRATED_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
         service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
 
         assert service.generator.blend_mode == "hybrid_per_color_k_td1s_gamma"
-        assert service.generator.alpha == pytest.approx(BAMBU_CMYK_CALIBRATED_PRESET[0].alpha)
+        assert service.generator.alpha == pytest.approx(BAMBU_CMYW_PHASE6_PRESET[0].alpha)
 
         baseline = FilamentPreviewService(
-            Colors.from_configs(BAMBU_CMYK_PRESET),
+            Colors.from_configs(CLEAR_CMYWG_PRESET),
             layer_count=4,
             layer_height=0.08,
         )

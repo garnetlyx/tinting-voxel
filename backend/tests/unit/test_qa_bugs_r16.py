@@ -227,7 +227,7 @@ class TestFilamentConfigMixinValidation:
 
         with pytest.raises(ValueError, match="Cannot provide both"):
             TestModel(
-                filamentPreset=FilamentPreset.BAMBU_CMYK,
+                filamentPreset=FilamentPreset.BAMBU_CMYW_PHASE6,
                 filamentColors=[
                     FilamentColorConfig(name='Red', hex='#FF0000', transmission_distance=3.0),
                     FilamentColorConfig(name='Green', hex='#00FF00', transmission_distance=3.0),

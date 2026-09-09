@@ -15,20 +15,8 @@ def test_get_filament_presets(client):
     assert response.status_code == 200
     data = response.json()
     assert "presets" in data
-    assert len(data["presets"]) == 5
-    names = [p["name"] for p in data["presets"]]
-    assert "bambu_cmyk" in names
-    assert "bambu_cmyk_calibrated" in names
-    assert "bambu_cmyk_phase6" in names
-    assert "bambu_cmyw_phase6" in names
-    assert "clear_cmyk" in names
-
-    display_names = {preset["name"]: preset["display_name"] for preset in data["presets"]}
-    assert display_names["bambu_cmyk"] == "Bambu CMYW"
-    assert display_names["bambu_cmyk_calibrated"] == "Bambu CMYWK Calibrated"
-    assert display_names["bambu_cmyk_phase6"] == "Bambu CMYWK Phase 6"
-    assert display_names["bambu_cmyw_phase6"] == "Bambu CMYW Phase 6"
-    assert display_names["clear_cmyk"] == "Clear CMYW"
+    assert [p["name"] for p in data["presets"]] == ["bambu_cmyw_phase6", "clear_cmywg"]
+    assert [p["display_name"] for p in data["presets"]] == ["Bambu CMYW Phase 6", "Clear CMYWG"]
 
 
 def test_get_filament_presets_exposes_calibrated_material_params(client):
@@ -39,7 +27,7 @@ def test_get_filament_presets_exposes_calibrated_material_params(client):
 
     calibrated = next(
         preset for preset in data["presets"]
-        if preset["name"] == "bambu_cmyk_calibrated"
+        if preset["name"] == "bambu_cmyw_phase6"
     )
     cyan = next(color for color in calibrated["colors"] if color["name"] == "Cyan")
 
@@ -48,25 +36,6 @@ def test_get_filament_presets_exposes_calibrated_material_params(client):
     assert cyan["k"] >= 0
     assert cyan["td_scale"] > 0
     assert cyan["td_gamma"] > 0
-
-
-def test_get_filament_presets_exposes_phase6_material_params(client):
-    """GET /api/v2/filament-presets includes Phase 6 preset parameters."""
-    response = client.get("/api/v2/filament-presets")
-    assert response.status_code == 200
-    data = response.json()
-
-    phase6 = next(
-        preset for preset in data["presets"]
-        if preset["name"] == "bambu_cmyk_phase6"
-    )
-    key = next(color for color in phase6["colors"] if color["name"] == "Key")
-
-    assert key["transmission_distance"] == 0.1
-    assert key["alpha"] == 8.08
-    assert key["k"] == 17.65
-    assert key["td_scale"] == 1.48
-    assert key["td_gamma"] == 0.20
 
 
 def test_get_filament_presets_exposes_phase6_cmyw_material_params(client):
@@ -135,7 +104,7 @@ def test_get_colors_from_request_preserves_calibrated_custom_params():
 
 
 def test_v2_stl_with_default_colors(client, sample_color_blocks_with_hex):
-    """V2 STL with no preset or custom colors uses default CMYK."""
+    """V2 STL with no preset or custom colors uses default Phase 6 CMYW."""
     response = client.post(
         "/api/v2/download-stl",
         json={
@@ -151,17 +120,17 @@ def test_v2_stl_with_default_colors(client, sample_color_blocks_with_hex):
     assert len(zf.namelist()) > 0
 
 
-def test_get_colors_from_request_defaults_to_phase6_cmyk():
-    """Default color resolution should use the Phase 6 CMYK preset."""
+def test_get_colors_from_request_defaults_to_phase6_cmyw():
+    """Default color resolution should use the Phase 6 CMYW preset."""
     colors = get_colors_from_request(None, None)
-    assert len(colors) == 5
-    assert "K" in colors.get_labels()
+    assert len(colors) == 4
+    assert "K" not in colors.get_labels()
     assert colors["C"].k == 8.13
     assert colors["W"].k == 12.39
 
 
 def test_v2_stl_with_bambu_preset(client, sample_color_blocks_with_hex):
-    """V2 STL with bambu_cmyk preset works."""
+    """V2 STL with bambu_cmyw_phase6 preset works."""
     response = client.post(
         "/api/v2/download-stl",
         json={
@@ -170,25 +139,7 @@ def test_v2_stl_with_bambu_preset(client, sample_color_blocks_with_hex):
             "pixelSize": 0.08,
             "layerCount": 4,
             "imageDimensions": {"width": 4, "height": 4},
-            "filamentPreset": "bambu_cmyk",
-        },
-    )
-    assert response.status_code == 200
-    zf = zipfile.ZipFile(BytesIO(response.content))
-    assert len(zf.namelist()) > 0
-
-
-def test_v2_stl_with_calibrated_bambu_preset(client, sample_color_blocks_with_hex):
-    """V2 STL with calibrated preset works."""
-    response = client.post(
-        "/api/v2/download-stl",
-        json={
-            "colorBlocks": sample_color_blocks_with_hex,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
-            "filamentPreset": "bambu_cmyk_calibrated",
+            "filamentPreset": "bambu_cmyw_phase6",
         },
     )
     assert response.status_code == 200
@@ -431,7 +382,7 @@ def test_v2_svg_stl_with_base_plate(client):
             "pixelSize": 0.08,
             "layerCount": 4,
             "imageDimensions": {"width": 10, "height": 10},
-            "filamentPreset": "bambu_cmyk",
+            "filamentPreset": "bambu_cmyw_phase6",
             "basePlateThickness": 0.5,
         },
     )
@@ -460,7 +411,7 @@ def test_v2_svg_stl_success(client):
             "pixelSize": 0.08,
             "layerCount": 4,
             "imageDimensions": {"width": 10, "height": 10},
-            "filamentPreset": "bambu_cmyk",
+            "filamentPreset": "bambu_cmyw_phase6",
         },
     )
     assert response.status_code == 200
@@ -498,7 +449,7 @@ def test_v2_3mf_with_preset(client, sample_color_blocks_with_hex):
             "pixelSize": 0.08,
             "layerCount": 4,
             "imageDimensions": {"width": 4, "height": 4},
-            "filamentPreset": "bambu_cmyk",
+            "filamentPreset": "bambu_cmyw_phase6",
         },
     )
     assert response.status_code == 200
@@ -533,14 +484,14 @@ def test_print_settings_with_preset(client):
             "pixelSize": 0.1,
             "layerCount": 4,
             "imageDimensions": {"width": 100, "height": 80},
-            "filamentPreset": "bambu_cmyk",
+            "filamentPreset": "bambu_cmyw_phase6",
         },
     )
     assert response.status_code == 200
     assert "print_settings.json" in response.headers.get("content-disposition", "")
     data = json.loads(response.content)
     assert data["version"] == "1.0"
-    assert data["filament"]["preset"] == "bambu_cmyk"
+    assert data["filament"]["preset"] == "bambu_cmyw_phase6"
     assert data["filament"]["extruder_count"] == 4
     assert data["object_dimensions"]["width_mm"] == 10.0
     assert data["object_dimensions"]["height_mm"] == 8.0
@@ -581,7 +532,7 @@ def test_print_settings_with_base_plate(client):
             "layerCount": 4,
             "imageDimensions": {"width": 10, "height": 10},
             "basePlateThickness": 0.5,
-            "filamentPreset": "bambu_cmyk",
+            "filamentPreset": "bambu_cmyw_phase6",
         },
     )
     assert response.status_code == 200
@@ -592,7 +543,7 @@ def test_print_settings_with_base_plate(client):
 
 
 def test_print_settings_default_colors(client):
-    """Print settings with no preset or custom uses default CMYK."""
+    """Print settings with no preset or custom uses default Phase 6 CMYW."""
     response = client.post(
         "/api/v2/print-settings",
         json={
@@ -605,4 +556,12 @@ def test_print_settings_default_colors(client):
     assert response.status_code == 200
     data = json.loads(response.content)
     assert data["filament"]["extruder_count"] == 4
-    assert data["filament"]["preset"] == "bambu_cmyk"
+    assert data["filament"]["preset"] == "bambu_cmyw_phase6"
+
+
+def test_palette_and_preset_materials_match(client):
+    presets = client.get("/api/v2/filament-presets").json()["presets"]
+    for preset in presets:
+        palette = client.get(f"/api/palettes/{preset['name']}")
+        assert palette.status_code == 200
+        assert palette.json()["colors"] == preset["colors"]

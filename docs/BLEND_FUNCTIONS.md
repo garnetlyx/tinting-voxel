@@ -375,7 +375,7 @@ Hybrid with per-color k (Phase 6, 2026-03-07)
     |-- physically-ordered k: K > W > M > C > Y
     |-- 16×16 real: dE=39.69 (first real improvement over P0=42.90)
     |-- transfer score: 28.57 (best production-facing)
-    |-- production recommendation: BAMBU_CMYK_PHASE6_PRESET
+    |-- production recommendation: BAMBU_CMYW_PHASE6_PRESET
     |
     v
 Hybrid with per-channel k per color (P7, 2026-03-10)
@@ -507,7 +507,7 @@ T_ch(c) = exp(-(scatter_alpha / td_c + k_c · A_ch(c)) · d)
 
 Parameters: scatter_alpha + N × k_c + N × td_c = 1 + 2N (11 for CMYKW).
 
-**Status**: Implemented as `hybrid_per_color_k` blend mode + `BAMBU_CMYK_PHASE6_PRESET`. Best production-facing preset (16×16 dE=39.69, transfer=28.57). Important caveat: `kW` is not very meaningful in this formula because `A_ch(W) ≈ 0`; gains mainly come from per-CMY absorption scaling.
+**Status**: Implemented as `hybrid_per_color_k` blend mode + `BAMBU_CMYW_PHASE6_PRESET`. The distributed preset contains the four CMYW channels. Important caveat: `kW` is not very meaningful in this formula because `A_ch(W) ≈ 0`; gains mainly come from per-CMY absorption scaling.
 
 ### 1b. Per-Channel k Per Color — **IMPLEMENTED EXPERIMENTALLY** (2026-03-10)
 
@@ -517,7 +517,7 @@ Extends per-color k to per-channel: `(k_R, k_G, k_B)` per filament.
 T_ch(c) = exp(-(scatter_alpha / td_c + k_ch(c) · A_ch(c)) · d)
 ```
 
-**Status**: Implemented as `hybrid_per_channel_k` + `BAMBU_CMYK_PER_CHANNEL_K_PRESET`. k_rgb values are hand-tuned guesses, not optimized. Next step: gradient descent on k_rgb using training photos.
+**Status**: The `hybrid_per_channel_k` kernel supports custom per-channel material parameters. No experimental built-in preset is distributed.
 
 ### 2. Saunderson Correction (Medium-term)
 

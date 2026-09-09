@@ -265,16 +265,11 @@ class Color:
 
 
 class Colors:
-    from core.color_config import BAMBU_CMYK_PRESET, CLEAR_CMYK_PRESET
+    from core.color_config import BAMBU_CMYW_PHASE6_PRESET, CLEAR_CMYWG_PRESET
 
-    _BAMBU_PRESET = {c.label: c for c in BAMBU_CMYK_PRESET}
-    _CLEAR_PRESET = {c.label: c for c in CLEAR_CMYK_PRESET}
-    PRIMARY_COLORS = [c.label for c in BAMBU_CMYK_PRESET]
+    _BAMBU_PRESET = {c.label: c for c in BAMBU_CMYW_PHASE6_PRESET}
+    _CLEAR_PRESET = {c.label: c for c in CLEAR_CMYWG_PRESET}
 
-    DEFAULT_TD = {c.label: c.transmission_distance for c in BAMBU_CMYK_PRESET}
-    BAMBU_CMYK_HEX = {c.label: c.hex for c in BAMBU_CMYK_PRESET}
-    DEFAULT_CLEAR_TD = {c.label: c.transmission_distance for c in CLEAR_CMYK_PRESET}
-    CLEAR_CMYK_HEX = {c.label: c.hex for c in CLEAR_CMYK_PRESET}
 
     def __init__(self, colors=None, clear=False, names=None):
         self.colors = colors if colors is not None else {}
@@ -284,7 +279,7 @@ class Colors:
             return
 
         preset = self._CLEAR_PRESET if clear else self._BAMBU_PRESET
-        labels = names if names is not None else self.PRIMARY_COLORS
+        labels = names if names is not None else list(preset)
 
         for c in labels:
             cfg = preset.get(c)
@@ -374,7 +369,7 @@ class Colors:
         if len(configs) < 4:
             raise ValueError(
                 f"Color configuration requires at least 4 colors, got {len(configs)}. "
-                f"Use the default CMYK preset or provide 4+ custom filament colors."
+                f"Use the default Phase 6 CMYW preset or provide 4+ custom filament colors."
             )
 
         instance = cls(colors={})
