@@ -181,11 +181,31 @@ tinting-voxel/
 | **FilamentConfigPanel** | N-color filament configuration UI | Local state, preset manager |
 | **ThreeDPreview** | WebGL 3D preview with orbit controls | Three.js, useRef |
 | **BatchProcessor** | Batch image processing UI | Local file state |
-| **PaletteLibrary** | Color palette selection UI | Local filter state |
+| **PaletteLibrary** | Color palette selection UI | Local expanded/loading state |
 | **ImageEditor** | Canvas-based crop/resize editor | Canvas API, useRef |
 | **ColorBlocksList** | Display extracted color swatches with data | Props only |
 | **DownloadButtons** | Trigger CSV/STL/3MF downloads | Loading state |
 | **LanguageSelector** | Switch the workspace language | Dedicated locale preference |
+
+### Frontend Styles and Brand Assets
+
+Vite builds Tailwind v3 through PostCSS using `tailwind.config.cjs` and
+`postcss.config.cjs`. Content scanning covers `index.html` and `src/`; UI classes
+must be complete strings so the build can discover them. `src/index.css` contains
+the Tailwind layers and base typography. The browser loads only the bundled CSS.
+
+`public/brand.svg` is the shared header/favicon artwork. The ICO contains 16, 32,
+and 48 px versions; the Apple Touch Icon is an opaque 180 px PNG. These raster
+icons are exports of the same SVG. `public/share-card.svg` is the editable source
+for the 1200 × 630 PNG used by social previews. Keep exported files synchronized
+when changing their source artwork. Vite copies `public/` into the build, and the
+Docker frontend stage includes both the assets and CSS configuration files.
+
+`index.html` contains the canonical production URL, default English description,
+Open Graph metadata, icon links, and sharing image URLs. They are available in
+the initial response without executing JavaScript. UI locale changes synchronize
+the document title and description; the single canonical URL uses one English
+sharing card.
 
 ### Frontend Localization Boundary
 
@@ -195,7 +215,7 @@ remain language-independent. Documentation remains in its existing language.
 
 | Module | Responsibility |
 |--------|----------------|
-| `i18n/index.ts` | Initialize i18next, register supported locales and aliases, resolve preferences, synchronize document language/title, expose the React translation hook |
+| `i18n/index.ts` | Initialize i18next, register supported locales and aliases, resolve preferences, synchronize document language/title/description, expose the React translation hook |
 | `i18n/resources.ts` and `i18next.d.ts` | Register locale resources and type-check namespace/key references |
 | `i18n/locales/<locale>/*.json` | Feature-owned strings: common, converter, parameters, filaments, preview, editor, batch, palettes, search, feedback, errors |
 | `i18n/messages.ts` | Adapt canonical frontend/API error and warning strings for display without modifying their source state |

@@ -4,7 +4,7 @@ import { useTranslation } from '../i18n';
  * Main converter page component
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Settings, Palette, Image as ImageIcon, Layers, Loader2 } from 'lucide-react';
+import { Settings, Image as ImageIcon, Layers, Loader2 } from 'lucide-react';
 import { useImageProcessor } from '../hooks/useImageProcessor';
 import { useParamSearch } from '../hooks/useParamSearch';
 import { useBackendReady } from '../hooks/useBackendReady';
@@ -143,7 +143,7 @@ const Converter: React.FC = () => {
           {/* Header */}
           <div className="flex flex-col gap-3 mb-8 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-xl sm:text-3xl font-bold text-gray-800 flex items-center gap-3 min-w-0 flex-1">
-              <Palette className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-purple-600" />{t('converter:title')}</h1>
+              <img src="/brand.svg" alt="" width={32} height={32} className="w-6 h-6 sm:w-8 sm:h-8 shrink-0" />{t('converter:title')}</h1>
             <div className="flex shrink-0 items-center justify-end gap-2">
             <LanguageSelector />
             <button

@@ -39,6 +39,7 @@ function updateDocumentLanguage(): void {
   document.documentElement.lang = i18n.resolvedLanguage ?? 'en';
   document.documentElement.dir = i18n.dir();
   document.title = i18n.t('title', { ns: 'converter' });
+  document.querySelector('meta[name="description"]')?.setAttribute('content', i18n.t('description', { ns: 'converter' }));
 }
 
 export function initializeLocale(): void {

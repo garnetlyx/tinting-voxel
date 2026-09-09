@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<rect width="1200" height="630" fill="#FAF8FF"/>
+<g transform="translate(64 40) scale(.8)">
+  <path fill="#EAB308" d="M6 36 32 22 58 36v9L32 59 6 45z"/>
+  <path fill="#FDE047" d="m6 36 26-14 26 14-26 14z"/>
+  <path fill="#CA8A04" d="M32 50 58 36v9L32 59z"/>
+  <path fill="#C026D3" d="M6 25 32 11 58 25v9L32 48 6 34z"/>
+  <path fill="#E879F9" d="m6 25 26-14 26 14-26 14z"/>
+  <path fill="#A21CAF" d="M32 39 58 25v9L32 48z"/>
+  <path fill="#0891B2" d="M6 14 32 0 58 14v9L32 37 6 23z" transform="translate(0 3)"/>
+  <path fill="#67E8F9" d="m6 17 26-14 26 14-26 14z"/>
+  <path fill="#0E7490" d="M32 31 58 17v9L32 40z"/>
+</g>
+<g font-family="Arial, Helvetica, sans-serif" fill="#1F2937">
+<text x="130" y="78" font-size="32" font-weight="700">Tinting Voxel</text>
+<text x="1136" y="74" font-size="18" text-anchor="end" fill="#6B7280">tintingvoxel.com</text>
+<text x="64" y="179" font-size="58" font-weight="700" letter-spacing="-2">From image to color 3D print.</text>
+<text x="67" y="223" font-size="23" fill="#6B7280">Preview filament blends. Export layered STL &amp; 3MF files.</text>
+<rect x="66" y="270" width="1068" height="304" rx="24" fill="white"/>
+<rect x="134" y="298" width="208" height="208" rx="16" fill="#F3F4F6"/>
+
+<rect x="158" y="322" width="40" height="40" fill="#67E8F9"/>
+<rect x="198" y="322" width="40" height="40" fill="#22D3EE"/>
+<rect x="238" y="322" width="40" height="40" fill="#E879F9"/>
+<rect x="278" y="322" width="40" height="40" fill="#C026D3"/>
+<rect x="158" y="362" width="40" height="40" fill="#22D3EE"/>
+<rect x="198" y="362" width="40" height="40" fill="#A5F3FC"/>
+<rect x="238" y="362" width="40" height="40" fill="#C026D3"/>
+<rect x="278" y="362" width="40" height="40" fill="#FDE047"/>
+<rect x="158" y="402" width="40" height="40" fill="#E879F9"/>
+<rect x="198" y="402" width="40" height="40" fill="#C026D3"/>
+<rect x="238" y="402" width="40" height="40" fill="#FDE047"/>
+<rect x="278" y="402" width="40" height="40" fill="#FEF08A"/>
+<rect x="158" y="442" width="40" height="40" fill="#C026D3"/>
+<rect x="198" y="442" width="40" height="40" fill="#FDE047"/>
+<rect x="238" y="442" width="40" height="40" fill="#FEF08A"/>
+<rect x="278" y="442" width="40" height="40" fill="#67E8F9"/>
+<path d="M427 402h95m-19-19 19 19-19 19" fill="none" stroke="#9333EA" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M830 336 998 408 998 418 830 490 662 418 662 408z" fill="#FDE047"/>
+<path d="M830 480 998 408v10l-168 72z" fill="#1F2937" opacity=".14"/>
+<path d="M830 315 998 387 998 397 830 469 662 397 662 387z" fill="#E879F9"/>
+<path d="M830 459 998 387v10l-168 72z" fill="#1F2937" opacity=".14"/>
+<path d="M830 294 998 366 998 376 830 448 662 376 662 366z" fill="#67E8F9"/>
+<path d="M830 438 998 366v10l-168 72z" fill="#1F2937" opacity=".14"/>
+<path d="M830 294l42 18-42 18-42-18z" fill="#67E8F9" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M872 312l42 18-42 18-42-18z" fill="#22D3EE" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M914 330l42 18-42 18-42-18z" fill="#E879F9" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M956 348l42 18-42 18-42-18z" fill="#C026D3" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M788 312l42 18-42 18-42-18z" fill="#22D3EE" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M830 330l42 18-42 18-42-18z" fill="#A5F3FC" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M872 348l42 18-42 18-42-18z" fill="#C026D3" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M914 366l42 18-42 18-42-18z" fill="#FDE047" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M746 330l42 18-42 18-42-18z" fill="#E879F9" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M788 348l42 18-42 18-42-18z" fill="#C026D3" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M830 366l42 18-42 18-42-18z" fill="#FDE047" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M872 384l42 18-42 18-42-18z" fill="#FEF08A" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M704 348l42 18-42 18-42-18z" fill="#C026D3" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M746 366l42 18-42 18-42-18z" fill="#FDE047" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M788 384l42 18-42 18-42-18z" fill="#FEF08A" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<path d="M830 402l42 18-42 18-42-18z" fill="#67E8F9" stroke="white" stroke-opacity=".4" stroke-width="1"/>
+<text x="238" y="543" text-anchor="middle" font-size="18" fill="#6B7280">YOUR IMAGE</text>
+<text x="830" y="543" text-anchor="middle" font-size="18" fill="#6B7280">YOUR LAYERED PRINT</text>
+</g></svg>

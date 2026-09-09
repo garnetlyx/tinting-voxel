@@ -20,5 +20,6 @@
   "title": "Tinting Voxel · Image to STL Color Block Converter",
   "optimizationPrompt": "Want to auto-optimize parameters for better results?",
   "serverStarting": "Server is warming up, please wait...",
-  "simulatedPrint": "Simulated Print"
+  "simulatedPrint": "Simulated Print",
+  "description": "Turn images into layered, full-color 3D prints. Preview filament blends and export print-ready STL or 3MF files with Tinting Voxel."
 }
