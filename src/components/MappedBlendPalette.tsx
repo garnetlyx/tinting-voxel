@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n';
 import React from 'react';
 import type { MappedBlendPaletteEntry } from '../api/types';
 
@@ -6,15 +7,14 @@ interface MappedBlendPaletteProps {
 }
 
 export const MappedBlendPalette: React.FC<MappedBlendPaletteProps> = ({ entries }) => {
+  const { t } = useTranslation();
   if (entries.length === 0) return null;
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-gray-800">Mapped Blend Palette</h3>
-        <p className="text-xs text-gray-500">
-          Source colors mapped to the nearest printable blend used for this image.
-        </p>
+        <h3 className="text-sm font-semibold text-gray-800">{t('preview:mappedBlendPalette')}</h3>
+        <p className="text-xs text-gray-500">{t('preview:mappingHelp')}</p>
       </div>
 
       <div className="space-y-2">
@@ -28,19 +28,19 @@ export const MappedBlendPalette: React.FC<MappedBlendPaletteProps> = ({ entries 
                 <div
                   className="h-6 w-6 rounded border border-gray-200"
                   style={{ backgroundColor: entry.sourceHex }}
-                  title={`Source ${entry.sourceHex}`}
+                  title={t('preview:source', { hex: entry.sourceHex })}
                 />
                 <span className="text-xs text-gray-400">→</span>
                 <div
                   className="h-6 w-6 rounded border border-gray-200"
                   style={{ backgroundColor: entry.hex }}
-                  title={`Printable ${entry.hex}`}
+                  title={t('preview:printable', { hex: entry.hex })}
                 />
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-800">{entry.code}</div>
                 <div className="text-xs text-gray-500">
-                  {entry.sourceHex} to {entry.hex}
+                  {t('preview:mapping', { source: entry.sourceHex, target: entry.hex })}
                 </div>
               </div>
             </div>

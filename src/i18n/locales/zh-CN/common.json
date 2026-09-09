@@ -1,0 +1,22 @@
+{
+  "processing": "正在处理…",
+  "done": "完成",
+  "cancel": "取消",
+  "delete": "删除",
+  "generating": "正在生成…",
+  "save": "保存",
+  "refresh": "刷新",
+  "reset": "重置",
+  "hide": "隐藏",
+  "apply": "应用",
+  "close": "关闭",
+  "retry": "重试",
+  "show": "显示",
+  "language": "语言",
+  "colorEntry": "颜色 {{index}} · {{code}} · {{hex}}",
+  "colorCount_one": "{{count}} 种颜色",
+  "colorCount_other": "{{count}} 种颜色",
+  "pixels_one": "{{count, number}} 像素",
+  "pixels_other": "{{count, number}} 像素",
+  "removeFile": "移除 {{name}}"
+}

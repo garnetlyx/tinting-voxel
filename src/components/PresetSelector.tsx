@@ -1,3 +1,5 @@
+import { usePresetLabel } from '../i18n/catalog';
+import { useTranslation } from '../i18n';
 /**
  * Filament preset selector component
  */
@@ -25,15 +27,15 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
   onPresetChange,
   disabled = false,
 }) => {
+  const { t } = useTranslation();
+  const presetLabel = usePresetLabel();
   // Handle null case for custom colors
   const currentValue = selectedPreset ?? 'custom';
 
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Filament Preset
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('filaments:filamentPreset')}</label>
         <select
           value={currentValue}
           onChange={(e) => {
@@ -50,7 +52,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
         >
           {PRESET_OPTIONS.map((option) => (
             <option key={option.value ?? 'custom'} value={option.value ?? 'custom'}>
-              {option.label}
+              {presetLabel(option.value, option.label)}
             </option>
           ))}
         </select>
@@ -59,14 +61,14 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
       {/* Color preview - only show for presets, not custom */}
       {selectedPreset && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Colors:</span>
+          <span className="text-xs text-gray-500">{t('filaments:colors')}</span>
           <div className="flex gap-1">
             {DEFAULT_PRESETS[selectedPreset].map((color, index) => (
               <div
                 key={index}
                 className="w-6 h-6 rounded border border-gray-200 shadow-sm"
                 style={{ backgroundColor: color.hex }}
-                title={`${color.name} (TD: ${color.transmission_distance})`}
+                title={t('common:colorEntry', { index: index + 1, code: color.name[0]?.toUpperCase() ?? '?', hex: color.hex })}
               />
             ))}
           </div>

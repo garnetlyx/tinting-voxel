@@ -1,6 +1,7 @@
 /**
  * Vector color list display component for SVG mode
  */
+import { useTranslation } from '../i18n';
 import React from 'react';
 import type { VectorColorResult } from '../api/types';
 
@@ -9,6 +10,7 @@ interface VectorColorListProps {
 }
 
 export const VectorColorList: React.FC<VectorColorListProps> = ({ vectorResults }) => {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
       {vectorResults.map((result, index) => {
@@ -28,10 +30,10 @@ export const VectorColorList: React.FC<VectorColorListProps> = ({ vectorResults 
             RGB({result.color[0]},{result.color[1]},{result.color[2]})
           </div>
           <div className="text-xs text-gray-500">
-            {result.polygon_points} vertices
+            {t('preview:vertices', { count: result.polygon_points })}
           </div>
           <div className="text-xs text-gray-500">
-            {regionCount} regions{holeCount > 0 ? `, ${holeCount} holes` : ''}
+            {t('preview:regions', { count: regionCount })}{holeCount > 0 ? t('preview:holes', { count: holeCount }) : ''}
           </div>
         </div>
         );

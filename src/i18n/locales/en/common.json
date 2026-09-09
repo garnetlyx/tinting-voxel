@@ -1,0 +1,22 @@
+{
+  "processing": "Processing...",
+  "done": "Done",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "generating": "Generating...",
+  "save": "Save",
+  "refresh": "Refresh",
+  "reset": "Reset",
+  "hide": "Hide",
+  "apply": "Apply",
+  "close": "Close",
+  "retry": "Retry",
+  "show": "Show",
+  "language": "Language",
+  "colorEntry": "Color {{index}} · {{code}} · {{hex}}",
+  "colorCount_one": "{{count}} color",
+  "colorCount_other": "{{count}} colors",
+  "pixels_one": "{{count, number}} pixel",
+  "pixels_other": "{{count, number}} pixels",
+  "removeFile": "Remove {{name}}"
+}

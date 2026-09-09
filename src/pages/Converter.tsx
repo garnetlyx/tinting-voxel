@@ -1,3 +1,5 @@
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useTranslation } from '../i18n';
 /**
  * Main converter page component
  */
@@ -30,6 +32,7 @@ import {
 type AppMode = 'single' | 'batch';
 
 const Converter: React.FC = () => {
+  const { t } = useTranslation();
   const [showSettings, setShowSettings] = useState(true);
   const [appMode, setAppMode] = useState<AppMode>('single');
 
@@ -138,27 +141,26 @@ const Converter: React.FC = () => {
       <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-              <Palette className="w-8 h-8 text-purple-600" />
-              Tinting Voxel · Image to STL Color Block Converter
-            </h1>
+          <div className="flex flex-col gap-3 mb-8 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-800 flex items-center gap-3 min-w-0 flex-1">
+              <Palette className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-purple-600" />{t('converter:title')}</h1>
+            <div className="flex shrink-0 items-center justify-end gap-2">
+            <LanguageSelector />
             <button
               onClick={() => setShowSettings(!showSettings)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title={showSettings ? "Hide Settings Sidebar" : "Show Settings Sidebar"}
+              title={showSettings ? t('converter:hideSettingsSidebar') : t('converter:showSettingsSidebar')}
             >
               <Settings className={`w-6 h-6 ${showSettings ? "text-purple-600" : "text-gray-600"}`} />
             </button>
+            </div>
           </div>
 
           {/* Backend warming-up banner */}
           {!backendReady && (
             <div className="mb-6 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
               <Loader2 className="w-5 h-5 animate-spin shrink-0" />
-              <span className="text-sm font-medium">
-                Server is warming up, please wait...
-              </span>
+              <span className="text-sm font-medium">{t('converter:serverStarting')}</span>
             </div>
           )}
 
@@ -259,9 +261,7 @@ const Converter: React.FC = () => {
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                 >
-                  <ImageIcon className="w-4 h-4" />
-                  Single Image
-                </button>
+                  <ImageIcon className="w-4 h-4" />{t('converter:singleImage')}</button>
                 <button
                   onClick={() => setAppMode('batch')}
                   className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${appMode === 'batch'
@@ -269,9 +269,7 @@ const Converter: React.FC = () => {
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                 >
-                  <Layers className="w-4 h-4" />
-                  Batch Processing
-                </button>
+                  <Layers className="w-4 h-4" />{t('converter:batchProcessing')}</button>
               </div>
 
               {/* Single Image Mode */}
@@ -317,9 +315,7 @@ const Converter: React.FC = () => {
                       {/* Param search prompt */}
                       {showParamSearchPrompt && (
                         <div className="flex items-center justify-between gap-4 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3">
-                          <p className="text-sm text-purple-800">
-                            Want to auto-optimize parameters for better results?
-                          </p>
+                          <p className="text-sm text-purple-800">{t('converter:optimizationPrompt')}</p>
                           <div className="flex gap-2 shrink-0">
                             <button
                               onClick={() => {
@@ -328,15 +324,11 @@ const Converter: React.FC = () => {
                                 setParamSearchOpen(true);
                               }}
                               className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                            >
-                              Optimize
-                            </button>
+                            >{t('converter:optimize')}</button>
                             <button
                               onClick={() => setShowParamSearchPrompt(false)}
                               className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                              Skip
-                            </button>
+                            >{t('converter:skip')}</button>
                           </div>
                         </div>
                       )}
@@ -344,10 +336,10 @@ const Converter: React.FC = () => {
                       <ImageComparison
                         originalImage={image}
                         intermediateImageUrl={segmentationImageUrl}
-                        intermediateLabel={mode === 'pixel' ? 'Grouped Colors' : 'Vectorized Regions'}
+                        intermediateLabel={mode === 'pixel' ? t('converter:groupedColors') : t('converter:vectorizedRegions')}
                         processedImageUrl={processedImageUrl}
                         colorCount={resultCount}
-                        processedLabel="Simulated Print"
+                        processedLabel={t('converter:simulatedPrint')}
                       />
 
                       {mappedBlendPalette.length > 0 && (
@@ -399,10 +391,10 @@ const Converter: React.FC = () => {
                   {/* Original Image Preview (when no results yet) */}
                   {image && !hasResults && !processing && !isEditing && (
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-800 mb-3">Original Image Preview</h3>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-3">{t('converter:originalImagePreview')}</h3>
                       <img
                         src={image.src}
-                        alt="Preview"
+                        alt={t('converter:preview')}
                         className="max-w-full rounded-lg shadow-md"
                       />
                     </div>

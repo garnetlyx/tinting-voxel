@@ -1,6 +1,7 @@
 /**
  * Loading spinner with optional progress stage display
  */
+import { useTranslation } from '../i18n';
 import React from 'react';
 
 export type ProcessingStage =
@@ -9,12 +10,12 @@ export type ProcessingStage =
   | 'generating'
   | 'idle';
 
-const STAGE_LABELS: Record<ProcessingStage, string> = {
-  uploading: 'Uploading image...',
-  processing: 'Processing colors...',
-  generating: 'Generating STL files...',
-  idle: 'Processing...',
-};
+const STAGE_LABELS = {
+  uploading: 'converter:uploading',
+  processing: 'converter:processingColors',
+  generating: 'converter:generatingStl',
+  idle: 'common:processing',
+} as const;
 
 const STAGE_ORDER: ProcessingStage[] = ['uploading', 'processing', 'generating'];
 
@@ -27,7 +28,8 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   message,
   stage = 'idle',
 }) => {
-  const displayMessage = message || STAGE_LABELS[stage] || 'Processing...';
+  const { t } = useTranslation();
+  const displayMessage = message || t(STAGE_LABELS[stage]);
   const currentIdx = STAGE_ORDER.indexOf(stage);
   const showStages = stage !== 'idle' && currentIdx >= 0;
 
@@ -54,7 +56,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
                 <span className="text-xs">
                   {isComplete ? '\u2713' : isCurrent ? '\u25CF' : '\u25CB'}
                 </span>
-                {STAGE_LABELS[s].replace('...', '')}
+                {t(STAGE_LABELS[s]).replace(/(?:\.\.\.|…)$/, '')}
               </div>
             );
           })}

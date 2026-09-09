@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n';
 /**
  * Single row for editing one filament color configuration
  */
@@ -22,6 +23,7 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
   canRemove,
   existingLabels,
 }) => {
+  const { t } = useTranslation();
   const label = config.name?.[0]?.toUpperCase() ?? '';
   const isDuplicate = label && existingLabels.filter(l => l === label).length > 1;
   const isEmptyName = !config.name.trim();
@@ -34,31 +36,28 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
         value={config.hex}
         onChange={(e) => onChange(index, { ...config, hex: e.target.value })}
         className="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
-        title="Pick color"
+        title={t('filaments:pickColor')}
       />
 
-      {/* Name input */}
+      {/* Stable code editor; existing canonical names remain unchanged until edited. */}
       <div className="flex-1 min-w-0">
         <input
           type="text"
-          value={config.name}
-          onChange={(e) => onChange(index, { ...config, name: e.target.value })}
-          placeholder="Color name"
+          value={label}
+          maxLength={1}
+          onChange={(e) => {
+            const code = e.target.value.toUpperCase();
+            if (/^[A-Z]?$/.test(code)) onChange(index, { ...config, name: code });
+          }}
+          title={isDuplicate ? t('filaments:duplicateLabel') : t('filaments:label', { code: label })}
+          aria-invalid={Boolean(isDuplicate || isEmptyName)}
+          placeholder={t('filaments:codeName')}
+          aria-label={t('common:colorEntry', { index: index + 1, code: label || '?', hex: config.hex })}
           className={`w-full px-2 py-1 text-sm border rounded ${
             isDuplicate || isEmptyName ? 'border-red-400 bg-red-50' : 'border-gray-300'
           }`}
         />
       </div>
-
-      {/* Label badge */}
-      <span
-        className={`w-6 h-6 flex items-center justify-center text-xs font-bold rounded ${
-          isDuplicate ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'
-        }`}
-        title={isDuplicate ? 'Duplicate label' : `Label: ${label}`}
-      >
-        {label || '?'}
-      </span>
 
       {/* Transmission distance */}
       <input
@@ -76,7 +75,7 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
         max={1000}
         step={0.1}
         className="w-20 px-2 py-1 text-sm border border-gray-300 rounded text-right"
-        title="Transmission distance (must be > 0)"
+        title={t('filaments:transmissionDistanceMustBe0')}
       />
 
       {/* Remove button */}
@@ -84,7 +83,7 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
         onClick={() => onRemove(index)}
         disabled={!canRemove}
         className="p-1 rounded hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        title={canRemove ? 'Remove color' : 'Minimum 4 colors required'}
+        title={canRemove ? t('filaments:removeColor') : t('filaments:minimum4ColorsRequired')}
       >
         <Trash2 className="w-4 h-4 text-red-500" />
       </button>

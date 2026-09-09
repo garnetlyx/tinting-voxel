@@ -1,3 +1,4 @@
+import { i18n } from '../i18n';
 import type { BugReportContext, BugReportLog, ConverterBugReportState } from '../api/types';
 
 export const BUG_REPORT_CAPTURE_EVENT = 'tinting-voxel:capture-report';
@@ -41,7 +42,7 @@ export function collectBugReportContext(converter: ConverterBugReportState): Bug
   return {
     url: `${window.location.origin}${window.location.pathname}`.slice(0, 2000),
     userAgent: navigator.userAgent.slice(0, 500),
-    language: navigator.language.slice(0, 40),
+    language: (i18n.resolvedLanguage ?? navigator.language).slice(0, 40),
     timestamp: new Date().toISOString(),
     viewport: { width: window.innerWidth, height: window.innerHeight },
     converter: { ...converter, error: converter.error ? sanitizeDiagnostic(converter.error) : null },
@@ -68,6 +69,11 @@ export async function captureBugReportScreenshot(): Promise<string> {
       color: style.accentColor === 'auto' ? '#2563eb' : style.accentColor,
       direction: style.direction,
     };
+  });
+  // Snapshot native select labels before cloning; html2canvas clips their text baseline.
+  const selects = Array.from(target.querySelectorAll('select')).map(select => {
+    const bounds = select.getBoundingClientRect();
+    return { width: bounds.width, height: bounds.height, text: select.selectedOptions[0]?.text ?? '' };
   });
   const canvas = await html2canvas(target, {
     logging: false,
@@ -122,6 +128,19 @@ export async function captureBugReportScreenshot(): Promise<string> {
         track.append(fill);
         control.append(track, thumb);
         input.replaceWith(control);
+      });
+      clonedTarget.querySelectorAll('select').forEach((select, index) => {
+        const snapshot = selects[index];
+        const label = documentClone.createElement('span');
+        label.className = select.className;
+        label.style.cssText = select.style.cssText;
+        Object.assign(label.style, {
+          display: 'inline-flex', alignItems: 'center', boxSizing: 'border-box',
+          width: `${snapshot.width}px`, height: `${snapshot.height}px`,
+          whiteSpace: 'nowrap', overflow: 'visible',
+        });
+        label.textContent = snapshot.text;
+        select.replaceWith(label);
       });
       clonedTarget.querySelectorAll<HTMLInputElement>('input[type="password"]').forEach(input => { input.value = ''; });
     },

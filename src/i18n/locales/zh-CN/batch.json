@@ -1,0 +1,12 @@
+{
+  "clearAll": "清空",
+  "batchProcessingComplete": "批量处理完成",
+  "previewBatch": "批量预览",
+  "generatingStls": "正在生成 STL…",
+  "downloadAllStls": "下载全部 STL",
+  "selectImages": "点击选择图片（最多 {{max}} 张）",
+  "selected_one": "已选择 {{count}} 张图片",
+  "selected_other": "已选择 {{count}} 张图片",
+  "summary": "成功处理 {{success}} / {{total}} 张图片",
+  "failed": "（{{count}} 张失败）"
+}

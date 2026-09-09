@@ -2,7 +2,7 @@
 
 **Product Name**: tinting-voxel
 **Version**: 2.0
-**Last Updated**: 2026-06-19
+**Last Updated**: 2026-09-08
 **Status**: In Development — feature-complete beyond original MVP
 
 ---
@@ -118,7 +118,7 @@ tinting-voxel solves these by:
 
 #### Flow 2 — N-Color Filament Configuration
 1. User picks a preset (Bambu CMYK, Clear CMYK, Phase6, per-channel-k).
-2. User edits hex values / per-color `k` and `td` parameters.
+2. User edits generic color codes (unique A–Z letters), hex values, and transmission distance. Codes identify arbitrary colors; they do not constrain the palette to CMYK.
 3. Filament preview matrix regenerates showing achievable color gamut.
 4. Configuration persists across sessions via localStorage.
 
@@ -228,7 +228,8 @@ plates) is performed offline, outside this repo.
 |--------|---------|
 | Converter | Main workspace: upload, parameter panel, preview, downloads |
 | Parameter Panel | maxColors, colorThreshold, layerHeight, pixelSize, detail presets |
-| Filament Config Panel | N-color preset + per-color hex / k / td editing |
+| Filament Config Panel | N-color preset + generic code / hex / transmission-distance editing |
+| Language Selector | English / Simplified Chinese workspace preference |
 | Filament Preview | Achievable color gamut matrix |
 | Image Comparison | Original vs simulated print |
 | 3D Preview | three.js WebGL render with orbit controls |
@@ -238,6 +239,15 @@ plates) is performed offline, outside this repo.
 | Parameter Search Modal | Auto-tune sweep with progress |
 
 ### 5.3 Interaction Patterns
+
+- The workspace supports English and Simplified Chinese, with browser-language
+  detection on first visit and a persistent manual choice.
+- Switching language preserves the current image, parameters, processing results,
+  custom colors, and feedback draft; it does not initiate another conversion.
+- Interface text, tooltips, accessibility labels, known errors, and system catalog
+  metadata are localized. User text, arbitrary color codes, and machine-readable
+  exports preserve their original values. Backend and documentation translation
+  are outside the localization scope.
 
 - Drag-and-drop upload (with click fallback).
 - Debounced live parameter updates + explicit "Reprocess".

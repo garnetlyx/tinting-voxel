@@ -1,3 +1,6 @@
+import { useLocalizedMessage } from '../i18n/messages';
+import { usePresetLabel, useParameterLabel } from '../i18n/catalog';
+import { useTranslation } from '../i18n';
 /**
  * Parameter search modal component.
  * Manages four phases: config → running → results | error
@@ -36,6 +39,10 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
   onStart,
   onApplyParams,
 }) => {
+  const { t } = useTranslation();
+  const localize = useLocalizedMessage();
+  const presetLabel = usePresetLabel();
+  const parameterLabel = useParameterLabel();
   const [targetSize, setTargetSize] = useState(100);
   const [preset, setPreset] = useState('bambu_cmyw_phase6');
 
@@ -57,16 +64,16 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       aria-modal="true"
-      aria-label="Auto-Optimize Parameters"
+      aria-label={t('search:autoOptimizeParameters')}
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">Auto-Optimize Parameters</h2>
+          <h2 className="text-xl font-semibold text-gray-800">{t('search:autoOptimizeParameters')}</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="Close"
+            aria-label={t('common:close')}
           >
             ✕
           </button>
@@ -76,15 +83,10 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
           {/* Phase 1: Config */}
           {phase === 'config' && (
             <div className="space-y-5">
-              <p className="text-sm text-gray-600">
-                The optimizer runs image processing across multiple parameter
-                combinations and ranks them by similarity.
-              </p>
+              <p className="text-sm text-gray-600">{t('search:optimizerHelp')}</p>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="targetSize">
-                  Target longest edge (mm)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="targetSize">{t('search:targetLongestEdgeMm')}</label>
                 <input
                   id="targetSize"
                   type="number"
@@ -95,16 +97,11 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                   onChange={(e) => setTargetSize(Number(e.target.value))}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  pixel_size is derived automatically as this value divided by
-                  the image's longest edge in pixels.
-                </p>
+                <p className="text-xs text-gray-500 mt-1">{t('search:targetSizeHelp')}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="presetSelect">
-                  Filament preset
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="presetSelect">{t('search:filamentPreset')}</label>
                 <select
                   id="presetSelect"
                   value={preset}
@@ -112,7 +109,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   {PRESET_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.value} value={o.value}>{presetLabel(o.value, o.label)}</option>
                   ))}
                 </select>
               </div>
@@ -120,19 +117,17 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
               <button
                 onClick={() => onStart(targetSize, preset)}
                 className="w-full py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-              >
-                Start Optimization
-              </button>
+              >{t('search:startOptimization')}</button>
             </div>
           )}
 
           {/* Phase 2: Running */}
           {phase === 'running' && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">Searching for optimal parameters, please wait...</p>
+              <p className="text-sm text-gray-600">{t('search:searchingForOptimalParametersPleaseWait')}</p>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm text-gray-600">
-                  <span>Progress</span>
+                  <span>{t('search:progress')}</span>
                   <span>
                     {progress ? `${progress.completed} / ${progress.total}` : '—'}
                   </span>
@@ -148,17 +143,14 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                   />
                 </div>
                 {progress && (
-                  <p className="text-xs text-gray-500">
-                    Current best MAE: {progress.bestMae.toFixed(2)}
+                  <p className="text-xs text-gray-500">{t('search:currentBestMae')}{' '}{progress.bestMae.toFixed(2)}
                   </p>
                 )}
               </div>
               <button
                 onClick={onClose}
                 className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
+              >{t('common:cancel')}</button>
             </div>
           )}
 
@@ -166,12 +158,12 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
           {phase === 'results' && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
-                Found {results.length} results. Click a card to apply its parameters.
+                {t('search:results', { count: results.length })}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {top5.map((r) => (
                   <button
-                    key={`${r.rank}-${r.mode}`}
+                    key={`${r.rank}-${r.mode === 'pixel' ? t('search:modePixel') : r.mode === 'svg' ? t('search:modeSvg') : r.mode}`}
                     onClick={() => {
                       onApplyParams(r.params, r.mode);
                       onClose();
@@ -184,22 +176,20 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                       <span className="text-sm font-semibold text-purple-700">#{r.rank}</span>
                       <span className="text-xs text-gray-500 uppercase">{r.mode}</span>
                       {r.rank === 1 && (
-                        <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                          Best
-                        </span>
+                        <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{t('search:best')}</span>
                       )}
                     </div>
                     <img
                       src={r.previewImage}
-                      alt={`rank ${r.rank} preview`}
+                      alt={t('search:rankPreview', { rank: r.rank })}
                       className="w-full rounded-lg mb-2 object-cover"
                       style={{ maxHeight: 120 }}
                     />
-                    <p className="text-xs text-gray-600 mb-1">MAE: {r.mae.toFixed(2)}</p>
+                    <p className="text-xs text-gray-600 mb-1">{t('search:mae')}{' '}{r.mae.toFixed(2)}</p>
                     <div className="text-xs text-gray-500 space-y-0.5">
                       {Object.entries(r.params).map(([k, v]) => (
                         <div key={k} className="flex justify-between">
-                          <span>{k}</span>
+                          <span>{parameterLabel(k)}</span>
                           <span className="font-mono">{typeof v === 'number' ? v.toFixed(2) : v}</span>
                         </div>
                       ))}
@@ -210,9 +200,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
               <button
                 onClick={onClose}
                 className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Close
-              </button>
+              >{t('common:close')}</button>
             </div>
           )}
 
@@ -220,21 +208,17 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
           {phase === 'error' && (
             <div className="space-y-4">
               <div className="rounded-lg bg-red-50 border border-red-200 p-4">
-                <p className="text-sm text-red-700">{error ?? 'Optimization failed. Please try again.'}</p>
+                <p className="text-sm text-red-700">{localize(error ?? 'Optimization failed. Please try again.')}</p>
               </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => onStart(targetSize, preset)}
                   className="flex-1 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  Retry
-                </button>
+                >{t('common:retry')}</button>
                 <button
                   onClick={onClose}
                   className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Close
-                </button>
+                >{t('common:close')}</button>
               </div>
             </div>
           )}

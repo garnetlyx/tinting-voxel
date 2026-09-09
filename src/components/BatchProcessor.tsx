@@ -1,3 +1,5 @@
+import { useLocalizedMessage } from '../i18n/messages';
+import { useTranslation } from '../i18n';
 /**
  * Batch processing component for multiple image upload and conversion
  */
@@ -40,6 +42,8 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
   filamentColors,
   detailSize,
 }) => {
+  const { t } = useTranslation();
+  const localize = useLocalizedMessage();
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -175,7 +179,7 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
           className="w-full flex flex-col items-center gap-2 text-gray-600 hover:text-purple-600 disabled:opacity-50"
         >
           <Upload className="w-8 h-8" />
-          <span className="font-medium">Click to Select Images (up to {MAX_FILES})</span>
+          <span className="font-medium">{t('batch:selectImages', { max: MAX_FILES })}</span>
           <span className="text-sm text-gray-400">PNG, JPEG, GIF, WebP, BMP</span>
         </button>
       </div>
@@ -185,15 +189,13 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-medium text-gray-700">
-              {files.length} image{files.length !== 1 ? 's' : ''} selected
+              {t('batch:selected', { count: files.length })}
             </h3>
             <button
               onClick={clearAll}
               disabled={processing || downloading}
               className="text-sm text-red-500 hover:text-red-700 disabled:opacity-50"
-            >
-              Clear All
-            </button>
+            >{t('batch:clearAll')}</button>
           </div>
           <div className="space-y-1 max-h-48 overflow-y-auto">
             {files.map((file, idx) => {
@@ -212,11 +214,12 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
                     </span>
                   </div>
                   {result?.status === 'error' && (
-                    <span className="text-red-500 text-xs truncate mx-2 max-w-[200px]" title={result.error}>
-                      {result.error}
+                    <span className="text-red-500 text-xs truncate mx-2 max-w-[200px]" title={localize(result.error)}>
+                      {localize(result.error)}
                     </span>
                   )}
                   <button
+                    aria-label={t('common:removeFile', { name: file.name })}
                     onClick={() => removeFile(idx)}
                     disabled={processing || downloading}
                     className="text-gray-400 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
@@ -233,18 +236,18 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
-          {error}
+          {localize(error)}
         </div>
       )}
 
       {/* Results Summary */}
       {results && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <h3 className="font-medium text-green-800 mb-1">Batch Processing Complete</h3>
+          <h3 className="font-medium text-green-800 mb-1">{t('batch:batchProcessingComplete')}</h3>
           <p className="text-sm text-green-700">
-            {results.successCount} of {results.totalImages} images processed successfully
+            {t('batch:summary', { success: results.successCount, total: results.totalImages })}
             {results.errorCount > 0 && (
-              <span className="text-red-600"> ({results.errorCount} failed)</span>
+              <span className="text-red-600">{' '}{t('batch:failed', { count: results.errorCount })}</span>
             )}
           </p>
         </div>
@@ -260,11 +263,9 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
           >
             {processing ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Processing...
-              </>
+                <Loader2 className="w-4 h-4 animate-spin" />{t('common:processing')}</>
             ) : (
-              'Preview Batch'
+              t('batch:previewBatch')
             )}
           </button>
           <button
@@ -274,14 +275,10 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
           >
             {downloading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Generating STLs...
-              </>
+                <Loader2 className="w-4 h-4 animate-spin" />{t('batch:generatingStls')}</>
             ) : (
               <>
-                <Download className="w-4 h-4" />
-                Download All STLs
-              </>
+                <Download className="w-4 h-4" />{t('batch:downloadAllStls')}</>
             )}
           </button>
         </div>

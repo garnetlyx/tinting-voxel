@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n';
 /**
  * 3D WebGL preview component using three.js
  * Renders color blocks as layered voxels with orbit controls
@@ -46,6 +47,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
   doubleSided,
   printStack,
 }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -318,9 +320,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
   if (webglError) {
     return (
       <div className="mt-6 p-4 bg-gray-50 rounded-lg text-center text-gray-500 text-sm">
-        <Layers className="w-5 h-5 mx-auto mb-2 text-gray-400" />
-        3D Preview unavailable (WebGL not supported)
-      </div>
+        <Layers className="w-5 h-5 mx-auto mb-2 text-gray-400" />{t('preview:3dPreviewUnavailableWebglNotSupported')}</div>
     );
   }
 
@@ -328,46 +328,38 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
     <div className="mt-6 space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-          <Layers className="w-5 h-5 text-purple-600" />
-          3D Preview
-        </h3>
+          <Layers className="w-5 h-5 text-purple-600" />{t('preview:3dPreview')}</h3>
         <div className="flex gap-2">
           <button
             onClick={handleResetView}
             className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1"
-            title="Reset camera"
+            title={t('preview:resetCamera')}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset
-          </button>
+            <RotateCcw className="w-3.5 h-3.5" />{t('common:reset')}</button>
           <button
             onClick={handleFitView}
             className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1"
-            title="Top-down view"
+            title={t('preview:topDownView')}
           >
-            <Maximize2 className="w-3.5 h-3.5" />
-            Top
-          </button>
+            <Maximize2 className="w-3.5 h-3.5" />{t('preview:top')}</button>
           <button
             onClick={() => setShowExploded(!showExploded)}
             className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${
               showExploded ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 hover:bg-gray-200'
             }`}
-            title="Toggle exploded view"
+            title={t('preview:toggleExplodedView')}
           >
-            <Layers className="w-3.5 h-3.5" />
-            Exploded
-          </button>
+            <Layers className="w-3.5 h-3.5" />{t('preview:exploded')}</button>
         </div>
       </div>
 
       {/* Size info */}
       <div className="text-xs text-gray-500 flex gap-4">
         <span>{physicalWidth} x {physicalHeight} mm</span>
-        <span>Height: {totalHeight} mm</span>
-        <span>Layers: {printStack.opticalLayerCount} + {printStack.whiteBackingLayers}</span>
-        <span>{totalPixels.toLocaleString()} voxels</span>
-        {isLargeModel && <span className="text-amber-600">Large model</span>}
+        <span>{t('preview:height')}{' '}{totalHeight} mm</span>
+        <span>{t('preview:layers')}{' '}{printStack.opticalLayerCount} + {printStack.whiteBackingLayers}</span>
+        <span>{t('preview:voxels', { count: totalPixels })}</span>
+        {isLargeModel && <span className="text-amber-600">{t('preview:largeModel')}</span>}
       </div>
 
       {/* WebGL canvas */}
@@ -383,7 +375,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
           onClick={toggleAllVisibility}
           className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
         >
-          {colorVisibility.every(cv => cv.visible) ? 'Hide All' : 'Show All'}
+          {colorVisibility.every(cv => cv.visible) ? t('preview:hideAll') : t('preview:showAll')}
         </button>
         {colorVisibility.map(cv => (
           <button
@@ -392,7 +384,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
             className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
               cv.visible ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-50 text-gray-400'
             }`}
-            title={`${cv.visible ? 'Hide' : 'Show'} ${cv.hex} (${cv.count} pixels)`}
+            title={t('preview:visibility', { action: cv.visible ? t('common:hide') : t('common:show'), hex: cv.hex, count: cv.count })}
           >
             <span
               className="w-3 h-3 rounded-sm border border-gray-300"
@@ -404,9 +396,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
         ))}
       </div>
 
-      <p className="text-xs text-gray-400">
-        Drag to rotate, scroll to zoom, right-click to pan
-      </p>
+      <p className="text-xs text-gray-400">{t('preview:dragToRotateScrollToZoomRightClickTo')}</p>
     </div>
   );
 };

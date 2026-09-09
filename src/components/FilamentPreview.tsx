@@ -1,3 +1,5 @@
+import { useLocalizedMessage } from '../i18n/messages';
+import { useTranslation } from '../i18n';
 /**
  * Filament preview component showing achievable color matrix from current configuration
  */
@@ -36,6 +38,8 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
   isConfigValid,
   disabled = false,
 }) => {
+  const { t } = useTranslation();
+  const localize = useLocalizedMessage();
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,29 +111,25 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-sm font-medium text-gray-700">Achievable Filament Gamut</h4>
-          <p className="text-xs text-gray-500">Generic to the current filament setup, not this upload.</p>
+          <h4 className="text-sm font-medium text-gray-700">{t('filaments:achievableFilamentGamut')}</h4>
+          <p className="text-xs text-gray-500">{t('filaments:gamutHelp')}</p>
         </div>
         <button
           onClick={fetchPreview}
           disabled={loading || disabled}
           className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
         >
-          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />{t('common:refresh')}</button>
       </div>
 
       {loading && !preview && (
         <div className="flex items-center justify-center py-6 text-gray-400 text-sm">
-          <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-          Generating preview...
-        </div>
+          <RefreshCw className="w-4 h-4 animate-spin mr-2" />{t('filaments:generatingPreview')}</div>
       )}
 
       {error && (
         <div className="text-xs text-red-500 bg-red-50 p-2 rounded">
-          {error}
+          {localize(error)}
         </div>
       )}
 
@@ -139,7 +139,7 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
           <div className="relative">
             <img
               src={`data:image/png;base64,${preview.image}`}
-              alt="Filament color matrix preview"
+              alt={t('filaments:filamentColorMatrixPreview')}
               className={`w-full rounded border border-gray-200 ${loading ? 'opacity-50' : ''}`}
               style={{ imageRendering: 'pixelated' }}
             />
@@ -153,10 +153,10 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
           {/* Stats */}
           <div className="flex gap-4 text-xs text-gray-500">
             <span>
-              <span className="font-medium text-gray-700">{preview.stats.colorCount}</span> filament colors
+              {t('filaments:filamentCount', { count: preview.stats.colorCount })}
             </span>
             <span>
-              <span className="font-medium text-gray-700">{preview.stats.combinationCount.toLocaleString()}</span> combinations
+              {t('filaments:combinations', { count: preview.stats.combinationCount })}
             </span>
             <span>
               {preview.imageDimensions.width}&times;{preview.imageDimensions.height}px
@@ -172,7 +172,7 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
                   className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 p-2 rounded"
                 >
                   <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  <span>{warning}</span>
+                  <span>{localize(warning)}</span>
                 </div>
               ))}
             </div>

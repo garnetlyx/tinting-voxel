@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n';
 /**
  * Image upload component with drag-and-drop support
  */
@@ -10,6 +11,7 @@ interface ImageUploaderProps {
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onFileDrop }) => {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -58,7 +60,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onF
       >
         <Upload className={`w-8 h-8 ${isDragging ? 'animate-bounce' : ''}`} />
         <span className="font-medium">
-          {isDragging ? 'Drop image here' : 'Click or drag image here'}
+          {isDragging ? t('editor:dropImageHere') : t('editor:clickOrDragImageHere')}
         </span>
         <span className="text-xs text-gray-400">PNG, JPEG, GIF, WebP, BMP</span>
       </button>

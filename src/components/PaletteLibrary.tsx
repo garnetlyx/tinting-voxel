@@ -1,3 +1,6 @@
+import { usePaletteText } from '../i18n/catalog';
+import { useLocalizedMessage } from '../i18n/messages';
+import { useTranslation } from '../i18n';
 /**
  * Palette library browser component.
  * Displays curated color palettes organized by category with color swatches.
@@ -16,6 +19,9 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
   onApplyPalette,
   disabled = false,
 }) => {
+  const { t } = useTranslation();
+  const localize = useLocalizedMessage();
+  const paletteText = usePaletteText();
   const [library, setLibrary] = useState<PaletteLibraryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,9 +81,9 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg flex items-center justify-between"
       >
-        <span>Palette Library</span>
+        <span>{t('palettes:paletteLibrary')}</span>
         <span className="text-gray-400 text-xs">
-          {isExpanded ? 'Hide' : 'Browse curated palettes'}
+          {isExpanded ? t('common:hide') : t('palettes:browseCuratedPalettes')}
         </span>
       </button>
 
@@ -92,9 +98,7 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                   ? 'bg-purple-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
-            >
-              All
-            </button>
+            >{t('palettes:all')}</button>
             {Object.keys(categoryNames).map((key) => (
               <button
                 key={key}
@@ -105,7 +109,7 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                {key}
+                {paletteText(key, key)}
               </button>
             ))}
           </div>
@@ -119,7 +123,7 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
 
           {/* Error */}
           {error && (
-            <p className="text-red-500 text-sm">{error}</p>
+            <p className="text-red-500 text-sm">{localize(error)}</p>
           )}
 
           {/* Palette Grid */}
@@ -131,10 +135,10 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                   className="border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <h4 className="text-sm font-medium text-gray-800">{palette.name}</h4>
-                    <span className="text-xs text-gray-400 capitalize">{palette.category}</span>
+                    <h4 className="text-sm font-medium text-gray-800">{paletteText(`${palette.id}_name`, palette.name)}</h4>
+                    <span className="text-xs text-gray-400 capitalize">{paletteText(palette.category, palette.category)}</span>
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">{palette.description}</p>
+                  <p className="text-xs text-gray-500 mb-2">{paletteText(`${palette.id}_description`, palette.description)}</p>
 
                   {/* Color Swatches */}
                   <div className="flex gap-1 mb-2">
@@ -142,14 +146,14 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                       <div
                         key={idx}
                         className="flex flex-col items-center"
-                        title={`${color.name} (${color.hex})`}
+                        title={t('common:colorEntry', { index: idx + 1, code: color.name[0]?.toUpperCase() ?? '?', hex: color.hex })}
                       >
                         <div
                           className="w-6 h-6 rounded border border-gray-300"
                           style={{ backgroundColor: color.hex }}
                         />
                         <span className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[40px]">
-                          {color.name}
+                          {color.name[0]?.toUpperCase() ?? String(idx + 1)}
                         </span>
                       </div>
                     ))}
@@ -159,16 +163,14 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                     onClick={() => handleApply(palette)}
                     disabled={disabled}
                     className="w-full py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 transition-colors"
-                  >
-                    Apply
-                  </button>
+                  >{t('common:apply')}</button>
                 </div>
               ))}
             </div>
           )}
 
           {!loading && library && library.palettes.length === 0 && (
-            <p className="text-gray-500 text-sm text-center py-3">No palettes found</p>
+            <p className="text-gray-500 text-sm text-center py-3">{t('palettes:noPalettesFound')}</p>
           )}
         </div>
       )}

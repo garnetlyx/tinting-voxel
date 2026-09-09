@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n';
 /**
  * Image pre-processing component for crop and resize before color processing.
  * Uses canvas-based rendering with click-and-drag crop selection.
@@ -25,6 +26,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
   onCancel,
   disabled = false,
 }) => {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -241,33 +243,25 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
     <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-          <Crop className="w-4 h-4" />
-          Image Editor
-        </h3>
+          <Crop className="w-4 h-4" />{t('editor:imageEditor')}</h3>
         <div className="flex gap-2">
           <button
             onClick={handleReset}
             disabled={disabled || !hasEdits}
             className="flex items-center gap-1 text-xs px-2 py-1 text-gray-500 hover:text-gray-700 disabled:text-gray-300 transition-colors"
           >
-            <RotateCcw className="w-3 h-3" />
-            Reset
-          </button>
+            <RotateCcw className="w-3 h-3" />{t('common:reset')}</button>
           <button
             onClick={onCancel}
             disabled={disabled}
             className="text-xs px-3 py-1 text-gray-500 hover:text-gray-700 border border-gray-300 rounded transition-colors"
-          >
-            Cancel
-          </button>
+          >{t('common:cancel')}</button>
           <button
             onClick={handleApply}
             disabled={disabled}
             className="flex items-center gap-1 text-xs px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-300 transition-colors"
           >
-            <Check className="w-3 h-3" />
-            Apply & Process
-          </button>
+            <Check className="w-3 h-3" />{t('editor:applyProcess')}</button>
         </div>
       </div>
 
@@ -275,7 +269,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
       <div className="flex items-center gap-4 text-sm">
         <div className="flex items-center gap-2">
           <Maximize2 className="w-3.5 h-3.5 text-gray-500" />
-          <label className="text-gray-600">Resize:</label>
+          <label className="text-gray-600">{t('editor:resize')}</label>
           <input
             type="range"
             min="10"
@@ -303,7 +297,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
           }`}
         >
           <Crop className="w-3 h-3" />
-          {isCropping ? 'Cropping...' : 'Crop'}
+          {isCropping ? t('editor:cropping') : t('editor:crop')}
         </button>
 
         <span className="text-xs text-gray-400 ml-auto">
@@ -335,9 +329,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
       </div>
 
       {isCropping && !cropRegion && (
-        <p className="text-xs text-gray-400 text-center">
-          Click and drag on the image to select a crop region
-        </p>
+        <p className="text-xs text-gray-400 text-center">{t('editor:clickAndDragOnTheImageToSelectA')}</p>
       )}
     </div>
   );

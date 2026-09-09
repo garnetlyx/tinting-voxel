@@ -5,10 +5,11 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 ## Features
 
 - **Scientific Color Mixing** - Beer-Lambert optical model (hybrid per-channel-k) for accurate transparent filament color blending
-- **N-Color Support (4–16 colors)** - Configurable filament primaries with custom hex values and per-color transmission/scattering parameters
+- **N-Color Support (4–16 colors)** - Arbitrary color codes with custom hex values and per-color transmission/scattering parameters
 - **Multiple Output Formats** - STL ZIP, SVG-STL, **3MF** (with named color objects), SVG-3MF, CSV, and slicer print-settings JSON
 - **Batch Processing** - Process up to 20 images in one run
 - **Palette Library** - 10 curated color palettes across 3 categories
+- **Interface Languages** - English and Simplified Chinese with automatic detection, persistent switching, and feature-based translation resources
 - **Bug Reports** - In-app feedback with optional page screenshots, conversion settings, and diagnostic logs
 - **3D WebGL Preview** - three.js render with orbit controls before export
 - **Parameter Auto-Search** - Sweep maxColors / colorThreshold combinations and pick the best variant
@@ -39,6 +40,7 @@ tinting-voxel/
 │   ├── main.tsx                 # Entry point
 │   ├── pages/Converter.tsx      # Main page component
 │   ├── components/              # UI components
+│   ├── i18n/                    # Frontend locale runtime and feature translations
 │   ├── hooks/                   # Custom hooks
 │   ├── api/                     # API client + types
 │   └── index.css
@@ -194,6 +196,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 - **Cross-Platform**: React code uses `/` for paths. Python uses `pathlib` or `os.path.join`.
 - **Hot Reload**: Both Vite (frontend) and Uvicorn (backend) support hot reload on file changes.
+- **Localization**: Add languages through `src/i18n/`; see the [presentation-layer boundary](docs/ARCHITECTURE.md#frontend-localization-boundary). UI language never changes calculation or export data.
 - **Docs**: Visit `/docs` on the backend for interactive OpenAPI documentation.
 
 ## Documentation

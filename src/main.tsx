@@ -2,8 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import Converter from './pages/Converter';
 import './index.css';
+import { initializeLocale } from './i18n';
 import { initializeBugReportDiagnostics } from './utils/bugReport';
 
+initializeLocale();
 initializeBugReportDiagnostics();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

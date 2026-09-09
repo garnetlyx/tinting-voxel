@@ -1,0 +1,14 @@
+{
+  "reportABug": "报告问题",
+  "thanksYourReportHasBeenReceived": "谢谢！我们已收到你的反馈。",
+  "reportId": "反馈编号：",
+  "whatHappened": "遇到了什么问题？",
+  "optional": "（选填）",
+  "includeAScreenshotOfTheCurrentView": "附上当前画面的截图",
+  "sending": "正在发送…",
+  "sendReport": "发送反馈",
+  "closeBugReport": "关闭问题反馈",
+  "descriptionHelp": "请描述遇到的问题。反馈会附带浏览器信息、当前转换设置和近期错误，帮助我们排查。",
+  "screenshotHelp": "截图可能包含你上传的图片。仅在勾选后附上。",
+  "descriptionPlaceholder": "当时进行了什么操作？你期望出现什么结果？"
+}

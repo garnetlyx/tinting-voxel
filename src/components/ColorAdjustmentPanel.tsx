@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n';
 /**
  * Manual color adjustment panel for reassigning color block mappings.
  * Allows users to edit colors, merge blocks, and delete blocks.
@@ -19,6 +20,7 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
   onMergeColors,
   onDeleteColor,
 }) => {
+  const { t } = useTranslation();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [mergeSource, setMergeSource] = useState<number | null>(null);
 
@@ -84,14 +86,14 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
     <div className="mb-8">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-gray-800">
-          Color Blocks ({colorBlocks.length})
+          {t('preview:colorBlocks', { count: colorBlocks.length })}
         </h2>
         {mergeSource !== null && (
           <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg">
             <Merge className="w-4 h-4" />
-            <span>Select target color to merge into</span>
+            <span>{t('preview:selectTargetColorToMergeInto')}</span>
             <button
-              onClick={handleCancelMerge}
+              aria-label={t('common:cancel')} onClick={handleCancelMerge}
               className="ml-1 p-0.5 hover:bg-blue-100 rounded"
             >
               <X className="w-4 h-4" />
@@ -109,7 +111,7 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
             ? ((color.count / totalPixels) * 100).toFixed(1)
             : '0';
 
-          const ariaLabel = `Color block ${color.hex}, ${color.count} pixels, ${percentage}%${isSelected ? ', selected' : ''}${isMergeSource ? ', merge source' : ''}${isMergeTarget ? ', click to merge' : ''}`;
+          const ariaLabel = t('preview:blockLabel', { hex: color.hex, count: color.count, percentage, state: [isSelected && t('preview:selected'), isMergeSource && t('preview:mergeSource'), isMergeTarget && t('preview:mergeTarget')].filter(Boolean).join('') });
 
           return (
             <div
@@ -143,7 +145,7 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
                     onChange={(e) => handleColorChange(index, e.target.value)}
                     onClick={(e) => e.stopPropagation()}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    title="Change color"
+                    title={t('preview:changeColor')}
                   />
                 )}
               </div>
@@ -156,7 +158,7 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
                 RGB({color.r},{color.g},{color.b})
               </div>
               <div className="text-xs text-gray-400">
-                {color.count} px ({percentage}%)
+                {t('preview:pixelShare', { count: color.count, percentage })}
               </div>
 
               {/* Action buttons (visible when selected) */}
@@ -168,20 +170,16 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
                   <button
                     onClick={() => handleStartMerge(index)}
                     className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
-                    title="Merge into another color"
+                    title={t('preview:mergeIntoAnotherColor')}
                   >
-                    <Merge className="w-3 h-3" />
-                    Merge
-                  </button>
+                    <Merge className="w-3 h-3" />{t('preview:merge')}</button>
                   {colorBlocks.length > 1 && (
                     <button
                       onClick={() => handleDelete(index)}
                       className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors"
-                      title="Delete and merge into nearest color"
+                      title={t('preview:deleteAndMergeIntoNearestColor')}
                     >
-                      <Trash2 className="w-3 h-3" />
-                      Delete
-                    </button>
+                      <Trash2 className="w-3 h-3" />{t('common:delete')}</button>
                   )}
                 </div>
               )}
@@ -191,9 +189,7 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
       </div>
 
       {colorBlocks.length > 0 && (
-        <p className="mt-3 text-xs text-gray-400">
-          Click a color to edit it. Use merge to combine two colors, or delete to remove one.
-        </p>
+        <p className="mt-3 text-xs text-gray-400">{t('preview:colorEditingHelp')}</p>
       )}
     </div>
   );

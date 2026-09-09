@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n';
 /**
  * Parameter adjustment panel component with mode-specific parameters
  */
@@ -89,6 +90,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   hasImage,
   onAutoOptimize,
 }) => {
+  const { t } = useTranslation();
   const formatMaxDimension = (value: number) => value.toFixed(1);
   const [maxDimensionInput, setMaxDimensionInput] = useState(formatMaxDimension(maxDimension));
   const [isEditingMaxDimension, setIsEditingMaxDimension] = useState(false);
@@ -120,8 +122,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
       {mode === 'pixel' ? (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Max Colors: {maxColors}
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:maxColors')}{' '}{maxColors}
             </label>
             <input
               type="range"
@@ -134,8 +135,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Color Merge Threshold: {colorThreshold}
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:colorMergeThreshold')}{' '}{colorThreshold}
             </label>
             <input
               type="range"
@@ -150,8 +150,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
       ) : (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Number of Colors: {numColors}
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:numberOfColors')}{' '}{numColors}
             </label>
             <input
               type="range"
@@ -164,8 +163,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Simplification (Epsilon): {(epsilon ?? 0).toFixed(1)}
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:simplificationEpsilon')}{(epsilon ?? 0).toFixed(1)}
             </label>
             <input
               type="range"
@@ -176,14 +174,11 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               onChange={(e) => onEpsilonChange(parseFloat(e.target.value))}
               className="w-full"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Higher values produce simpler shapes with fewer vertices
-            </p>
+            <p className="text-xs text-gray-500 mt-1">{t('parameters:simplificationHelp')}</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Min Area: {minArea.toFixed(1)} mm²
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:minArea')}{' '}{minArea.toFixed(1)} mm²
             </label>
             <input
               type="range"
@@ -194,16 +189,13 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               onChange={(e) => onMinAreaChange(parseFloat(e.target.value))}
               className="w-full"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Filters out small contours below this physical area
-            </p>
+            <p className="text-xs text-gray-500 mt-1">{t('parameters:minimumAreaHelp')}</p>
           </div>
         </>
       )}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Color Layers: {layerCount} <span className="text-xs font-normal text-gray-500">(max {maxLayerCount} for current filament set)</span>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:colorLayers')}{' '}{layerCount} <span className="text-xs font-normal text-gray-500">{t('parameters:layerLimit', { max: maxLayerCount })}</span>
         </label>
         <input
           type="range"
@@ -214,14 +206,11 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           onChange={(e) => onLayerCountChange(parseInt(e.target.value, 10))}
           className="w-full"
         />
-        <p className="text-xs text-gray-500 mt-1">
-          Higher layer counts improve blend fidelity but increase compute cost exponentially with the selected filament preset or custom set.
-        </p>
+        <p className="text-xs text-gray-500 mt-1">{t('parameters:layerCountHelp')}</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Layer Height: {layerHeight} mm
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:layerHeight')}{' '}{layerHeight} mm
         </label>
         <input
           type="range"
@@ -235,8 +224,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Detail Size (Nozzle Line Width): {(detailSize ?? 0).toFixed(2)} mm
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:detailSizeNozzleLineWidth')}{(detailSize ?? 0).toFixed(2)} mm
         </label>
         <div className="flex gap-2">
           {[0.22, 0.42, 0.62, 0.82].map((val) => (
@@ -251,19 +239,16 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
             >
               {val.toFixed(2)}
               <span className="block text-gray-400 text-[10px] leading-tight" style={{color: Math.abs((detailSize ?? 0) - val) < 0.005 ? 'rgba(255,255,255,0.75)' : undefined}}>
-                {(val - 0.02).toFixed(1)}mm nozzle
+                {t('parameters:nozzle', { diameter: (val - 0.02).toFixed(1) })}
               </span>
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-500 mt-1">
-          Minimum printable feature size, generally equal to your hotend (nozzle) diameter. The slicer default line width is nozzle + 0.02 mm, which is what these presets represent. Regions narrower than this are merged into neighbors before export.
-        </p>
+        <p className="text-xs text-gray-500 mt-1">{t('parameters:detailSizeHelp')}</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Pixel Size: {(pixelSize ?? 0).toFixed(2)} mm
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:pixelSize')}{(pixelSize ?? 0).toFixed(2)} mm
         </label>
         <input
           type="range"
@@ -274,16 +259,12 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           onChange={(e) => onPixelSizeChange(parseFloat(e.target.value))}
           className="w-full"
         />
-        <p className="text-xs text-gray-500 mt-1">
-          Base pixel size. Defaults to Detail Size (1 pixel = 1 line width). If set smaller than Detail Size, the slicer's line width must be adjusted manually to match.
-        </p>
+        <p className="text-xs text-gray-500 mt-1">{t('parameters:pixelSizeHelp')}</p>
       </div>
 
       {targetWidth > 0 && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="maxDimension">
-            Max Dimension (Width or Height)
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="maxDimension">{t('parameters:maxDimensionWidthOrHeight')}</label>
           <input
             id="maxDimension"
             type="number"
@@ -310,15 +291,13 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
           />
           <p className="text-xs text-gray-500">
-            Current size: {targetWidth.toFixed(1)} mm × {targetHeight.toFixed(1)} mm. The shorter side follows the image proportion automatically.
+            {t('parameters:currentSize', { width: targetWidth.toFixed(1), height: targetHeight.toFixed(1) })}
           </p>
         </div>
       )}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="whiteBackingLayers">
-          White Backing Layers
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="whiteBackingLayers">{t('parameters:whiteBackingLayers')}</label>
         <input
           id="whiteBackingLayers"
           type="number"
@@ -330,13 +309,12 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
         />
         <p className="text-xs text-gray-500 mt-1">
-          0 disables backing. Current stack: {printStack.opticalLayerCount} optical + {printStack.whiteBackingLayers} backing = {printStack.totalLayerCount} total layers.
+          {t('parameters:stack', { optical: printStack.opticalLayerCount, backing: printStack.whiteBackingLayers, total: printStack.totalLayerCount })}
         </p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Base Plate Thickness: {basePlateThickness} mm
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:basePlateThickness')}{' '}{basePlateThickness} mm
         </label>
         <input
           type="range"
@@ -348,12 +326,11 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           className="w-full"
         />
         <p className="text-xs text-gray-500 mt-1">
-          {basePlateThickness === 0 ? 'No base plate' : `Adds a solid base plate below color layers`}
+          {basePlateThickness === 0 ? t('parameters:noBasePlate') : t('parameters:basePlateHelp')}
         </p>
       </div>
 
-      <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
-        Actual export height: {printStack.totalHeightMm.toFixed(2)} mm
+      <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">{t('parameters:actualExportHeight')}{' '}{printStack.totalHeightMm.toFixed(2)} mm
       </div>
 
       {mode === 'pixel' && (
@@ -365,12 +342,8 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
             onChange={(e) => onDoubleSidedChange(e.target.checked)}
             className="h-4 w-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
           />
-          <label htmlFor="doubleSided" className="text-sm font-medium text-gray-700">
-            Double-sided print
-          </label>
-          <p className="text-xs text-gray-500">
-            Generates mirrored back side for two-sided viewing
-          </p>
+          <label htmlFor="doubleSided" className="text-sm font-medium text-gray-700">{t('parameters:doubleSidedPrint')}</label>
+          <p className="text-xs text-gray-500">{t('parameters:doubleSidedHelp')}</p>
         </div>
       )}
 
@@ -380,7 +353,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           disabled={processing}
           className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400"
         >
-          {processing ? 'Processing...' : 'Reprocess'}
+          {processing ? t('common:processing') : t('parameters:reprocess')}
         </button>
       )}
 
@@ -389,9 +362,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           onClick={onAutoOptimize}
           disabled={processing}
           className="w-full py-2 border border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Auto-Optimize Parameters
-        </button>
+        >{t('parameters:autoOptimizeParameters')}</button>
       )}
     </div>
   );

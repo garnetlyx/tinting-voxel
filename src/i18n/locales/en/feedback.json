@@ -1,0 +1,14 @@
+{
+  "reportABug": "Report a bug",
+  "thanksYourReportHasBeenReceived": "Thanks! Your report has been received.",
+  "reportId": "Report ID:",
+  "whatHappened": "What happened?",
+  "optional": "(optional)",
+  "includeAScreenshotOfTheCurrentView": "Include a screenshot of the current view",
+  "sending": "Sending…",
+  "sendReport": "Send report",
+  "closeBugReport": "Close bug report",
+  "descriptionHelp": "Tell us what went wrong. Browser details, current conversion settings, and recent errors are included to help us investigate.",
+  "screenshotHelp": "The screenshot may include your uploaded image. It is only attached when selected.",
+  "descriptionPlaceholder": "What were you doing, and what did you expect to happen?"
+}

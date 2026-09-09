@@ -1,0 +1,27 @@
+import batchEn from './locales/en/batch.json';
+import batchZh from './locales/zh-CN/batch.json';
+import commonEn from './locales/en/common.json';
+import commonZh from './locales/zh-CN/common.json';
+import feedbackEn from './locales/en/feedback.json';
+import feedbackZh from './locales/zh-CN/feedback.json';
+import previewEn from './locales/en/preview.json';
+import previewZh from './locales/zh-CN/preview.json';
+import converterEn from './locales/en/converter.json';
+import converterZh from './locales/zh-CN/converter.json';
+import filamentsEn from './locales/en/filaments.json';
+import filamentsZh from './locales/zh-CN/filaments.json';
+import editorEn from './locales/en/editor.json';
+import editorZh from './locales/zh-CN/editor.json';
+import parametersEn from './locales/en/parameters.json';
+import parametersZh from './locales/zh-CN/parameters.json';
+import palettesEn from './locales/en/palettes.json';
+import palettesZh from './locales/zh-CN/palettes.json';
+import searchEn from './locales/en/search.json';
+import searchZh from './locales/zh-CN/search.json';
+import errorsEn from './locales/en/errors.json';
+import errorsZh from './locales/zh-CN/errors.json';
+
+export const english = { batch: batchEn, common: commonEn, feedback: feedbackEn, preview: previewEn, converter: converterEn, filaments: filamentsEn, editor: editorEn, parameters: parametersEn, palettes: palettesEn, search: searchEn, errors: errorsEn };
+type TranslationResources = { [N in keyof typeof english]: Record<keyof typeof english[N], string> };
+export const chinese = { batch: batchZh, common: commonZh, feedback: feedbackZh, preview: previewZh, converter: converterZh, filaments: filamentsZh, editor: editorZh, parameters: parametersZh, palettes: palettesZh, search: searchZh, errors: errorsZh } satisfies TranslationResources;
+export const resources = { en: english, 'zh-CN': chinese };

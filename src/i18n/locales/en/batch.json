@@ -1,0 +1,12 @@
+{
+  "clearAll": "Clear All",
+  "batchProcessingComplete": "Batch Processing Complete",
+  "previewBatch": "Preview Batch",
+  "generatingStls": "Generating STLs...",
+  "downloadAllStls": "Download All STLs",
+  "selectImages": "Click to Select Images (up to {{max}})",
+  "selected_one": "{{count}} image selected",
+  "selected_other": "{{count}} images selected",
+  "summary": "{{success}} of {{total}} images processed successfully",
+  "failed": "({{count}} failed)"
+}

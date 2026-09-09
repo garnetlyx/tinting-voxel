@@ -1,3 +1,5 @@
+import { useLocalizedMessage } from '../i18n/messages';
+import { useTranslation } from '../i18n';
 /**
  * CRUD UI for managing saved filament presets (localStorage)
  */
@@ -33,6 +35,8 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
   onImportPresets,
   disabled = false,
 }) => {
+  const { t } = useTranslation();
+  const localize = useLocalizedMessage();
   const [saveName, setSaveName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -133,7 +137,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-medium text-gray-700">Saved Presets</h4>
+      <h4 className="text-sm font-medium text-gray-700">{t('filaments:savedPresets')}</h4>
 
       {/* Save current config */}
       <div className="flex gap-2">
@@ -142,7 +146,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
           value={saveName}
           onChange={e => setSaveName(e.target.value)}
           onKeyDown={handleSaveKeyDown}
-          placeholder="Preset name..."
+          placeholder={t('filaments:presetName')}
           disabled={disabled || !isConfigValid}
           className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
         />
@@ -151,9 +155,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
           disabled={disabled || !isConfigValid || !saveName.trim()}
           className="flex items-center gap-1 text-sm px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
-          <Save className="w-3.5 h-3.5" />
-          Save
-        </button>
+          <Save className="w-3.5 h-3.5" />{t('common:save')}</button>
       </div>
 
       {/* Preset list */}
@@ -208,20 +210,20 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
                     onClick={() => onLoadPreset(preset.colors)}
                     disabled={disabled}
                     className="flex-1 text-left text-sm text-gray-700 hover:text-purple-700 truncate disabled:cursor-not-allowed"
-                    title={`Load "${preset.name}" (${preset.colors.length} colors)`}
+                    title={t('filaments:loadPreset', { name: preset.name, count: preset.colors.length })}
                   >
                     {preset.name}
                   </button>
 
                   {/* Color count */}
-                  <span className="text-[10px] text-gray-400">{preset.colors.length}c</span>
+                  <span className="text-[10px] text-gray-400">{t('filaments:compactCount', { count: preset.colors.length })}</span>
 
                   {/* Overwrite */}
                   <button
                     onClick={() => onUpdatePreset(preset.id, preset.name, currentColors)}
                     disabled={disabled || !isConfigValid}
                     className="opacity-0 group-hover:opacity-100 text-blue-500 hover:text-blue-700 disabled:text-gray-300 p-0.5 transition-opacity"
-                    title="Overwrite with current config"
+                    title={t('filaments:overwriteWithCurrentConfig')}
                   >
                     <Save className="w-3 h-3" />
                   </button>
@@ -231,7 +233,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
                     onClick={() => handleStartRename(preset)}
                     disabled={disabled}
                     className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 disabled:text-gray-300 p-0.5 transition-opacity"
-                    title="Rename"
+                    title={t('filaments:rename')}
                   >
                     <Edit2 className="w-3 h-3" />
                   </button>
@@ -241,7 +243,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
                     onClick={() => onDeletePreset(preset.id)}
                     disabled={disabled}
                     className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 disabled:text-gray-300 p-0.5 transition-opacity"
-                    title="Delete"
+                    title={t('common:delete')}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -253,7 +255,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
       )}
 
       {presets.length === 0 && (
-        <p className="text-xs text-gray-400 italic">No saved presets yet</p>
+        <p className="text-xs text-gray-400 italic">{t('filaments:noSavedPresetsYet')}</p>
       )}
 
       {/* Import / Export */}
@@ -263,17 +265,13 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
           disabled={disabled || presets.length === 0}
           className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
         >
-          <Download className="w-3 h-3" />
-          Export
-        </button>
+          <Download className="w-3 h-3" />{t('filaments:export')}</button>
         <button
           onClick={handleImportClick}
           disabled={disabled}
           className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
         >
-          <Upload className="w-3 h-3" />
-          Import
-        </button>
+          <Upload className="w-3 h-3" />{t('filaments:import')}</button>
         <input
           ref={fileInputRef}
           type="file"
@@ -286,7 +284,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
       {/* Import feedback */}
       {importMessage && (
         <p className={`text-xs ${importMessageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-          {importMessage}
+          {localize(importMessage)}
         </p>
       )}
     </div>

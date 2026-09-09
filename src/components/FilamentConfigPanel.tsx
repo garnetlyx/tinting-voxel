@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n';
 /**
  * Panel for configuring filament colors with preset quick-load and custom editing
  */
@@ -31,6 +32,7 @@ export const FilamentConfigPanel: React.FC<FilamentConfigPanelProps> = ({
   onRemoveColor,
   disabled = false,
 }) => {
+  const { t } = useTranslation();
   const existingLabels = filamentColors.map(c => c.name?.[0]?.toUpperCase() ?? '');
   const canAdd = filamentColors.length < MAX_FILAMENT_COLORS;
   const canRemove = filamentColors.length > MIN_FILAMENT_COLORS;
@@ -48,27 +50,25 @@ export const FilamentConfigPanel: React.FC<FilamentConfigPanelProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500 font-medium">
-            {filamentColors.length} of {MAX_FILAMENT_COLORS} colors
+            {t('filaments:capacity', { count: filamentColors.length, max: MAX_FILAMENT_COLORS })}
           </span>
           {!isValid && (
-            <span className="text-xs text-red-500 font-medium">
-              Fix validation errors below
-            </span>
+            <span className="text-xs text-red-500 font-medium">{t('filaments:fixValidationErrorsBelow')}</span>
           )}
         </div>
 
+        <p className="text-xs text-gray-500">{t('filaments:codeHelp')}</p>
         {/* Column headers */}
         <div className="flex items-center gap-2 text-xs text-gray-400 px-0.5">
-          <span className="w-8">Hex</span>
-          <span className="flex-1">Name</span>
-          <span className="w-6 text-center">ID</span>
-          <span className="w-20 text-right">TD</span>
+          <span className="w-8">{t('filaments:hex')}</span>
+          <span className="flex-1">{t('filaments:codeName')}</span>
+          <span className="w-20 text-right">{t('filaments:td')}</span>
           <span className="w-6"></span>
         </div>
 
         {filamentColors.map((config, index) => (
           <FilamentColorRow
-            key={`${config.name}-${config.hex}-${config.transmission_distance}`}
+            key={index}
             config={config}
             index={index}
             onChange={onUpdateColor}
@@ -85,9 +85,7 @@ export const FilamentConfigPanel: React.FC<FilamentConfigPanelProps> = ({
         disabled={!canAdd || disabled}
         className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-800 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
       >
-        <Plus className="w-4 h-4" />
-        Add Color
-      </button>
+        <Plus className="w-4 h-4" />{t('filaments:addColor')}</button>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 /**
  * Color blocks grid display component
  */
+import { useTranslation } from '../i18n';
 import React from 'react';
 import type { ColorBlock } from '../api/types';
 
@@ -9,6 +10,7 @@ interface ColorBlocksListProps {
 }
 
 export const ColorBlocksList: React.FC<ColorBlocksListProps> = ({ colorBlocks }) => {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
       {colorBlocks.map((color, index) => (
@@ -24,7 +26,7 @@ export const ColorBlocksList: React.FC<ColorBlocksListProps> = ({ colorBlocks })
             RGB({color.r},{color.g},{color.b})
           </div>
           <div className="text-xs text-gray-500 mb-2">
-            {color.count} pixels
+            {t('common:pixels', { count: color.count })}
           </div>
         </div>
       ))}

@@ -50,6 +50,28 @@ describe('Bug report diagnostics', () => {
 });
 
 describe('Bug report screenshot', () => {
+  it('captures the selected language label without changing the live selection', async () => {
+    document.body.innerHTML = '<div id="root"><select><option value="en">English</option><option value="zh-CN">简体中文</option></select></div>';
+    const select = document.querySelector('select')!;
+    select.value = 'zh-CN';
+    vi.spyOn(select, 'getBoundingClientRect').mockReturnValue({ width: 84, height: 20 } as DOMRect);
+    vi.mocked(html2canvas).mockImplementation(async (_target, options) => {
+      const clone = document.implementation.createHTMLDocument();
+      clone.body.innerHTML = document.body.innerHTML;
+      await options!.onclone!(clone, clone.body);
+      expect(clone.querySelector('select')).toBeNull();
+      const label = clone.querySelector('#root span') as HTMLElement;
+      expect(label.textContent).toBe('简体中文');
+      expect(label.style.width).toBe('84px');
+      expect(label.style.height).toBe('20px');
+      return { toDataURL: () => 'data:image/jpeg;base64,small' } as HTMLCanvasElement;
+    });
+    await captureBugReportScreenshot();
+    expect(select.isConnected).toBe(true);
+    expect(select.value).toBe('zh-CN');
+    document.body.innerHTML = '';
+  });
+
   it('preserves slider positions in the screenshot without changing live controls', async () => {
     document.body.innerHTML = '<div id="root"><input type="range" min="10" max="20" value="15"><input type="range" value="100"><input type="password" value="private"></div>';
     document.querySelectorAll('input[type="range"]').forEach(input => {

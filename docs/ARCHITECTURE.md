@@ -1,6 +1,6 @@
 # Architecture
 
-**Last Updated**: 2026-03-11
+**Last Updated**: 2026-09-08
 
 ## Overview
 
@@ -70,6 +70,7 @@ tinting-voxel is a web application that converts images into layered 3D-printabl
 | Layer | Technology | Rationale |
 |-------|------------|-----------|
 | **Frontend Framework** | React 19 + TypeScript | Type safety, component-based architecture, modern hooks API |
+| **Frontend Localization** | i18next + react-i18next | Typed feature namespaces, live locale switching, English fallback |
 | **Build Tool** | Vite | Fast HMR, ESBuild-powered bundling, native ESM support |
 | **Styling** | Tailwind CSS | Utility-first, rapid prototyping, small bundle size |
 | **Backend Framework** | FastAPI | Async support, automatic OpenAPI docs, Pydantic validation |
@@ -137,6 +138,8 @@ tinting-voxel/
 │   │   ├── FilamentConfigPanel.tsx # N-color filament config
 │   │   ├── ImageEditor.tsx       # Canvas crop/resize editor
 │   │   └── UploadDropzone.tsx    # Drag-and-drop upload
+│   ├── i18n/             # Locale runtime, typed resources, presentation adapters
+│   │   └── locales/      # en/ and zh-CN/ feature namespaces
 │   ├── hooks/            # Custom hooks
 │   └── api/              # API client + types
 ├── e2e/                  # Playwright E2E tests (8 spec files, 45 tests)
@@ -182,6 +185,70 @@ tinting-voxel/
 | **ImageEditor** | Canvas-based crop/resize editor | Canvas API, useRef |
 | **ColorBlocksList** | Display extracted color swatches with data | Props only |
 | **DownloadButtons** | Trigger CSV/STL/3MF downloads | Loading state |
+| **LanguageSelector** | Switch the workspace language | Dedicated locale preference |
+
+### Frontend Localization Boundary
+
+Localization is owned by the presentation layer in `src/i18n/`. The backend,
+processing hooks, API payloads, color calculations, and machine-readable exports
+remain language-independent. Documentation remains in its existing language.
+
+| Module | Responsibility |
+|--------|----------------|
+| `i18n/index.ts` | Initialize i18next, register supported locales and aliases, resolve preferences, synchronize document language/title, expose the React translation hook |
+| `i18n/resources.ts` and `i18next.d.ts` | Register locale resources and type-check namespace/key references |
+| `i18n/locales/<locale>/*.json` | Feature-owned strings: common, converter, parameters, filaments, preview, editor, batch, palettes, search, feedback, errors |
+| `i18n/messages.ts` | Adapt canonical frontend/API error and warning strings for display without modifying their source state |
+| `i18n/catalog.ts` | Resolve system preset and palette display metadata by stable identity, preserving unknown entries |
+| `components/LanguageSelector.tsx` | Accessible locale control independent of converter state |
+
+**Locale lifecycle.** `main.tsx` initializes the language before rendering React.
+A supported preference in `localStorage["tinting-voxel.locale"]` takes precedence
+over the browser's ordered language preferences. Chinese variants currently
+resolve to Simplified Chinese (`zh-CN`); unsupported preferences fall back to
+English (`en`). Storage failures do not prevent switching. All resources are
+bundled for synchronous initial rendering and switching; there is no translation
+service or locale-specific backend request. Future resource loading changes belong
+inside this module and must preserve the mounted workspace.
+
+**State and transport.** Components translate at render time, including errors
+already on screen. Processing hooks retain canonical messages, values, and task
+states; translated strings are never added to calculation dependencies. Switching
+language must not re-upload files, restart processing, replace result images, or
+recreate the WebGL canvas. Existing API errors have no localization contract, so
+`messages.ts` contains explicit legacy string/pattern matching separate from
+editable English display copy. Unknown server details remain intact. A future
+structured error protocol can be supported by this adapter without coupling the
+backend to UI translation keys.
+
+**Dynamic colors and catalogs.** No fixed CMYK-to-language color dictionary is
+used. Color swatches display the current entry's code/index and hex value. The
+frontend code editor accepts unique letters A–Z, matching the existing backend
+protocol that derives a label from `name[0].upper()`. Unedited legacy names and
+all material parameters are preserved; editing a code updates only that entry's
+canonical `name` to the chosen letter. Locale changes never rewrite names or
+codes. Saved preset names and other user-authored text stay verbatim. System
+preset/palette titles and descriptions use ID-based display lookups with supplied
+text as fallback for new entries; these lookups do not define the palette's
+colors or change an applied configuration. Supporting identifiers beyond the
+existing single-letter protocol would require a separate data-contract migration.
+
+**Formatting and feedback.** Complete sentences with counts use interpolation
+and plural forms; visible large counts use locale-aware number formatting.
+Numeric inputs, API numbers, and STL/3MF/CSV/slicer schemas retain their canonical
+formats and units. Feedback context records the active UI language. Screenshot
+capture renders native range/select controls in the clone to preserve their
+appearance and translated labels without changing the live page.
+
+**Adding a language or feature.** Add the same feature resource files under a new
+locale directory, register them in `resources.ts`, and register its code, native
+label, and matching aliases in `supportedLocales`. Add feature namespaces in
+`resources.ts`; namespace subscriptions are derived from that registry. Keep
+keys semantic and stable, use interpolation for variable content, and keep
+user/transport data outside translation resources. Resource parity tests cover every registered locale. Current tests enforce matching keys and
+interpolation parameters, locale persistence and fallback, live error updates,
+dynamic color preservation, retained feedback drafts, and no redundant preview
+requests. `npm test` and `npm run build` validate this boundary.
 
 ## Data Flow
 
