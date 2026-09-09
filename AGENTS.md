@@ -30,6 +30,7 @@ tinting-voxel/
 │   │       ├── batch.py      # Batch processing (up to 20 images)
 │   │       ├── palette.py    # Palette library
 │   │       ├── param_search.py # Param search SSE + top-N results
+│   │       ├── bug_report.py  # In-app bug reports (storage + optional email)
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py    # Color blending (Beer-Lambert model)
@@ -41,6 +42,7 @@ tinting-voxel/
 │   │   └── palette_library.py # Supported filament palettes
 │   ├── services/         # Business logic
 │   │   ├── analytics.py         # In-memory usage analytics
+│   │   ├── bug_report.py       # Bug report storage + optional email delivery
 │   │   ├── batch_processor.py    # Multi-image batch processing
 │   │   ├── csv_generator.py      # CSV export
 │   │   ├── filament_preview.py   # Color matrix preview
@@ -56,7 +58,7 @@ tinting-voxel/
 │   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
 │   │   └── vector_processor.py   # Vector/contour processing
 │   ├── config/           # Configuration (settings, constants)
-│   └── tests/            # Test suite (~670 tests)
+│   └── tests/            # Test suite (~680 tests)
 │       ├── unit/             # Unit tests
 │       ├── integration/      # Integration tests
 │       ├── performance/      # Performance tests
@@ -73,8 +75,9 @@ tinting-voxel/
 │   │   ├── FilamentConfigPanel.tsx # N-color filament config
 │   │   └── ImageEditor.tsx       # Canvas crop/resize editor
 │   ├── hooks/            # Custom hooks
+│   ├── i18n/             # Locale runtime and feature translations (en, zh-CN)
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (6 spec files, 35 tests)
+├── e2e/                  # Playwright E2E tests (7 spec files, 38 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config
@@ -149,6 +152,7 @@ docker compose up --build  # Build and run
 | POST | `/api/filament-preview` | Color matrix preview |
 | POST | `/api/batch/process` | Batch process up to 20 images |
 | POST | `/api/batch/download-stl` | Batch STL download |
+| POST | `/api/bug-report` | Submit in-app bug report (optional screenshot) |
 | POST | `/api/param-search` | Run parameter search, return top-N results |
 | GET | `/api/param-search/progress/{job_id}` | SSE stream of search progress events |
 | GET | `/api/palettes/` | List color palettes |
@@ -168,13 +172,13 @@ docker compose up --build  # Build and run
 ## Testing
 
 ```bash
-# Backend (~670 tests)
+# Backend (~680 tests)
 cd backend && pytest -v
 
-# Frontend (Vitest, 12 test files)
+# Frontend (Vitest, 20 test files)
 npm test
 
-# E2E (6 spec files, 35 tests)
+# E2E (7 spec files, 38 tests)
 npx playwright test
 ```
 

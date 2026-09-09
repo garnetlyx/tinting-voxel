@@ -2,7 +2,7 @@
 
 **Product Name**: tinting-voxel
 **Version**: 2.0
-**Last Updated**: 2026-09-08
+**Last Updated**: 2026-09-09
 **Status**: In Development — feature-complete beyond original MVP
 
 ---
@@ -175,10 +175,12 @@ tinting-voxel solves these by:
 - Palette library selector
 - Parameter-search modal with backend warmup UX
 - Color adjustment panel
+- In-app bug reports (optional screenshot, settings, diagnostics; email delivery via Resend)
+- English and Simplified Chinese UI with live locale switching
 
 **Infrastructure / API**
 - FastAPI app with V1 + V2 routes, param-search, batch, palette, filament,
-  health, analytics
+  health, analytics, bug-report
 - `slowapi` rate limiting on all endpoints
 - `@handle_api_errors` standardized error handling
 - File upload validators (extension, size, magic bytes)
@@ -186,7 +188,7 @@ tinting-voxel solves these by:
 - Docker multi-stage build + Railway / Fly.io / docker-compose configs
 
 **Quality**
-- ~670 backend tests, ~118 frontend Vitest tests, 35 Playwright E2E tests (6 spec files)
+- ~680 backend tests, ~145 frontend Vitest tests (20 files), 38 Playwright E2E tests (7 spec files)
 - QA regression suite (R1–R16+) documenting 190+ bugs fixed
 
 ### 4.2 In Progress / Planned
@@ -380,6 +382,7 @@ param search, Docker/cloud deploy. Calibration performed offline.
 | POST | `/api/filament-preview` | Color gamut matrix |
 | POST | `/api/batch/process` | Batch (≤20 images) |
 | POST | `/api/batch/download-stl` | Batch STL download |
+| POST | `/api/bug-report` | Submit in-app bug report (optional screenshot) |
 | POST | `/api/param-search` | Auto parameter sweep |
 | GET  | `/api/param-search/progress/{job_id}` | Sweep progress |
 | GET  | `/api/palettes/` | List palettes |

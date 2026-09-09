@@ -1,6 +1,6 @@
 # Architecture
 
-**Last Updated**: 2026-09-08
+**Last Updated**: 2026-09-09
 
 ## Overview
 
@@ -96,6 +96,8 @@ tinting-voxel/
 │   │       ├── filament.py   # Filament preview
 │   │       ├── batch.py      # Batch processing (up to 20 images)
 │   │       ├── palette.py    # Palette library
+│   │       ├── param_search.py # Param search SSE + top-N results
+│   │       ├── bug_report.py  # In-app bug reports
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py        # Color blending (Original/Kromacut/Hybrid/Per-channel modes)
@@ -117,14 +119,14 @@ tinting-voxel/
 │   │   ├── batch_processor.py    # Multi-image batch processing
 │   │   ├── filament_preview.py   # Color matrix preview
 │   │   ├── print_settings_generator.py # Slicer settings JSON
-│   │   ├── print_settings_generator.py # Slicer settings JSON
 │   │   ├── print_stack.py       # Print stack modeling
 │   │   ├── raster_cleanup.py    # Raster post-processing cleanup
 │   │   ├── matrix_cache.py      # Reference-matrix cache (powers /api/cache-stats)
 │   │   ├── param_search_service.py # Auto parameter sweep engine
+│   │   ├── bug_report.py        # Bug report storage + optional email delivery
 │   │   └── analytics.py         # In-memory usage analytics
 │   ├── config/           # Configuration
-│   └── tests/            # Test suite (~670 tests)
+│   └── tests/            # Test suite (~680 tests)
 │       └── fixtures/
 │           ├── images/        # Committed small test images (200-500px, <100KB)
 │           └── images-local/  # Gitignored large images for local manual testing
@@ -142,7 +144,7 @@ tinting-voxel/
 │   │   └── locales/      # en/ and zh-CN/ feature namespaces
 │   ├── hooks/            # Custom hooks
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (8 spec files, 45 tests)
+├── e2e/                  # Playwright E2E tests (7 spec files, 38 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config
@@ -169,6 +171,7 @@ tinting-voxel/
 | **PaletteLibrary** | Curated color palette management | dataclasses |
 | **PrintSettingsGenerator** | Slicer settings JSON export | json |
 | **Analytics** | In-memory usage analytics | threading |
+| **BugReportService** | Bug report storage + optional email delivery | json, Resend API |
 
 ### Frontend Components
 
