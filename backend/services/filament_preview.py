@@ -19,6 +19,11 @@ from core.blend_color import BlendTestGenerator, Colors
 
 logger = logging.getLogger(__name__)
 
+# Gamut preview render bounds: cells shrink for large grids so the decoded
+# image stays browser-safe; the combination data itself is never capped.
+BASE_CELL_SIZE_PX = 12
+MAX_PREVIEW_EDGE_PX = 2048
+
 
 class FilamentPreviewService:
     """
@@ -111,7 +116,10 @@ class FilamentPreviewService:
         else:
             page_matrix = color_matrix
 
-        # Render grid image for the current page's entries
+        # Render grid image for the current page's entries. Swatches are viewed
+        # at display resolution, so shrink cells instead of emitting
+        # multi-megapixel images — a 390k-combination grid at 12px cells is
+        # 7500x7500 and freezes the browser tab decoding ~225MB of pixels.
         page_count = len(page_matrix)
         if page_count > 0:
             cols = int(np.ceil(np.sqrt(page_count)))
@@ -119,7 +127,7 @@ class FilamentPreviewService:
         else:
             cols = 0
             rows = 0
-        cell_size = 12
+        cell_size = max(1, min(BASE_CELL_SIZE_PX, MAX_PREVIEW_EDGE_PX // max(cols, rows, 1)))
         img_width = max(1, cols * cell_size)
         img_height = max(1, rows * cell_size)
 
