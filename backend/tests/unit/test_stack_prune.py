@@ -121,6 +121,27 @@ class TestRegimeGate:
         code_df, _ = compute_reference_matrices(4, 0.08, bambu)
         assert len(set(_codes_from_matrix(code_df))) == 5**4
 
+    def test_unmeasured_custom_set_keeps_full_enumeration(self):
+        """Gate regression (review round 9): a custom set with no td_neutral
+        but high transmission_distance must NOT be pruned — the prune's ΔE
+        budget is validated only on TD1S-measured sets, so approximation
+        never engages on unproven regimes. The lenient fallback remains the
+        classification default for the frontend layer-height hint."""
+        custom = [
+            type(get_preset("clear_cmywg")[0])(
+                name=n, hex=h, transmission_distance=10.0, alpha=12.0, k=1.0,
+            )
+            for n, h in (("Cyan", "#5489B4"), ("Magenta", "#DE5740"),
+                         ("Yellow", "#DDC465"), ("White", "#D9D6C5"))
+        ]
+        colors = Colors.from_configs(custom)
+        # Classification default (layer-height hint): fallback tds qualify.
+        assert is_translucent_set(colors)
+        # Prune gate: no measured td_neutral -> exact full enumeration.
+        assert not is_translucent_set(colors, require_measured_td=True)
+        code_df, _ = compute_reference_matrices(4, 0.84, colors)
+        assert len(set(_codes_from_matrix(code_df))) == 4**4  # 256 exact, not C(7,3)=35
+
     def test_mixed_set_keeps_full_enumeration(self):
         """Opaque/mixed sets remain exact: one opaque filament disqualifies
         the whole set from pruning (theory: opaque + transparent blends are

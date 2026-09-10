@@ -48,12 +48,21 @@ CANDIDATE_MARGIN_DELTA_E = 8.0
 MAX_CANDIDATE_COMPOSITIONS = 12
 
 
-def is_translucent_set(colors: Colors, threshold_mm: Optional[float] = None) -> bool:
+def is_translucent_set(
+    colors: Colors,
+    threshold_mm: Optional[float] = None,
+    require_measured_td: bool = False,
+) -> bool:
     """True when every filament's neutral TD meets the transparency threshold.
 
     Uses the same td_neutral data and default threshold (6.7 mm) as the
-    frontend transparency classification; unmeasured colors fall back to
-    their configured transmission distance.
+    frontend transparency classification. With ``require_measured_td=False``
+    (the classification default, which drives the frontend layer-height hint)
+    unmeasured colors fall back to their configured transmission distance.
+    With ``require_measured_td=True`` (the prune gate) every color must carry
+    a measured td_neutral: the prune's ΔE budget is validated only on
+    TD1S-measured transparent sets, so approximation stays confined to that
+    proven domain and everything else keeps exact full enumeration.
     """
     if threshold_mm is None:
         threshold_mm = settings.transparent_td_threshold
@@ -62,6 +71,8 @@ def is_translucent_set(colors: Colors, threshold_mm: Optional[float] = None) -> 
         return False
     for color in items:
         td_neutral = getattr(color, "td_neutral", None)
+        if require_measured_td and td_neutral is None:
+            return False
         td = td_neutral if td_neutral is not None else color.td
         if td is None or td < threshold_mm:
             return False
@@ -143,7 +154,7 @@ def refine_matches(
     perceptual metric as the production mapper. No-op for non-translucent
     sets, whose reference matrix already enumerates every ordering exactly.
     """
-    if not is_translucent_set(colors):
+    if not is_translucent_set(colors, require_measured_td=True):
         return stage1_codes, stage1_rgbs
 
     ref_codes = []

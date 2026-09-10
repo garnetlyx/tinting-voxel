@@ -97,7 +97,7 @@ def compute_reference_matrices(
 
     from core.stack_prune import composition_codes, is_translucent_set
 
-    translucent = is_translucent_set(colors)
+    translucent = is_translucent_set(colors, require_measured_td=True)
     # Pruning only ever operates in the translucent regime: `prune` may opt
     # OUT (False, the oracle) but can never force an opaque or mixed set onto
     # the composition-pruned path.
