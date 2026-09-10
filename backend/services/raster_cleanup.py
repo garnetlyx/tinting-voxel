@@ -107,7 +107,7 @@ def remove_thin_features(
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (min_width, min_width))
 
     for label_idx in range(len(colors)):
-        mask = (labels == label_idx).astype(np.uint8)
+        mask = (result == label_idx).astype(np.uint8)
         if not mask.any():
             continue
 
@@ -159,30 +159,22 @@ def remove_thin_features(
         if stroke_pixels.any():
             result[stroke_pixels] = label_idx
 
-        # Apply noise removal: reassign to nearest other label via distance
-        # transform (vectorised, no Python loops)
+        # Apply noise removal: reassign to nearest other label via exact distance transform
         if noise_pixels.any():
             # Build a mask of "anchor" pixels: belong to a different label
             # and were not themselves removed
             other_mask = (result != label_idx).astype(np.uint8)
             if not other_mask.any():
                 continue
-            # Distance transform gives, for each pixel, the distance to the
-            # nearest non-zero pixel in other_mask.  We also need the label
-            # of that nearest pixel → use label transform via Voronoi.
-            # cv2 doesn't expose label transform directly, so we use
-            # connectedComponents on other_mask to build a Voronoi map.
-            _, voronoi_labels = cv2.distanceTransformWithLabels(
-                1 - other_mask,  # foreground = pixels to fill
-                cv2.DIST_L2,
-                cv2.DIST_MASK_PRECISE,
-                labelType=cv2.DIST_LABEL_PIXEL,
+            import scipy.ndimage as ndi
+            # distance_transform_edt returns the exact (y, x) coordinates of the
+            # nearest zero pixel in (1 - other_mask), i.e., the nearest anchor pixel
+            indices = ndi.distance_transform_edt(
+                1 - other_mask,
+                return_distances=False,
+                return_indices=True,
             )
-            # voronoi_labels[y,x] = flat index of nearest anchor pixel
-            # Map flat index → label value in result
-            flat_result = result.flatten()
-            nearest_label_map = flat_result[voronoi_labels.flatten() - 1].reshape(height, width)
-            result[noise_pixels] = nearest_label_map[noise_pixels]
+            result[noise_pixels] = result[indices[0][noise_pixels], indices[1][noise_pixels]]
 
     return result
 

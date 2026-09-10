@@ -137,3 +137,34 @@ def test_remove_thin_features_deletes_compact_noise():
     assert int((cleaned == 1).sum()) == 0, (
         "Compact noise blob was not removed by remove_thin_features"
     )
+
+
+def test_remove_thin_features_reassigns_to_spatial_neighbor_not_top_left_origin():
+    """
+    Ensure noise pixels are reassigned to their true spatial neighbors rather
+    than erroneously indexing top-left pixels from flat array mismatch.
+    """
+    from services.raster_cleanup import remove_thin_features
+
+    H, W = 50, 50
+    # Top-left has label 0
+    labels = np.zeros((H, W), dtype=np.int32)
+    # Bottom-right has label 1
+    labels[25:, 25:] = 1
+    # Inside bottom-right, put a tiny 2x2 noise blob of label 2 at (40:42, 40:42)
+    labels[40:42, 40:42] = 2
+
+    colors = [(0, 0, 255), (255, 0, 0), (0, 255, 0)]  # 0=blue, 1=red, 2=green
+
+    cleaned = remove_thin_features(
+        labels=labels,
+        colors=colors,
+        pixel_size=0.1,
+        detail_size=0.4,
+    )
+
+    # The noise blob was deep inside label 1 (red). It must become label 1, NOT label 0 (blue)
+    assert np.all(cleaned[40:42, 40:42] == 1), (
+        f"Noise blob was incorrectly reassigned to {cleaned[40:42, 40:42]} instead of neighbor 1"
+    )
+
