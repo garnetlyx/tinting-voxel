@@ -210,12 +210,12 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:layerHeight')}{' '}{layerHeight} mm
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:layerHeight')}{' '}{layerHeight.toFixed(2)} mm
         </label>
         <input
           type="range"
           min="0.04"
-          max="0.28"
+          max={layerHeight > 0.28 ? Math.max(1.00, layerHeight) : 0.28}
           step="0.01"
           value={layerHeight}
           onChange={(e) => onLayerHeightChange(parseFloat(e.target.value))}

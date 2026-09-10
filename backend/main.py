@@ -44,10 +44,10 @@ async def lifespan(app: FastAPI):
         layer_height=settings.default_layer_height
     )
 
-    # Warm up matrix cache for common preset configurations
+    # Warm up matrix cache for common preset configurations (layers 4 and 5)
     logger.info("Warming up matrix cache for preset configurations...")
     from services.matrix_cache import warmup_cache
-    cache_entries = warmup_cache()
+    cache_entries = warmup_cache(layer_counts=[4, 5])
     logger.info("Matrix cache warmed up with %d entries", cache_entries)
 
     logger.info("Application startup complete")
