@@ -149,7 +149,12 @@ export const useImageProcessor = () => {
     setFilamentPreset(preset);
     setFilamentColors([...DEFAULT_PRESETS[preset]]);
     filamentStorage.setLastPresetId(null);
-  }, [filamentStorage]);
+    if (preset === 'clear_cmywg') {
+      setLayerHeight(0.84);
+    } else if (layerHeight === 0.84) {
+      setLayerHeight(0.08);
+    }
+  }, [filamentStorage, layerHeight]);
 
   // Load a saved (custom) preset's colors into the editor
   const loadSavedPresetColors = useCallback((colors: FilamentColorConfig[]) => {
@@ -241,7 +246,10 @@ export const useImageProcessor = () => {
   }, [maxLayerCount]);
 
   // Process image by calling backend API
-  const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode, overridePixelSize?: number) => {
+  const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode, overridePixelSize?: number, overrides?: Partial<{
+    maxColors: number; colorThreshold: number; epsilon: number; minArea: number; numColors: number;
+    detailSize: number; whiteBackingLayers: number;
+  }>) => {
     // Abort any in-flight processing request
     if (processAbortRef.current) {
       processAbortRef.current.abort();
@@ -290,11 +298,15 @@ export const useImageProcessor = () => {
         pixelSize: overridePixelSize ?? pixelSize,
         layerHeight,
         layerCount,
-        whiteBackingLayers,
+        whiteBackingLayers: overrides?.whiteBackingLayers ?? whiteBackingLayers,
         ...filamentRequestPayload,
-        detailSize,
-        pixelParams: processingMode === 'pixel' ? { maxColors, colorThreshold } : undefined,
-        svgParams: processingMode === 'svg' ? { epsilon, minArea, numColors } : undefined,
+        detailSize: overrides?.detailSize ?? detailSize,
+        pixelParams: processingMode === 'pixel'
+          ? { maxColors: overrides?.maxColors ?? maxColors, colorThreshold: overrides?.colorThreshold ?? colorThreshold }
+          : undefined,
+        svgParams: processingMode === 'svg'
+          ? { epsilon: overrides?.epsilon ?? epsilon, minArea: overrides?.minArea ?? minArea, numColors: overrides?.numColors ?? numColors }
+          : undefined,
       }, controller.signal);
 
       // Only update state if this request wasn't aborted
@@ -464,9 +476,13 @@ export const useImageProcessor = () => {
   }, []);
 
   // Reprocess image with current parameters
-  const handleReprocess = () => {
+  const handleReprocess = (
+    overridePixelSize?: number,
+    overrides?: Parameters<typeof handleProcessImage>[3],
+    modeOverride?: ProcessingMode,
+  ) => {
     if (image) {
-      handleProcessImage(image);
+      handleProcessImage(image, modeOverride, overridePixelSize, overrides);
     }
   };
 

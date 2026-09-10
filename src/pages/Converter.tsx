@@ -441,6 +441,7 @@ const Converter: React.FC = () => {
         progress={paramSearch.progress}
         results={paramSearch.results}
         error={paramSearch.error}
+        defaultTargetSizeMm={maxDimension}
         onStart={(targetLongestEdgeMm, preset) => {
           if (!image || !imageFileRef.current) return;
           paramSearch.startSearch(
@@ -456,17 +457,27 @@ const Converter: React.FC = () => {
             imageDimensions,
           );
         }}
-        onApplyParams={(params, resultMode) => {
-          // Apply returned params to the relevant state setters
-          if ('max_colors' in params) setMaxColors(params.max_colors);
-          if ('color_threshold' in params) setColorThreshold(params.color_threshold);
-          if ('num_colors' in params) setNumColors(params.num_colors);
-          if ('epsilon' in params) setEpsilon(params.epsilon);
-          if ('min_area' in params) setMinArea(params.min_area);
-          if ('detail_size' in params) setDetailSize(params.detail_size);
-          if ('white_backing_layers' in params) setWhiteBackingLayers(params.white_backing_layers);
-          if (resultMode === 'pixel' || resultMode === 'svg') setMode(resultMode);
-          handleReprocess();
+        onApplyParams={(params, resultMode, targetLongestEdgeMm) => {
+          // Apply returned params to the relevant state setters AND pass them as
+          // overrides to the reprocess call: setState is async, so a reprocess
+          // fired in the same tick would otherwise read the previous values.
+          const overrides: Parameters<typeof handleReprocess>[1] = {};
+          if ('max_colors' in params) { setMaxColors(params.max_colors); overrides.maxColors = params.max_colors; }
+          if ('color_threshold' in params) { setColorThreshold(params.color_threshold); overrides.colorThreshold = params.color_threshold; }
+          if ('num_colors' in params) { setNumColors(params.num_colors); overrides.numColors = params.num_colors; }
+          if ('epsilon' in params) { setEpsilon(params.epsilon); overrides.epsilon = params.epsilon; }
+          if ('min_area' in params) { setMinArea(params.min_area); overrides.minArea = params.min_area; }
+          if ('detail_size' in params) { setDetailSize(params.detail_size); overrides.detailSize = params.detail_size; }
+          if ('white_backing_layers' in params) { setWhiteBackingLayers(params.white_backing_layers); overrides.whiteBackingLayers = params.white_backing_layers; }
+          const nextMode = resultMode === 'pixel' || resultMode === 'svg' ? resultMode : undefined;
+          if (nextMode) setMode(nextMode);
+          // Re-apply the pixel size the search evaluated at, so the reprocessed
+          // result matches the card preview (pixel_size is a run-fixed param and
+          // is not part of the per-result params dict).
+          const longestPx = Math.max(imageDimensions.width, imageDimensions.height);
+          const nextPixelSize = longestPx > 0 ? targetLongestEdgeMm / longestPx : undefined;
+          if (nextPixelSize) setPixelSize(nextPixelSize);
+          handleReprocess(nextPixelSize, overrides, nextMode);
         }}
       />
     </div>

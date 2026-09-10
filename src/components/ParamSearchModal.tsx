@@ -20,7 +20,9 @@ interface ParamSearchModalProps {
   results: SearchResultItem[];
   error: string | null;
   onStart: (targetLongestEdgeMm: number, preset: string) => void;
-  onApplyParams: (params: Record<string, number>, mode: string) => void;
+  onApplyParams: (params: Record<string, number>, mode: string, targetLongestEdgeMm: number) => void;
+  /** Current print longest edge (mm); the search defaults to evaluating this size. */
+  defaultTargetSizeMm?: number;
 }
 
 export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
@@ -32,12 +34,21 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
   error,
   onStart,
   onApplyParams,
+  defaultTargetSizeMm,
 }) => {
   const { t } = useTranslation();
   const localize = useLocalizedMessage();
   const presetLabel = usePresetLabel();
   const parameterLabel = useParameterLabel();
-  const [targetSize, setTargetSize] = useState(100);
+  const [targetSize, setTargetSize] = useState(defaultTargetSizeMm ?? 100);
+
+  useEffect(() => {
+    // The modal stays mounted (hidden), so re-sync the default every time it
+    // opens; maxDimension is unknown (0) until an image has been processed.
+    if (isOpen && defaultTargetSizeMm && defaultTargetSizeMm > 0) {
+      setTargetSize(defaultTargetSizeMm);
+    }
+  }, [isOpen, defaultTargetSizeMm]);
   const [preset, setPreset] = useState<string>(DEFAULT_FILAMENT_PRESET);
 
   useEffect(() => {
@@ -159,7 +170,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                   <button
                     key={`${r.rank}-${r.mode === 'pixel' ? t('search:modePixel') : r.mode === 'svg' ? t('search:modeSvg') : r.mode}`}
                     onClick={() => {
-                      onApplyParams(r.params, r.mode);
+                      onApplyParams(r.params, r.mode, targetSize);
                       onClose();
                     }}
                     className={`text-left rounded-xl border p-3 hover:border-purple-400 hover:shadow-md transition-all ${

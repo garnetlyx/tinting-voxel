@@ -97,7 +97,7 @@ describe('ParamSearchModal', () => {
     const firstCard = screen.getByAltText('rank 1 preview').closest('button');
     await user.click(firstCard!);
 
-    expect(onApplyParams).toHaveBeenCalledWith(mockResults[0].params, mockResults[0].mode);
+    expect(onApplyParams).toHaveBeenCalledWith(mockResults[0].params, mockResults[0].mode, 100);
     expect(onClose).toHaveBeenCalled();
   });
 
