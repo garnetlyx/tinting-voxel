@@ -201,7 +201,7 @@ const Converter: React.FC = () => {
                   doubleSided={doubleSided}
                   onDoubleSidedChange={setDoubleSided}
                   printStack={printStack}
-                  onReprocess={handleReprocess}
+                  onReprocess={() => handleReprocess()}
                   processing={processing}
                   hasImage={image !== null}
                   onAutoOptimize={() => {

@@ -164,6 +164,25 @@ describe('useImageProcessor', () => {
     );
   });
 
+  it('ignores a MouseEvent leaked into handleReprocess as the pixel-size override', async () => {
+    // onClick={handleReprocess} forwards the click event as the first
+    // argument; it must never serialize into pixelSize ("[object Object]").
+    const { result } = renderHook(() => useImageProcessor());
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+
+    await act(async () => {
+      result.current.handleApplyEdit(img);
+    });
+    mockedProcessImage.mockClear();
+
+    await act(async () => {
+      (result.current.handleReprocess as unknown as (e: unknown) => void)({ type: 'click' });
+    });
+
+    const call = mockedProcessImage.mock.calls[0];
+    expect(call[1].pixelSize).toBe(0.42);
+  });
+
   it('stores simulated preview data returned by svg mode', async () => {
     mockedProcessImage.mockResolvedValueOnce({
       vectorResults: [{ color: [255, 0, 0], polygons: [], pixel_count: 48, polygon_points: 0 }],

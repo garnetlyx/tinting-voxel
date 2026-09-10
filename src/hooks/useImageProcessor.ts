@@ -481,8 +481,11 @@ export const useImageProcessor = () => {
     overrides?: Parameters<typeof handleProcessImage>[3],
     modeOverride?: ProcessingMode,
   ) => {
+    // onClick handlers forward the MouseEvent as the first argument; guard
+    // against non-number values leaking into the pixelSize override.
+    const pixelSizeOverride = typeof overridePixelSize === 'number' ? overridePixelSize : undefined;
     if (image) {
-      handleProcessImage(image, modeOverride, overridePixelSize, overrides);
+      handleProcessImage(image, modeOverride, pixelSizeOverride, overrides);
     }
   };
 
