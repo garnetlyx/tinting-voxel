@@ -4,10 +4,16 @@
  * set is TD1S-transparent, so these runs exercise the composition-pruned
  * mapping path (see backend core/stack_prune.py).
  *
+ * Each layer-count change is verified against its specific
+ * /api/simulate-preview network response (request body carries layerCount),
+ * and the returned preview must re-render — no fixed waits, no accepting an
+ * already-present image. Requests cannot leak between tests: every layer
+ * change awaits its own response.
+ *
  * Requires backend/tests/fixtures/images-local/local-photo.JPG (gitignored local
  * fixture); the suite skips gracefully when it is absent.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
@@ -19,6 +25,45 @@ test.skip(!fs.existsSync(LOCAL_PHOTO_IMAGE), 'local-photo.JPG local fixture not 
 test.beforeAll(() => {
   fs.mkdirSync(SHOT_DIR, { recursive: true });
 });
+
+/**
+ * Set the layer-count slider and wait for the /api/simulate-preview response
+ * carrying that exact layerCount in its multipart body, then for a fresh
+ * Simulated Print render.
+ */
+async function setLayersAndWaitForPreview(page: Page, layerCount: number) {
+  const srcBefore = await page.locator('img[alt="Processed"]').getAttribute('src');
+  const responsePromise = page.waitForResponse(async resp => {
+    if (!resp.url().includes('/api/simulate-preview')) return false;
+    const body = resp.request().postData() ?? '';
+    if (!body.includes(`"layerCount":"${layerCount}"`) && !body.includes(`layerCount"${layerCount}`) && !new RegExp(`layerCount[^0-9]{0,3}${layerCount}([^0-9]|$)`).test(body)) return false;
+    return true;
+  }, { timeout: 240_000 });
+
+  await page.evaluate(count => {
+    const t = Array.from(document.querySelectorAll('input[type="range"]'))
+      .find(s => s.min === '4' && s.step === '1') as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(t, String(count));
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+    t.dispatchEvent(new Event('change', { bubbles: true }));
+  }, layerCount);
+
+  const resp = await responsePromise;
+  expect(resp.status(), `simulate-preview layerCount=${layerCount}`).toBe(200);
+
+  // The returned preview must actually render: wait until the Processed image
+  // is replaced with a new data URL from this response.
+  await page.waitForFunction(
+    (prev: string | null) => {
+      const img = document.querySelector('img[alt="Processed"]') as HTMLImageElement | null;
+      return !!img?.src && img.src !== prev;
+    },
+    srcBefore,
+    { timeout: 60_000 },
+  );
+  await expect(page.locator('img[alt="Processed"]')).toBeVisible();
+}
 
 for (const layerCount of [6, 8]) {
   test(`clear palette ${layerCount} layers @0.84mm renders via pruned path`, async ({ page }) => {
@@ -44,7 +89,7 @@ for (const layerCount of [6, 8]) {
     const layerHeight = await page.locator('input[type=range][min="0.08"]').first().inputValue();
     expect(layerHeight).toBe('0.84');
 
-    // Upload the real photo and process.
+    // Upload the real photo and process (default 4 layers).
     const chooserP = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: /Click or drag image here/ }).click();
     (await chooserP).setFiles([LOCAL_PHOTO_IMAGE]);
@@ -54,24 +99,10 @@ for (const layerCount of [6, 8]) {
       timeout: 240_000,
     });
 
-    // Raise to the target layer count (default is 4).
-    await page.evaluate(count => {
-      const sliders = Array.from(document.querySelectorAll('input[type="range"]'));
-      const t = sliders.find(s => s.min === '4' && s.step === '1') as HTMLInputElement;
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
-      setter.call(t, String(count));
-      t.dispatchEvent(new Event('input', { bubbles: true }));
-      t.dispatchEvent(new Event('change', { bubbles: true }));
-    }, layerCount);
+    // Raise to the target layer count and verify THAT request completes and
+    // its returned preview renders.
+    await setLayersAndWaitForPreview(page, layerCount);
 
-    // The pruned mapping keeps high-layer reprocessing fast; still allow a
-    // generous bound for the dev-server cold cache.
-    await page.waitForFunction(
-      () => document.body.innerText.includes('Reprocess'),
-      null,
-      { timeout: 240_000 },
-    );
-    await page.waitForTimeout(2_000);
     await page.screenshot({
       path: path.join(SHOT_DIR, `clear_${layerCount}L_pruned.png`),
       fullPage: true,

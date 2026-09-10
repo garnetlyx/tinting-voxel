@@ -121,6 +121,22 @@ class TestRegimeGate:
         code_df, _ = compute_reference_matrices(4, 0.08, bambu)
         assert len(set(_codes_from_matrix(code_df))) == 5**4
 
+    def test_mixed_set_keeps_full_enumeration(self):
+        """Opaque/mixed sets remain exact: one opaque filament disqualifies
+        the whole set from pruning (theory: opaque + transparent blends are
+        possible, so only fully transparent sets may prune)."""
+        clear = [c for c in get_preset("clear_cmywg")]
+        mixed = clear[:4] + [
+            type(clear[0])(
+                name="Key", hex="#0B0F0C", transmission_distance=0.1,
+                alpha=12.0, k=10.0, td_neutral=0.1,
+            )
+        ]
+        colors = Colors.from_configs(mixed)
+        assert not is_translucent_set(colors)
+        code_df, _ = compute_reference_matrices(4, 0.84, colors)
+        assert len(set(_codes_from_matrix(code_df))) == 5**4  # full, not C(8,4)=70
+
 
 class TestRefinement:
     def test_refine_is_noop_for_opaque_set(self):
