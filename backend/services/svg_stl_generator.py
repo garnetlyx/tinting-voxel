@@ -355,11 +355,12 @@ def generate_svg_stl_zip(
     # Extract colors from vector results
     input_colors = [result['color'] for result in vector_results]
 
-    # Map to blend codes using Beer-Lambert model
-    result_codes, result_rgbs = Color.map_to_nearest_color(
-        input_colors,
-        ref_code_matrix,
-        ref_rgb_matrix
+    # Map to blend codes using Beer-Lambert model (with order refinement
+    # for composition-pruned translucent sets)
+    from services.image_processor import _map_and_refine
+    result_codes, result_rgbs = _map_and_refine(
+        input_colors, ref_code_matrix, ref_rgb_matrix,
+        active_colors, layer_count, layer_height,
     )
 
     _log_input_color_brightness(input_colors, "SVG-STL")

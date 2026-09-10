@@ -49,6 +49,38 @@ def _render_color_block_image(
     return _image_to_data_url(Image.fromarray(img_array))
 
 
+def _map_and_refine(
+    source_colors: list[tuple[int, int, int]],
+    ref_code_matrix,
+    ref_rgb_matrix,
+    colors: Colors,
+    layer_count: int,
+    layer_height: float,
+) -> tuple[list[str], list[tuple[int, int, int]]]:
+    """Nearest-code mapping plus order refinement for pruned (translucent) sets."""
+    from core.stack_prune import refine_matches
+    from services.stl_generator import _build_code_to_rgb
+
+    result_codes, result_rgbs = Color.map_to_nearest_color(
+        source_colors, ref_code_matrix, ref_rgb_matrix,
+    )
+    result_codes, result_rgbs = refine_matches(
+        source_colors,
+        result_codes,
+        result_rgbs,
+        ref_code_matrix,
+        ref_rgb_matrix,
+        colors,
+        layer_height,
+        code_to_rgb=_build_code_to_rgb(colors, layer_count, layer_height),
+    )
+    normalized_rgbs = [
+        tuple(int(channel) for channel in np.asarray(rgb).tolist())
+        for rgb in result_rgbs
+    ]
+    return result_codes, normalized_rgbs
+
+
 def _map_source_colors_to_blends(
     source_colors: list[tuple[int, int, int]],
     colors: Colors,
@@ -60,16 +92,9 @@ def _map_source_colors_to_blends(
         layer_height,
         colors,
     )
-    result_codes, result_rgbs = Color.map_to_nearest_color(
-        source_colors,
-        ref_code_matrix,
-        ref_rgb_matrix,
+    return _map_and_refine(
+        source_colors, ref_code_matrix, ref_rgb_matrix, colors, layer_count, layer_height,
     )
-    normalized_rgbs = [
-        tuple(int(channel) for channel in np.asarray(rgb).tolist())
-        for rgb in result_rgbs
-    ]
-    return result_codes, normalized_rgbs
 
 
 def _build_mapped_blend_palette(
@@ -220,15 +245,11 @@ def build_vector_simulated_preview(
     # Use pre-computed matrices if provided, otherwise compute them
     if ref_matrices is not None:
         ref_code_matrix, ref_rgb_matrix = ref_matrices
-        result_codes, result_rgbs = Color.map_to_nearest_color(
-            source_colors,
-            ref_code_matrix,
-            ref_rgb_matrix,
+        result_codes, normalized_rgbs = _map_and_refine(
+            source_colors, ref_code_matrix, ref_rgb_matrix,
+            colors, layer_count, layer_height,
         )
-        normalized_rgbs = [
-            tuple(int(channel) for channel in np.asarray(rgb).tolist())
-            for rgb in result_rgbs
-        ]
+        result_rgbs = normalized_rgbs
     else:
         result_codes, normalized_rgbs = _map_source_colors_to_blends(
             source_colors=source_colors,
@@ -256,15 +277,10 @@ def build_vector_simulated_preview(
     # Use pre-computed matrices if available
     if ref_matrices is not None:
         ref_code_matrix, ref_rgb_matrix = ref_matrices
-        all_codes, all_rgbs_raw = Color.map_to_nearest_color(
-            unique_colors_in_quantized,
-            ref_code_matrix,
-            ref_rgb_matrix,
+        all_codes, all_rgbs = _map_and_refine(
+            unique_colors_in_quantized, ref_code_matrix, ref_rgb_matrix,
+            colors, layer_count, layer_height,
         )
-        all_rgbs = [
-            tuple(int(channel) for channel in np.asarray(rgb).tolist())
-            for rgb in all_rgbs_raw
-        ]
     else:
         all_codes, all_rgbs = _map_source_colors_to_blends(
             source_colors=unique_colors_in_quantized,

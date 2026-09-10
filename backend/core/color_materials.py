@@ -31,6 +31,7 @@ class Color:
         k=DEFAULT_K,
         k_rgb=None,
         td_rgb=None,
+        td_neutral=None,
         td_scale=DEFAULT_TD_SCALE,
         td_gamma=DEFAULT_TD_GAMMA,
         display_name=None,
@@ -111,6 +112,12 @@ class Color:
                         f"td_rgb[{i}] must be finite and > 0, got {td_ch}"
                     )
         self.td_rgb = tuple(float(x) for x in td_rgb) if td_rgb is not None else None
+        if td_neutral is not None:
+            if not np.isfinite(float(td_neutral)) or float(td_neutral) <= 0:
+                raise ValueError(
+                    f"td_neutral must be finite and > 0, got {td_neutral}"
+                )
+        self.td_neutral = float(td_neutral) if td_neutral is not None else None
         self.td_scale = td_scale
         self.td_gamma = td_gamma
         self.display_name = display_name
@@ -194,9 +201,60 @@ class Color:
         return L < 60 and a > 5 and b > 10 and C < 70
 
     @staticmethod
-    def map_to_nearest_color(input_colors, reference_code, reference_rgb, weights=None):
+    def perceptual_distance_raw(lab_color, ref_lab):
+        """Plain CIEDE2000 distance, without the dark-color adjustments."""
         from skimage.color import deltaE_ciede2000
-        
+
+        lab_color = np.asarray(lab_color, dtype=np.float64).reshape(3)
+        ref_lab = np.asarray(ref_lab, dtype=np.float64).reshape(-1, 3)
+        return np.asarray(deltaE_ciede2000(
+            lab_color.reshape(1, 1, 3), ref_lab.reshape(-1, 1, 3), channel_axis=-1,
+        )).reshape(-1)
+
+    @staticmethod
+    def perceptual_distance(lab_color, ref_lab):
+        """CIEDE2000 with dark-color adjustments — the map_to_nearest_color metric.
+
+        For dark chromatic sources, hue differences are penalized harder
+        (CIEDE2000 underweights hue in dark colors); for dark neutrals,
+        low-chroma candidates are preferred.
+        """
+        from skimage.color import deltaE_ciede2000
+
+        lab_color = np.asarray(lab_color, dtype=np.float64).reshape(3)
+        ref_lab = np.asarray(ref_lab, dtype=np.float64).reshape(-1, 3)
+        dists = np.asarray(deltaE_ciede2000(
+            lab_color.reshape(1, 1, 3), ref_lab.reshape(-1, 1, 3), channel_axis=-1,
+        )).reshape(-1)
+
+        source_L, source_a, source_b = lab_color
+        source_chroma = np.sqrt(source_a**2 + source_b**2)
+
+        if source_L < 40 and source_chroma > 8:
+            ref_a = ref_lab[:, 1]
+            ref_b = ref_lab[:, 2]
+            ref_chromas = np.sqrt(ref_a**2 + ref_b**2)
+
+            source_hue = np.arctan2(source_b, source_a)
+            ref_hues = np.arctan2(ref_b, ref_a)
+
+            hue_diff = np.abs(source_hue - ref_hues)
+            hue_diff = np.minimum(hue_diff, 2 * np.pi - hue_diff)
+
+            darkness_factor = (40 - source_L) / 40
+            chroma_factor = np.minimum(source_chroma / 20, 1.0)
+            hue_penalty = hue_diff * darkness_factor * chroma_factor * 25
+            dists = dists + hue_penalty
+        elif source_L < 35 and source_chroma <= 8:
+            ref_chromas = np.sqrt(ref_lab[:, 1]**2 + ref_lab[:, 2]**2)
+            darkness_factor = (35 - source_L) / 35
+            chroma_penalty = ref_chromas * darkness_factor * 1.5
+            dists = dists + chroma_penalty
+
+        return dists
+
+    @staticmethod
+    def map_to_nearest_color(input_colors, reference_code, reference_rgb, weights=None):
         ref_colors = []
         ref_blend_codes = []
 
@@ -216,48 +274,8 @@ class Color:
         results_code = []
         results_color = []
         for lab_color in inp_lab:
-            # Use CIEDE2000 for perceptually uniform color distance
-            dists = np.array([
-                deltaE_ciede2000(lab_color, ref_lab_single)
-                for ref_lab_single in ref_lab
-            ])
-            
-            source_L = lab_color[0]
-            source_a = lab_color[1]
-            source_b = lab_color[2]
-            source_chroma = np.sqrt(source_a**2 + source_b**2)
-            
-            # For dark colors with visible chroma, hue is critical
-            # CIEDE2000 may not weight hue enough for very dark colors
-            if source_L < 40 and source_chroma > 8:
-                ref_a = ref_lab[:, 1]
-                ref_b = ref_lab[:, 2]
-                ref_chromas = np.sqrt(ref_a**2 + ref_b**2)
-                
-                # Calculate hue angles
-                source_hue = np.arctan2(source_b, source_a)
-                ref_hues = np.arctan2(ref_b, ref_a)
-                
-                # Hue difference (accounting for circular nature)
-                hue_diff = np.abs(source_hue - ref_hues)
-                hue_diff = np.minimum(hue_diff, 2 * np.pi - hue_diff)
-                
-                # Strong hue penalty for dark chromatic colors
-                # Darkness increases hue importance
-                darkness_factor = (40 - source_L) / 40  # 0 to 1
-                chroma_factor = np.minimum(source_chroma / 20, 1.0)
-                hue_penalty = hue_diff * darkness_factor * chroma_factor * 25
-                
-                dists = dists + hue_penalty
-            
-            # For very dark neutrals, prefer low-chroma candidates
-            elif source_L < 35 and source_chroma <= 8:
-                ref_chromas = np.sqrt(ref_lab[:, 1]**2 + ref_lab[:, 2]**2)
-                darkness_factor = (35 - source_L) / 35
-                chroma_penalty = ref_chromas * darkness_factor * 1.5
-                dists = dists + chroma_penalty
-            
-            nearest_idx = np.argmin(dists)
+            dists = Color.perceptual_distance(lab_color, ref_lab)
+            nearest_idx = int(np.argmin(dists))
             results_code.append(ref_blend_codes[nearest_idx])
             results_color.append(np.round(ref_colors[nearest_idx] * 255).astype(int))
 
@@ -399,6 +417,7 @@ class Colors:
                 k=config.k,
                 k_rgb=config.k_rgb,
                 td_rgb=getattr(config, "td_rgb", None),
+                td_neutral=getattr(config, "td_neutral", None),
                 td_scale=config.td_scale,
                 td_gamma=config.td_gamma,
             )

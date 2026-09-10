@@ -124,10 +124,11 @@ def generate_3mf(
     labels = colors.get_labels()
     code_mesh_map: dict[str, list[np.ndarray]] = {label: [] for label in labels}
 
-    # Map input colors to blend codes
+    # Map input colors to blend codes (with order refinement for pruned sets)
+    from services.image_processor import _map_and_refine
     input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
-    result_codes, _ = Color.map_to_nearest_color(
-        input_colors, ref_code_matrix, ref_rgb_matrix
+    result_codes, _ = _map_and_refine(
+        input_colors, ref_code_matrix, ref_rgb_matrix, colors, layer_count, layer_height,
     )
 
     _log_input_color_brightness(input_colors, "3MF")

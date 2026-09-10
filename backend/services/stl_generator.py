@@ -32,10 +32,23 @@ _current_colors = None
 _global_state_lock = threading.Lock()
 
 
+def _build_code_to_rgb(colors: Colors, layer_count: int, layer_height: float):
+    """Blend callable consistent with compute_reference_matrices."""
+    generator = BlendTestGenerator(
+        colors=colors,
+        layer_height=layer_height,
+        layer_count_max=layer_count,
+        alpha=colors.get_blend_alpha(),
+        blend_mode=colors.get_blend_mode(),
+    )
+    return generator.code_to_rgb
+
+
 def compute_reference_matrices(
     layer_count: int,
     layer_height: float,
-    colors: Colors
+    colors: Colors,
+    prune: Optional[bool] = None,
 ) -> tuple:
     """
     Compute color reference matrices for Beer-Lambert mapping.
@@ -49,6 +62,11 @@ def compute_reference_matrices(
 
     Returns:
         Tuple of (code_matrix, rgb_matrix) as DataFrames
+
+    prune:
+        None (default) auto-prunes to composition representatives in the
+        translucent regime; True forces pruning; False forces the full
+        ordered enumeration (correctness oracle for the pruned path).
 
     Raises:
         ValueError: If permutation count exceeds safety limit
@@ -68,14 +86,35 @@ def compute_reference_matrices(
         raise ValueError("Colors instance has no colors defined")
     max_permutations = 1_000_000
     permutation_count = len(items) ** layer_count
-    if permutation_count > max_permutations:
-        raise ValueError(
-            f"Too many color permutations: {len(items)} colors x {layer_count} layers = "
-            f"{permutation_count:,}. Maximum allowed is {max_permutations:,}. "
-            f"Reduce the number of colors or layers."
+
+    from core.stack_prune import composition_rep_codes, is_translucent_set
+
+    use_prune = is_translucent_set(colors) if prune is None else prune
+    if use_prune:
+        # Translucent regime: composition representatives instead of the full
+        # ordered product (see core/stack_prune.py); order is recovered per
+        # match by refine_matches().
+        code_list = composition_rep_codes(items, layer_count)
+        if len(code_list) > max_permutations:
+            raise ValueError(
+                f"Too many stack compositions: {len(items)} colors x {layer_count} layers = "
+                f"{len(code_list):,}. Maximum allowed is {max_permutations:,}. "
+                f"Reduce the number of colors or layers."
+            )
+        logger.info(
+            "Pruned stack candidates: %d compositions of %d colors x %d layers "
+            "(full ordered set would be %d)",
+            len(code_list), len(items), layer_count, permutation_count,
         )
-    perms = list(itertools.product(items, repeat=layer_count))
-    code_list = [''.join(p) for p in perms]
+    else:
+        if permutation_count > max_permutations:
+            raise ValueError(
+                f"Too many color permutations: {len(items)} colors x {layer_count} layers = "
+                f"{permutation_count:,}. Maximum allowed is {max_permutations:,}. "
+                f"Reduce the number of colors or layers."
+            )
+        perms = list(itertools.product(items, repeat=layer_count))
+        code_list = [''.join(p) for p in perms]
 
     rgb_list = [generator.code_to_rgb(code) for code in code_list]
 
@@ -96,7 +135,11 @@ def compute_reference_matrices(
     code_df = pd.DataFrame(code_matrix)
     rgb_df = pd.DataFrame(rgb_matrix)
 
-    logger.info("Computed reference matrices: %d colors, %d combinations", len(items), len(code_list))
+    logger.info(
+        "Computed reference matrices: %d colors, %d candidates%s",
+        len(items), len(code_list),
+        " (composition-pruned)" if use_prune else "",
+    )
     return code_df, rgb_df
 
 
@@ -121,6 +164,19 @@ def map_color_blocks_to_blend_results(
         input_colors,
         ref_code_matrix,
         ref_rgb_matrix,
+    )
+    # Translucent sets match against composition representatives; recover the
+    # best ordering across the top compositions (no-op for opaque sets).
+    from core.stack_prune import refine_matches
+    result_codes, result_rgbs = refine_matches(
+        input_colors,
+        result_codes,
+        result_rgbs,
+        ref_code_matrix,
+        ref_rgb_matrix,
+        colors,
+        layer_height,
+        code_to_rgb=_build_code_to_rgb(colors, layer_count, layer_height),
     )
     normalized_rgbs = [
         tuple(int(channel) for channel in np.asarray(rgb).tolist())
