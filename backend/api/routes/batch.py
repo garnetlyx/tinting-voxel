@@ -140,6 +140,9 @@ async def api_batch_download_stl(
                     transmission_distance=fc['transmission_distance'],
                     alpha=fc.get('alpha', 12.0),
                     k=fc.get('k', 10.0),
+                    k_rgb=fc.get('k_rgb'),
+                    td_rgb=fc.get('td_rgb'),
+                    td_neutral=fc.get('td_neutral'),
                     td_scale=fc.get('td_scale', 1.0),
                     td_gamma=fc.get('td_gamma', 1.0),
                 )

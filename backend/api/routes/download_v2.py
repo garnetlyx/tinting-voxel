@@ -64,6 +64,8 @@ def get_colors_from_request(
                 transmission_distance=fc.transmission_distance,
                 alpha=fc.alpha,
                 k=fc.k,
+                td_rgb=fc.td_rgb,
+                td_neutral=fc.td_neutral,
                 td_scale=fc.td_scale,
                 td_gamma=fc.td_gamma,
             )

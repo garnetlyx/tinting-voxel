@@ -64,9 +64,10 @@ def compute_reference_matrices(
         Tuple of (code_matrix, rgb_matrix) as DataFrames
 
     prune:
-        None (default) auto-prunes to composition representatives in the
-        translucent regime; True forces pruning; False forces the full
-        ordered enumeration (correctness oracle for the pruned path).
+        None (default) prunes to composition representatives in the translucent
+        regime and keeps full enumeration otherwise; False forces the full
+        ordered enumeration in every regime (correctness oracle for the
+        pruned path). Pruning is never forced outside the translucent regime.
 
     Raises:
         ValueError: If permutation count exceeds safety limit
@@ -87,14 +88,26 @@ def compute_reference_matrices(
     max_permutations = 1_000_000
     permutation_count = len(items) ** layer_count
 
-    from core.stack_prune import composition_rep_codes, is_translucent_set
+    if prune is True:
+        raise ValueError(
+            "prune=True is not supported: pruning applies automatically and "
+            "only to translucent sets. Use prune=None (automatic) or "
+            "prune=False (full-enumeration oracle)."
+        )
 
-    use_prune = is_translucent_set(colors) if prune is None else prune
+    from core.stack_prune import composition_codes, is_translucent_set
+
+    translucent = is_translucent_set(colors)
+    # Pruning only ever operates in the translucent regime: `prune` may opt
+    # OUT (False, the oracle) but can never force an opaque or mixed set onto
+    # the composition-pruned path.
+    use_prune = translucent and prune is not False
     if use_prune:
-        # Translucent regime: composition representatives instead of the full
-        # ordered product (see core/stack_prune.py); order is recovered per
-        # match by refine_matches().
-        code_list = composition_rep_codes(items, layer_count)
+        # Translucent regime: one canonical representative per composition
+        # (C(N+L-1, L) candidates; see core/stack_prune.py) instead of the
+        # full ordered product; order is recovered per match by
+        # refine_matches().
+        code_list = composition_codes(items, layer_count)
         if len(code_list) > max_permutations:
             raise ValueError(
                 f"Too many stack compositions: {len(items)} colors x {layer_count} layers = "

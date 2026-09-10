@@ -1,27 +1,23 @@
 """Composition-pruned stack search for translucent filament sets.
 
 Implements the hierarchical search from the tinting-voxel research note
-``docs/TD_ADAPTIVE_STACK_SEARCH.md``: in the translucent regime — every
-filament's neutral TD clears the transparency threshold — a stack's color is
-dominated by its composition (multiset of layers) and layer order is a
-secondary perturbation. The reference set therefore shrinks from ``N**L``
-ordered codes to ``C(N+L-1, L)`` compositions.
+``TD_ADAPTIVE_STACK_SEARCH.md`` (companion tinting-voxel-research
+repository): in the translucent regime — every filament's neutral TD clears
+the transparency threshold — a stack's color is dominated by its composition
+(multiset of layers) and layer order is a secondary perturbation. The stage-1
+reference set therefore shrinks from ``N**L`` ordered codes to exactly
+``C(N+L-1, L)`` composition representatives (one canonical ordering each:
+495 for 5 filaments x 8 layers vs 390,625 fully enumerated). Stage 2 then
+refines the distinct orderings of every composition that ranks within a
+margin of the best representative, under the production
+``Color.perceptual_distance`` metric.
 
-Design deviation from the note, measured and documented here: the note's
-stage 1 keeps ONE canonical (sorted) ordering per composition — 495
-candidates for 5 filaments x 8 layers. On the staircase-calibrated clear set
-that stage misses the full-enumeration oracle budget (max ~10 dE00 on
-reachable targets), because a single ordering can misrepresent a composition
-by more than the intra-composition spread where the production metric's
-dark-chromatic hue penalty amplifies ordering-driven hue differences. The
-implemented matrix therefore carries up to THREE diverse orderings per
-composition — sorted, reversed, and round-robin interleaved — bounded by
-``3 x C(N+L-1, L)`` candidates (1,458 at 5x8, still ~268x below the full
-390,625), and stage 2 refines the distinct orderings of the top compositions
-under the production ``Color.perceptual_distance`` metric. With this design
-the oracle budget holds (see tests/unit/test_stack_prune.py).
+Pruning is never forced: it applies only when the automatic transparency
+classification marks the whole set translucent; opaque and mixed sets keep
+the exact full enumeration.
 
-Opaque and mixed sets keep the exact full enumeration.
+The ΔE00 budgets that gate this design against full enumeration as the
+oracle are asserted in tests/unit/test_stack_prune.py at both 6 and 8 layers.
 """
 import itertools
 import logging
@@ -39,11 +35,17 @@ logger = logging.getLogger(__name__)
 # exotic wider sets are capped deterministically (evenly sampled).
 MAX_PERMS_PER_COMPOSITION = 8192
 
-# Compositions refined per input color. The stage-1 winner plus a few
-# neighbours: bounds the cost at top_k * MAX_PERMS_PER_COMPOSITION blends per
-# input while recovering compositions whose best ordering outranks the
-# canonical representative of the stage-1 winner.
-DEFAULT_TOP_K_COMPOSITIONS = 5
+# Stage-2 candidate pool: compositions whose representative ranks within this
+# ΔE00 margin of the best representative, by either the production metric or
+# raw CIEDE2000. The margin covers the measured intra-composition order
+# spread (mean ~3, max ~6.4 at 8 layers) plus slack, so a composition whose
+# canonical ordering ranks poorly but whose other orderings win stays in the
+# pool. The raw-CIEDE2000 channel guards against the production metric's
+# dark-chromatic hue penalty hiding such compositions.
+CANDIDATE_MARGIN_DELTA_E = 8.0
+
+# Upper bound on compositions refined per input color.
+MAX_CANDIDATE_COMPOSITIONS = 12
 
 
 def is_translucent_set(colors: Colors, threshold_mm: Optional[float] = None) -> bool:
@@ -67,56 +69,14 @@ def is_translucent_set(colors: Colors, threshold_mm: Optional[float] = None) -> 
 
 
 def composition_codes(labels: list, layer_count: int) -> list:
-    """Canonical (sorted) code per composition of layer_count over labels."""
+    """One canonical (sorted) code per composition of layer_count over labels.
+
+    Exactly ``C(len(labels) + layer_count - 1, layer_count)`` entries.
+    """
     return [
         "".join(combo)
         for combo in itertools.combinations_with_replacement(sorted(labels), layer_count)
     ]
-
-
-def _interleaved_ordering(combo: tuple) -> str:
-    """Round-robin ordering starting from the most frequent label.
-
-    Gives each composition a hue-diverse representative whose member ordering
-    differs from both the sorted and reversed forms.
-    """
-    from collections import Counter
-
-    counts = Counter(combo)
-    queue = [label for label, _ in counts.most_common()]
-    out = []
-    qi = 0
-    for _ in combo:
-        # advance to a label that still has budget (round robin over labels)
-        while counts[queue[qi % len(queue)]] == 0:
-            qi += 1
-        label = queue[qi % len(queue)]
-        counts[label] -= 1
-        out.append(label)
-        qi += 1
-    return "".join(out)
-
-
-def composition_rep_codes(labels: list, layer_count: int) -> list:
-    """Three diverse orderings per composition (sorted, reversed, interleaved).
-
-    A single canonical ordering can misrepresent a composition by more than
-    the measured intra-composition spread, because the production metric's
-    dark-chromatic hue penalty amplifies ordering-driven hue differences.
-    Diverse representatives keep the stage-1 ranking honest while the matrix
-    stays at 3x C(N+L-1, L) candidates instead of N^L.
-    """
-    codes = []
-    for combo in itertools.combinations_with_replacement(sorted(labels), layer_count):
-        canonical = "".join(combo)
-        reversed_code = canonical[::-1]
-        interleaved = _interleaved_ordering(combo)
-        codes.append(canonical)
-        if reversed_code != canonical:
-            codes.append(reversed_code)
-        if interleaved not in (canonical, reversed_code):
-            codes.append(interleaved)
-    return codes
 
 
 def distinct_permutations(code: str, cap: int = MAX_PERMS_PER_COMPOSITION) -> list:
@@ -146,16 +106,18 @@ def refine_matches(
     colors: Colors,
     layer_height: float,
     code_to_rgb: Callable[[str], tuple],
-    top_k: int = DEFAULT_TOP_K_COMPOSITIONS,
+    margin_delta_e: float = CANDIDATE_MARGIN_DELTA_E,
+    max_compositions: int = MAX_CANDIDATE_COMPOSITIONS,
 ) -> tuple:
-    """Two-stage refinement for composition-pruned nearest matches.
+    """Order-refinement pass for composition-pruned nearest matches.
 
     Stage 1 (``Color.map_to_nearest_color`` against the pruned reference
-    matrix) picks the nearest composition representative. Stage 2 re-ranks the
-    top ``top_k`` compositions per input over all their distinct orderings,
-    using the same perceptual metric as the production mapper. No-op for
-    non-translucent sets, whose reference matrix already enumerates every
-    ordering exactly.
+    matrix, one canonical representative per composition) picks the nearest
+    composition. Stage 2 re-ranks every composition whose representative
+    falls within ``margin_delta_e`` of the best — by the production metric or
+    raw CIEDE2000 — over all its distinct orderings, using the same
+    perceptual metric as the production mapper. No-op for non-translucent
+    sets, whose reference matrix already enumerates every ordering exactly.
     """
     if not is_translucent_set(colors):
         return stage1_codes, stage1_rgbs
@@ -177,17 +139,17 @@ def refine_matches(
     perms_evaluated = 0
 
     for i, lab_color in enumerate(inp_lab):
-        # Candidate selection runs on two rankings: the production metric and
-        # raw CIEDE2000. The dark-chromatic hue penalty in the production
-        # metric can hide a composition whose canonical ordering has a misaligned
-        # hue but whose other orderings win; the raw ranking keeps those in play.
-        # The final pick is always ranked by the production metric.
         rep_pen = Color.perceptual_distance(lab_color, ref_lab)
         rep_raw = Color.perceptual_distance_raw(lab_color, ref_lab)
-        top = sorted(set(np.argsort(rep_pen)[:top_k]) | set(np.argsort(rep_raw)[:top_k]))
+        pool = sorted(
+            set(np.where(rep_pen <= rep_pen.min() + margin_delta_e)[0])
+            | set(np.where(rep_raw <= rep_raw.min() + margin_delta_e)[0])
+        )
+        if len(pool) > max_compositions:
+            pool = sorted(pool, key=lambda j: min(rep_pen[j], rep_raw[j]))[:max_compositions]
 
         best_code, best_rgb, best_dist = stage1_codes[i], stage1_rgbs[i], float(rep_pen.min())
-        for idx in top:
+        for idx in pool:
             rep_code = ref_codes[idx]
             if rep_code not in perm_cache:
                 perm_cache[rep_code] = distinct_permutations(rep_code)
@@ -209,7 +171,7 @@ def refine_matches(
         refined_rgbs[i] = best_rgb
 
     logger.info(
-        "Prune refinement: %d inputs, top-%d compositions each, %d orderings evaluated",
-        len(input_colors), top_k, perms_evaluated,
+        "Prune refinement: %d inputs, %d orderings evaluated",
+        len(input_colors), perms_evaluated,
     )
     return refined_codes, refined_rgbs
