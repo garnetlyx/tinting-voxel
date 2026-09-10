@@ -69,6 +69,11 @@ class Evaluator:
     """Evaluates a single parameter combination by running the pipeline and computing MAE."""
 
     EVAL_SIZE = (128, 128)
+    # Search evaluations run on a downscaled copy: MAE is compared at 128x128
+    # anyway, so full-resolution processing only adds cost without changing the
+    # ranking. Winning params stay physical (mm) and re-run at full resolution
+    # in the normal pipeline.
+    WORK_MAX_EDGE = 384
 
     def __init__(self, original_image_bytes: bytes, colors: Colors, fixed: FixedParams) -> None:
         self._original_bytes = original_image_bytes
@@ -77,9 +82,19 @@ class Evaluator:
         # Pre-load and resize original image once
         try:
             img = Image.open(BytesIO(original_image_bytes)).convert("RGB")
-            self._original_resized = img.resize(self.EVAL_SIZE, Image.LANCZOS)
         except Exception as exc:
             raise ValueError(f"Cannot load original image: {exc}") from exc
+        self._original_resized = img.resize(self.EVAL_SIZE, Image.LANCZOS)
+
+        # Build the downscaled working image once. Physical params must map to
+        # the smaller pixel grid, so the effective pixel size grows by the
+        # downscale factor to keep min_area/detail_size semantics unchanged.
+        work = img.copy() if max(img.size) > self.WORK_MAX_EDGE else img
+        work.thumbnail((self.WORK_MAX_EDGE, self.WORK_MAX_EDGE), Image.LANCZOS)
+        buf = BytesIO()
+        work.save(buf, format="PNG")
+        self._work_bytes = buf.getvalue()
+        self._pixel_size = fixed.pixel_size * (max(img.size) / max(work.size))
 
     def evaluate(self, params: dict, mode: str) -> SearchResult:
         """Run one pipeline pass and return MAE + preview data URL."""
@@ -96,10 +111,10 @@ class Evaluator:
     def _run_pixel(self, params: dict) -> str:
         from services.image_processor import process_image
         result = process_image(
-            image_bytes=self._original_bytes,
+            image_bytes=self._work_bytes,
             max_colors=int(params.get("max_colors", 10)),
             color_threshold=float(params.get("color_threshold", 50)),
-            pixel_size=self._fixed.pixel_size,
+            pixel_size=self._pixel_size,
             filament_colors=self._colors,
             layer_count=self._fixed.layer_count,
             layer_height=self._fixed.layer_height,
@@ -115,7 +130,7 @@ class Evaluator:
         from services.image_processor import build_vector_simulated_preview, _downscale_if_needed, MAX_PROCESSING_DIMENSION
         from services.vector_processor import VectorProcessorConfig, process_image_vector_with_preview
 
-        img = _Image.open(_BytesIO(self._original_bytes))
+        img = _Image.open(_BytesIO(self._work_bytes))
         if img.mode == "RGBA":
             bg = _Image.new("RGB", img.size, (255, 255, 255))
             bg.paste(img, mask=img.split()[3])
@@ -125,7 +140,7 @@ class Evaluator:
         img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
         img_array = _np.array(img)
 
-        pixel_size = self._fixed.pixel_size
+        pixel_size = self._pixel_size
         min_area_mm2 = float(params.get("min_area", 4.0))
         min_area_px = max(1, int(min_area_mm2 / (pixel_size * pixel_size)))
 
@@ -301,8 +316,15 @@ class ParamSearchService:
         self,
         image_bytes: bytes,
         on_progress: Optional[Callable[[ProgressEvent], None]] = None,
+        cancel: Optional[threading.Event] = None,
+        out: Optional[list[SearchResult]] = None,
     ) -> list[SearchResult]:
-        """Run the full search and return top-N results sorted by MAE ascending."""
+        """Run the full search and return results sorted by MAE ascending.
+
+        Each finished evaluation is appended to ``out`` immediately, so a caller
+        that trips ``cancel`` keeps the partial results instead of losing them
+        when the loop stops between evaluations.
+        """
         cfg = self._config
         evaluator = Evaluator(image_bytes, cfg.colors, cfg.fixed)
         modes = self._modes()
@@ -311,13 +333,16 @@ class ParamSearchService:
         total = sum(self._build_strategy(m).total() for m in modes)
         completed = 0
         best_mae = float("inf")
-        all_results: list[SearchResult] = []
+        all_results = out if out is not None else []
 
         job_id = ""  # filled by caller if needed
 
         for mode in modes:
             strategy = self._build_strategy(mode)
             for params in strategy.generate():
+                if cancel is not None and cancel.is_set():
+                    logger.info("Search cancelled after %d/%d evaluations", completed, total)
+                    return self._rank_and_trim(all_results)
                 try:
                     result = evaluator.evaluate(params, mode)
                     all_results.append(result)
@@ -347,13 +372,20 @@ class ParamSearchService:
         timeout_seconds: float = 120.0,
         on_progress: Optional[Callable[[ProgressEvent], None]] = None,
     ) -> list[SearchResult]:
-        """Run with a wall-clock timeout; returns best results found so far."""
-        results: list[SearchResult] = []
+        """Run with a wall-clock timeout; returns the best results completed so far.
+
+        On timeout the search loop is asked to stop after the in-flight
+        evaluation (cooperative cancel), so the worker thread exits promptly
+        instead of burning CPU through the remaining grid, and whatever
+        finished is ranked and returned.
+        """
+        collected: list[SearchResult] = []
         exc_holder: list[Exception] = []
+        cancel = threading.Event()
 
         def _run():
             try:
-                results.extend(self.run(image_bytes, on_progress))
+                self.run(image_bytes, on_progress=on_progress, cancel=cancel, out=collected)
             except Exception as exc:
                 exc_holder.append(exc)
 
@@ -361,15 +393,16 @@ class ParamSearchService:
         t.start()
         t.join(timeout=timeout_seconds)
 
+        if t.is_alive():
+            cancel.set()
+            # Grace period for the in-flight evaluation to finish and the loop
+            # to observe the flag; the daemon thread is abandoned if it overruns.
+            t.join(timeout=30.0)
+
         if exc_holder:
             raise exc_holder[0]
 
-        # If thread is still running (timeout), return whatever was collected
-        # by re-running a partial search — but since we can't interrupt the
-        # thread cleanly, we return what we have via a shared list approach.
-        # For simplicity, if the thread finished we return its results;
-        # if it timed out we return an empty list (caller handles partial).
-        return results if results else []
+        return self._rank_and_trim(collected)
 
     @staticmethod
     def _rank_and_trim(results: list[SearchResult]) -> list[SearchResult]:

@@ -23,6 +23,7 @@ from api.models import (
 )
 from api.rate_limiter import limiter
 from api.validators import validate_image_upload
+from config.settings import settings
 from core.blend_color import Colors
 from core.color_config import get_available_presets, get_preset
 from services.param_search_service import (
@@ -139,7 +140,11 @@ async def api_param_search(
     # Run in thread pool to avoid blocking the event loop
     results = await asyncio.get_event_loop().run_in_executor(
         None,
-        lambda: service.run_with_timeout(image_bytes, timeout_seconds=120.0, on_progress=_on_progress),
+        lambda: service.run_with_timeout(
+            image_bytes,
+            timeout_seconds=settings.param_search_budget_seconds,
+            on_progress=_on_progress,
+        ),
     )
 
     elapsed = time.monotonic() - start

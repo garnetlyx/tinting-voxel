@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     default_max_colors: int = 10
     default_color_threshold: float = 50.0
 
+    # Param search: wall-clock budget per run. Must stay below the Railway edge
+    # request timeout (~60s observed); the endpoint returns the best partial
+    # results collected within this budget.
+    param_search_budget_seconds: float = 50.0
+
     # File Upload
     max_upload_size: int = 10 * 1024 * 1024  # 10MB
     allowed_extensions: list[str] = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"]
