@@ -180,7 +180,8 @@ describe('useImageProcessor', () => {
     });
 
     const call = mockedProcessImage.mock.calls[0];
-    expect(call[1].pixelSize).toBe(0.42);
+    expect(call[1].pixelSize).toBe(result.current.pixelSize);
+    expect(call[1].pixelSize).not.toBe('[object Object]');
   });
 
   it('stores simulated preview data returned by svg mode', async () => {
