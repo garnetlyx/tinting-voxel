@@ -177,6 +177,53 @@ class TestRefinement:
         assert refined_de < 1.0  # the exact ordering exists in the candidate set
 
 
+class TestPaddingTailRegression:
+    """Padded matrix cells must not crowd out distinct compositions.
+
+    The stage-1 matrix pads 495 compositions into 506 cells; the 11 copies of
+    the final composition rank identically and previously could consume the
+    entire refinement cap. The padded tail (its own blend color as target)
+    must still refine across distinct compositions within oracle budget.
+    """
+
+    def test_padded_tail_target_refines_within_budget(self):
+        from core.stack_prune import _cap_distinct_compositions
+
+        colors = _clear_colors()
+        lc, lh = 8, 0.84
+        pruned_code_df, pruned_rgb_df = compute_reference_matrices(lc, lh, colors)
+        full_code_df, full_rgb_df = compute_reference_matrices(lc, lh, colors, prune=False)
+        code_to_rgb = _build_code_to_rgb(colors, lc, lh)
+
+        # The matrix pads with copies of the FINAL canonical composition.
+        cells = _codes_from_matrix(pruned_code_df)
+        assert len(cells) == 506 and len(set(cells)) == 495
+        pad_code = cells[-1]
+        assert sum(1 for c in cells if c == pad_code) >= 11
+
+        # Unit: duplicates can never exceed one cap slot.
+        fake_pen = np.zeros(506)
+        fake_raw = np.zeros(506)
+        pool = _cap_distinct_compositions(list(range(506)), cells, fake_pen, fake_raw, 12)
+        assert len(pool) == 12
+        assert len({cells[j] for j in pool}) == 12  # twelve distinct compositions
+
+        # Behavioral: target = padded composition's blend; refined pick stays
+        # within the spread budget of the full-enumeration oracle pick.
+        target_rgb = code_to_rgb(pad_code)
+        stage1_codes = [pad_code]
+        stage1_rgbs = [target_rgb]
+        refined_codes, refined_rgbs = refine_matches(
+            [target_rgb], stage1_codes, stage1_rgbs,
+            code_matrix=pruned_code_df, rgb_matrix=pruned_rgb_df,
+            colors=colors, layer_height=lh, code_to_rgb=code_to_rgb,
+        )
+        _, oracle_rgb = Color.map_to_nearest_color([target_rgb], full_code_df, full_rgb_df)
+        de = float(deltaE_ciede2000(
+            _lab([oracle_rgb[0]]), _lab([refined_rgbs[0]]), channel_axis=-1).ravel()[0])
+        assert de <= MAX_DELTA_E_BUDGET, f"padded-tail target {de:.2f} over budget"
+
+
 class TestPrunedVsFullOracle:
     @pytest.mark.parametrize("layer_count", [6, 8])
     def test_pruned_refined_mapping_within_delta_e_budget(self, layer_count):

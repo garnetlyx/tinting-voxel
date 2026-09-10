@@ -97,6 +97,30 @@ def _lab(rgb01: np.ndarray) -> np.ndarray:
     return rgb2lab(np.asarray(rgb01, dtype=np.float64).reshape(-1, 1, 3)).reshape(-1, 3)
 
 
+def _cap_distinct_compositions(
+    pool: list,
+    ref_codes: list,
+    rep_pen: np.ndarray,
+    rep_raw: np.ndarray,
+    cap: int,
+) -> list:
+    """Keep the best ``cap`` DISTINCT composition codes from a margin pool.
+
+    Matrix padding repeats the final composition (495 compositions pad to
+    506 cells); duplicate entries are ranked identically, so deduplicate by
+    code before applying the cap.
+    """
+    chosen: dict = {}
+    for j in sorted(pool, key=lambda j: min(rep_pen[j], rep_raw[j])):
+        code = ref_codes[j]
+        if code in chosen:
+            continue
+        chosen[code] = j
+        if len(chosen) >= cap:
+            break
+    return sorted(chosen.values())
+
+
 def refine_matches(
     input_colors: list,
     stage1_codes: list,
@@ -146,7 +170,13 @@ def refine_matches(
             | set(np.where(rep_raw <= rep_raw.min() + margin_delta_e)[0])
         )
         if len(pool) > max_compositions:
-            pool = sorted(pool, key=lambda j: min(rep_pen[j], rep_raw[j]))[:max_compositions]
+            # Cap by DISTINCT compositions: the reference matrix is padded to
+            # a rectangle (e.g. 495 compositions -> 506 cells), and the padded
+            # copies of the final composition would otherwise consume cap
+            # slots that belong to genuinely different compositions.
+            pool = _cap_distinct_compositions(
+                pool, ref_codes, rep_pen, rep_raw, max_compositions
+            )
 
         best_code, best_rgb, best_dist = stage1_codes[i], stage1_rgbs[i], float(rep_pen.min())
         for idx in pool:
