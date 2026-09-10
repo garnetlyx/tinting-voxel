@@ -5,16 +5,23 @@ Implements the hierarchical search from the tinting-voxel research note
 filament's neutral TD clears the transparency threshold — a stack's color is
 dominated by its composition (multiset of layers) and layer order is a
 secondary perturbation. The reference set therefore shrinks from ``N**L``
-ordered codes to ``C(N+L-1, L)`` composition representatives. Each input is
-then matched against the top-K compositions (by the production
-``Color.perceptual_distance`` metric) refined over all distinct orderings of
-those compositions.
+ordered codes to ``C(N+L-1, L)`` compositions.
 
-Correctness is bounded by the intra-composition order spread (measured on the
-staircase-calibrated clear set at 8 layers: mean ~3, max ~6.4 ΔE00) and
-guarded by a regression test against full enumeration as the oracle
-(tests/unit/test_stack_prune.py). Opaque and mixed sets keep the exact full
-enumeration.
+Design deviation from the note, measured and documented here: the note's
+stage 1 keeps ONE canonical (sorted) ordering per composition — 495
+candidates for 5 filaments x 8 layers. On the staircase-calibrated clear set
+that stage misses the full-enumeration oracle budget (max ~10 dE00 on
+reachable targets), because a single ordering can misrepresent a composition
+by more than the intra-composition spread where the production metric's
+dark-chromatic hue penalty amplifies ordering-driven hue differences. The
+implemented matrix therefore carries up to THREE diverse orderings per
+composition — sorted, reversed, and round-robin interleaved — bounded by
+``3 x C(N+L-1, L)`` candidates (1,458 at 5x8, still ~268x below the full
+390,625), and stage 2 refines the distinct orderings of the top compositions
+under the production ``Color.perceptual_distance`` metric. With this design
+the oracle budget holds (see tests/unit/test_stack_prune.py).
+
+Opaque and mixed sets keep the exact full enumeration.
 """
 import itertools
 import logging

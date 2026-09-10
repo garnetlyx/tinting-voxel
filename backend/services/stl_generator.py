@@ -102,9 +102,10 @@ def compute_reference_matrices(
                 f"Reduce the number of colors or layers."
             )
         logger.info(
-            "Pruned stack candidates: %d compositions of %d colors x %d layers "
-            "(full ordered set would be %d)",
-            len(code_list), len(items), layer_count, permutation_count,
+            "Pruned stack candidates: %d compositions of %d colors x %d layers, "
+            "%d diverse orderings in matrix (full ordered set would be %d)",
+            len(set("".join(sorted(c)) for c in code_list)), len(items), layer_count,
+            len(code_list), permutation_count,
         )
     else:
         if permutation_count > max_permutations:

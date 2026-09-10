@@ -335,8 +335,12 @@ def generate_svg_3mf(
     code_mesh_map: dict[str, list[np.ndarray]] = {label: [] for label in labels}
 
     input_colors = [result['color'] for result in vector_results]
-    result_codes, _ = Color.map_to_nearest_color(
-        input_colors, ref_code_matrix, ref_rgb_matrix
+    # Map with order refinement for composition-pruned translucent sets
+    # (same as the pixel STL/3MF paths).
+    from services.image_processor import _map_and_refine
+    result_codes, _ = _map_and_refine(
+        input_colors, ref_code_matrix, ref_rgb_matrix,
+        colors, layer_count, layer_height,
     )
 
     _log_input_color_brightness(input_colors, "SVG-3MF")

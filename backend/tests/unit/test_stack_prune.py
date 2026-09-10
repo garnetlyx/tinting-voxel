@@ -63,6 +63,24 @@ class TestCandidateGeneration:
         assert len(codes) == 495
         assert 5**8 / len(codes) > 700
 
+    def test_rep_matrix_bounds_and_documented_size(self):
+        """Stage-1 matrix = up to 3 diverse orderings per composition.
+
+        The implemented design (documented in core/stack_prune.py) carries
+        3 x C(N+L-1, L) candidates instead of the note's single canonical
+        ordering, because one representative misses the oracle budget.
+        """
+        from core.stack_prune import composition_rep_codes
+
+        reps = composition_rep_codes(["C", "M", "Y", "W", "G"], 8)
+        comps = composition_codes(["C", "M", "Y", "W", "G"], 8)
+        assert len(reps) <= 3 * len(comps)
+        assert len(reps) < 5**8 / 200  # ~268x below full enumeration at 5x8
+        # Every composition is represented by at least its canonical ordering.
+        assert all(c in set(reps) for c in comps)
+        # Deduplicated: no candidate appears twice.
+        assert len(reps) == len(set(reps))
+
     def test_distinct_permutations_unique_and_capped(self):
         perms = distinct_permutations("CCMMYYWG")
         assert len(perms) == len(set(perms))
