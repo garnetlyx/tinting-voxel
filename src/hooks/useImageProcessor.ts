@@ -13,7 +13,7 @@ import type {
   FilamentPreset,
   FilamentColorConfig,
 } from '../api/types';
-import { DEFAULT_PRESETS, DEFAULT_FILAMENT_PRESET } from '../api/types';
+import { DEFAULT_PRESETS, DEFAULT_FILAMENT_PRESET, DEFAULT_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM, DEFAULT_TRANSPARENT_TD_THRESHOLD_MM, isAllTransparentFilaments } from '../api/types';
 import type { ProcessingStage } from '../components/LoadingSpinner';
 import {
   processImage,
@@ -83,7 +83,7 @@ export const useImageProcessor = () => {
   const [mappedBlockColors, setMappedBlockColors] = useState<MappedBlockColor[]>([]);
   const [mappedBlendPalette, setMappedBlendPalette] = useState<MappedBlendPaletteEntry[]>([]);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
-  const [layerHeight, setLayerHeight] = useState(0.08);
+  const [layerHeight, setLayerHeight] = useState(DEFAULT_LAYER_HEIGHT_MM);
   const [detailSize, setDetailSize] = useState(0.42);
   const [pixelSize, setPixelSize] = useState(0.42);
   const [layerCount, setLayerCount] = useState(MIN_COLOR_LAYERS);
@@ -100,6 +100,32 @@ export const useImageProcessor = () => {
   const [filamentColors, setFilamentColors] = useState<FilamentColorConfig[]>(
     [...DEFAULT_PRESETS[DEFAULT_FILAMENT_PRESET]]
   );
+
+  // Transparency classification (TD1S neutral TD threshold, mm). Data-driven:
+  // every filament must meet the threshold for the set to count as transparent.
+  const [transparentTdThreshold, setTransparentTdThreshold] = useState(
+    DEFAULT_TRANSPARENT_TD_THRESHOLD_MM
+  );
+  const allTransparent = useMemo(
+    () => isAllTransparentFilaments(filamentColors, transparentTdThreshold),
+    [filamentColors, transparentTdThreshold]
+  );
+  const allTransparentRef = useRef(allTransparent);
+  useEffect(() => {
+    if (allTransparentRef.current === allTransparent) return;
+    allTransparentRef.current = allTransparent;
+    // Swap the default layer height when the classification flips; manually
+    // chosen values are preserved.
+    setLayerHeight(prev => {
+      if (allTransparent && Math.abs(prev - DEFAULT_LAYER_HEIGHT_MM) < 1e-9) {
+        return TRANSPARENT_LAYER_HEIGHT_MM;
+      }
+      if (!allTransparent && Math.abs(prev - TRANSPARENT_LAYER_HEIGHT_MM) < 1e-9) {
+        return DEFAULT_LAYER_HEIGHT_MM;
+      }
+      return prev;
+    });
+  }, [allTransparent]);
 
   // Filament preset storage (localStorage persistence)
   const filamentStorage = useFilamentStorage();
@@ -149,12 +175,7 @@ export const useImageProcessor = () => {
     setFilamentPreset(preset);
     setFilamentColors([...DEFAULT_PRESETS[preset]]);
     filamentStorage.setLastPresetId(null);
-    if (preset === 'clear_cmywg') {
-      setLayerHeight(0.84);
-    } else if (layerHeight === 0.84) {
-      setLayerHeight(0.08);
-    }
-  }, [filamentStorage, layerHeight]);
+  }, [filamentStorage]);
 
   // Load a saved (custom) preset's colors into the editor
   const loadSavedPresetColors = useCallback((colors: FilamentColorConfig[]) => {
@@ -821,6 +842,9 @@ export const useImageProcessor = () => {
     setMinArea,
     setNumColors,
     setLayerHeight,
+    transparentTdThreshold,
+    setTransparentTdThreshold,
+    allTransparent,
     setLayerCount: handleSetLayerCount,
     setPixelSize: handleSetPixelSize,
     setDetailSize: handleSetDetailSize,

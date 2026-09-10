@@ -143,6 +143,45 @@ describe('useImageProcessor', () => {
     expect(result.current.layerCount).toBe(8);
   });
 
+  it('raises the default layer height only when every filament classifies as transparent', () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    // Clear preset: every TD1S neutral TD >= 6.7 -> transparent default 0.84.
+    act(() => { result.current.loadPreset('clear_cmywg'); });
+    expect(result.current.allTransparent).toBe(true);
+    expect(result.current.layerHeight).toBe(0.84);
+
+    // Back to Bambu CMYWK (Key 0.1 blocks) -> non-transparent default 0.08.
+    act(() => { result.current.loadPreset('bambu_cmywk_phase6'); });
+    expect(result.current.allTransparent).toBe(false);
+    expect(result.current.layerHeight).toBe(0.08);
+  });
+
+  it('preserves a manually chosen layer height across classification flips', () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    act(() => {
+      result.current.setLayerHeight(0.3);
+      result.current.loadPreset('clear_cmywg');
+    });
+    expect(result.current.layerHeight).toBe(0.3);
+
+    act(() => { result.current.loadPreset('bambu_cmywk_phase6'); });
+    expect(result.current.layerHeight).toBe(0.3);
+  });
+
+  it('reclassifies when the user adjusts the transparency threshold', () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    act(() => { result.current.loadPreset('clear_cmywg'); });
+    expect(result.current.layerHeight).toBe(0.84);
+
+    // Raising the threshold past grey (7.3) makes the clear set non-transparent.
+    act(() => { result.current.setTransparentTdThreshold(50); });
+    expect(result.current.allTransparent).toBe(false);
+    expect(result.current.layerHeight).toBe(0.08);
+  });
+
   it('sends filament config and layer settings when processing an image', async () => {
     const { result } = renderHook(() => useImageProcessor());
     const img = new globalThis.Image() as unknown as HTMLImageElement;

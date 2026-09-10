@@ -46,6 +46,9 @@ describe('ParameterPanel', () => {
     onReprocess: vi.fn(),
     processing: false,
     hasImage: true,
+    transparentTdThreshold: 6.7,
+    allTransparent: false,
+    onTransparentTdThresholdChange: vi.fn(),
   };
 
   it('lets users type a multi-digit max dimension before committing', async () => {

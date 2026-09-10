@@ -51,6 +51,11 @@ class FilamentColorConfig(BaseModel):
         None,
         description="Staircase-measured per-channel transmission distances (td_R, td_G, td_B), mm; selects the per_channel blend mode"
     )
+    td_neutral: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Neutral (dye-free) transmission distance from TD1S strand measurement, mm; drives transparency classification"
+    )
 
     @field_validator('name')
     @classmethod

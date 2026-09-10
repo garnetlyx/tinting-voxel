@@ -4,6 +4,7 @@ import { useTranslation } from '../i18n';
  */
 import React, { useEffect, useState } from 'react';
 import type { PrintStackInfo, ProcessingMode } from '../api/types';
+import { LAYER_HEIGHT_MIN_MM, LAYER_HEIGHT_MAX_MM } from '../api/types';
 import { ModeSelector } from './ModeSelector';
 
 interface ParameterPanelProps {
@@ -39,6 +40,10 @@ interface ParameterPanelProps {
   onMaxDimensionChange: (value: number) => void;
   whiteBackingLayers: number;
   onWhiteBackingLayersChange: (value: number) => void;
+  // Transparency classification (drives the layer-height default)
+  transparentTdThreshold: number;
+  allTransparent: boolean;
+  onTransparentTdThresholdChange: (value: number) => void;
   // Base plate
   basePlateThickness: number;
   onBasePlateThicknessChange: (value: number) => void;
@@ -80,6 +85,9 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   onMaxDimensionChange,
   whiteBackingLayers,
   onWhiteBackingLayersChange,
+  transparentTdThreshold,
+  allTransparent,
+  onTransparentTdThresholdChange,
   basePlateThickness,
   onBasePlateThicknessChange,
   doubleSided,
@@ -145,6 +153,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               onChange={(e) => onColorThresholdChange(parseInt(e.target.value))}
               className="w-full"
             />
+            <p className="text-xs text-gray-500 mt-1">{t('parameters:colorMergeThresholdHelp')}</p>
           </div>
         </>
       ) : (
@@ -214,13 +223,34 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
         </label>
         <input
           type="range"
-          min="0.04"
-          max={layerHeight > 0.28 ? Math.max(1.00, layerHeight) : 0.28}
+          min={LAYER_HEIGHT_MIN_MM}
+          max={LAYER_HEIGHT_MAX_MM}
           step="0.01"
           value={layerHeight}
           onChange={(e) => onLayerHeightChange(parseFloat(e.target.value))}
           className="w-full"
         />
+        {allTransparent && (
+          <p className="text-xs text-emerald-700 mt-1">{t('parameters:allTransparentNote')}</p>
+        )}
+        <div className="mt-2 flex items-center gap-2">
+          <label className="text-xs text-gray-500" htmlFor="transparentTdThreshold">{t('parameters:transparentTdThreshold')}</label>
+          <input
+            id="transparentTdThreshold"
+            type="number"
+            min="0.1"
+            max="200"
+            step="0.1"
+            value={transparentTdThreshold}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v) && v > 0) onTransparentTdThresholdChange(v);
+            }}
+            className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
+          />
+          <span className="text-xs text-gray-400">mm</span>
+        </div>
+        <p className="text-xs text-gray-500 mt-1">{t('parameters:transparentTdThresholdHelp')}</p>
       </div>
 
       <div>
