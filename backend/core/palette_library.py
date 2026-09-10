@@ -26,15 +26,15 @@ class PaletteEntry:
 # Palette metadata references the canonical filament presets.
 PALETTE_BAMBU_CMYWK_PHASE6 = PaletteEntry(
     id="bambu_cmywk_phase6",
-    name="Bambu CMYWK Phase 6",
-    description="Phase 6 calibrated Bambu Lab CMYWK filament set for full-color printing with true black",
+    name="Bambu CMYWK",
+    description="Calibrated Bambu Lab CMYWK filament set for full-color printing with true black",
     colors=BAMBU_CMYWK_PHASE6_PRESET,  # Reference source-of-truth constant
 )
 
 PALETTE_BAMBU_CMYW_PHASE6 = PaletteEntry(
     id="bambu_cmyw_phase6",
-    name="Bambu CMYW Phase 6",
-    description="Phase 6 calibrated Bambu Lab CMYW filament set for full-color printing",
+    name="Bambu CMYW",
+    description="Calibrated Bambu Lab CMYW filament set for full-color printing",
     colors=BAMBU_CMYW_PHASE6_PRESET,  # Reference source-of-truth constant
 )
 

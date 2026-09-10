@@ -57,7 +57,7 @@ class TestPaletteLibrary:
         palette = get_palette("bambu_cmyw_phase6")
         assert palette is not None
         assert palette.id == "bambu_cmyw_phase6"
-        assert palette.name == "Bambu CMYW Phase 6"
+        assert palette.name == "Bambu CMYW"
 
     def test_get_palette_not_found(self):
         """Get a non-existent palette returns None."""

@@ -91,7 +91,7 @@ describe('live localization boundaries', () => {
   it('uses catalog IDs for known metadata and preserves unknown entries', () => {
     const { result } = renderHook(() => ({ preset: usePresetLabel(), palette: usePaletteText() }));
     act(() => setLocale('zh-CN'));
-    expect(result.current.preset('bambu_cmyw_phase6', 'fallback')).toContain('第六阶段');
+    expect(result.current.preset('bambu_cmyw_phase6', 'fallback')).toContain('CMYW');
     expect(result.current.preset('new-dynamic-preset', 'My custom 8-color palette')).toBe('My custom 8-color palette');
     expect(result.current.palette('new-palette_name', '新配色 Q')).toBe('新配色 Q');
   });

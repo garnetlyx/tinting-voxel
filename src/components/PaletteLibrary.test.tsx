@@ -8,7 +8,7 @@ describe('PaletteLibrary', () => {
   it('preserves all calibrated material parameters when applying a palette', async () => {
     const colors = DEFAULT_PRESETS.bambu_cmyw_phase6;
     const mock = vi.spyOn(api, 'getPaletteLibrary').mockResolvedValue({ palettes: [{
-      id: 'bambu_cmyw_phase6', name: 'Bambu CMYW Phase 6', description: '', colors,
+      id: 'bambu_cmyw_phase6', name: 'Bambu CMYW', description: '', colors,
     }] });
     const onApplyPalette = vi.fn();
     try {

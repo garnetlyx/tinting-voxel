@@ -46,7 +46,7 @@ class TestGetPalette:
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == "bambu_cmyw_phase6"
-        assert data["name"] == "Bambu CMYW Phase 6"
+        assert data["name"] == "Bambu CMYW"
         assert len(data["colors"]) == 4
 
     def test_get_nonexistent_palette(self, client):

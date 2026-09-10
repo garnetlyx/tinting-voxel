@@ -16,7 +16,7 @@ def test_get_filament_presets(client):
     data = response.json()
     assert "presets" in data
     assert [p["name"] for p in data["presets"]] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmywg"]
-    assert [p["display_name"] for p in data["presets"]] == ["Bambu CMYWK Phase 6", "Bambu CMYW Phase 6", "Clear CMYWG"]
+    assert [p["display_name"] for p in data["presets"]] == ["Bambu CMYWK", "Bambu CMYW", "Clear CMYWG"]
 
 
 def test_get_filament_presets_exposes_calibrated_material_params(client):

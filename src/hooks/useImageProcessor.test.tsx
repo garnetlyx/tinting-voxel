@@ -119,7 +119,7 @@ describe('useImageProcessor', () => {
     expect(mockedProcessImage).not.toHaveBeenCalled();
   });
 
-  it('defaults to the Phase 6 CMYWK filament preset', () => {
+  it('defaults to the Bambu CMYWK filament preset', () => {
     const { result } = renderHook(() => useImageProcessor());
 
     expect(result.current.filamentPreset).toBe('bambu_cmywk_phase6');
