@@ -109,8 +109,8 @@ export type FilamentPreset =
 
 export const DEFAULT_FILAMENT_PRESET: FilamentPreset = 'bambu_cmywk_phase6';
 export const FILAMENT_PRESET_OPTIONS: { value: FilamentPreset; label: string }[] = [
-  { value: 'bambu_cmywk_phase6', label: 'Bambu CMYWK Phase 6' },
-  { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW Phase 6' },
+  { value: 'bambu_cmywk_phase6', label: 'Bambu CMYWK' },
+  { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW' },
   { value: 'clear_cmywg', label: 'Clear CMYWG' },
 ];
 
@@ -120,6 +120,7 @@ export interface FilamentColorConfig {
   transmission_distance: number;
   alpha?: number;
   k?: number;
+  td_rgb?: [number, number, number];
   td_scale?: number;
   td_gamma?: number;
 }
@@ -368,46 +369,51 @@ export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
   clear_cmywg: [
     {
       name: 'Cyan',
-      hex: '#4C72A0',
-      transmission_distance: 200.0,
+      hex: '#5489B4',
+      transmission_distance: 4.7,
       alpha: 12.0,
       k: 1.93,
+      td_rgb: [1.04, 4.66, 8.30],
       td_scale: 1.0,
       td_gamma: 1.0,
     },
     {
       name: 'Magenta',
-      hex: '#CE5E53',
-      transmission_distance: 200.0,
+      hex: '#DE5740',
+      transmission_distance: 6.3,
       alpha: 12.0,
       k: 1.44,
+      td_rgb: [12.87, 2.39, 3.70],
       td_scale: 1.0,
       td_gamma: 1.0,
     },
     {
       name: 'Yellow',
-      hex: '#D8B695',
-      transmission_distance: 200.0,
+      hex: '#DDC465',
+      transmission_distance: 10.1,
       alpha: 12.0,
       k: 0.67,
+      td_rgb: [15.13, 12.29, 2.81],
       td_scale: 1.0,
       td_gamma: 1.0,
     },
     {
       name: 'White',
       hex: '#D9D6C5',
-      transmission_distance: 110.4,
+      transmission_distance: 18.0,
       alpha: 12.0,
       k: 0.11,
+      td_rgb: [17.95, 18.90, 17.21],
       td_scale: 1.0,
       td_gamma: 1.0,
     },
     {
       name: 'Grey',
-      hex: '#676563',
-      transmission_distance: 7.3,
+      hex: '#9A9D9C',
+      transmission_distance: 1.7,
       alpha: 12.0,
       k: 10.0,
+      td_rgb: [2.23, 1.69, 1.19],
       td_scale: 1.0,
       td_gamma: 1.0,
     },

@@ -195,20 +195,55 @@ BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
     ),
 ]
 
-# Clear filament parameters from staircase v2 calibration (2026-07-17).
-# Source: staircase v2 calibration (2026-07-17), staircase_report_v2.json
-# Hex = WB-corrected thickest-step color; td/k = least-squares fit of the
-# hybrid_per_color_k decay rate (alpha/td + k*A_ch) to the measured per-channel
-# rates ln(10)/td_ch (thin-range fit, d <= 3mm). Clear filaments have negligible
-# neutral scattering, so td saturates at the 200.0 cap and color separation is
-# carried by k. Grey (Panchroma) has no staircase yet: hex/td are TD1S values.
-# See docs/CLEAR_CALIBRATION.md "Preset Update" for derivation and residuals.
+# Clear filament parameters from staircase calibration.
+# Source: tinting-voxel-research repo (staircase-KX-B-default and PLATE-07 cross-validation).
+# Hex = WB-corrected thickest-step measured color:
+#   Cyan: #5489B4 (Ziro Light Cyan Clear)
+#   Magenta: #DE5740 (iSANMATE Light Pink)
+#   Yellow: #DDC465 (Sunlu Transparent Yellow)
+#   White: #D9D6C5 (Kingroon Transparent PLA)
+#   Grey: #9A9D9C (Panchroma Translucent Grey)
 CLEAR_CMYWG_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan", hex="#4C72A0", transmission_distance=200.0, alpha=12.0, k=1.93),  # Ziro Light Cyan Clear
-    ColorConfig(name="Magenta", hex="#CE5E53", transmission_distance=200.0, alpha=12.0, k=1.44),  # iSANMATE Light Pink
-    ColorConfig(name="Yellow", hex="#D8B695", transmission_distance=200.0, alpha=12.0, k=0.67),  # Sunlu Transparent Yellow
-    ColorConfig(name="White", hex="#D9D6C5", transmission_distance=110.4, alpha=12.0, k=0.11),  # Kingroon Transparent PLA
-    ColorConfig(name="Grey", hex="#676563", transmission_distance=7.3, alpha=12.0, k=10.0),  # Panchroma (staircase pending)
+    ColorConfig(
+        name="Cyan",
+        hex="#5489B4",
+        transmission_distance=4.7,
+        alpha=12.0,
+        k=1.93,
+        td_rgb=(1.04, 4.66, 8.30),
+    ),  # Ziro Light Cyan Clear
+    ColorConfig(
+        name="Magenta",
+        hex="#DE5740",
+        transmission_distance=6.3,
+        alpha=12.0,
+        k=1.44,
+        td_rgb=(12.87, 2.39, 3.70),
+    ),  # iSANMATE Light Pink
+    ColorConfig(
+        name="Yellow",
+        hex="#DDC465",
+        transmission_distance=10.1,
+        alpha=12.0,
+        k=0.67,
+        td_rgb=(15.13, 12.29, 2.81),
+    ),  # Sunlu Transparent Yellow
+    ColorConfig(
+        name="White",
+        hex="#D9D6C5",
+        transmission_distance=18.0,
+        alpha=12.0,
+        k=0.11,
+        td_rgb=(17.95, 18.90, 17.21),
+    ),  # Kingroon Transparent PLA
+    ColorConfig(
+        name="Grey",
+        hex="#9A9D9C",
+        transmission_distance=1.7,
+        alpha=12.0,
+        k=10.0,
+        td_rgb=(2.23, 1.69, 1.19),
+    ),  # Panchroma Translucent Grey
 ]
 
 PRESETS = {
@@ -218,8 +253,8 @@ PRESETS = {
 }
 
 PRESET_DISPLAY_NAMES = {
-    "bambu_cmywk_phase6": "Bambu CMYWK Phase 6",
-    "bambu_cmyw_phase6": "Bambu CMYW Phase 6",
+    "bambu_cmywk_phase6": "Bambu CMYWK",
+    "bambu_cmyw_phase6": "Bambu CMYW",
     "clear_cmywg": "Clear CMYWG",
 }
 

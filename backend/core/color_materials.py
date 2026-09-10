@@ -330,6 +330,10 @@ class Colors:
         """Select the calibrated blend family implied by the material parameters."""
         colors = self.colors.values() if isinstance(self.colors, dict) else []
         for color in colors:
+            # Directly measured per-channel TDs bypass fitted families: the
+            # staircase-measured td_rgb tuple is consumed as-is (k_residual=0).
+            if getattr(color, "td_rgb", None) is not None:
+                return "per_channel"
             if (
                 color.td_scale != Color.DEFAULT_TD_SCALE
                 or color.td_gamma != Color.DEFAULT_TD_GAMMA
@@ -369,7 +373,7 @@ class Colors:
         if len(configs) < 4:
             raise ValueError(
                 f"Color configuration requires at least 4 colors, got {len(configs)}. "
-                f"Use the default Phase 6 CMYW preset or provide 4+ custom filament colors."
+                f"Use a built-in preset or provide 4+ custom filament colors."
             )
 
         instance = cls(colors={})

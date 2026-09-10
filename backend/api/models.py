@@ -47,6 +47,10 @@ class FilamentColorConfig(BaseModel):
         le=1000,
         description="TD remap exponent for calibrated blend modes"
     )
+    td_rgb: Optional[tuple[float, float, float]] = Field(
+        None,
+        description="Staircase-measured per-channel transmission distances (td_R, td_G, td_B), mm; selects the per_channel blend mode"
+    )
 
     @field_validator('name')
     @classmethod
