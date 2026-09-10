@@ -12,7 +12,7 @@ class TestListPalettes:
         assert response.status_code == 200
         data = response.json()
         assert "palettes" in data
-        assert [p["id"] for p in data["palettes"]] == ["bambu_cmyw_phase6", "clear_cmywg"]
+        assert [p["id"] for p in data["palettes"]] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmywg"]
 
 
     def test_palette_has_required_fields(self, client):

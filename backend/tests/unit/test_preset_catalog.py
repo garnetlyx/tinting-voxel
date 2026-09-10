@@ -16,7 +16,7 @@ def test_catalog_matches_frontend_fixture():
                       if key not in {"k_rgb", "td_rgb"}} for c in colors]
               for name, colors in PRESETS.items()}
     assert actual == expected
-    assert get_available_presets() == ["bambu_cmyw_phase6", "clear_cmywg"]
+    assert get_available_presets() == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmywg"]
     assert [preset.value for preset in FilamentPreset] == get_available_presets()
 
 

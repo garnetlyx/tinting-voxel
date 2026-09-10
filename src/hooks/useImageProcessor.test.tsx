@@ -119,14 +119,14 @@ describe('useImageProcessor', () => {
     expect(mockedProcessImage).not.toHaveBeenCalled();
   });
 
-  it('defaults to the Phase 6 CMYW filament preset', () => {
+  it('defaults to the Phase 6 CMYWK filament preset', () => {
     const { result } = renderHook(() => useImageProcessor());
 
-    expect(result.current.filamentPreset).toBe('bambu_cmyw_phase6');
-    expect(result.current.filamentColors).toHaveLength(4);
+    expect(result.current.filamentPreset).toBe('bambu_cmywk_phase6');
+    expect(result.current.filamentColors).toHaveLength(5);
     expect(result.current.layerCount).toBe(4);
-    expect(result.current.maxLayerCount).toBe(9);
-    expect(result.current.filamentColors.some(color => color.name === 'Key')).toBe(false);
+    expect(result.current.maxLayerCount).toBe(8);
+    expect(result.current.filamentColors.some(color => color.name === 'Key')).toBe(true);
     expect(result.current.filamentColors[0].k).toBe(8.13);
   });
 
@@ -158,7 +158,7 @@ describe('useImageProcessor', () => {
         layerHeight: 0.08,
         layerCount: 4,
         whiteBackingLayers: 1,
-        filamentPreset: 'bambu_cmyw_phase6',
+        filamentPreset: 'bambu_cmywk_phase6',
       }),
       expect.any(AbortSignal)
     );
@@ -216,7 +216,7 @@ describe('useImageProcessor', () => {
 
     expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
       expect.objectContaining({
-        filamentPreset: 'bambu_cmyw_phase6',
+        filamentPreset: 'bambu_cmywk_phase6',
       })
     );
     expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
@@ -236,12 +236,12 @@ describe('useImageProcessor', () => {
 
     expect(mockedDownload3MFV2).toHaveBeenCalledWith(
       expect.objectContaining({
-        filamentPreset: 'bambu_cmyw_phase6',
+        filamentPreset: 'bambu_cmywk_phase6',
       })
     );
     expect(mockedDownloadPrintSettings).toHaveBeenCalledWith(
       expect.objectContaining({
-        filamentPreset: 'bambu_cmyw_phase6',
+        filamentPreset: 'bambu_cmywk_phase6',
       })
     );
   });

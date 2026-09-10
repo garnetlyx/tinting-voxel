@@ -59,7 +59,7 @@ def _parse_filament_form_payload(
                 status_code=400,
                 detail=(
                     f"Invalid filament preset: {filament_preset}. "
-                    "Valid presets: bambu_cmyw_phase6, clear_cmywg"
+                    f"Valid presets: {', '.join(p.value for p in FilamentPreset)}"
                 ),
             ) from exc
 

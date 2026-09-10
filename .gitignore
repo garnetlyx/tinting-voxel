@@ -38,6 +38,7 @@ backend/**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
 .Python
 pip-log.txt
 pip-delete-this-directory.txt

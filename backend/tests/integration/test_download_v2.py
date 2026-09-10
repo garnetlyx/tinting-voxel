@@ -15,8 +15,8 @@ def test_get_filament_presets(client):
     assert response.status_code == 200
     data = response.json()
     assert "presets" in data
-    assert [p["name"] for p in data["presets"]] == ["bambu_cmyw_phase6", "clear_cmywg"]
-    assert [p["display_name"] for p in data["presets"]] == ["Bambu CMYW Phase 6", "Clear CMYWG"]
+    assert [p["name"] for p in data["presets"]] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmywg"]
+    assert [p["display_name"] for p in data["presets"]] == ["Bambu CMYWK Phase 6", "Bambu CMYW Phase 6", "Clear CMYWG"]
 
 
 def test_get_filament_presets_exposes_calibrated_material_params(client):
@@ -120,11 +120,12 @@ def test_v2_stl_with_default_colors(client, sample_color_blocks_with_hex):
     assert len(zf.namelist()) > 0
 
 
-def test_get_colors_from_request_defaults_to_phase6_cmyw():
-    """Default color resolution should use the Phase 6 CMYW preset."""
+def test_get_colors_from_request_defaults_to_phase6_cmywk():
+    """Default color resolution should use the Phase 6 CMYWK preset."""
     colors = get_colors_from_request(None, None)
-    assert len(colors) == 4
-    assert "K" not in colors.get_labels()
+    assert len(colors) == 5
+    assert "K" in colors.get_labels()
+    assert colors["K"].k == 17.65
     assert colors["C"].k == 8.13
     assert colors["W"].k == 12.39
 
@@ -555,8 +556,8 @@ def test_print_settings_default_colors(client):
     )
     assert response.status_code == 200
     data = json.loads(response.content)
-    assert data["filament"]["extruder_count"] == 4
-    assert data["filament"]["preset"] == "bambu_cmyw_phase6"
+    assert data["filament"]["extruder_count"] == 5
+    assert data["filament"]["preset"] == "bambu_cmywk_phase6"
 
 
 def test_palette_and_preset_materials_match(client):

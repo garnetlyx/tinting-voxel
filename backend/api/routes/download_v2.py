@@ -22,6 +22,7 @@ from api.models import (
 )
 from core.blend_color import Colors
 from core.color_config import (
+    BAMBU_CMYWK_PHASE6_PRESET,
     BAMBU_CMYW_PHASE6_PRESET,
     ColorConfig,
     get_preset,
@@ -76,8 +77,8 @@ def get_colors_from_request(
         if preset_configs:
             return Colors.from_configs(preset_configs)
 
-    # Fall back to the default image-preview Phase 6 CMYW preset
-    return Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
+    # Fall back to the default Phase 6 CMYWK preset
+    return Colors.from_configs(BAMBU_CMYWK_PHASE6_PRESET)
 
 
 @router.get("/filament-presets", response_model=FilamentPresetsResponse)
@@ -287,13 +288,13 @@ async def api_print_settings(request: Request, body: PrintSettingsRequest):
                 for c in preset_configs
             ]
     else:
-        for c in BAMBU_CMYW_PHASE6_PRESET:
+        for c in BAMBU_CMYWK_PHASE6_PRESET:
             filament_colors_dicts.append({
                 'name': c.name,
                 'hex': c.hex,
                 'transmission_distance': c.transmission_distance,
             })
-        preset_name = 'bambu_cmyw_phase6'
+        preset_name = 'bambu_cmywk_phase6'
 
     image_dimensions = body.imageDimensions.model_dump()
 

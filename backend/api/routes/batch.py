@@ -161,7 +161,7 @@ async def api_batch_download_stl(
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid filament preset: {filamentPreset}. "
-                f"Valid presets: bambu_cmyw_phase6, clear_cmywg"
+                f"Valid presets: {', '.join(p.value for p in FilamentPreset)}"
             )
 
     zip_content = generate_batch_stl_zip(

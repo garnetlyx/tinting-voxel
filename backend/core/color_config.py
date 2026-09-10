@@ -104,7 +104,58 @@ class ColorConfig:
         return self.name[0].upper()
 
 
-# Phase 6 CMYW calibration.
+# Phase 6 CMYWK calibration with Key (true black).
+# Uses physically-ordered k values derived from black/white backing dual-calibration.
+# Physical ordering: K (17.65) > W (12.39) > M (8.42) > C (8.13) > Y (3.73).
+BAMBU_CMYWK_PHASE6_PRESET: List[ColorConfig] = [
+    ColorConfig(
+        name="Cyan",
+        hex="#3D79C6",
+        transmission_distance=2.0,
+        alpha=8.08,
+        k=8.13,
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Magenta",
+        hex="#B3356E",
+        transmission_distance=2.9,
+        alpha=8.08,
+        k=8.42,
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Yellow",
+        hex="#FFE665",
+        transmission_distance=5.0,
+        alpha=8.08,
+        k=3.73,
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="White",
+        hex="#FFFFFF",
+        transmission_distance=6.1,
+        alpha=8.08,
+        k=12.39,
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+    ColorConfig(
+        name="Key",
+        hex="#0B0F0C",
+        transmission_distance=0.1,
+        alpha=8.08,
+        k=17.65,
+        td_scale=1.48,
+        td_gamma=0.20,
+    ),
+]
+
+# Phase 6 CMYW calibration without Key (legacy 4-color option).
 BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
     ColorConfig(
         name="Cyan",
@@ -161,11 +212,13 @@ CLEAR_CMYWG_PRESET: List[ColorConfig] = [
 ]
 
 PRESETS = {
+    "bambu_cmywk_phase6": BAMBU_CMYWK_PHASE6_PRESET,
     "bambu_cmyw_phase6": BAMBU_CMYW_PHASE6_PRESET,
     "clear_cmywg": CLEAR_CMYWG_PRESET,
 }
 
 PRESET_DISPLAY_NAMES = {
+    "bambu_cmywk_phase6": "Bambu CMYWK Phase 6",
     "bambu_cmyw_phase6": "Bambu CMYW Phase 6",
     "clear_cmywg": "Clear CMYWG",
 }

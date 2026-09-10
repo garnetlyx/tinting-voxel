@@ -2,6 +2,8 @@
   "paletteLibrary": "配色库",
   "browseCuratedPalettes": "浏览精选配色",
   "noPalettesFound": "未找到配色",
+  "bambu_cmywk_phase6_name": "Bambu CMYWK 第六阶段",
+  "bambu_cmywk_phase6_description": "用于全彩打印的第六阶段校准 Bambu Lab CMYWK 耗材组合（含纯黑）",
   "bambu_cmyw_phase6_name": "Bambu CMYW 第六阶段",
   "bambu_cmyw_phase6_description": "用于全彩打印的第六阶段校准的 Bambu Lab CMYW 耗材组合",
   "clear_cmywg_name": "透明 CMYWG",

@@ -6,7 +6,12 @@ Exposes the two supported built-in filament configurations for browsing.
 from dataclasses import dataclass
 from typing import List, Optional
 
-from core.color_config import ColorConfig, BAMBU_CMYW_PHASE6_PRESET, CLEAR_CMYWG_PRESET
+from core.color_config import (
+    ColorConfig,
+    BAMBU_CMYWK_PHASE6_PRESET,
+    BAMBU_CMYW_PHASE6_PRESET,
+    CLEAR_CMYWG_PRESET,
+)
 
 
 @dataclass
@@ -19,6 +24,13 @@ class PaletteEntry:
 
 
 # Palette metadata references the canonical filament presets.
+PALETTE_BAMBU_CMYWK_PHASE6 = PaletteEntry(
+    id="bambu_cmywk_phase6",
+    name="Bambu CMYWK Phase 6",
+    description="Phase 6 calibrated Bambu Lab CMYWK filament set for full-color printing with true black",
+    colors=BAMBU_CMYWK_PHASE6_PRESET,  # Reference source-of-truth constant
+)
+
 PALETTE_BAMBU_CMYW_PHASE6 = PaletteEntry(
     id="bambu_cmyw_phase6",
     name="Bambu CMYW Phase 6",
@@ -33,7 +45,11 @@ PALETTE_CLEAR_CMYWG = PaletteEntry(
     colors=CLEAR_CMYWG_PRESET,  # Reference source-of-truth constant
 )
 
-ALL_PALETTES: List[PaletteEntry] = [PALETTE_BAMBU_CMYW_PHASE6, PALETTE_CLEAR_CMYWG]
+ALL_PALETTES: List[PaletteEntry] = [
+    PALETTE_BAMBU_CMYWK_PHASE6,
+    PALETTE_BAMBU_CMYW_PHASE6,
+    PALETTE_CLEAR_CMYWG,
+]
 
 
 def get_palette(palette_id: str) -> Optional[PaletteEntry]:

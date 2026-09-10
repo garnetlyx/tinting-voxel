@@ -26,6 +26,7 @@
   "filamentCount": "{{count}} filament colors",
   "combinations": "{{count, number}} combinations",
   "custom": "Custom",
+  "bambu_cmywk_phase6": "Bambu CMYWK Phase 6",
   "bambu_cmyw_phase6": "Bambu CMYW Phase 6",
   "clear_cmywg": "Clear CMYWG",
   "codeName": "Code",

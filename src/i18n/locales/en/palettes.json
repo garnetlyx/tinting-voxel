@@ -2,6 +2,8 @@
   "paletteLibrary": "Palette Library",
   "browseCuratedPalettes": "Browse curated palettes",
   "noPalettesFound": "No palettes found",
+  "bambu_cmywk_phase6_name": "Bambu CMYWK Phase 6",
+  "bambu_cmywk_phase6_description": "Phase 6 calibrated Bambu Lab CMYWK filament set for full-color printing with true black",
   "bambu_cmyw_phase6_name": "Bambu CMYW Phase 6",
   "bambu_cmyw_phase6_description": "Phase 6 calibrated Bambu Lab CMYW filament set for full-color printing",
   "clear_cmywg_name": "Clear CMYWG",

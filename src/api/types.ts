@@ -103,11 +103,13 @@ export interface DownloadSVGSTLParams {
 // V2 API types for configurable filament colors
 
 export type FilamentPreset =
+  | 'bambu_cmywk_phase6'
   | 'bambu_cmyw_phase6'
   | 'clear_cmywg';
 
-export const DEFAULT_FILAMENT_PRESET: FilamentPreset = 'bambu_cmyw_phase6';
+export const DEFAULT_FILAMENT_PRESET: FilamentPreset = 'bambu_cmywk_phase6';
 export const FILAMENT_PRESET_OPTIONS: { value: FilamentPreset; label: string }[] = [
+  { value: 'bambu_cmywk_phase6', label: 'Bambu CMYWK Phase 6' },
   { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW Phase 6' },
   { value: 'clear_cmywg', label: 'Clear CMYWG' },
 ];
@@ -278,6 +280,53 @@ export interface PaletteLibraryResponse {
 
 // Default presets for frontend initialization
 export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
+  bambu_cmywk_phase6: [
+    {
+      name: 'Cyan',
+      hex: '#3D79C6',
+      transmission_distance: 2.0,
+      alpha: 8.08,
+      k: 8.13,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Magenta',
+      hex: '#B3356E',
+      transmission_distance: 2.9,
+      alpha: 8.08,
+      k: 8.42,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Yellow',
+      hex: '#FFE665',
+      transmission_distance: 5.0,
+      alpha: 8.08,
+      k: 3.73,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'White',
+      hex: '#FFFFFF',
+      transmission_distance: 6.1,
+      alpha: 8.08,
+      k: 12.39,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Key',
+      hex: '#0B0F0C',
+      transmission_distance: 0.1,
+      alpha: 8.08,
+      k: 17.65,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+  ],
   bambu_cmyw_phase6: [
     {
       name: 'Cyan',

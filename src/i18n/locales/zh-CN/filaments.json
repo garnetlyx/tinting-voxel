@@ -26,6 +26,7 @@
   "filamentCount": "{{count}} 种耗材颜色",
   "combinations": "{{count, number}} 种组合",
   "custom": "自定义",
+  "bambu_cmywk_phase6": "Bambu CMYWK 第六阶段",
   "bambu_cmyw_phase6": "Bambu CMYW 第六阶段",
   "clear_cmywg": "透明 CMYWG",
   "codeName": "编码",
