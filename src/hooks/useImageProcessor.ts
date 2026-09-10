@@ -171,7 +171,18 @@ export const useImageProcessor = () => {
   const addFilamentColor = useCallback(() => {
     setFilamentColors(prev => {
       if (prev.length >= MAX_FILAMENT_COLORS) return prev;
-      return [...prev, { name: '', hex: '#808080', transmission_distance: 5.0 }];
+      // Inherit calibration-family params from the current set: blending
+      // requires a shared alpha, and td_scale/td_gamma must stay consistent
+      // within a calibrated preset instead of falling back to backend defaults.
+      const family = prev[0];
+      return [...prev, {
+        name: '',
+        hex: '#808080',
+        transmission_distance: 5.0,
+        alpha: family?.alpha,
+        td_scale: family?.td_scale,
+        td_gamma: family?.td_gamma,
+      }];
     });
     setFilamentPreset(null);
   }, []);

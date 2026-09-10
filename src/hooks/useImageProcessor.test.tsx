@@ -341,6 +341,23 @@ describe('useImageProcessor', () => {
     );
   });
 
+  it('inherits family blend params when adding a custom color to a calibrated preset', () => {
+    const { result } = renderHook(() => useImageProcessor());
+
+    act(() => {
+      result.current.loadPreset('bambu_cmyw_phase6');
+      result.current.addFilamentColor();
+    });
+
+    expect(result.current.filamentColors).toHaveLength(5);
+    // Regression: a custom color without inherited alpha mixed 8.08 with the
+    // backend default 12.0 and crashed blending with a shared-alpha error.
+    const added = result.current.filamentColors[4];
+    expect(added.alpha).toBe(8.08);
+    expect(added.td_scale).toBe(1.48);
+    expect(added.td_gamma).toBe(0.20);
+  });
+
   it('preserves calibrated material parameters when editing a calibrated preset', async () => {
     const { result } = renderHook(() => useImageProcessor());
 
