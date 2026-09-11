@@ -42,10 +42,10 @@ MAX_PERMS_PER_COMPOSITION = 8192
 # canonical ordering ranks poorly but whose other orderings win stays in the
 # pool. The raw-CIEDE2000 channel guards against the production metric's
 # dark-chromatic hue penalty hiding such compositions.
-CANDIDATE_MARGIN_DELTA_E = 8.0
+CANDIDATE_MARGIN_DELTA_E = 16.0
 
 # Upper bound on compositions refined per input color.
-MAX_CANDIDATE_COMPOSITIONS = 12
+MAX_CANDIDATE_COMPOSITIONS = 32
 
 
 def is_translucent_set(

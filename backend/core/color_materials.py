@@ -351,7 +351,7 @@ class Colors:
             # Directly measured per-channel TDs bypass fitted families: the
             # staircase-measured td_rgb tuple is consumed as-is (k_residual=0).
             if getattr(color, "td_rgb", None) is not None:
-                return "per_channel"
+                return "beer_lambert_td_rgb"
             if (
                 color.td_scale != Color.DEFAULT_TD_SCALE
                 or color.td_gamma != Color.DEFAULT_TD_GAMMA

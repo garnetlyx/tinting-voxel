@@ -357,5 +357,5 @@ class TestCalibrationForwarding:
         cyan = colors.colors["C"]
         assert cyan.td_rgb == (1.04, 4.66, 8.30)
         assert cyan.td_neutral == 48.9
-        assert colors.get_blend_mode() == "per_channel"
+        assert colors.get_blend_mode() == "beer_lambert_td_rgb"
         assert is_translucent_set(colors), "edited Clear palette must keep the prune regime"
