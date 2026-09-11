@@ -19,7 +19,6 @@
   "maxDimensionWidthOrHeight": "Max Dimension (Width or Height)",
   "whiteBackingLayers": "White Backing Layers",
   "actualExportHeight": "Actual export height:",
-  "doubleSidedPrint": "Double-sided print",
   "reprocess": "Reprocess",
   "autoOptimizeParameters": "Auto-Optimize Parameters",
   "layerLimit": "(max {{max}} for current filament set)",
@@ -30,6 +29,5 @@
   "detailSizeHelp": "Minimum printable feature size, generally equal to your hotend (nozzle) diameter. The slicer default line width is nozzle + 0.02 mm, which is what these presets represent. Regions narrower than this are merged into neighbors before export.",
   "pixelSizeHelp": "Base pixel size. Defaults to Detail Size (1 pixel = 1 line width). If set smaller than Detail Size, the slicer's line width must be adjusted manually to match.",
   "simplificationHelp": "Higher values produce simpler shapes with fewer vertices",
-  "minimumAreaHelp": "Filters out small contours below this physical area",
-  "doubleSidedHelp": "Generates mirrored back side for two-sided viewing"
+  "minimumAreaHelp": "Filters out small contours below this physical area"
 }

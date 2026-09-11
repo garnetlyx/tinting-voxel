@@ -19,7 +19,6 @@
   "maxDimensionWidthOrHeight": "最大尺寸（宽或高）",
   "whiteBackingLayers": "白色背衬层数",
   "actualExportHeight": "实际导出高度：",
-  "doubleSidedPrint": "双面打印",
   "reprocess": "重新处理",
   "autoOptimizeParameters": "自动优化参数",
   "layerLimit": "（当前耗材配置最多 {{max}} 层）",
@@ -30,6 +29,5 @@
   "detailSizeHelp": "最小可打印细节通常与喷嘴直径相当。这些预设采用“喷嘴直径 + 0.02 mm”的切片线宽。导出前，小于此宽度的区域会合并到相邻区域。",
   "pixelSizeHelp": "基础像素尺寸默认等于细节尺寸（1 像素 = 1 条线宽）。若设得更小，需要手动调整切片器线宽使其匹配。",
   "simplificationHelp": "数值越大，形状越简单，顶点越少",
-  "minimumAreaHelp": "过滤小于此实际面积的轮廓",
-  "doubleSidedHelp": "生成镜像背面，支持双面观看"
+  "minimumAreaHelp": "过滤小于此实际面积的轮廓"
 }

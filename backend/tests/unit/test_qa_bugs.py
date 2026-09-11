@@ -1507,11 +1507,6 @@ class TestPresetAndCustomColorsMutualExclusivity:
             pass  # Correctly rejected
 
 
-
-
-
-
-
 class TestCodeToRgbUnclampedValues:
     """
     BUG QA-36: _code_to_rgb_cached() returns unclamped RGB values.
@@ -2584,49 +2579,6 @@ class TestColorInitEqNone:
             "is or is not, never the equality operators.' "
             "Fix: Change 'if hex == None:' to 'if hex is None:'"
         )
-
-
-# -- BUG QA-67: 3MF endpoint doesn't pass double_sided to generate_3mf --------
-# File: backend/api/routes/download_v2.py
-# The STL endpoint passes double_sided=body.doubleSided to generate_stl_zip,
-# but the 3MF endpoint uses the same DownloadSTLRequestV2 model (which has
-# doubleSided field) yet IGNORES it when calling generate_3mf.
-
-
-class TestThreeMFDoubleSidedIgnored:
-    """
-    BUG QA-67: api_download_3mf ignores body.doubleSided field.
-
-    DownloadSTLRequestV2 model has a doubleSided: bool field.
-    The STL endpoint at line 145 passes it: double_sided=body.doubleSided
-    But the 3MF endpoint at line 266 does NOT pass it to generate_3mf.
-
-    Users requesting double-sided 3MF get single-sided output silently.
-    """
-
-    def test_3mf_route_passes_double_sided(self):
-        """api_download_3mf should pass double_sided to generate_3mf."""
-        import inspect
-        from api.routes.download_v2 import api_download_3mf
-
-        source = inspect.getsource(api_download_3mf)
-
-        # The 3MF endpoint should handle doubleSided like the STL endpoint does
-        assert 'doubleSided' in source or 'double_sided' in source, (
-            "BUG QA-67: api_download_3mf does not pass body.doubleSided to "
-            "generate_3mf. The STL endpoint passes double_sided=body.doubleSided "
-            "but the 3MF endpoint silently ignores this field. "
-            "Users requesting double-sided 3MF get single-sided output. "
-            "Fix: Add double_sided parameter to generate_3mf and pass body.doubleSided."
-        )
-
-
-# -- BUG QA-68: _code_to_rgb_cached short code background index ---------------
-# File: backend/core/blend_color.py:198,206
-# For codes shorter than 4 chars, light_loss_ratio[i+1] stores background
-# at index 1/2/3, but rgb calculation at line 206 uses light_loss_ratio[-1]
-# (always index max(len,4)), which is 0 for short codes.
-# This test verifies the actual function, not inline reproduction.
 
 
 class TestCodeToRgbShortCodeBackground:

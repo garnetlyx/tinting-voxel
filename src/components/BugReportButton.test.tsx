@@ -11,7 +11,7 @@ vi.mock('../utils/bugReport', async importOriginal => ({
 }));
 const context: ConverterBugReportState = {
   appMode: 'single', mode: 'pixel', pixelSize: 0.16, layerHeight: 0.08, layerCount: 4,
-  whiteBackingLayers: 1, doubleSided: false, imageWidth: 1000,
+  whiteBackingLayers: 1, imageWidth: 1000,
   imageHeight: 1250, colorCount: 8, filamentPreset: null, processing: false, error: null,
 };
 const open = () => {

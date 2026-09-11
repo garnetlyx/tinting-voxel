@@ -562,7 +562,6 @@ def generate_stl_zip(
     image_dimensions: dict,
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
-    double_sided: bool = False,
     white_backing_layers: int = 1,
 ) -> bytes:
     """
@@ -576,7 +575,6 @@ def generate_stl_zip(
         image_dimensions: Dict with 'width' and 'height' keys
         use_greedy_meshing: If True, merge adjacent pixels to reduce file size
         colors: Optional Colors instance. If None, uses current global colors.
-        double_sided: If True, generate mirrored back side layers on top
 
     Returns:
         ZIP file binary content
@@ -694,54 +692,6 @@ def generate_stl_zip(
         logger.info("Added 1 merged white backing block (thickness=%.2f mm) at z=%.2f-%.2f mm",
                      n_white * layer_height, optical_top, optical_top + n_white * layer_height)
 
-    # Step 4c: Generate back-side (mirrored) layers if double-sided
-    if double_sided:
-        front_top = z_offset + layer_count * layer_height + n_white * layer_height
-
-        for idx, color_block in enumerate(color_blocks):
-            pixels = color_block['pixels']
-            blend_code = result_codes[idx]
-
-            # Mirror pixels horizontally: x -> (width - 1 - x)
-            mirrored_pixels = [
-                {'x': width - 1 - p['x'], 'y': p['y']}
-                for p in pixels
-            ]
-
-            # Back layers are stacked on top of front, in reverse order
-            start_idx = 0
-            for code_char, group in itertools.groupby(reversed(blend_code)):
-                group_len = len(list(group))
-                z_min = front_top + start_idx * layer_height
-                z_max = front_top + (start_idx + group_len) * layer_height
-                start_idx += group_len
-
-                if use_greedy_meshing and len(mirrored_pixels) > 1:
-                    optimized_boxes = generate_optimized_boxes(
-                        pixels=mirrored_pixels,
-                        width=width,
-                        height=height,
-                        pixel_size=pixel_size,
-                        z_min=z_min,
-                        z_max=z_max
-                    )
-                    batch_mesh = generate_boxes_batch(optimized_boxes)
-                    code_mesh_map[code_char].append(batch_mesh)
-                else:
-                    box_ranges = [
-                        (
-                            (p['x'] * pixel_size, (p['x'] + 1) * pixel_size),
-                            (p['y'] * pixel_size, (p['y'] + 1) * pixel_size),
-                            (z_min, z_max)
-                        )
-                        for p in mirrored_pixels
-                    ]
-                    if box_ranges:
-                        batch_mesh = generate_boxes_batch(box_ranges)
-                        code_mesh_map[code_char].append(batch_mesh)
-
-        logger.info("Generated double-sided print: front + mirrored back")
-
     if use_greedy_meshing and total_original_boxes > 0:
         reduction = (1 - total_optimized_boxes / total_original_boxes) * 100
         logger.info(
@@ -757,7 +707,6 @@ def generate_stl_zip(
         layer_count=layer_count,
         layer_height=layer_height,
         white_backing_layers=n_white,
-        double_sided=double_sided,
     )
     physical_height = print_stack["totalHeightMm"]
     prefix = get_filename_prefix(active_colors)

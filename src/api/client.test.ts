@@ -393,7 +393,6 @@ describe('batchDownloadSTL', () => {
       layerHeight: 0.08,
       layerCount: 4,
       whiteBackingLayers: 1,
-      doubleSided: false,
     });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(

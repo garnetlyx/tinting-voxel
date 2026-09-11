@@ -99,7 +99,7 @@ async def api_process_image(
     mode: str = Form("pixel"),
     maxColors: int = Form(10, ge=1, le=256),
     colorThreshold: float = Form(50, ge=0, le=1000),
-    pixelSize: float = Form(0.08, gt=0, le=10),
+    pixelSize: float = Form(0.2, gt=0, le=10),
     epsilon: float = Form(2.0, gt=0, le=100),
     minArea: float = Form(4.0, gt=0, le=100),
     numColors: int = Form(8, ge=1, le=256),

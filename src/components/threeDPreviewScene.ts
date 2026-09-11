@@ -66,7 +66,6 @@ export function buildInstancedMeshes(
   layerHeight: number,
   layerCount: number,
   whiteBackingLayers: number,
-  doubleSided: boolean,
   visibilityMap: Map<string, boolean>,
   showExploded: boolean,
 ): THREE.Group {
@@ -136,40 +135,6 @@ export function buildInstancedMeshes(
 
     mesh.instanceMatrix.needsUpdate = true;
     group.add(mesh);
-  }
-
-  // Double-sided: mirror on back
-  if (doubleSided) {
-    const mirrorBaseY = -blockHeight / 2;
-    for (const [displayHex, rectangles] of regions) {
-      const material = materials.get(displayHex)!;
-
-      const instanceCount = showExploded ? rectangles.length * layerCount : rectangles.length;
-      const mesh = new THREE.InstancedMesh(geometry, material, instanceCount);
-
-      let instanceIdx = 0;
-      for (const rectangle of rectangles) {
-        // Mirror X for back side.
-        const x = -((rectangle.x + rectangle.width / 2) * pixelSize - offsetX);
-        const z = (rectangle.y + rectangle.height / 2) * pixelSize - offsetZ;
-        matrix.makeScale(rectangle.width, 1, rectangle.height);
-
-        if (showExploded) {
-          // In exploded view, mirror each layer separately
-          for (let layer = 0; layer < layerCount; layer++) {
-            const mirrorLayerY = -(layer * (layerHeight + explodedGap) + explodedGap + layerHeight / 2);
-            matrix.setPosition(x, mirrorLayerY, z);
-            mesh.setMatrixAt(instanceIdx++, matrix);
-          }
-        } else {
-          matrix.setPosition(x, mirrorBaseY, z);
-          mesh.setMatrixAt(instanceIdx++, matrix);
-        }
-      }
-
-      mesh.instanceMatrix.needsUpdate = true;
-      group.add(mesh);
-    }
   }
 
   if (whiteBackingLayers > 0) {

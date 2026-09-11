@@ -19,7 +19,6 @@ interface ThreeDPreviewProps {
   pixelSize: number;
   layerCount: number;
   whiteBackingLayers: number;
-  doubleSided: boolean;
   printStack: PrintStackInfo;
 }
 
@@ -42,7 +41,6 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
   pixelSize,
   layerCount,
   whiteBackingLayers,
-  doubleSided,
   printStack,
 }) => {
   const { t } = useTranslation();
@@ -115,7 +113,6 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
       layerHeight,
       layerCount,
       whiteBackingLayers,
-      doubleSided,
       visibilityMap,
       showExploded,
     );
@@ -126,7 +123,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
     const modelWidth = imageDimensions.width * pixelSize;
     const modelDepth = imageDimensions.height * pixelSize;
     const gap = showExploded ? Math.max(layerHeight * 0.5, Math.max(modelWidth, modelDepth) * 0.02) : 0;
-    const bottom = doubleSided ? -layerCount * (layerHeight + gap) : 0;
+    const bottom = 0;
     const top = (whiteBackingLayers + layerCount) * layerHeight
       + Math.max(0, whiteBackingLayers + layerCount - 1) * gap;
     new THREE.Box3(
@@ -137,7 +134,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
       gridRef.current.position.y = bottom - Math.max(layerHeight, Math.max(modelWidth, modelDepth) * 0.005);
     }
     if (cameraRef.current) updatePreviewCameraClipping(cameraRef.current, boundsRef.current);
-  }, [colorBlocks, mappedBlockColors, imageDimensions, pixelSize, layerHeight, layerCount, whiteBackingLayers, doubleSided, visibilityMap, showExploded]);
+  }, [colorBlocks, mappedBlockColors, imageDimensions, pixelSize, layerHeight, layerCount, whiteBackingLayers, visibilityMap, showExploded]);
 
   // Initialize three.js scene
   useEffect(() => {

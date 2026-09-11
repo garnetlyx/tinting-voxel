@@ -76,7 +76,6 @@ def generate_3mf(
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
     color_hex_map: Optional[dict] = None,
-    double_sided: bool = False,
     white_backing_layers: int = 1,
 ) -> bytes:
     """
@@ -94,7 +93,6 @@ def generate_3mf(
         use_greedy_meshing: If True, merge adjacent pixels
         colors: Optional Colors instance
         color_hex_map: Optional dict mapping label -> hex color for visual colors
-        double_sided: If True, generate mirrored back side layers on top
 
     Returns:
         3MF file binary content
@@ -196,45 +194,6 @@ def generate_3mf(
         logger.info("3MF: added %d white backing layers at z=%.2f-%.2f mm",
                      n_white, optical_top, optical_top + n_white * layer_height)
 
-    # Generate back-side (mirrored) layers if double-sided
-    if double_sided:
-        front_top = z_offset + layer_count * layer_height + n_white * layer_height
-
-        for idx, color_block in enumerate(color_blocks):
-            pixels = color_block['pixels']
-            blend_code = result_codes[idx]
-
-            mirrored_pixels = [
-                {'x': width - 1 - p['x'], 'y': p['y']}
-                for p in pixels
-            ]
-
-            for z_idx, code_char in enumerate(reversed(blend_code)):
-                z_min = front_top + z_idx * layer_height
-                z_max = front_top + (z_idx + 1) * layer_height
-
-                if use_greedy_meshing and len(mirrored_pixels) > 1:
-                    optimized_boxes = generate_optimized_boxes(
-                        pixels=mirrored_pixels, width=width, height=height,
-                        pixel_size=pixel_size, z_min=z_min, z_max=z_max
-                    )
-                    batch_mesh = generate_boxes_batch(optimized_boxes)
-                    code_mesh_map[code_char].append(batch_mesh)
-                else:
-                    box_ranges = [
-                        (
-                            (p['x'] * pixel_size, (p['x'] + 1) * pixel_size),
-                            (p['y'] * pixel_size, (p['y'] + 1) * pixel_size),
-                            (z_min, z_max)
-                        )
-                        for p in mirrored_pixels
-                    ]
-                    if box_ranges:
-                        batch_mesh = generate_boxes_batch(box_ranges)
-                        code_mesh_map[code_char].append(batch_mesh)
-
-        logger.info("Generated double-sided 3MF: front + mirrored back")
-
     logger.info("Mesh generation complete, converting to trimesh objects...")
 
     # Convert to trimesh Scene with named objects
@@ -281,7 +240,6 @@ def generate_svg_3mf(
     image_dimensions: dict,
     colors: Optional[Colors] = None,
     color_hex_map: Optional[dict] = None,
-    double_sided: bool = False,
     white_backing_layers: int = 1,
 ) -> bytes:
     """
@@ -295,7 +253,6 @@ def generate_svg_3mf(
         image_dimensions: Dict with 'width' and 'height' keys
         colors: Colors instance (required)
         color_hex_map: Optional dict mapping label -> hex color for visual colors
-        double_sided: If True, generate mirrored back side layers on top
 
     Returns:
         3MF file binary content
@@ -377,55 +334,6 @@ def generate_svg_3mf(
             code_mesh_map[w_label].append(backing_mesh)
         logger.info("SVG-3MF: added %d white backing layers at z=%.2f-%.2f mm",
                      n_white, optical_top, optical_top + n_white * layer_height)
-
-    if double_sided:
-        front_top = z_offset + layer_count * layer_height + n_white * layer_height
-
-        for idx, result in enumerate(vector_results):
-            regions = normalize_regions(result)
-            region_grid = render_region_mask(regions, width=width, height=height)
-            if not region_grid.any():
-                continue
-            blend_code = result_codes[idx]
-            mirrored_grid = np.fliplr(region_grid)
-
-            start_idx = 0
-            for code_char, group in itertools.groupby(reversed(blend_code)):
-                group_len = len(list(group))
-                z_min = front_top + start_idx * layer_height
-                z_max = front_top + (start_idx + group_len) * layer_height
-                start_idx += group_len
-
-                boxes = generate_optimized_boxes_from_grid(
-                    grid=mirrored_grid,
-                    pixel_size=pixel_size,
-                    z_min=z_min,
-                    z_max=z_max,
-                )
-                if boxes:
-                    code_mesh_map[code_char].append(generate_boxes_batch(boxes))
-
-        logger.info("Generated double-sided SVG 3MF: front + mirrored back")
-
-    scene = trimesh.Scene()
-
-    for label, mesh_arrays in code_mesh_map.items():
-        if not mesh_arrays:
-            continue
-
-        rgb = None
-        if color_hex_map and label in color_hex_map:
-            hex_color = color_hex_map[label]
-            rgb = (
-                int(hex_color[1:3], 16),
-                int(hex_color[3:5], 16),
-                int(hex_color[5:7], 16),
-            )
-
-        mesh_obj = _triangles_to_trimesh(mesh_arrays, color_rgb=rgb)
-        geom_name = f"color_{label}"
-        scene.add_geometry(mesh_obj, node_name=geom_name, geom_name=geom_name)
-        logger.info("SVG-3MF color '%s': %d triangles", label, len(mesh_obj.faces))
 
     buf = BytesIO()
     scene.export(buf, file_type='3mf')

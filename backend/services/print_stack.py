@@ -39,11 +39,10 @@ def build_print_stack(
     layer_count: int,
     layer_height: float,
     white_backing_layers: Optional[int] = None,
-    double_sided: bool = False,
 ) -> dict:
     """Build shared stack metadata for UI, exports, and print settings."""
     backing_layers = normalize_white_backing_layers(white_backing_layers)
-    optical_layer_count = layer_count * (2 if double_sided else 1)
+    optical_layer_count = layer_count
     total_layer_count = optical_layer_count + backing_layers
     total_height_mm = round(total_layer_count * layer_height, 2)
 

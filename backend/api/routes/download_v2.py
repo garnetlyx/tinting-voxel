@@ -122,7 +122,6 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
         layer_count=body.layerCount,
         image_dimensions=image_dimensions,
         colors=colors,
-        double_sided=body.doubleSided,
         white_backing_layers=body.whiteBackingLayers,
     )
 
@@ -155,7 +154,6 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
         layer_count=body.layerCount,
         image_dimensions=image_dimensions,
         colors=colors,
-        double_sided=body.doubleSided,
         white_backing_layers=body.whiteBackingLayers,
     )
 
@@ -198,7 +196,6 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
         image_dimensions=image_dimensions,
         colors=colors,
         color_hex_map=color_hex_map,
-        double_sided=body.doubleSided,
         white_backing_layers=body.whiteBackingLayers,
     )
 
@@ -239,7 +236,6 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
         image_dimensions=image_dimensions,
         colors=colors,
         color_hex_map=color_hex_map,
-        double_sided=body.doubleSided,
         white_backing_layers=body.whiteBackingLayers,
     )
 
@@ -304,7 +300,6 @@ async def api_print_settings(request: Request, body: PrintSettingsRequest):
         filament_colors=filament_colors_dicts,
         white_backing_layers=body.whiteBackingLayers,
         filament_preset=preset_name,
-        double_sided=body.doubleSided,
     )
 
     logger.info("Generated print settings JSON")

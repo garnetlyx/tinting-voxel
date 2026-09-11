@@ -316,7 +316,6 @@ def generate_svg_stl_zip(
     layer_count: int,
     image_dimensions: dict,
     colors: Optional[Colors] = None,
-    double_sided: bool = False,
     white_backing_layers: int = 1,
 ) -> bytes:
     """
@@ -431,44 +430,12 @@ def generate_svg_stl_zip(
         logger.info("SVG-STL: added 1 merged white backing block thickness=%.2f mm at z=%.2f-%.2f mm",
                      n_white * layer_height, optical_top, optical_top + n_white * layer_height)
 
-    # Step 4b: Generate back-side (mirrored) layers if double_sided
-    if double_sided:
-        front_top = z_offset + layer_count * layer_height + n_white * layer_height
-
-        for idx, result in enumerate(vector_results):
-            region_grid = region_grids[idx]
-            if not region_grid.any():
-                continue
-            blend_code = result_codes[idx]
-            mirrored_grid = np.fliplr(region_grid)
-
-            # Back layers are stacked on top of front, in reverse order
-            start_idx = 0
-            for code_char, group in itertools.groupby(reversed(blend_code)):
-                group_len = len(list(group))
-                z_min = front_top + start_idx * layer_height
-                z_max = front_top + (start_idx + group_len) * layer_height
-                start_idx += group_len
-
-                boxes = generate_optimized_boxes_from_grid(
-                    grid=mirrored_grid,
-                    pixel_size=pixel_size,
-                    z_min=z_min,
-                    z_max=z_max,
-                )
-                if boxes:
-                    total_boxes += len(boxes)
-                    code_mesh_map[code_char].append(generate_boxes_batch(boxes))
-
-        logger.info("Generated double-sided print: front + mirrored back")
-
     # Merge meshes by primary color and create STL files
     stl_files = {}
     print_stack = build_print_stack(
         layer_count=layer_count,
         layer_height=layer_height,
         white_backing_layers=n_white,
-        double_sided=double_sided,
     )
     physical_height = print_stack["totalHeightMm"]
     prefix = get_filename_prefix(active_colors)

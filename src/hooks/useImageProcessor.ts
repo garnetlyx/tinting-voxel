@@ -92,7 +92,6 @@ export const useImageProcessor = () => {
   // Base plate options
 
   // Double-sided print
-  const [doubleSided, setDoubleSided] = useState(false);
 
   // Filament color state
   const [filamentPreset, setFilamentPreset] = useState<FilamentPreset | null>(DEFAULT_FILAMENT_PRESET);
@@ -561,9 +560,9 @@ export const useImageProcessor = () => {
       };
 
       if (mode === 'pixel') {
-        await downloadSTLV2({ colorBlocks, ...commonParams, ...(doubleSided ? { doubleSided } : {}) });
+        await downloadSTLV2({ colorBlocks, ...commonParams });
       } else {
-        await downloadSVGSTLV2({ vectorResults, ...commonParams, ...(doubleSided ? { doubleSided } : {}) });
+        await downloadSVGSTLV2({ vectorResults, ...commonParams });
       }
     } catch (err) {
       console.error('Error downloading STL:', err);
@@ -592,7 +591,6 @@ export const useImageProcessor = () => {
         layerCount,
         whiteBackingLayers,
         imageDimensions,
-        ...(doubleSided ? { doubleSided } : {}),
         detailSize,
         ...filamentRequestPayload,
       };
@@ -700,9 +698,8 @@ export const useImageProcessor = () => {
       layerCount,
       layerHeight,
       whiteBackingLayers,
-        doubleSided,
     ),
-[layerCount, layerHeight, whiteBackingLayers, doubleSided]
+[layerCount, layerHeight, whiteBackingLayers]
   );
 
   // Update a color block's RGB/hex values (manual color adjustment)
@@ -813,7 +810,6 @@ export const useImageProcessor = () => {
     detailSize,
     layerCount,
     whiteBackingLayers,
-    doubleSided,
     targetWidth,
     targetHeight,
     maxDimension,
@@ -844,7 +840,6 @@ export const useImageProcessor = () => {
     setDetailSize: handleSetDetailSize,
     setWhiteBackingLayers,
     setMaxDimension,
-    setDoubleSided,
     loadPreset,
     loadSavedPresetColors,
     updateFilamentColor,

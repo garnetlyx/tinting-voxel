@@ -64,7 +64,7 @@ async def api_batch_process(
     images: List[UploadFile] = File(...),
     maxColors: int = Form(10, ge=1, le=256),
     colorThreshold: float = Form(50, ge=0, le=1000),
-    pixelSize: float = Form(0.08, gt=0, le=10),
+    pixelSize: float = Form(0.2, gt=0, le=10),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
 ):
     """Process multiple images in a single request (up to 20)."""
@@ -96,11 +96,10 @@ async def api_batch_download_stl(
     images: List[UploadFile] = File(...),
     maxColors: int = Form(10, ge=1, le=256),
     colorThreshold: float = Form(50, ge=0, le=1000),
-    pixelSize: float = Form(0.08, gt=0, le=10),
+    pixelSize: float = Form(0.2, gt=0, le=10),
     layerHeight: float = Form(0.08, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
     whiteBackingLayers: int = Form(1, ge=0, le=5),
-    doubleSided: bool = Form(False),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
@@ -173,7 +172,6 @@ async def api_batch_download_stl(
         layer_count=layerCount,
         colors=colors,
         white_backing_layers=whiteBackingLayers,
-        double_sided=doubleSided,
     )
 
     logger.info(

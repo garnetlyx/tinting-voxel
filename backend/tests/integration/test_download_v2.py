@@ -213,60 +213,6 @@ def test_v2_stl_duplicate_labels_returns_422(client, sample_color_blocks_with_he
         },
     )
     assert response.status_code == 422
-
-
-def test_v2_stl_double_sided(client, sample_color_blocks_with_hex):
-    """V2 STL with doubleSided=True generates larger ZIP (more mesh data)."""
-    # Single-sided
-    response_single = client.post(
-        "/api/v2/download-stl",
-        json={
-            "colorBlocks": sample_color_blocks_with_hex,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
-        },
-    )
-    assert response_single.status_code == 200
-
-    # Double-sided
-    response_double = client.post(
-        "/api/v2/download-stl",
-        json={
-            "colorBlocks": sample_color_blocks_with_hex,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
-            "doubleSided": True,
-        },
-    )
-    assert response_double.status_code == 200
-    zf = zipfile.ZipFile(BytesIO(response_double.content))
-    assert len(zf.namelist()) > 0
-    # Double-sided output should be larger than single-sided
-    assert len(response_double.content) > len(response_single.content)
-
-
-def test_v2_stl_double_sided_false_same_as_default(client, sample_color_blocks_with_hex):
-    """V2 STL with doubleSided=False produces same result as not specifying it."""
-    payload = {
-        "colorBlocks": sample_color_blocks_with_hex,
-        "layerHeight": 0.08,
-        "pixelSize": 0.08,
-        "layerCount": 4,
-        "imageDimensions": {"width": 4, "height": 4},
-    }
-    response_default = client.post("/api/v2/download-stl", json=payload)
-    payload["doubleSided"] = False
-    response_false = client.post("/api/v2/download-stl", json=payload)
-
-    assert response_default.status_code == 200
-    assert response_false.status_code == 200
-    assert len(response_default.content) == len(response_false.content)
-
-
 def test_v2_svg_stl_success(client):
     """V2 SVG STL endpoint works."""
     vector_results = [

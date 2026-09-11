@@ -360,7 +360,6 @@ export async function batchDownloadSTL(
   formData.append('layerHeight', params.layerHeight.toString());
   formData.append('layerCount', params.layerCount.toString());
   formData.append('whiteBackingLayers', params.whiteBackingLayers.toString());
-  formData.append('doubleSided', params.doubleSided.toString());
   if (params.filamentPreset) {
     formData.append('filamentPreset', params.filamentPreset);
   }

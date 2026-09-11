@@ -21,7 +21,6 @@ def generate_print_settings(
     filament_colors: list[dict],
     white_backing_layers: int = 1,
     filament_preset: Optional[str] = None,
-    double_sided: bool = False,
 ) -> str:
     """
     Generate a JSON print settings file for slicer reference.
@@ -57,7 +56,6 @@ def generate_print_settings(
         layer_count=layer_count,
         layer_height=layer_height,
         white_backing_layers=white_backing_layers,
-        double_sided=double_sided,
     )
 
     extruders = []
@@ -79,7 +77,6 @@ def generate_print_settings(
             "layer_height": layer_height,
             "layer_count": layer_count,
             "white_backing_layers": print_stack["whiteBackingLayers"],
-            "double_sided": double_sided,
         },
         "object_dimensions": {
             "width_mm": width_mm,

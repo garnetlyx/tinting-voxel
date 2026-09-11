@@ -69,7 +69,6 @@ const Converter: React.FC = () => {
     layerCount,
     maxLayerCount,
     whiteBackingLayers,
-    doubleSided,
     targetWidth,
     targetHeight,
     maxDimension,
@@ -100,7 +99,6 @@ const Converter: React.FC = () => {
     setDetailSize,
     setWhiteBackingLayers,
     setMaxDimension,
-    setDoubleSided,
     loadPreset,
     loadSavedPresetColors,
     updateFilamentColor,
@@ -200,8 +198,6 @@ const Converter: React.FC = () => {
                   onMaxDimensionChange={setMaxDimension}
                   whiteBackingLayers={whiteBackingLayers}
                   onWhiteBackingLayersChange={setWhiteBackingLayers}
-                  doubleSided={doubleSided}
-                  onDoubleSidedChange={setDoubleSided}
                   printStack={printStack}
                   onReprocess={() => handleReprocess()}
                   processing={processing}
@@ -369,7 +365,6 @@ const Converter: React.FC = () => {
                           pixelSize={pixelSize}
                           layerCount={layerCount}
                           whiteBackingLayers={whiteBackingLayers}
-                          doubleSided={doubleSided}
                           printStack={printStack}
                         />
                       )}
@@ -412,7 +407,6 @@ const Converter: React.FC = () => {
                   layerHeight={layerHeight}
                   layerCount={layerCount}
                   whiteBackingLayers={whiteBackingLayers}
-                  doubleSided={doubleSided}
                   filamentPreset={filamentPreset ?? undefined}
                   filamentColors={filamentPreset ? undefined : filamentColors}
                   detailSize={detailSize}
@@ -425,7 +419,7 @@ const Converter: React.FC = () => {
 
       <BugReportButton context={{
         appMode, mode, pixelSize, layerHeight, layerCount, whiteBackingLayers,
-        doubleSided, imageWidth: imageDimensions.width,
+        imageWidth: imageDimensions.width,
         imageHeight: imageDimensions.height, colorCount: resultCount,
         filamentPreset, processing, error,
       }} />

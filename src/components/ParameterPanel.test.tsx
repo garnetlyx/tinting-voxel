@@ -33,9 +33,7 @@ describe('ParameterPanel', () => {
     onMaxDimensionChange: vi.fn(),
     whiteBackingLayers: 1,
     onWhiteBackingLayersChange: vi.fn(),
-    doubleSided: false,
-    onDoubleSidedChange: vi.fn(),
-    printStack: {
+        printStack: {
       opticalLayerCount: 4,
       whiteBackingLayers: 1,
       totalLayerCount: 5,

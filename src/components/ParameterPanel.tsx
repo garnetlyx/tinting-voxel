@@ -46,8 +46,6 @@ interface ParameterPanelProps {
   onTransparentTdThresholdChange: (value: number) => void;
   // Base plate
   // Double-sided
-  doubleSided: boolean;
-  onDoubleSidedChange: (value: boolean) => void;
   printStack: PrintStackInfo;
   onReprocess: () => void;
   processing: boolean;
@@ -86,8 +84,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   transparentTdThreshold,
   allTransparent,
   onTransparentTdThresholdChange,
-  doubleSided,
-  onDoubleSidedChange,
   printStack,
   onReprocess,
   processing,
@@ -341,20 +337,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
 
       <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">{t('parameters:actualExportHeight')}{' '}{printStack.totalHeightMm.toFixed(2)} mm
       </div>
-
-      {mode === 'pixel' && (
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="doubleSided"
-            checked={doubleSided}
-            onChange={(e) => onDoubleSidedChange(e.target.checked)}
-            className="h-4 w-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
-          />
-          <label htmlFor="doubleSided" className="text-sm font-medium text-gray-700">{t('parameters:doubleSidedPrint')}</label>
-          <p className="text-xs text-gray-500">{t('parameters:doubleSidedHelp')}</p>
-        </div>
-      )}
 
       {hasImage && (
         <button

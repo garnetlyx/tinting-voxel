@@ -14,42 +14,6 @@ from core.blend_color import Color, Colors, BlendTestGenerator, _code_to_rgb_cac
 from core.color_config import ColorConfig
 
 
-# -- QA-66: 3MF endpoint doubleSided — FIXED in uncommitted changes.
-# The route at download_v2.py:277 now passes double_sided=body.doubleSided
-# and generate_3mf at threemf_generator.py:63 accepts double_sided param.
-# No failing test needed — already fixed.
-
-
-# -- QA-67: SVG STL V2 endpoint ignores doubleSided ---------------------------
-# File: backend/api/routes/download_v2.py:199-207
-# DownloadSVGSTLRequestV2 model doesn't have a doubleSided field at all,
-# and the SVG endpoint doesn't pass it to generate_svg_stl_zip.
-
-class TestQA67SVGSTLDoubleSidedMissing:
-    """SVG STL V2 model and endpoint don't support doubleSided."""
-
-    def test_svg_stl_v2_model_has_double_sided_field(self):
-        """DownloadSVGSTLRequestV2 should have a doubleSided field for parity."""
-        from api.models import DownloadSVGSTLRequestV2
-
-        field_names = list(DownloadSVGSTLRequestV2.model_fields.keys())
-
-        assert 'doubleSided' in field_names, (
-            "BUG QA-67: DownloadSVGSTLRequestV2 lacks 'doubleSided' field. "
-            "DownloadSTLRequestV2 has it at line 153, but the SVG V2 model "
-            "(lines 188-227) omits it. Users switching between pixel and SVG "
-            "mode lose double-sided functionality."
-        )
-
-
-# -- QA-68: Frontend sends filamentPreset AND filamentColors together -----------
-# File: src/hooks/useImageProcessor.ts:314-321
-# This is confirmed by QA-50/QA-FE-04 but the actual download function
-# sends BOTH filamentPreset (line 319) and filamentColors (line 320)
-# in the same request body. The backend root_validator rejects this.
-# Additionally, handleDownload3MF (line 360) and handleDownloadPrintSettings
-# (line 387) also send both.
-
 class TestQA68AllDownloadsSendBothPresetAndColors:
     """All V2 download functions in the frontend send both filamentPreset
     AND filamentColors, but backend rejects this combo.
@@ -268,9 +232,6 @@ class TestQA72ThreeMFDuplicateImport:
 # and somehow bypasses validation, Colors() works fine. Not a real bug.
 
 
-# -- QA-75: DownloadSVGSTLRequestV2 missing doubleSided field --------------------
-# Already covered by QA-67 above.
-
 
 # -- QA-76: Colors.__getitem__ raises KeyError for missing labels ----------------
 # File: backend/core/blend_color.py:289-291
@@ -398,68 +359,6 @@ class TestQA82ColorsSetItemNoneValue:
         with pytest.raises(AttributeError):
             _ = colors['Z'].td
 
-
-# -- QA-83: V2 SVG STL endpoint missing doubleSided support ----------------------
-# File: backend/api/routes/download_v2.py:199-207
-# api_download_svg_stl_v2 does NOT pass doubleSided to generate_svg_stl_zip,
-# even if the model were updated to include it. The generate_svg_stl_zip
-# function itself doesn't accept double_sided either.
-# This is related to QA-67 but covers the route handler too.
-
-class TestQA83SVGSTLEndpointNoDoubleSided:
-    """SVG STL V2 endpoint doesn't pass doubleSided to generator."""
-
-    def test_svg_stl_zip_generator_accepts_double_sided(self):
-        """generate_svg_stl_zip should accept double_sided parameter."""
-        from services.svg_stl_generator import generate_svg_stl_zip
-
-        sig = inspect.signature(generate_svg_stl_zip)
-        param_names = list(sig.parameters.keys())
-
-        assert 'double_sided' in param_names, (
-            "BUG QA-83: generate_svg_stl_zip does not accept 'double_sided' param. "
-            "DownloadSTLRequestV2 has doubleSided field, and generate_stl_zip "
-            "supports it, but the SVG equivalent does not. This means SVG mode "
-            "users cannot generate double-sided prints."
-        )
-
-
-# -- QA-84: threemf_generator empty color_blocks not raised as ValueError ---------
-# File: backend/services/threemf_generator.py:84-85
-# generate_3mf raises ValueError("No color blocks provided") for empty
-# color_blocks, which is caught by the route's ValueError handler and
-# returns 422. This is correct. BUT: the error is raised BEFORE
-# `colors is None` check (line 87-88), so if both color_blocks is empty
-# AND colors is None, the error message says "No color blocks" instead
-# of "Colors instance is required". This is fine — just documenting.
-
-
-# -- QA-85: process_image creates 0x0 processed_img_array if height=0 or width=0 -
-# File: backend/services/image_processor.py:202
-# processed_img_array = np.zeros((height, width, 3), dtype=np.uint8)
-# If the image has 0 width or height (shouldn't happen after PIL.Image.open),
-# this creates a 0-dimensional array. PIL can't save it. However, PIL
-# should never return 0x0 images, so this is theoretical only.
-
-
-# -- QA-86: handleImageUpload doesn't validate file type before reading -----------
-# File: src/hooks/useImageProcessor.ts:241-255
-# The frontend reads ANY selected file via FileReader without checking
-# if it's actually an image. Invalid files will fail at img.onload but
-# the error is silent (no onerror handler on the img element).
-# The backend validates properly, but the frontend gives no feedback
-# for invalid uploads until processing fails.
-
-# Frontend-only bug
-
-
-# -- QA-87: BlendTestGenerator.save_stl_mesh uses os.mkdir not os.makedirs --------
-# File: backend/core/blend_color.py:518-520
-# os.mkdir only creates the immediate directory, not parents.
-# If self.directory is nested (e.g., './output/CMYW_208x208x0.32/'),
-# and ./output/ doesn't exist, os.mkdir will fail with FileNotFoundError.
-# Should use os.makedirs(exist_ok=True).
-# Already documented as QA-56. Adding a test to verify the behavior.
 
 class TestQA87MkdirNestedDirectoryFails:
     """BlendTestGenerator.save_stl_mesh uses os.mkdir which can't create

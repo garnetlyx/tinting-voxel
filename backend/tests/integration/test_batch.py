@@ -162,24 +162,6 @@ class TestBatchDownloadSTL:
         )
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/zip"
-
-    def test_with_double_sided(self, client):
-        """STL download with double-sided option."""
-        png_bytes = _make_png()
-        response = client.post(
-            "/api/batch/download-stl",
-            files=[("images", ("test.png", png_bytes, "image/png"))],
-            data={
-                "maxColors": "10",
-                "pixelSize": "0.08",
-                "layerHeight": "0.08",
-                "layerCount": "4",
-                "doubleSided": "true",
-            },
-        )
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "application/zip"
-
     def test_content_disposition_header(self, client):
         """Response has correct content-disposition header."""
         png_bytes = _make_png()

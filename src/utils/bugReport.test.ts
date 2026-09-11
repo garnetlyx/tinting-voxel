@@ -6,7 +6,7 @@ import html2canvas from 'html2canvas';
 vi.mock('html2canvas', () => ({ default: vi.fn() }));
 const context: ConverterBugReportState = {
   appMode: 'batch', mode: 'svg', pixelSize: 0.16, layerHeight: 0.08, layerCount: 4,
-  whiteBackingLayers: 1, doubleSided: false, imageWidth: 1000,
+  whiteBackingLayers: 1, imageWidth: 1000,
   imageHeight: 1250, colorCount: 8, filamentPreset: null, processing: false, error: null,
 };
 afterEach(() => { vi.restoreAllMocks(); window.history.replaceState({}, '', '/'); });
