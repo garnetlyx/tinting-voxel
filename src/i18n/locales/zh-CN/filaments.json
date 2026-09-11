@@ -35,5 +35,7 @@
   "colorName": "颜色名称",
   "transmissionDistanceMustBe0": "透射距离（必须大于 0）",
   "presetName": "预设名称…",
-  "gamutHelp": "展示当前耗材配置的色域，与本次上传的图片无关。"
+  "gamutHelp": "展示当前耗材配置的色域，与本次上传的图片无关。",
+  "measuredTdInert": "此色为实测参数驱动：混色使用 td_rgb，透明判定使用 TD1S，行内透射距离不生效。",
+  "downgradeToCustom": "改为自定义：清除实测参数，此后此透射距离将同时驱动混色与透明判定"
 }

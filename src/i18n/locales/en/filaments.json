@@ -35,5 +35,7 @@
   "colorName": "Color name",
   "transmissionDistanceMustBe0": "Transmission distance (must be > 0)",
   "presetName": "Preset name...",
-  "gamutHelp": "Generic to the current filament setup, not this upload."
+  "gamutHelp": "Generic to the current filament setup, not this upload.",
+  "measuredTdInert": "Driven by measured parameters: blending uses td_rgb, classification uses TD1S; the row TD is inert.",
+  "downgradeToCustom": "Convert to custom: clears measured parameters; this TD then drives both blending and classification"
 }
