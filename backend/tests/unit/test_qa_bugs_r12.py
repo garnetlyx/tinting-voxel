@@ -68,9 +68,9 @@ class TestQA116SVGDownloadMissingDoubleSided:
 
 # -- QA-117: print_settings_generator ignores double_sided for height ----------
 # File: backend/services/print_settings_generator.py:45
-# total_height_mm = layer_count * layer_height + base_plate_thickness
+# total_height_mm = layer_count * layer_height
 # When double_sided=True, the total height should double the layer portion:
-# total = 2 * layer_count * layer_height + base_plate_thickness
+# total = 2 * layer_count * layer_height
 # Currently the output is wrong for double-sided prints.
 
 class TestQA117PrintSettingsDoubleSidedHeight:

@@ -18,8 +18,6 @@
   "pixelSize": "像素尺寸：",
   "maxDimensionWidthOrHeight": "最大尺寸（宽或高）",
   "whiteBackingLayers": "白色背衬层数",
-  "basePlateThickness": "底板厚度：",
-  "noBasePlate": "不添加底板",
   "actualExportHeight": "实际导出高度：",
   "doubleSidedPrint": "双面打印",
   "reprocess": "重新处理",
@@ -33,6 +31,5 @@
   "pixelSizeHelp": "基础像素尺寸默认等于细节尺寸（1 像素 = 1 条线宽）。若设得更小，需要手动调整切片器线宽使其匹配。",
   "simplificationHelp": "数值越大，形状越简单，顶点越少",
   "minimumAreaHelp": "过滤小于此实际面积的轮廓",
-  "basePlateHelp": "在颜色层下方添加实心底板",
   "doubleSidedHelp": "生成镜像背面，支持双面观看"
 }

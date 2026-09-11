@@ -33,8 +33,6 @@ describe('ParameterPanel', () => {
     onMaxDimensionChange: vi.fn(),
     whiteBackingLayers: 1,
     onWhiteBackingLayersChange: vi.fn(),
-    basePlateThickness: 0,
-    onBasePlateThicknessChange: vi.fn(),
     doubleSided: false,
     onDoubleSidedChange: vi.fn(),
     printStack: {

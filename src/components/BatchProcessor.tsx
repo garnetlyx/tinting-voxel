@@ -22,7 +22,6 @@ interface BatchProcessorProps {
   layerHeight: number;
   layerCount: number;
   whiteBackingLayers: number;
-  basePlateThickness: number;
   doubleSided: boolean;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
@@ -36,7 +35,6 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
   layerHeight,
   layerCount,
   whiteBackingLayers,
-  basePlateThickness,
   doubleSided,
   filamentPreset,
   filamentColors,
@@ -144,7 +142,6 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
         layerHeight,
         layerCount,
         whiteBackingLayers,
-        basePlateThickness,
         doubleSided,
         filamentPreset: filamentPreset,
         filamentColors,
@@ -159,7 +156,7 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
         setDownloading(false);
       }
     }
-  }, [files, maxColors, colorThreshold, pixelSize, layerHeight, layerCount, whiteBackingLayers, basePlateThickness, doubleSided, filamentPreset, filamentColors, detailSize]);
+  }, [files, maxColors, colorThreshold, pixelSize, layerHeight, layerCount, whiteBackingLayers, doubleSided, filamentPreset, filamentColors, detailSize]);
 
   return (
     <div className="space-y-4">

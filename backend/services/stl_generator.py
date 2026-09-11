@@ -562,7 +562,6 @@ def generate_stl_zip(
     image_dimensions: dict,
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
-    base_plate_thickness: float = 0.0,
     double_sided: bool = False,
     white_backing_layers: int = 1,
 ) -> bytes:
@@ -577,7 +576,6 @@ def generate_stl_zip(
         image_dimensions: Dict with 'width' and 'height' keys
         use_greedy_meshing: If True, merge adjacent pixels to reduce file size
         colors: Optional Colors instance. If None, uses current global colors.
-        base_plate_thickness: Thickness of solid base plate in mm (0 = no base plate)
         double_sided: If True, generate mirrored back side layers on top
 
     Returns:
@@ -625,8 +623,7 @@ def generate_stl_zip(
             f"Reduce image size or colors."
         )
 
-    # Z offset: color layers sit on top of base plate
-    z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
+    z_offset = 0.0
 
     n_white = normalize_white_backing_layers(white_backing_layers)
     w_label = resolve_white_backing_label(active_colors, n_white)
@@ -760,7 +757,6 @@ def generate_stl_zip(
         layer_count=layer_count,
         layer_height=layer_height,
         white_backing_layers=n_white,
-        base_plate_thickness=base_plate_thickness if base_plate_thickness > 0 else 0.0,
         double_sided=double_sided,
     )
     physical_height = print_stack["totalHeightMm"]
@@ -776,19 +772,6 @@ def generate_stl_zip(
 
             stl_files[filename] = merged_stl
             logger.info("Merged color '%s': %d bytes", code, len(merged_stl))
-
-    # Step 5b: Generate base plate if thickness > 0
-    if base_plate_thickness > 0:
-        base_mesh = generate_box(
-            xrange=(0, width * pixel_size),
-            yrange=(0, height * pixel_size),
-            zrange=(0, base_plate_thickness)
-        )
-        base_stl = merge_stl_meshes([base_mesh])
-        base_filename = f"{prefix}_{width}x{height}x{physical_height:.2f}_base.stl"
-        stl_files[base_filename] = base_stl
-        logger.info("Generated base plate: %.2f x %.2f x %.2f mm",
-                     width * pixel_size, height * pixel_size, base_plate_thickness)
 
     # Step 6: Create ZIP archive
     zip_buffer = BytesIO()

@@ -138,7 +138,6 @@ class TestPrintSettingsEmptyFilamentColors:
                 layer_count=4,
                 image_dimensions={'width': 100, 'height': 100},
                 filament_colors=[],
-                base_plate_thickness=0.0,
             )
 
     def test_print_settings_with_valid_filament_colors(self):
@@ -154,7 +153,6 @@ class TestPrintSettingsEmptyFilamentColors:
                 {'name': 'Yellow', 'hex': '#FFFF00', 'transmission_distance': 3.0},
                 {'name': 'White', 'hex': '#FFFFFF', 'transmission_distance': 3.0},
             ],
-            base_plate_thickness=0.0,
         )
         data = json.loads(result)
         assert data['filament']['extruder_count'] == 4

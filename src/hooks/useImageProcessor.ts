@@ -90,7 +90,6 @@ export const useImageProcessor = () => {
   const [whiteBackingLayers, setWhiteBackingLayers] = useState(1);
 
   // Base plate options
-  const [basePlateThickness, setBasePlateThickness] = useState(0.0);
 
   // Double-sided print
   const [doubleSided, setDoubleSided] = useState(false);
@@ -557,7 +556,6 @@ export const useImageProcessor = () => {
         layerCount,
         whiteBackingLayers,
         imageDimensions,
-        basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         detailSize,
         ...filamentRequestPayload,
       };
@@ -594,7 +592,6 @@ export const useImageProcessor = () => {
         layerCount,
         whiteBackingLayers,
         imageDimensions,
-        basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         ...(doubleSided ? { doubleSided } : {}),
         detailSize,
         ...filamentRequestPayload,
@@ -631,7 +628,6 @@ export const useImageProcessor = () => {
         layerCount,
         whiteBackingLayers,
         imageDimensions,
-        basePlateThickness: basePlateThickness > 0 ? basePlateThickness : undefined,
         detailSize,
         ...filamentRequestPayload,
       });
@@ -704,10 +700,9 @@ export const useImageProcessor = () => {
       layerCount,
       layerHeight,
       whiteBackingLayers,
-      basePlateThickness,
-      doubleSided,
+        doubleSided,
     ),
-    [layerCount, layerHeight, whiteBackingLayers, basePlateThickness, doubleSided]
+[layerCount, layerHeight, whiteBackingLayers, doubleSided]
   );
 
   // Update a color block's RGB/hex values (manual color adjustment)
@@ -818,7 +813,6 @@ export const useImageProcessor = () => {
     detailSize,
     layerCount,
     whiteBackingLayers,
-    basePlateThickness,
     doubleSided,
     targetWidth,
     targetHeight,
@@ -850,7 +844,6 @@ export const useImageProcessor = () => {
     setDetailSize: handleSetDetailSize,
     setWhiteBackingLayers,
     setMaxDimension,
-    setBasePlateThickness,
     setDoubleSided,
     loadPreset,
     loadSavedPresetColors,

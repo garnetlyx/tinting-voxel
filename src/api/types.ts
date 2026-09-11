@@ -165,7 +165,6 @@ export interface DownloadSTLParamsV2 extends DownloadSTLParams {
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   whiteBackingLayers?: number;
-  basePlateThickness?: number;
   doubleSided?: boolean;
   detailSize?: number;
 }
@@ -174,7 +173,6 @@ export interface DownloadSVGSTLParamsV2 extends DownloadSVGSTLParams {
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   whiteBackingLayers?: number;
-  basePlateThickness?: number;
   doubleSided?: boolean;
   detailSize?: number;
 }
@@ -185,7 +183,6 @@ export interface PrintSettingsParams {
   layerCount: number;
   imageDimensions: ImageDimensions;
   whiteBackingLayers?: number;
-  basePlateThickness?: number;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   detailSize?: number;
@@ -283,7 +280,6 @@ export interface BatchDownloadSTLParams {
   layerHeight: number;
   layerCount: number;
   whiteBackingLayers: number;
-  basePlateThickness: number;
   doubleSided: boolean;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
@@ -468,7 +464,6 @@ export interface ConverterBugReportState {
   layerHeight: number;
   layerCount: number;
   whiteBackingLayers: number;
-  basePlateThickness: number;
   doubleSided: boolean;
   imageWidth: number;
   imageHeight: number;

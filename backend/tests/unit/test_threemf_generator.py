@@ -99,28 +99,6 @@ class TestGenerate3MF:
                 colors=None,
             )
 
-    def test_with_base_plate(self, simple_color_blocks, default_colors):
-        """3MF with base plate is larger than without."""
-        result_no_base = generate_3mf(
-            color_blocks=simple_color_blocks,
-            layer_height=0.08,
-            pixel_size=0.08,
-            layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
-            colors=default_colors,
-            base_plate_thickness=0.0,
-        )
-        result_with_base = generate_3mf(
-            color_blocks=simple_color_blocks,
-            layer_height=0.08,
-            pixel_size=0.08,
-            layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
-            colors=default_colors,
-            base_plate_thickness=0.5,
-        )
-        assert len(result_with_base) > len(result_no_base)
-
     def test_with_color_hex_map(self, simple_color_blocks, default_colors):
         """3MF generation with color hex map succeeds."""
         result = generate_3mf(

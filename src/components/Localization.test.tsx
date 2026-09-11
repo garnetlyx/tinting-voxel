@@ -78,7 +78,7 @@ describe('live localization boundaries', () => {
 
   it('retains a feedback draft and screenshot choice while changing language', async () => {
     const user = userEvent.setup();
-    render(<BugReportModal onClose={vi.fn()} context={{ appMode: 'single', mode: 'pixel', pixelSize: 0.16, layerHeight: 0.08, layerCount: 4, whiteBackingLayers: 1, basePlateThickness: 0, doubleSided: false, imageWidth: 1000, imageHeight: 1250, colorCount: 8, filamentPreset: null, processing: false, error: null }} />);
+    render(<BugReportModal onClose={vi.fn()} context={{ appMode: 'single', mode: 'pixel', pixelSize: 0.16, layerHeight: 0.08, layerCount: 4, whiteBackingLayers: 1, doubleSided: false, imageWidth: 1000, imageHeight: 1250, colorCount: 8, filamentPreset: null, processing: false, error: null }} />);
     const description = screen.getByRole('textbox');
     await user.type(description, '我的自定义材料 Q has an issue');
     await user.click(screen.getByRole('checkbox'));

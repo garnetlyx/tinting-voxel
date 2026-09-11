@@ -20,7 +20,6 @@ def generate_print_settings(
     image_dimensions: dict,
     filament_colors: list[dict],
     white_backing_layers: int = 1,
-    base_plate_thickness: float = 0.0,
     filament_preset: Optional[str] = None,
     double_sided: bool = False,
 ) -> str:
@@ -34,7 +33,6 @@ def generate_print_settings(
         image_dimensions: Dict with 'width' and 'height' keys (pixels)
         filament_colors: List of dicts with 'name', 'hex', 'transmission_distance'.
                          Must contain at least 1 color.
-        base_plate_thickness: Base plate thickness in mm
         filament_preset: Name of the preset used (if any)
 
     Returns:
@@ -59,7 +57,6 @@ def generate_print_settings(
         layer_count=layer_count,
         layer_height=layer_height,
         white_backing_layers=white_backing_layers,
-        base_plate_thickness=base_plate_thickness,
         double_sided=double_sided,
     )
 
@@ -82,7 +79,6 @@ def generate_print_settings(
             "layer_height": layer_height,
             "layer_count": layer_count,
             "white_backing_layers": print_stack["whiteBackingLayers"],
-            "base_plate_thickness": base_plate_thickness,
             "double_sided": double_sided,
         },
         "object_dimensions": {

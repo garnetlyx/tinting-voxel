@@ -393,7 +393,6 @@ describe('batchDownloadSTL', () => {
       layerHeight: 0.08,
       layerCount: 4,
       whiteBackingLayers: 1,
-      basePlateThickness: 0,
       doubleSided: false,
     });
 

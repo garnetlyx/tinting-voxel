@@ -630,7 +630,6 @@ class TestQA92BaseFilenameCollision:
             layer_count=4,
             image_dimensions={'width': 4, 'height': 4},
             colors=colors,
-            base_plate_thickness=0.5,  # Enable base plate
             white_backing_layers=0,  # No white filament in this config
         )
 

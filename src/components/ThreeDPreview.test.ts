@@ -9,10 +9,10 @@ const blocks: ColorBlock[] = [{
 const mapped = [{ code: 'MMMM', rgb: [220, 20, 100], hex: '#dc1464' }];
 const visibility = new Map([['#dc1464', true]]);
 
-function build(backing = 1, base = 0, doubleSided = false, exploded = false, visible = true) {
+function build(backing = 1, doubleSided = false, exploded = false, visible = true) {
   return buildInstancedMeshes(
     blocks, mapped, { width: 2, height: 2 }, 1, 0.08, 4,
-    backing, base, doubleSided, visible ? visibility : new Map(), exploded,
+    backing, doubleSided, visible ? visibility : new Map(), exploded,
   );
 }
 
@@ -37,24 +37,24 @@ describe('3D preview layer visibility', () => {
   });
 
   it.each([
-    [0, 0, false], [1, 0, false], [3, 0.5, false], [1, 0, true], [3, 0.5, true],
-  ] as const)('preserves total thickness (backing=%i, base=%f, double=%s)', (backing, base, double) => {
-    const group = build(backing, base, double);
+    [0, false], [1, false], [3, false], [1, true], [3, true],
+  ] as const)('preserves total thickness (backing=%i, double=%s)', (backing, double) => {
+    const group = build(backing, double);
     const bounds = new THREE.Box3().setFromObject(group);
-    expect(bounds.max.y - bounds.min.y).toBeCloseTo((4 * (double ? 2 : 1) + backing) * 0.08 + base, 6);
+    expect(bounds.max.y - bounds.min.y).toBeCloseTo((4 * (double ? 2 : 1) + backing) * 0.08, 6);
     if (double) expect(firstHit(group, true).object).toBeInstanceOf(THREE.InstancedMesh);
     disposePreviewModel(group);
   });
 
   it('reveals the backing when a color is hidden', () => {
-    const group = build(1, 0, false, false, false);
+    const group = build(1, false, false, false);
     expect(firstHit(group).object).not.toBeInstanceOf(THREE.InstancedMesh);
     expect((firstHit(group).object as THREE.Mesh).material).toHaveProperty('opacity', 1);
     disposePreviewModel(group);
   });
 
   it('keeps every exploded color and backing layer separate', () => {
-    const group = build(2, 0.5, true, true);
+    const group = build(2, true, true);
     const intervals: Array<[number, number]> = [];
     const matrix = new THREE.Matrix4();
     group.updateMatrixWorld(true);
@@ -71,7 +71,8 @@ describe('3D preview layer visibility', () => {
       }
     });
     intervals.sort((a, b) => a[0] - b[0]);
-    expect(intervals).toHaveLength(11);
+    // 8 color layers (double-sided) + 2 exploded backing layers
+    expect(intervals).toHaveLength(10);
     intervals.slice(1).forEach((interval, index) => {
       expect(interval[0]).toBeGreaterThanOrEqual(intervals[index][1] - 1e-6);
     });
@@ -109,7 +110,7 @@ describe('3D preview depth precision', () => {
 
 describe('3D preview resource disposal', () => {
   it('disposes shared resources once and uses fresh materials when rebuilt', () => {
-    const group = build(2, 0, true, true);
+    const group = build(2, true, true);
     const front = group.children[0] as THREE.Mesh;
     const instanceDispose = vi.spyOn(front as THREE.InstancedMesh, 'dispose');
     const geometryDispose = vi.spyOn(front.geometry, 'dispose');
@@ -118,7 +119,7 @@ describe('3D preview resource disposal', () => {
     expect(instanceDispose).toHaveBeenCalledTimes(1);
     expect(geometryDispose).toHaveBeenCalledTimes(1);
     expect(materialDispose).toHaveBeenCalledTimes(1);
-    const rebuilt = build(2, 0, true, true);
+    const rebuilt = build(2, true, true);
     expect((rebuilt.children[0] as THREE.Mesh).material).not.toBe(front.material);
     disposePreviewModel(rebuilt);
   });
@@ -161,7 +162,7 @@ describe('3D preview surface merging', () => {
     for (let y = 0; y < 1250; y++) for (let x = 0; x < 1000; x++) pixels.push({ x, y });
     const group = buildInstancedMeshes(
       [{ ...blocks[0], count: pixels.length, pixels }], mapped,
-      { width: 1000, height: 1250 }, 0.16, 0.08, 4, 1, 0, false, visibility, false,
+      { width: 1000, height: 1250 }, 0.16, 0.08, 4, 1, false, visibility, false,
     );
     const mesh = group.children[0] as THREE.InstancedMesh;
     expect(mesh.count).toBe(1);

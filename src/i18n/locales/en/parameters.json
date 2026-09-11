@@ -18,8 +18,6 @@
   "pixelSize": "Pixel Size:",
   "maxDimensionWidthOrHeight": "Max Dimension (Width or Height)",
   "whiteBackingLayers": "White Backing Layers",
-  "basePlateThickness": "Base Plate Thickness:",
-  "noBasePlate": "No base plate",
   "actualExportHeight": "Actual export height:",
   "doubleSidedPrint": "Double-sided print",
   "reprocess": "Reprocess",
@@ -33,6 +31,5 @@
   "pixelSizeHelp": "Base pixel size. Defaults to Detail Size (1 pixel = 1 line width). If set smaller than Detail Size, the slicer's line width must be adjusted manually to match.",
   "simplificationHelp": "Higher values produce simpler shapes with fewer vertices",
   "minimumAreaHelp": "Filters out small contours below this physical area",
-  "basePlateHelp": "Adds a solid base plate below color layers",
   "doubleSidedHelp": "Generates mirrored back side for two-sided viewing"
 }

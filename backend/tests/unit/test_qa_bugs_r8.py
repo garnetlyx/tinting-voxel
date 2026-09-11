@@ -212,7 +212,6 @@ class TestQA55PrintSettingsEmptyConfig:
             filament_colors=[
                 {'name': 'Cyan', 'hex': '#0086D6', 'transmission_distance': 3.0},
             ],
-            base_plate_thickness=0.0,
             filament_preset=None,
         )
         data = json.loads(result)

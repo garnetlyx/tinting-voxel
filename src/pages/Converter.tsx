@@ -69,7 +69,6 @@ const Converter: React.FC = () => {
     layerCount,
     maxLayerCount,
     whiteBackingLayers,
-    basePlateThickness,
     doubleSided,
     targetWidth,
     targetHeight,
@@ -101,7 +100,6 @@ const Converter: React.FC = () => {
     setDetailSize,
     setWhiteBackingLayers,
     setMaxDimension,
-    setBasePlateThickness,
     setDoubleSided,
     loadPreset,
     loadSavedPresetColors,
@@ -202,8 +200,6 @@ const Converter: React.FC = () => {
                   onMaxDimensionChange={setMaxDimension}
                   whiteBackingLayers={whiteBackingLayers}
                   onWhiteBackingLayersChange={setWhiteBackingLayers}
-                  basePlateThickness={basePlateThickness}
-                  onBasePlateThicknessChange={setBasePlateThickness}
                   doubleSided={doubleSided}
                   onDoubleSidedChange={setDoubleSided}
                   printStack={printStack}
@@ -373,7 +369,6 @@ const Converter: React.FC = () => {
                           pixelSize={pixelSize}
                           layerCount={layerCount}
                           whiteBackingLayers={whiteBackingLayers}
-                          basePlateThickness={basePlateThickness}
                           doubleSided={doubleSided}
                           printStack={printStack}
                         />
@@ -417,7 +412,6 @@ const Converter: React.FC = () => {
                   layerHeight={layerHeight}
                   layerCount={layerCount}
                   whiteBackingLayers={whiteBackingLayers}
-                  basePlateThickness={basePlateThickness}
                   doubleSided={doubleSided}
                   filamentPreset={filamentPreset ?? undefined}
                   filamentColors={filamentPreset ? undefined : filamentColors}
@@ -431,7 +425,7 @@ const Converter: React.FC = () => {
 
       <BugReportButton context={{
         appMode, mode, pixelSize, layerHeight, layerCount, whiteBackingLayers,
-        basePlateThickness, doubleSided, imageWidth: imageDimensions.width,
+        doubleSided, imageWidth: imageDimensions.width,
         imageHeight: imageDimensions.height, colorCount: resultCount,
         filamentPreset, processing, error,
       }} />

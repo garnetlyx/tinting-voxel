@@ -45,8 +45,6 @@ interface ParameterPanelProps {
   allTransparent: boolean;
   onTransparentTdThresholdChange: (value: number) => void;
   // Base plate
-  basePlateThickness: number;
-  onBasePlateThicknessChange: (value: number) => void;
   // Double-sided
   doubleSided: boolean;
   onDoubleSidedChange: (value: boolean) => void;
@@ -88,8 +86,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   transparentTdThreshold,
   allTransparent,
   onTransparentTdThresholdChange,
-  basePlateThickness,
-  onBasePlateThicknessChange,
   doubleSided,
   onDoubleSidedChange,
   printStack,
@@ -340,23 +336,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
         />
         <p className="text-xs text-gray-500 mt-1">
           {t('parameters:stack', { optical: printStack.opticalLayerCount, backing: printStack.whiteBackingLayers, total: printStack.totalLayerCount })}
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:basePlateThickness')}{' '}{basePlateThickness} mm
-        </label>
-        <input
-          type="range"
-          min="0"
-          max="2"
-          step="0.1"
-          value={basePlateThickness}
-          onChange={(e) => onBasePlateThicknessChange(parseFloat(e.target.value))}
-          className="w-full"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          {basePlateThickness === 0 ? t('parameters:noBasePlate') : t('parameters:basePlateHelp')}
         </p>
       </div>
 

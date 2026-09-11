@@ -215,82 +215,6 @@ def test_v2_stl_duplicate_labels_returns_422(client, sample_color_blocks_with_he
     assert response.status_code == 422
 
 
-def test_v2_stl_with_base_plate(client, sample_color_blocks_with_hex):
-    """V2 STL with base plate thickness generates extra base STL file."""
-    response = client.post(
-        "/api/v2/download-stl",
-        json={
-            "colorBlocks": sample_color_blocks_with_hex,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
-            "basePlateThickness": 0.5,
-        },
-    )
-    assert response.status_code == 200
-    zf = zipfile.ZipFile(BytesIO(response.content))
-    filenames = zf.namelist()
-    assert len(filenames) > 0
-    base_files = [f for f in filenames if '_base.stl' in f]
-    assert len(base_files) == 1, f"Expected 1 base plate file, got {base_files}"
-
-
-def test_v2_stl_without_base_plate(client, sample_color_blocks_with_hex):
-    """V2 STL with no base plate thickness has no base file."""
-    response = client.post(
-        "/api/v2/download-stl",
-        json={
-            "colorBlocks": sample_color_blocks_with_hex,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
-        },
-    )
-    assert response.status_code == 200
-    zf = zipfile.ZipFile(BytesIO(response.content))
-    filenames = zf.namelist()
-    base_files = [f for f in filenames if '_base.stl' in f]
-    assert len(base_files) == 0, f"Expected no base plate file, got {base_files}"
-
-
-def test_v2_stl_base_plate_zero_thickness(client, sample_color_blocks_with_hex):
-    """V2 STL with basePlateThickness=0 has no base file."""
-    response = client.post(
-        "/api/v2/download-stl",
-        json={
-            "colorBlocks": sample_color_blocks_with_hex,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
-            "basePlateThickness": 0,
-        },
-    )
-    assert response.status_code == 200
-    zf = zipfile.ZipFile(BytesIO(response.content))
-    filenames = zf.namelist()
-    base_files = [f for f in filenames if '_base.stl' in f]
-    assert len(base_files) == 0, f"Expected no base plate file with thickness=0"
-
-
-def test_v2_stl_base_plate_invalid_thickness(client, sample_color_blocks_with_hex):
-    """V2 STL with basePlateThickness > 10 returns 422."""
-    response = client.post(
-        "/api/v2/download-stl",
-        json={
-            "colorBlocks": sample_color_blocks_with_hex,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
-            "basePlateThickness": 15.0,
-        },
-    )
-    assert response.status_code == 422
-
-
 def test_v2_stl_double_sided(client, sample_color_blocks_with_hex):
     """V2 STL with doubleSided=True generates larger ZIP (more mesh data)."""
     # Single-sided
@@ -325,28 +249,6 @@ def test_v2_stl_double_sided(client, sample_color_blocks_with_hex):
     assert len(response_double.content) > len(response_single.content)
 
 
-def test_v2_stl_double_sided_with_base_plate(client, sample_color_blocks_with_hex):
-    """V2 STL with doubleSided=True and base plate works together."""
-    response = client.post(
-        "/api/v2/download-stl",
-        json={
-            "colorBlocks": sample_color_blocks_with_hex,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
-            "doubleSided": True,
-            "basePlateThickness": 0.5,
-        },
-    )
-    assert response.status_code == 200
-    zf = zipfile.ZipFile(BytesIO(response.content))
-    filenames = zf.namelist()
-    assert len(filenames) > 0
-    base_files = [f for f in filenames if '_base.stl' in f]
-    assert len(base_files) == 1
-
-
 def test_v2_stl_double_sided_false_same_as_default(client, sample_color_blocks_with_hex):
     """V2 STL with doubleSided=False produces same result as not specifying it."""
     payload = {
@@ -363,35 +265,6 @@ def test_v2_stl_double_sided_false_same_as_default(client, sample_color_blocks_w
     assert response_default.status_code == 200
     assert response_false.status_code == 200
     assert len(response_default.content) == len(response_false.content)
-
-
-def test_v2_svg_stl_with_base_plate(client):
-    """V2 SVG STL with base plate generates extra base STL file."""
-    vector_results = [
-        {
-            "color": [255, 0, 0],
-            "polygons": [[[0, 0], [10, 0], [10, 10], [0, 10]]],
-            "pixel_count": 100,
-            "polygon_points": 4,
-        }
-    ]
-    response = client.post(
-        "/api/v2/download-svg-stl",
-        json={
-            "vectorResults": vector_results,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 10, "height": 10},
-            "filamentPreset": "bambu_cmyw_phase6",
-            "basePlateThickness": 0.5,
-        },
-    )
-    assert response.status_code == 200
-    zf = zipfile.ZipFile(BytesIO(response.content))
-    filenames = zf.namelist()
-    base_files = [f for f in filenames if '_base.stl' in f]
-    assert len(base_files) == 1, f"Expected 1 base plate file, got {base_files}"
 
 
 def test_v2_svg_stl_success(client):
@@ -458,24 +331,6 @@ def test_v2_3mf_with_preset(client, sample_color_blocks_with_hex):
     assert zipfile.is_zipfile(buf)
 
 
-def test_v2_3mf_with_base_plate(client, sample_color_blocks_with_hex):
-    """V2 3MF with base plate succeeds."""
-    response = client.post(
-        "/api/v2/download-3mf",
-        json={
-            "colorBlocks": sample_color_blocks_with_hex,
-            "layerHeight": 0.08,
-            "pixelSize": 0.08,
-            "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
-            "basePlateThickness": 0.5,
-        },
-    )
-    assert response.status_code == 200
-
-
-# -- Print Settings endpoint tests --
-
 def test_print_settings_with_preset(client):
     """Print settings with preset returns valid JSON."""
     response = client.post(
@@ -521,26 +376,6 @@ def test_print_settings_with_custom_colors(client):
     assert data["filament"]["preset"] is None
     assert data["filament"]["extruder_count"] == 4
     assert data["filament"]["extruders"][0]["name"] == "Cyan"
-
-
-def test_print_settings_with_base_plate(client):
-    """Print settings includes base plate in total height."""
-    response = client.post(
-        "/api/v2/print-settings",
-        json={
-            "layerHeight": 0.1,
-            "pixelSize": 0.1,
-            "layerCount": 4,
-            "imageDimensions": {"width": 10, "height": 10},
-            "basePlateThickness": 0.5,
-            "filamentPreset": "bambu_cmyw_phase6",
-        },
-    )
-    assert response.status_code == 200
-    data = json.loads(response.content)
-    assert data["print_settings"]["base_plate_thickness"] == 0.5
-    assert data["print_settings"]["white_backing_layers"] == 1
-    assert data["object_dimensions"]["total_height_mm"] == 1.0
 
 
 def test_print_settings_default_colors(client):

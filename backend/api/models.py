@@ -256,10 +256,6 @@ class DownloadSTLRequestV2(FilamentConfigMixin, WhiteBackingMixin):
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
     mode: ProcessingMode = ProcessingMode.PIXEL
-    basePlateThickness: Optional[float] = Field(
-        None, ge=0, le=10,
-        description="Base plate thickness in mm (0 or None = no base plate)"
-    )
     doubleSided: bool = Field(
         False,
         description="Generate mirrored back side for double-sided printing"
@@ -280,10 +276,6 @@ class DownloadSVGSTLRequestV2(FilamentConfigMixin, WhiteBackingMixin):
     pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
-    basePlateThickness: Optional[float] = Field(
-        None, ge=0, le=10,
-        description="Base plate thickness in mm (0 or None = no base plate)"
-    )
     doubleSided: bool = Field(
         False,
         description="Generate mirrored back side for double-sided printing"
@@ -344,7 +336,6 @@ class PrintSettingsRequest(FilamentConfigMixin, WhiteBackingMixin):
     pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
-    basePlateThickness: Optional[float] = Field(None, ge=0, le=10)
     doubleSided: bool = Field(
         False,
         description="Generate mirrored back side for double-sided printing"
@@ -515,7 +506,6 @@ class BugReportConverterState(BaseModel):
     layerHeight: float = Field(0, ge=0, le=1000)
     layerCount: int = Field(0, ge=0, le=10000)
     whiteBackingLayers: int = Field(0, ge=0, le=10000)
-    basePlateThickness: float = Field(0, ge=0, le=10000)
     doubleSided: bool = False
     imageWidth: int = Field(0, ge=0, le=100000)
     imageHeight: int = Field(0, ge=0, le=100000)

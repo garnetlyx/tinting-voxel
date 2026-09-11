@@ -40,14 +40,12 @@ class TestGeneratePrintSettings:
             filament_colors=[
                 {'name': 'Cyan', 'hex': '#0086D6', 'transmission_distance': 3.0},
             ],
-            base_plate_thickness=0.5,
         )
         data = json.loads(result)
         ps = data['print_settings']
         assert ps['layer_height'] == 0.12
         assert ps['layer_count'] == 6
         assert ps['white_backing_layers'] == 1
-        assert ps['base_plate_thickness'] == 0.5
 
     def test_object_dimensions_calculation(self):
         """Object dimensions are correctly computed from pixels and pixel_size."""
@@ -70,22 +68,6 @@ class TestGeneratePrintSettings:
         assert dims['width_pixels'] == 100
         assert dims['height_pixels'] == 80
         assert dims['pixel_size_mm'] == 0.1
-
-    def test_object_dimensions_with_base_plate(self):
-        """Total height includes base plate thickness."""
-        result = generate_print_settings(
-            layer_height=0.1,
-            pixel_size=0.1,
-            layer_count=4,
-            image_dimensions={'width': 10, 'height': 10},
-            filament_colors=[
-                {'name': 'Cyan', 'hex': '#0086D6', 'transmission_distance': 3.0},
-            ],
-            base_plate_thickness=0.5,
-        )
-        data = json.loads(result)
-        assert data['object_dimensions']['total_height_mm'] == 1.0  # 4 optical + 1 backing + 0.5 base
-
     def test_filament_extruders(self):
         """Filament section lists all extruders with correct info."""
         colors = [
@@ -143,22 +125,6 @@ class TestGeneratePrintSettings:
         assert isinstance(data, dict)
         # Should be indented (multi-line)
         assert '\n' in result
-
-    def test_zero_base_plate(self):
-        """Zero base plate thickness is included correctly."""
-        result = generate_print_settings(
-            layer_height=0.08,
-            pixel_size=0.1,
-            layer_count=4,
-            image_dimensions={'width': 10, 'height': 10},
-            filament_colors=[
-                {'name': 'Cyan', 'hex': '#0086D6', 'transmission_distance': 3.0},
-            ],
-            base_plate_thickness=0.0,
-        )
-        data = json.loads(result)
-        assert data['print_settings']['base_plate_thickness'] == 0.0
-
     def test_explicit_zero_white_backing(self):
         """Explicitly disabling backing removes it from the reported stack."""
         result = generate_print_settings(

@@ -66,7 +66,6 @@ export function buildInstancedMeshes(
   layerHeight: number,
   layerCount: number,
   whiteBackingLayers: number,
-  basePlateThickness: number,
   doubleSided: boolean,
   visibilityMap: Map<string, boolean>,
   showExploded: boolean,
@@ -82,7 +81,7 @@ export function buildInstancedMeshes(
   );
   // Preview coordinates put the colored face above its white backing.
   const backingThickness = whiteBackingLayers * layerHeight;
-  const baseY = basePlateThickness + backingThickness + blockHeight / 2;
+  const baseY = backingThickness + blockHeight / 2;
   const materials = new Map<string, THREE.MeshPhongMaterial>();
 
   // Center offset so model is centered at origin
@@ -122,7 +121,7 @@ export function buildInstancedMeshes(
       if (showExploded) {
         // Keep the individual layers separate in exploded view.
         for (let layer = 0; layer < layerCount; layer++) {
-          const layerY = basePlateThickness + backingThickness
+          const layerY = backingThickness
             + whiteBackingLayers * explodedGap
             + layer * (layerHeight + explodedGap) + layerHeight / 2;
           matrix.setPosition(x, layerY, z);
@@ -185,7 +184,7 @@ export function buildInstancedMeshes(
       const backingGeo = new THREE.BoxGeometry(plateWidth, layerHeight, plateDepth);
       for (let layer = 0; layer < whiteBackingLayers; layer++) {
         const backing = new THREE.Mesh(backingGeo, whiteMaterial);
-        const y = basePlateThickness + layer * (layerHeight + explodedGap) + layerHeight / 2;
+        const y = layer * (layerHeight + explodedGap) + layerHeight / 2;
         backing.position.set(0, y, 0);
         group.add(backing);
       }
@@ -193,23 +192,9 @@ export function buildInstancedMeshes(
       const backingThickness = whiteBackingLayers * layerHeight;
       const backingGeo = new THREE.BoxGeometry(plateWidth, backingThickness, plateDepth);
       const backing = new THREE.Mesh(backingGeo, whiteMaterial);
-      backing.position.set(0, basePlateThickness + backingThickness / 2, 0);
+      backing.position.set(0, backingThickness / 2, 0);
       group.add(backing);
     }
-  }
-
-  // Base plate
-  if (basePlateThickness > 0) {
-    const plateWidth = imageDimensions.width * pixelSize;
-    const plateDepth = imageDimensions.height * pixelSize;
-    const plateGeo = new THREE.BoxGeometry(plateWidth, basePlateThickness, plateDepth);
-    const plateMat = new THREE.MeshPhongMaterial({
-      color: 0xeeeeee,
-      flatShading: true,
-    });
-    const plate = new THREE.Mesh(plateGeo, plateMat);
-    plate.position.set(0, basePlateThickness / 2, 0);
-    group.add(plate);
   }
 
   return group;

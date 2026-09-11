@@ -174,51 +174,6 @@ class TestDoubleSidedGeneration:
         assert get_labels(single) == get_labels(double)
 
 
-class TestDoubleSidedWithBasePlate:
-    """Double-sided combined with base plate thickness."""
-
-    def test_double_sided_and_base_plate(self, simple_color_blocks, default_colors):
-        """Double-sided with base plate includes both features."""
-        result = generate_stl_zip(
-            color_blocks=simple_color_blocks,
-            layer_height=0.08,
-            pixel_size=0.08,
-            layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
-            colors=default_colors,
-            double_sided=True,
-            base_plate_thickness=0.5,
-        )
-        zf = zipfile.ZipFile(BytesIO(result))
-        filenames = zf.namelist()
-        base_files = [f for f in filenames if '_base.stl' in f]
-        assert len(base_files) == 1
-
-    def test_double_sided_base_plate_height_in_filename(self, simple_color_blocks, default_colors):
-        """Physical height = (2 * layers + n_white backing) * layer_height + base_plate."""
-        layer_height = 0.1
-        layer_count = 4
-        base_plate = 0.5
-        n_white = 1
-        expected_height = (2 * layer_count + n_white) * layer_height + base_plate  # 1.40
-
-        result = generate_stl_zip(
-            color_blocks=simple_color_blocks,
-            layer_height=layer_height,
-            pixel_size=0.08,
-            layer_count=layer_count,
-            image_dimensions={'width': 4, 'height': 4},
-            colors=default_colors,
-            double_sided=True,
-            base_plate_thickness=base_plate,
-        )
-        zf = zipfile.ZipFile(BytesIO(result))
-        for fn in zf.namelist():
-            assert f"x{expected_height:.2f}" in fn, (
-                f"Expected height {expected_height:.2f} in '{fn}'"
-            )
-
-
 class TestDoubleSidedWithGreedyMeshing:
     """Double-sided with greedy meshing optimization."""
 

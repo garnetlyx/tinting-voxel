@@ -75,7 +75,6 @@ def generate_3mf(
     image_dimensions: dict,
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
-    base_plate_thickness: float = 0.0,
     color_hex_map: Optional[dict] = None,
     double_sided: bool = False,
     white_backing_layers: int = 1,
@@ -94,7 +93,6 @@ def generate_3mf(
         image_dimensions: Dict with 'width' and 'height' keys
         use_greedy_meshing: If True, merge adjacent pixels
         colors: Optional Colors instance
-        base_plate_thickness: Thickness of base plate in mm
         color_hex_map: Optional dict mapping label -> hex color for visual colors
         double_sided: If True, generate mirrored back side layers on top
 
@@ -135,7 +133,7 @@ def generate_3mf(
     _log_blend_code_distribution(result_codes, labels, "3MF")
 
     width, height = image_dimensions['width'], image_dimensions['height']
-    z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
+    z_offset = 0.0
 
     n_white = normalize_white_backing_layers(white_backing_layers)
     w_label = resolve_white_backing_label(colors, n_white)
@@ -261,16 +259,6 @@ def generate_3mf(
         scene.add_geometry(mesh_obj, node_name=geom_name, geom_name=geom_name)
         logger.info("Converted color '%s': %d triangles", label, len(mesh_obj.faces))
 
-    # Add base plate
-    if base_plate_thickness > 0:
-        base_mesh_data = generate_box(
-            xrange=(0, width * pixel_size),
-            yrange=(0, height * pixel_size),
-            zrange=(0, base_plate_thickness)
-        )
-        base_obj = _triangles_to_trimesh([base_mesh_data])
-        scene.add_geometry(base_obj, node_name="base_plate", geom_name="base_plate")
-
     # Export as 3MF
     logger.info("Exporting 3MF file with %d objects...", len(scene.geometry))
     buf = BytesIO()
@@ -292,7 +280,6 @@ def generate_svg_3mf(
     layer_count: int,
     image_dimensions: dict,
     colors: Optional[Colors] = None,
-    base_plate_thickness: float = 0.0,
     color_hex_map: Optional[dict] = None,
     double_sided: bool = False,
     white_backing_layers: int = 1,
@@ -307,7 +294,6 @@ def generate_svg_3mf(
         layer_count: Total number of layers
         image_dimensions: Dict with 'width' and 'height' keys
         colors: Colors instance (required)
-        base_plate_thickness: Thickness of base plate in mm
         color_hex_map: Optional dict mapping label -> hex color for visual colors
         double_sided: If True, generate mirrored back side layers on top
 
@@ -348,7 +334,7 @@ def generate_svg_3mf(
 
     width = image_dimensions['width']
     height = image_dimensions['height']
-    z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
+    z_offset = 0.0
 
     n_white = normalize_white_backing_layers(white_backing_layers)
     w_label = resolve_white_backing_label(colors, n_white)
@@ -440,15 +426,6 @@ def generate_svg_3mf(
         geom_name = f"color_{label}"
         scene.add_geometry(mesh_obj, node_name=geom_name, geom_name=geom_name)
         logger.info("SVG-3MF color '%s': %d triangles", label, len(mesh_obj.faces))
-
-    if base_plate_thickness > 0:
-        base_mesh_data = generate_box(
-            xrange=(0, width * pixel_size),
-            yrange=(0, height * pixel_size),
-            zrange=(0, base_plate_thickness)
-        )
-        base_obj = _triangles_to_trimesh([base_mesh_data])
-        scene.add_geometry(base_obj, node_name="base_plate", geom_name="base_plate")
 
     buf = BytesIO()
     scene.export(buf, file_type='3mf')

@@ -316,7 +316,6 @@ def generate_svg_stl_zip(
     layer_count: int,
     image_dimensions: dict,
     colors: Optional[Colors] = None,
-    base_plate_thickness: float = 0.0,
     double_sided: bool = False,
     white_backing_layers: int = 1,
 ) -> bytes:
@@ -334,7 +333,6 @@ def generate_svg_stl_zip(
         layer_count: Total number of layers
         image_dimensions: Dict with 'width' and 'height' keys
         colors: Optional Colors instance. If None, uses current global colors.
-        base_plate_thickness: Thickness of solid base plate in mm (0 = no base plate)
 
     Returns:
         ZIP file binary content
@@ -371,8 +369,7 @@ def generate_svg_stl_zip(
     total_regions = 0
     total_boxes = 0
 
-    # Z offset: color layers sit on top of base plate
-    z_offset = base_plate_thickness if base_plate_thickness > 0 else 0.0
+    z_offset = 0.0
 
     n_white = normalize_white_backing_layers(white_backing_layers)
     w_label = resolve_white_backing_label(active_colors, n_white)
@@ -471,7 +468,6 @@ def generate_svg_stl_zip(
         layer_count=layer_count,
         layer_height=layer_height,
         white_backing_layers=n_white,
-        base_plate_thickness=base_plate_thickness if base_plate_thickness > 0 else 0.0,
         double_sided=double_sided,
     )
     physical_height = print_stack["totalHeightMm"]
@@ -482,19 +478,6 @@ def generate_svg_stl_zip(
             merged_stl = merge_stl_meshes(meshes)
             filename = f"{prefix}_{width}x{height}x{physical_height:.2f}_{code}.stl"
             stl_files[filename] = merged_stl
-
-    # Generate base plate if thickness > 0
-    if base_plate_thickness > 0:
-        base_mesh = stl_generator.generate_box(
-            xrange=(0, width * pixel_size),
-            yrange=(0, height * pixel_size),
-            zrange=(0, base_plate_thickness)
-        )
-        base_stl = merge_stl_meshes([base_mesh])
-        base_filename = f"{prefix}_{width}x{height}x{physical_height:.2f}_base.stl"
-        stl_files[base_filename] = base_stl
-        logger.info("Generated base plate: %.2f x %.2f x %.2f mm",
-                     width * pixel_size, height * pixel_size, base_plate_thickness)
 
     # Create ZIP archive
     zip_buffer = BytesIO()
