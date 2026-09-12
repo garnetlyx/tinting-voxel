@@ -2,11 +2,15 @@
  * API client for parameter search optimization.
  */
 
+import type { FilamentColorConfig } from './types';
+
 const API_BASE_URL = '/api';
 
 export interface ParamSearchConfig {
   targetLongestEdgeMm: number;
-  preset: string;
+  /** Current filament configuration; either a named preset or custom colors. */
+  preset?: string;
+  filamentColors?: FilamentColorConfig[];
   mode: 'pixel' | 'svg' | 'both';
   layerCount: number;
   strategy?: 'grid' | 'random';
@@ -54,7 +58,11 @@ export async function startParamSearch(
 
   const formData = new FormData();
   formData.append('image', imageFile);
-  formData.append('preset', config.preset);
+  if (config.filamentColors?.length) {
+    formData.append('filamentColors', JSON.stringify(config.filamentColors));
+  } else if (config.preset) {
+    formData.append('preset', config.preset);
+  }
   formData.append('mode', config.mode);
   formData.append('layer_count', config.layerCount.toString());
   formData.append('pixel_size', pixelSize.toString());

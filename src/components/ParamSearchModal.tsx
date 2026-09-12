@@ -1,5 +1,5 @@
 import { useLocalizedMessage } from '../i18n/messages';
-import { usePresetLabel, useParameterLabel } from '../i18n/catalog';
+import { useParameterLabel } from '../i18n/catalog';
 import { useTranslation } from '../i18n';
 /**
  * Parameter search modal component.
@@ -10,7 +10,6 @@ import type { SearchResultItem } from '../api/paramSearch';
 import type { ParamSearchPhase } from '../hooks/useParamSearch';
 import type { ParamSearchProgress } from '../api/paramSearch';
 
-import { FILAMENT_PRESET_OPTIONS, DEFAULT_FILAMENT_PRESET } from '../api/types';
 
 interface ParamSearchModalProps {
   isOpen: boolean;
@@ -19,7 +18,7 @@ interface ParamSearchModalProps {
   progress: ParamSearchProgress | null;
   results: SearchResultItem[];
   error: string | null;
-  onStart: (targetLongestEdgeMm: number, preset: string) => void;
+  onStart: (targetLongestEdgeMm: number) => void;
   onApplyParams: (params: Record<string, number>, mode: string, targetLongestEdgeMm: number) => void;
   /** Current print longest edge (mm); the search defaults to evaluating this size. */
   defaultTargetSizeMm?: number;
@@ -38,7 +37,6 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const localize = useLocalizedMessage();
-  const presetLabel = usePresetLabel();
   const parameterLabel = useParameterLabel();
   const [targetSize, setTargetSize] = useState(defaultTargetSizeMm ?? 100);
 
@@ -49,8 +47,6 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
       setTargetSize(defaultTargetSizeMm);
     }
   }, [isOpen, defaultTargetSizeMm]);
-  const [preset, setPreset] = useState<string>(DEFAULT_FILAMENT_PRESET);
-
   useEffect(() => {
     if (!isOpen) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -105,22 +101,8 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                 <p className="text-xs text-gray-500 mt-1">{t('search:targetSizeHelp')}</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="presetSelect">{t('search:filamentPreset')}</label>
-                <select
-                  id="presetSelect"
-                  value={preset}
-                  onChange={(e) => setPreset(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  {FILAMENT_PRESET_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{presetLabel(o.value, o.label)}</option>
-                  ))}
-                </select>
-              </div>
-
               <button
-                onClick={() => onStart(targetSize, preset)}
+                onClick={() => onStart(targetSize)}
                 className="w-full py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
               >{t('search:startOptimization')}</button>
             </div>
@@ -217,7 +199,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => onStart(targetSize, preset)}
+                  onClick={() => onStart(targetSize)}
                   className="flex-1 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >{t('common:retry')}</button>
                 <button

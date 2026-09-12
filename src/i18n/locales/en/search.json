@@ -1,7 +1,6 @@
 {
   "autoOptimizeParameters": "Auto-Optimize Parameters",
   "targetLongestEdgeMm": "Target longest edge (mm)",
-  "filamentPreset": "Filament preset",
   "startOptimization": "Start Optimization",
   "searchingForOptimalParametersPleaseWait": "Searching for optimal parameters, please wait...",
   "progress": "Progress",

@@ -99,13 +99,31 @@ class TestParamSearchEndpoint:
             assert "preview_image" in item
             assert item["preview_image"].startswith("data:image/png;base64,")
 
-    def test_invalid_preset_returns_422(self, client, png_bytes):
+    def test_invalid_preset_returns_400(self, client, png_bytes):
         resp = client.post(
             "/api/param-search",
             data={**_FAST_FORM, "preset": "nonexistent_preset_xyz"},
             files={"image": ("test.png", png_bytes, "image/png")},
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 400
+
+    def test_custom_filament_colors_run_search(self, client, png_bytes):
+        """Custom color configs must be searchable, not just named presets."""
+        colors = json.dumps([
+            {"name": "C", "hex": "#00FFFF", "transmission_distance": 4.7},
+            {"name": "M", "hex": "#FF00FF", "transmission_distance": 6.3},
+            {"name": "Y", "hex": "#FFFF00", "transmission_distance": 10.1},
+            {"name": "W", "hex": "#FFFFFF", "transmission_distance": 18.0},
+        ])
+        resp = client.post(
+            "/api/param-search",
+            data={**_FAST_FORM, "preset": None, "filamentColors": colors, "mode": "svg"},
+            files={"image": ("test.png", png_bytes, "image/png")},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["results"]) > 0
+        assert all(r["mode"] == "svg" for r in body["results"])
 
     def test_rate_limit_third_request_returns_429(self, client, png_bytes):
         """Third request within 1 minute should be rate-limited."""

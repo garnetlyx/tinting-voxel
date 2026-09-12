@@ -8,10 +8,9 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from api.error_handlers import handle_api_errors
-from api.models import BatchProcessResponse, FilamentPreset
+from api.filament_payload import get_colors_from_request, parse_filament_form_payload
+from api.models import BatchProcessResponse
 from api.rate_limiter import limiter
-from core.blend_color import Colors
-from core.color_config import ColorConfig, get_preset
 from services.batch_processor import (
     MAX_BATCH_SIZE,
     generate_batch_stl_zip,
@@ -120,50 +119,8 @@ async def api_batch_download_stl(
         raise HTTPException(status_code=422, detail="All images failed to process")
 
     # Resolve colors: filamentColors > filamentPreset > default (Phase 6 CMYW)
-    colors = Colors()
-    if filamentColors:
-        try:
-            import json
-            colors_data = json.loads(filamentColors)
-        except (json.JSONDecodeError, ValueError) as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid filamentColors JSON: {str(e)}"
-            )
-        try:
-            configs = [
-                ColorConfig(
-                    name=fc['name'],
-                    hex=fc['hex'],
-                    transmission_distance=fc['transmission_distance'],
-                    alpha=fc.get('alpha', 12.0),
-                    k=fc.get('k', 10.0),
-                    k_rgb=fc.get('k_rgb'),
-                    td_rgb=fc.get('td_rgb'),
-                    td_neutral=fc.get('td_neutral'),
-                    td_scale=fc.get('td_scale', 1.0),
-                    td_gamma=fc.get('td_gamma', 1.0),
-                )
-                for fc in colors_data
-            ]
-            colors = Colors.from_configs(configs)
-        except (KeyError, TypeError) as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid filamentColors format: {str(e)}"
-            )
-    elif filamentPreset:
-        try:
-            preset_enum = FilamentPreset(filamentPreset)
-            preset_configs = get_preset(preset_enum.value)
-            if preset_configs:
-                colors = Colors.from_configs(preset_configs)
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid filament preset: {filamentPreset}. "
-                f"Valid presets: {', '.join(p.value for p in FilamentPreset)}"
-            )
+    parsed_preset, parsed_colors = parse_filament_form_payload(filamentPreset, filamentColors)
+    colors = get_colors_from_request(parsed_preset, parsed_colors)
 
     zip_content = generate_batch_stl_zip(
         batch_results=batch_result['results'],

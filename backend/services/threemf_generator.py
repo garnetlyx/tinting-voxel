@@ -15,6 +15,7 @@ import numpy as np
 import trimesh
 
 from core.blend_color import Color, Colors
+from config.settings import settings
 from services.mesh_optimizer import generate_optimized_boxes
 from services.print_stack import (
     normalize_white_backing_layers,
@@ -138,13 +139,13 @@ def generate_3mf(
     if n_white > 0:
         logger.info("3MF: white backing label='%s', n_white=%d", w_label, n_white)
 
-    # Complexity guard
+    # Complexity guard: enforced on the REAL merged box count (see
+    # settings.stl_max_boxes); the raw estimate is logged for observability.
     estimated_boxes = sum(len(b['pixels']) for b in color_blocks) * layer_count
-    if estimated_boxes > 5_000_000:
-        raise ValueError(
-            f"Request too complex: ~{estimated_boxes:,} estimated boxes. "
-            f"Reduce image size or colors."
-        )
+    total_optimized_boxes = 0
+
+    def _remaining_box_budget() -> int:
+        return max(0, settings.stl_max_boxes - total_optimized_boxes)
 
     logger.info(
         "3MF generation: %d color blocks, %d layers, %dx%d image, ~%d estimated boxes",
@@ -163,8 +164,10 @@ def generate_3mf(
             if use_greedy_meshing and len(pixels) > 1:
                 optimized_boxes = generate_optimized_boxes(
                     pixels=pixels, width=width, height=height,
-                    pixel_size=pixel_size, z_min=z_min, z_max=z_max
+                    pixel_size=pixel_size, z_min=z_min, z_max=z_max,
+                    max_rectangles=_remaining_box_budget(),
                 )
+                total_optimized_boxes += len(optimized_boxes)
                 batch_mesh = generate_boxes_batch(optimized_boxes)
                 code_mesh_map[code_char].append(batch_mesh)
             else:
@@ -317,8 +320,10 @@ def generate_svg_3mf(
                 pixel_size=pixel_size,
                 z_min=z_min,
                 z_max=z_max,
+                max_rectangles=_remaining_box_budget(),
             )
             if boxes:
+                total_optimized_boxes += len(boxes)
                 code_mesh_map[code_char].append(generate_boxes_batch(boxes))
 
     # Add white backing above optical layers (reflector behind colors)

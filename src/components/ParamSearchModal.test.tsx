@@ -37,15 +37,17 @@ const mockResults: SearchResultItem[] = [
 ];
 
 describe('ParamSearchModal', () => {
-  it('config step renders preset selector and size input', () => {
+  it('config step renders size input; the search reuses the current filament config', () => {
     render(<ParamSearchModal {...baseProps} phase="config" />);
 
     expect(screen.getByLabelText(/target longest edge/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/filament preset/i)).toBeInTheDocument();
+    // The modal no longer carries its own preset selector: the search runs
+    // against whatever the user has selected (or customized) in the main UI.
+    expect(screen.queryByLabelText(/filament preset/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /start optimization/i })).toBeInTheDocument();
   });
 
-  it('config step calls onStart with size and preset when confirmed', async () => {
+  it('config step calls onStart with the chosen size when confirmed', async () => {
     const user = userEvent.setup();
     const onStart = vi.fn();
 
@@ -54,9 +56,8 @@ describe('ParamSearchModal', () => {
     await user.click(screen.getByRole('button', { name: /start optimization/i }));
 
     expect(onStart).toHaveBeenCalledOnce();
-    const [size, preset] = onStart.mock.calls[0];
+    const [size] = onStart.mock.calls[0];
     expect(typeof size).toBe('number');
-    expect(typeof preset).toBe('string');
   });
 
   it('running step shows correct completed/total from progress', () => {

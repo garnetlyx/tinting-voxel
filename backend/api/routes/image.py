@@ -12,6 +12,10 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from PIL import Image
 
 from api.error_handlers import handle_api_errors
+from api.filament_payload import (
+    get_colors_from_request,
+    parse_filament_form_payload,
+)
 from api.models import (
     FilamentColorConfig,
     FilamentConfigMixin,
@@ -42,52 +46,6 @@ from services.vector_processor import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Image Processing"])
-
-
-def _parse_filament_form_payload(
-    filament_preset: Optional[str],
-    filament_colors: Optional[str],
-) -> tuple[Optional[FilamentPreset], Optional[list[FilamentColorConfig]]]:
-    parsed_preset = None
-    parsed_colors = None
-
-    if filament_preset:
-        try:
-            parsed_preset = FilamentPreset(filament_preset)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Invalid filament preset: {filament_preset}. "
-                    f"Valid presets: {', '.join(p.value for p in FilamentPreset)}"
-                ),
-            ) from exc
-
-    if filament_colors:
-        try:
-            colors_data = json.loads(filament_colors)
-        except (json.JSONDecodeError, ValueError) as exc:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid filamentColors JSON: {str(exc)}",
-            ) from exc
-        try:
-            parsed_colors = [FilamentColorConfig.model_validate(item) for item in colors_data]
-        except Exception as exc:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid filamentColors format: {str(exc)}",
-            ) from exc
-
-    try:
-        validated = FilamentConfigMixin(
-            filamentPreset=parsed_preset,
-            filamentColors=parsed_colors,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return validated.filamentPreset, validated.filamentColors
 
 
 @router.post("/process-image")
@@ -125,7 +83,7 @@ async def api_process_image(
 
     # pixelSize remains the actual model scale. detailSize only controls
     # local feature merging in pixel mode; it does not force global upscaling.
-    parsed_preset, parsed_colors = _parse_filament_form_payload(
+    parsed_preset, parsed_colors = parse_filament_form_payload(
         filament_preset=filamentPreset,
         filament_colors=filamentColors,
     )

@@ -13,6 +13,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from config.settings import settings
 from core.blend_color import BlendTestGenerator, Color, Colors
 from services.mesh_optimizer import generate_optimized_boxes
 from services.print_stack import (
@@ -613,13 +614,14 @@ def generate_stl_zip(
     total_original_boxes = 0
     total_optimized_boxes = 0
 
-    # Complexity guard: estimate total boxes and reject excessively large requests
+    # Complexity guard: enforced on the REAL merged box count, cumulative
+    # across color blocks (see settings.stl_max_boxes). The raw pixel × layer
+    # count is logged for observability but does not gate the request —
+    # mergeable photos must pass.
     estimated_boxes = sum(len(b['pixels']) for b in color_blocks) * layer_count
-    if estimated_boxes > 5_000_000:
-        raise ValueError(
-            f"Request too complex: ~{estimated_boxes:,} estimated boxes. "
-            f"Reduce image size or colors."
-        )
+
+    def _remaining_box_budget() -> int:
+        return max(0, settings.stl_max_boxes - total_optimized_boxes)
 
     z_offset = 0.0
 
@@ -654,7 +656,8 @@ def generate_stl_zip(
                     height=height,
                     pixel_size=pixel_size,
                     z_min=z_min,
-                    z_max=z_max
+                    z_max=z_max,
+                    max_rectangles=_remaining_box_budget(),
                 )
                 total_original_boxes += len(pixels)
                 total_optimized_boxes += len(optimized_boxes)
@@ -666,6 +669,12 @@ def generate_stl_zip(
                 # Original per-pixel box generation
                 total_original_boxes += len(pixels)
                 total_optimized_boxes += len(pixels)
+                if total_optimized_boxes > settings.stl_max_boxes:
+                    raise ValueError(
+                        f"Request too complex: {total_optimized_boxes:,} boxes after "
+                        f"meshing (budget {settings.stl_max_boxes:,}). "
+                        f"Reduce image size or colors."
+                    )
                 box_ranges = [
                     (
                         (pixel['x'] * pixel_size, (pixel['x'] + 1) * pixel_size),

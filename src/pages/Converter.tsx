@@ -436,13 +436,16 @@ const Converter: React.FC = () => {
         results={paramSearch.results}
         error={paramSearch.error}
         defaultTargetSizeMm={maxDimension}
-        onStart={(targetLongestEdgeMm, preset) => {
+        onStart={(targetLongestEdgeMm) => {
           if (!image || !imageFileRef.current) return;
           paramSearch.startSearch(
             imageFileRef.current,
             {
               targetLongestEdgeMm,
-              preset,
+              // Run the search against exactly what is selected in the UI,
+              // including fully custom filament configurations.
+              preset: filamentPreset ?? undefined,
+              filamentColors: filamentPreset ? undefined : filamentColors,
               mode,
               layerCount,
               strategy: 'random',

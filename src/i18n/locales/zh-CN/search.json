@@ -1,7 +1,6 @@
 {
   "autoOptimizeParameters": "自动优化参数",
   "targetLongestEdgeMm": "目标最长边（mm）",
-  "filamentPreset": "耗材预设",
   "startOptimization": "开始优化",
   "searchingForOptimalParametersPleaseWait": "正在寻找最佳参数，请稍候…",
   "progress": "进度",

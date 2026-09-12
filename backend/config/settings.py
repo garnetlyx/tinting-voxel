@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # STL/3MF generation: cap on total merged boxes per request. Greedy meshing
+    # collapses runs of same-color pixels, so the guard is enforced on the REAL
+    # merged box count (cumulative across color blocks), not on the raw
+    # pixel × layer estimate — a large but mergeable photo passes, while
+    # noise-like content fails fast inside greedy_mesh_2d.
+    # ~5M boxes ≈ the memory budget measured when OOM kills were fixed (d480ddf).
+    stl_max_boxes: int = 5_000_000
+
     # Bug reports are saved locally before optional email delivery.
     bug_report_storage_dir: str = "bug-reports"
     resend_api_key: SecretStr = SecretStr("")

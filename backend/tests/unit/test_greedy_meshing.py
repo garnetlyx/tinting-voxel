@@ -253,3 +253,25 @@ class TestGenerateOptimizedBoxes:
             z_min=0.0, z_max=1.0
         )
         assert len(boxes) == 2
+
+    def test_max_rectangles_cap_aborts_noise(self):
+        """The memory-budget cap must abort pathological grids instead of
+        materializing an unbounded rectangle list."""
+        import numpy as np
+        import pytest
+        from services.mesh_optimizer import greedy_mesh_2d, MeshTooComplexError
+
+        yy, xx = np.mgrid[0:120, 0:100]
+        checker = (xx + yy) % 2 == 0
+        with pytest.raises(MeshTooComplexError):
+            greedy_mesh_2d(checker, max_rectangles=50)
+
+    def test_no_cap_keeps_original_behavior(self):
+        """Without a cap the meshing result is unchanged."""
+        import numpy as np
+        from services.mesh_optimizer import greedy_mesh_2d
+
+        yy, xx = np.mgrid[0:120, 0:100]
+        checker = (xx + yy) % 2 == 0
+        rects = greedy_mesh_2d(checker)
+        assert len(rects) == int(checker.sum())

@@ -10,6 +10,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from api.error_handlers import handle_api_errors
+from api.filament_payload import get_colors_from_request
 from api.rate_limiter import limiter
 from api.models import (
     DownloadSTLRequestV2,
@@ -23,7 +24,6 @@ from api.models import (
 from core.blend_color import Colors
 from core.color_config import (
     BAMBU_CMYWK_PHASE6_PRESET,
-    BAMBU_CMYW_PHASE6_PRESET,
     ColorConfig,
     get_preset,
     PRESETS,
@@ -37,50 +37,6 @@ from services.threemf_generator import generate_3mf, generate_svg_3mf
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v2", tags=["Downloads V2"])
-
-
-def get_colors_from_request(
-    filament_preset: Optional[FilamentPreset],
-    filament_colors: Optional[List[FilamentColorConfig]]
-) -> Colors:
-    """
-    Get Colors instance from request parameters.
-
-    Priority: filament_colors > filament_preset > default Phase 6 CMYW
-
-    Args:
-        filament_preset: Optional preset name
-        filament_colors: Optional list of custom color configs
-
-    Returns:
-        Colors instance
-    """
-    if filament_colors:
-        # Use custom colors
-        configs = [
-            ColorConfig(
-                name=fc.name,
-                hex=fc.hex,
-                transmission_distance=fc.transmission_distance,
-                alpha=fc.alpha,
-                k=fc.k,
-                td_rgb=fc.td_rgb,
-                td_neutral=fc.td_neutral,
-                td_scale=fc.td_scale,
-                td_gamma=fc.td_gamma,
-            )
-            for fc in filament_colors
-        ]
-        return Colors.from_configs(configs)
-
-    if filament_preset:
-        # Use preset
-        preset_configs = get_preset(filament_preset.value)
-        if preset_configs:
-            return Colors.from_configs(preset_configs)
-
-    # Fall back to the default Phase 6 CMYWK preset
-    return Colors.from_configs(BAMBU_CMYWK_PHASE6_PRESET)
 
 
 @router.get("/filament-presets", response_model=FilamentPresetsResponse)

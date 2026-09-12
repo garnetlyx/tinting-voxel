@@ -14,6 +14,7 @@ from typing import Optional
 import numpy as np
 
 from core.blend_color import Color, Colors
+from config.settings import settings
 from services.mesh_optimizer import generate_optimized_boxes_from_grid
 from services import stl_generator
 from services.print_stack import (
@@ -406,6 +407,7 @@ def generate_svg_stl_zip(
                 pixel_size=pixel_size,
                 z_min=z_min,
                 z_max=z_max,
+                max_rectangles=max(0, settings.stl_max_boxes - total_boxes),
             )
             if boxes:
                 total_boxes += len(boxes)

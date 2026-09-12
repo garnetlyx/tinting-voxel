@@ -104,7 +104,15 @@ def find_max_rectangle(
     return (start_x, start_y, max_width, max_height)
 
 
-def greedy_mesh_2d(grid: np.ndarray) -> list[tuple[int, int, int, int]]:
+class MeshTooComplexError(ValueError):
+    """Raised when greedy meshing would produce more rectangles than the
+    memory budget (settings.stl_max_boxes) allows."""
+
+
+def greedy_mesh_2d(
+    grid: np.ndarray,
+    max_rectangles: int | None = None,
+) -> list[tuple[int, int, int, int]]:
     """
     Apply greedy meshing algorithm to merge pixels into rectangles.
 
@@ -113,6 +121,9 @@ def greedy_mesh_2d(grid: np.ndarray) -> list[tuple[int, int, int, int]]:
 
     Args:
         grid: 2D boolean grid where True indicates a pixel is present
+        max_rectangles: abort with MeshTooComplexError once the rectangle
+            list would exceed this count, so pathological (noise-like)
+            inputs fail fast instead of exhausting memory
 
     Returns:
         List of rectangles as (x, y, width, height) tuples
@@ -135,6 +146,12 @@ def greedy_mesh_2d(grid: np.ndarray) -> list[tuple[int, int, int, int]]:
                 rx, ry, rw, rh = rect
 
                 if rw > 0 and rh > 0:
+                    if max_rectangles is not None and len(rectangles) >= max_rectangles:
+                        raise MeshTooComplexError(
+                            f"Greedy meshing exceeded {max_rectangles:,} rectangles; "
+                            f"the image has too much fine detail to mesh within the "
+                            f"memory budget. Reduce image size or increase color merge."
+                        )
                     rectangles.append(rect)
                     # Mark as processed
                     remaining[ry:ry + rh, rx:rx + rw] = False
@@ -154,7 +171,8 @@ def generate_optimized_boxes(
     height: int,
     pixel_size: float,
     z_min: float,
-    z_max: float
+    z_max: float,
+    max_rectangles: int | None = None,
 ) -> list[tuple[tuple[float, float], tuple[float, float], tuple[float, float]]]:
     """
     Generate optimized box ranges using greedy meshing.
@@ -173,7 +191,7 @@ def generate_optimized_boxes(
         List of (xrange, yrange, zrange) tuples for each optimized box
     """
     grid = pixels_to_grid(pixels, width, height)
-    rectangles = greedy_mesh_2d(grid)
+    rectangles = greedy_mesh_2d(grid, max_rectangles=max_rectangles)
 
     boxes = []
     for x, y, w, h in rectangles:
@@ -196,7 +214,8 @@ def generate_optimized_boxes_from_grid(
     grid: np.ndarray,
     pixel_size: float,
     z_min: float,
-    z_max: float
+    z_max: float,
+    max_rectangles: int | None = None,
 ) -> list[tuple[tuple[float, float], tuple[float, float], tuple[float, float]]]:
     """
     Generate optimized boxes directly from a boolean grid.
@@ -204,7 +223,7 @@ def generate_optimized_boxes_from_grid(
     This avoids materializing large pixel lists when geometry is already
     available as a rasterized occupancy mask.
     """
-    rectangles = greedy_mesh_2d(grid)
+    rectangles = greedy_mesh_2d(grid, max_rectangles=max_rectangles)
 
     boxes = []
     for x, y, w, h in rectangles:

@@ -15,6 +15,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from api.error_handlers import handle_api_errors
+from api.filament_payload import get_colors_from_request, parse_filament_form_payload
 from api.models import (
     ParamSearchRequest,
     ParamSearchResponse,
@@ -25,7 +26,6 @@ from api.rate_limiter import limiter
 from api.validators import validate_image_upload
 from config.settings import settings
 from core.blend_color import Colors
-from core.color_config import get_available_presets, get_preset
 from services.param_search_service import (
     FixedParams,
     ParamSearchConfig,
@@ -79,7 +79,8 @@ _progress_store = ProgressStore()
 async def api_param_search(
     request: Request,
     image: UploadFile = File(...),
-    preset: str = Form(...),
+    preset: Optional[str] = Form(None),
+    filamentColors: Optional[str] = Form(None),
     mode: str = Form("pixel"),
     strategy: str = Form("grid"),
     n_trials: int = Form(50),
@@ -93,16 +94,11 @@ async def api_param_search(
     image_bytes = await image.read()
     validate_image_upload(image.filename, image_bytes)
 
-    # Validate preset
-    preset_configs = get_preset(preset)
-    if preset_configs is None:
-        available = get_available_presets()
-        raise HTTPException(
-            status_code=422,
-            detail=f"Unknown preset '{preset}'. Available: {', '.join(available)}",
-        )
-
-    colors = Colors.from_configs(preset_configs)
+    # Resolve colors: filamentColors > preset > default (Phase 6 CMYWK).
+    # Lets the search run against exactly what the user has selected in the
+    # UI, including fully custom filament configurations.
+    parsed_preset, parsed_colors = parse_filament_form_payload(preset, filamentColors)
+    colors = get_colors_from_request(parsed_preset, parsed_colors)
     job_id = str(uuid.uuid4())
     queue = _progress_store.create(job_id)
 
