@@ -13,7 +13,7 @@ import type {
   FilamentPreset,
   FilamentColorConfig,
 } from '../api/types';
-import { DEFAULT_PRESETS, DEFAULT_FILAMENT_PRESET, DEFAULT_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM, DEFAULT_TRANSPARENT_TD_THRESHOLD_MM, isAllTransparentFilaments } from '../api/types';
+import { DEFAULT_PRESETS, DEFAULT_FILAMENT_PRESET, DEFAULT_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM, isAllTransparentFilaments } from '../api/types';
 import type { ProcessingStage } from '../components/LoadingSpinner';
 import {
   processImage,
@@ -101,12 +101,9 @@ export const useImageProcessor = () => {
 
   // Transparency classification (TD1S neutral TD threshold, mm). Data-driven:
   // every filament must meet the threshold for the set to count as transparent.
-  const [transparentTdThreshold, setTransparentTdThreshold] = useState(
-    DEFAULT_TRANSPARENT_TD_THRESHOLD_MM
-  );
   const allTransparent = useMemo(
-    () => isAllTransparentFilaments(filamentColors, transparentTdThreshold),
-    [filamentColors, transparentTdThreshold]
+    () => isAllTransparentFilaments(filamentColors),
+    [filamentColors]
   );
   const allTransparentRef = useRef(allTransparent);
   useEffect(() => {
@@ -195,17 +192,12 @@ export const useImageProcessor = () => {
   const addFilamentColor = useCallback(() => {
     setFilamentColors(prev => {
       if (prev.length >= MAX_FILAMENT_COLORS) return prev;
-      // Inherit calibration-family params from the current set: blending
-      // requires a shared alpha, and td_scale/td_gamma must stay consistent
-      // within a calibrated preset instead of falling back to backend defaults.
-      const family = prev[0];
+      // New colors default to plain Beer-Lambert (k omitted = 0); a
+      // pigment gain is calibrated data, not something to inherit silently.
       return [...prev, {
         name: '',
         hex: '#808080',
         transmission_distance: 5.0,
-        alpha: family?.alpha,
-        td_scale: family?.td_scale,
-        td_gamma: family?.td_gamma,
       }];
     });
     setFilamentPreset(null);
@@ -832,8 +824,6 @@ export const useImageProcessor = () => {
     setMinArea,
     setNumColors,
     setLayerHeight,
-    transparentTdThreshold,
-    setTransparentTdThreshold,
     allTransparent,
     setLayerCount: handleSetLayerCount,
     setPixelSize: handleSetPixelSize,

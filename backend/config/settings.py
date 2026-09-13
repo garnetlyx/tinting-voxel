@@ -40,11 +40,6 @@ class Settings(BaseSettings):
     default_max_colors: int = 10
     default_color_threshold: float = 50.0
 
-    # Transparency classification threshold (TD1S neutral transmission distance,
-    # mm). Same default as DEFAULT_TRANSPARENT_TD_THRESHOLD_MM in the frontend;
-    # also gates the composition-pruned stack search (core/stack_prune.py).
-    transparent_td_threshold: float = 6.7
-
     # Param search: wall-clock budget per run. Must stay below the Railway edge
     # request timeout (~60s observed); the endpoint returns the best partial
     # results collected within this budget.

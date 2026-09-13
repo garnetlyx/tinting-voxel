@@ -24,6 +24,74 @@ from services.print_stack import (
 
 logger = logging.getLogger(__name__)
 
+# Probe-calibrated throughput for the full-enumeration cost model (self-
+# adjusting to the host CPU; measured once, cached). Rates are per code;
+# the match rate is per code per target.
+_probe_state: dict = {}
+
+
+def _probe_throughput() -> tuple[float, float, float]:
+    """Measure blend & match throughput once; both are linear in code count.
+
+    Match cost is two-part per code: a fixed part (matrix cell extraction
+    + Lab conversion, independent of target count) plus a small marginal
+    per-target deltaE term. Measured at 1 and 6 targets and decomposed —
+    extrapolating the single-target rate linearly overestimates by >10x
+    at real target counts.
+    """
+    if _probe_state:
+        return (
+            _probe_state["blend_s_per_code"],
+            _probe_state["match_fixed_s_per_code"],
+            _probe_state["match_marginal_s_per_code_per_target"],
+        )
+    import time as _time
+    from core.color_materials import Color as _C
+    probe_colors = Colors(colors={
+        l: _C(l, td, h) for l, h, td in zip(
+            "ABCD",
+            ["#3D79C6", "#B3356E", "#FFE665", "#FFFFFF"],
+            [0.5, 0.5, 0.6, 0.6],
+        )
+    })
+    gen = BlendTestGenerator(colors=probe_colors, layer_height=0.08, layer_count_max=4)
+    codes = [''.join(p) for p in itertools.product("ABCD", repeat=8)][:16384]
+    t0 = _time.perf_counter()
+    gen.codes_to_rgb(codes)
+    blend = (_time.perf_counter() - t0) / len(codes)
+    df_c = pd.DataFrame([codes[i:i + 128] for i in range(0, len(codes), 128)])
+    df_r = pd.DataFrame([[(128.0, 128.0, 128.0)] * 128 for _ in range(len(df_c))])
+    # The marginal per-target term is small (~0.1-1.5 µs/code) next to the
+    # fixed extraction cost, so the second measurement point uses many
+    # targets to lift its signal well above timing noise (a 6-target point
+    # can measure a negative delta under load, which clamps to 0 and makes
+    # the estimate target-blind).
+    targets = [(120 + i, 130 + i % 7, 140) for i in range(64)]
+    t0 = _time.perf_counter()
+    _C.map_to_nearest_color(targets[:1], df_c, df_r)
+    per_code_1 = (_time.perf_counter() - t0) / len(codes)
+    t0 = _time.perf_counter()
+    _C.map_to_nearest_color(targets, df_c, df_r)
+    per_code_64 = (_time.perf_counter() - t0) / len(codes)
+    marginal = max((per_code_64 - per_code_1) / 63.0, 0.0)
+    fixed = max(per_code_1 - marginal, 0.0)
+    _probe_state.update(
+        blend_s_per_code=blend,
+        match_fixed_s_per_code=fixed,
+        match_marginal_s_per_code_per_target=marginal,
+    )
+    logger.info(
+        "Enumeration cost probe: blend %.2e s/code, match fixed %.2e s/code "
+        "+ %.2e s/code/target",
+        blend, fixed, marginal,
+    )
+    return blend, fixed, marginal
+
+
+def _estimate_full_enumeration_seconds(n_codes: int, n_targets: int) -> float:
+    blend_rate, match_fixed, match_marginal = _probe_throughput()
+    return n_codes * (blend_rate + match_fixed + match_marginal * n_targets)
+
 
 # Global reference matrices (initialized on app startup, used as fallback)
 _reference_code_matrix = None
@@ -33,8 +101,8 @@ _current_colors = None
 _global_state_lock = threading.Lock()
 
 
-def _build_code_to_rgb(colors: Colors, layer_count: int, layer_height: float):
-    """Blend callable consistent with compute_reference_matrices."""
+def _build_codes_to_rgb(colors: Colors, layer_count: int, layer_height: float):
+    """Batch blend callable consistent with compute_reference_matrices."""
     generator = BlendTestGenerator(
         colors=colors,
         layer_height=layer_height,
@@ -42,7 +110,7 @@ def _build_code_to_rgb(colors: Colors, layer_count: int, layer_height: float):
         alpha=colors.get_blend_alpha(),
         blend_mode=colors.get_blend_mode(),
     )
-    return generator.code_to_rgb
+    return generator.codes_to_rgb
 
 
 def compute_reference_matrices(
@@ -75,6 +143,14 @@ def compute_reference_matrices(
     """
     if layer_count <= 0:
         raise ValueError(f"layer_count must be positive, got {layer_count}")
+
+    # Serve every caller (process, downloads, batch) through the content-keyed
+    # matrix cache: the key covers everything below that influences the output.
+    from services.matrix_cache import get_cached_matrices, set_cached_matrices
+    cached = get_cached_matrices(colors, layer_count, layer_height, prune=prune, n_targets=n_targets)
+    if cached is not None:
+        return cached
+
     generator = BlendTestGenerator(
         colors=colors,
         layer_height=layer_height,
@@ -98,11 +174,31 @@ def compute_reference_matrices(
 
     from core.stack_prune import composition_codes, is_translucent_set
 
-    translucent = is_translucent_set(colors, require_measured_td=True)
-    # Pruning only ever operates in the translucent regime: `prune` may opt
-    # OUT (False, the oracle) but can never force an opaque or mixed set onto
-    # the composition-pruned path.
-    use_prune = translucent and prune is not False
+    translucent = is_translucent_set(colors)
+    # The enumeration decision is time-budget driven (no fixed code-count
+    # cap): full enumeration whenever the probe-extrapolated wall time fits
+    # settings.full_enumeration_budget_seconds, composition pruning when
+    # only a translucent set could otherwise meet it, rejection otherwise.
+    # Pruning is never forced onto an opaque set — its ΔE budget is
+    # validated only for transparent sets.
+    estimated_seconds = _estimate_full_enumeration_seconds(
+        permutation_count, n_targets or 10,
+    )
+    within_budget = estimated_seconds <= settings.full_enumeration_budget_seconds
+    use_prune = translucent and prune is not False and not within_budget
+    if not translucent and not within_budget:
+        # Opaque over-budget enumeration rejects unconditionally: composition
+        # pruning is not validated for opaque sets and there is no fallback.
+        # (A translucent set with prune=False is the bounded full-enumeration
+        # oracle and stays allowed — the caller explicitly accepted its cost.)
+        raise ValueError(
+            f"Full enumeration for {len(items)} colors x {layer_count} layers "
+            f"({permutation_count:,} codes) is estimated at "
+            f"{estimated_seconds:.0f}s, over the "
+            f"{settings.full_enumeration_budget_seconds:.0f}s budget, and "
+            f"composition pruning is not validated for a non-transparent set. "
+            f"Reduce the number of colors or layers."
+        )
     if use_prune:
         # Translucent regime: one canonical representative per composition
         # (C(N+L-1, L) candidates; see core/stack_prune.py) instead of the
@@ -155,6 +251,7 @@ def compute_reference_matrices(
         len(items), len(code_list),
         " (composition-pruned)" if use_prune else "",
     )
+    set_cached_matrices(colors, layer_count, layer_height, code_df, rgb_df, prune=prune, n_targets=n_targets)
     return code_df, rgb_df
 
 
@@ -169,12 +266,13 @@ def map_color_blocks_to_blend_results(
 
     Uses the same reference matrices and LAB nearest-neighbor matching as STL export.
     """
+    input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
         layer_count,
         layer_height,
         colors,
+        n_targets=len(input_colors),
     )
-    input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
     result_codes, result_rgbs = Color.map_to_nearest_color(
         input_colors,
         ref_code_matrix,
@@ -191,7 +289,7 @@ def map_color_blocks_to_blend_results(
         ref_rgb_matrix,
         colors,
         layer_height,
-        code_to_rgb=_build_code_to_rgb(colors, layer_count, layer_height),
+        codes_to_rgb=_build_codes_to_rgb(colors, layer_count, layer_height),
     )
     normalized_rgbs = [
         tuple(int(channel) for channel in np.asarray(rgb).tolist())
@@ -506,33 +604,6 @@ def _find_white_label(colors: Colors) -> Optional[str]:
             return label
     return None
 
-
-def _calculate_white_layers(unique_codes, layer_height, colors, alpha=12.0):
-    """Return 0-5 white backing layers based on maximum transmittance.
-
-    Calculates the maximum light remaining after passing through the optical
-    stack for all unique blend codes. More transparent stacks need thicker
-    white backing to provide adequate reflection.
-
-    Args:
-        unique_codes: set of blend code strings, e.g. {"WWWW", "CCWW"}
-        layer_height: layer height in mm
-        colors: Colors instance with filament definitions
-        alpha: absorption coefficient for Beer-Lambert model
-
-    Returns:
-        Number of white backing layers (0-5)
-    """
-    max_remain = 0.0
-    for code in unique_codes:
-        remain = 1.0
-        for c in code:
-            remain *= Color.get_transmission_rate(layer_height, colors[c].td, alpha)
-        if remain > max_remain:
-            max_remain = remain
-    if max_remain < 0.01:
-        return 0
-    return max(1, int(max_remain * 5 + 0.5))
 
 
 def get_filename_prefix(colors: Colors) -> str:

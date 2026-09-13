@@ -65,25 +65,48 @@ class FilamentPreviewService:
         labels = self.colors.get_labels()
         num_colors = len(labels)
 
-        # Guard against permutation bomb (QA-01/QA-15)
-        max_permutations = 1_000_000
+        # Time-budget guard (same policy as compute_reference_matrices):
+        # the probe-extrapolated blend cost decides affordability; pagination
+        # is the caller's escape hatch for very large grids.
         permutation_count = num_colors ** self.layer_count
-        if permutation_count > max_permutations:
+        from config.settings import settings
+        from services.stl_generator import _estimate_full_enumeration_seconds
+        estimated = _estimate_full_enumeration_seconds(permutation_count, 1)
+        if estimated > settings.full_enumeration_budget_seconds and page is None:
             raise ValueError(
-                f"Too many color permutations: {num_colors} colors x "
-                f"{self.layer_count} layers = {permutation_count:,}. "
-                f"Maximum allowed is {max_permutations:,}."
+                f"Preview grid for {num_colors} colors x {self.layer_count} layers "
+                f"({permutation_count:,} cells) is estimated at {estimated:.0f}s, over "
+                f"the {settings.full_enumeration_budget_seconds:.0f}s budget. "
+                f"Request a page (page/page_size) or reduce colors/layers."
             )
 
-        # Generate all permutations of color codes
-        perms = list(itertools.product(labels, repeat=self.layer_count))
-        codes = [''.join(p) for p in perms]
-        num_combos = len(codes)
+        # Generate the requested slice of codes (paginated requests decode
+        # flat indices without materializing the full product).
+        if page is not None and page_size is not None:
+            total_pages = max(1, int(np.ceil(permutation_count / page_size)))
+            if page > total_pages:
+                raise ValueError(
+                    f"Page {page} is out of range. Total pages: {total_pages} "
+                    f"({permutation_count} combinations, page_size={page_size})."
+                )
+            start_idx = (page - 1) * page_size
+            end_idx = min(start_idx + page_size, permutation_count)
+            codes = []
+            for idx in range(start_idx, end_idx):
+                rem = idx
+                chars = [''] * self.layer_count
+                for pos in range(self.layer_count - 1, -1, -1):
+                    chars[pos] = labels[rem % num_colors]
+                    rem //= num_colors
+                codes.append(''.join(chars))
+        else:
+            codes = [''.join(p) for p in itertools.product(labels, repeat=self.layer_count)]
+        num_combos = permutation_count
 
-        # Compute RGB for each combination
+        # Vectorized batch blend (the only production blend path)
+        rgbs = self.generator.codes_to_rgb(codes)
         color_matrix = []
-        for code in codes:
-            rgb = self.generator.code_to_rgb(code)
+        for code, rgb in zip(codes, rgbs):
             rgb_int = (
                 max(0, min(255, int(round(rgb[0])))),
                 max(0, min(255, int(round(rgb[1])))),
@@ -100,21 +123,9 @@ class FilamentPreviewService:
 
         color_matrix.sort(key=lambda e: (e["_hue"], e["_light"]))
 
-        # Apply pagination if requested
+        # Pagination was applied when generating the code slice above.
         is_paginated = page is not None and page_size is not None
-        if is_paginated:
-            total_pages = max(1, int(np.ceil(num_combos / page_size)))
-            if page > total_pages:
-                raise ValueError(
-                    f"Page {page} is out of range. Total pages: {total_pages} "
-                    f"({num_combos} combinations, page_size={page_size})."
-                )
-            else:
-                start = (page - 1) * page_size
-                end = start + page_size
-                page_matrix = color_matrix[start:end]
-        else:
-            page_matrix = color_matrix
+        page_matrix = color_matrix
 
         # Render grid image for the current page's entries. Swatches are viewed
         # at display resolution, so shrink cells instead of emitting

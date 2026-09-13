@@ -728,7 +728,7 @@ class TestTransmissionRateZeroDivision:
         from core.blend_color import Color
 
         # Should not raise ZeroDivisionError
-        rate = Color.get_transmission_rate(d=0.08, td=0, alpha=23)
+        rate = Color.get_transmission_rate(d=0.08, td=0)
         # td=0 means fully opaque, transmission rate should be 0.0
         assert rate == 0.0, (
             f"BUG QA-20: Expected transmission rate 0.0 for td=0 "

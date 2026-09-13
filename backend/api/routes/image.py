@@ -154,27 +154,15 @@ async def api_process_image(
     from services.matrix_cache import get_cached_matrices, set_cached_matrices
     from services.stl_generator import compute_reference_matrices
     from core.color_materials import Color
-    
-    # Check if we're using a preset (can be cached)
-    preset_name = parsed_preset
-    
-    # Try cache first for preset configurations
-    cached = get_cached_matrices(preset_name, layerCount, layerHeight)
-    if cached is not None:
-        ref_code_matrix, ref_rgb_matrix = cached
-    else:
-        # Compute matrices
-        ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-            layerCount,
-            layerHeight,
-            colors,
-        )
-        # Cache for preset configurations
-        if preset_name is not None:
-            set_cached_matrices(
-                preset_name, layerCount, layerHeight,
-                ref_code_matrix, ref_rgb_matrix
-            )
+
+    # compute_reference_matrices serves every caller through the
+    # content-keyed matrix cache.
+    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
+        layerCount,
+        layerHeight,
+        colors,
+        n_targets=len(vector_results),
+    )
 
     # Render segmentation image: show quantized colors (BEFORE mapping) with vector outlines
     # This shows the original quantized colors, not the printable blend colors

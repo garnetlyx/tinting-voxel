@@ -12,8 +12,6 @@
   "colorLayers": "Color Layers:",
   "layerHeight": "Layer Height:",
   "allTransparentNote": "All filaments classify as transparent — default layer height set to 0.84 mm (3 × 0.28 mm print layers).",
-  "transparentTdThreshold": "Transparent TD threshold:",
-  "transparentTdThresholdHelp": "A filament counts as transparent when its neutral transmission distance (TD1S strand measurement; falls back to the configured TD) meets this threshold. Only all-transparent sets raise the default layer height.",
   "detailSizeNozzleLineWidth": "Detail Size (Nozzle Line Width):",
   "pixelSize": "Pixel Size:",
   "maxDimensionWidthOrHeight": "Max Dimension (Width or Height)",

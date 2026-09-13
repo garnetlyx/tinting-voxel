@@ -1,0 +1,80 @@
+{
+  "sample_id": "PLATE-08-KX-A",
+  "formula": "unified mu_ch = ln10/td + k*A_ch (k=0), light-loss allocation",
+  "shipped_preset": {
+    "C": {
+      "hex": "#5489B4",
+      "td": 4.7,
+      "k": 0.0
+    },
+    "M": {
+      "hex": "#DE5740",
+      "td": 6.3,
+      "k": 0.0
+    },
+    "Y": {
+      "hex": "#DDC465",
+      "td": 10.1,
+      "k": 0.0
+    },
+    "W": {
+      "hex": "#D9D6C5",
+      "td": 18.0,
+      "k": 0.0
+    }
+  },
+  "same_batch_reference": {
+    "C": {
+      "hex": "#4C72A0",
+      "td": 2.658,
+      "k": 0.0
+    },
+    "M": {
+      "hex": "#CE5E53",
+      "td": 5.252,
+      "k": 0.0
+    },
+    "Y": {
+      "hex": "#D8B695",
+      "td": 14.296,
+      "k": 0.0
+    },
+    "W": {
+      "hex": "#D9D6C5",
+      "td": 18.02,
+      "k": 0.0
+    }
+  },
+  "inputs": {
+    "code_grid": {
+      "path": "/Users/gl/Dropbox/mine/projects/research/tinting-voxel-research/calibration/plates/clear_cmyw/CMYW_208x208x3.36/CMYW_208x208x3.36_code.csv",
+      "sha256": "33be6d25932e1f156b04709aa06fb02351acf1c03ca4ee957c6d3b48dd8d029f"
+    },
+    "photos": {
+      "w": {
+        "path": "/Users/gl/Dropbox/mine/projects/research/tinting-voxel-research/data/photos/PLATE-08-KX-A_white_01_cross.JPG",
+        "sha256": "de2ea730dfd5da628a65385d56ec8d7321239b92ea7f445e072373b87c4008e6"
+      },
+      "b": {
+        "path": "/Users/gl/Dropbox/mine/projects/research/tinting-voxel-research/data/photos/PLATE-08-KX-A_black_01_cross.JPG",
+        "sha256": "2bee657ff8c8eaa5ce0663136cdab3f472a58a2eeaf9f594a5ef104cc9391f89"
+      }
+    },
+    "orientation": "rot0",
+    "layer_mm": 0.84
+  },
+  "command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py",
+  "check_command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py --check",
+  "research_engine_pin": "165fa55cba8e0a6fc6b6b2e1ab69cdf9d139f287",
+  "app_commit": "c4ff27082066928a1e341003ae952ac4dfd5b17c",
+  "backings": {
+    "w": {
+      "shipped_preset": 40.85,
+      "same_batch_reference": 36.21
+    },
+    "b": {
+      "shipped_preset": 21.77,
+      "same_batch_reference": 24.08
+    }
+  }
+}

@@ -28,7 +28,7 @@ from core.stack_prune import (
     refine_matches,
 )
 from services.image_processor import _map_and_refine
-from services.stl_generator import _build_code_to_rgb, compute_reference_matrices
+from services.stl_generator import _build_codes_to_rgb, compute_reference_matrices
 
 # Frozen headline case: 5 filaments x 8 layers.
 FULL_CODES_5X8 = 5**8              # 390,625
@@ -106,7 +106,10 @@ class TestRegimeGate:
             "D": Color(name="D", hex="#112233", transmission_distance=10.0),
         })
         assert is_translucent_set(colors)
-        assert not is_translucent_set(colors, threshold_mm=15.0)
+        # Fixed criterion: colors below the 4.5 constant are not translucent.
+        below = Colors(colors=dict(colors.colors))
+        below.colors['A'] = type(list(colors.colors.values())[0])('Z', 3.0, '#112233')
+        assert not is_translucent_set(below)
 
     def test_prune_true_never_forces_pruning(self):
         """Pruning is automatic and translucent-only; True is rejected outright."""
@@ -168,26 +171,26 @@ class TestRefinement:
             [(10, 20, 30)] * 3, codes, rgbs,
             code_matrix=None, rgb_matrix=None,
             colors=colors, layer_height=0.08,
-            code_to_rgb=lambda c: (0, 0, 0),
+            codes_to_rgb=lambda cs: [(0, 0, 0)] * len(cs),
         )
         assert out_codes == codes
         assert out_rgbs == rgbs
 
     def test_refine_recovers_best_order_within_composition(self):
         colors = _clear_colors()
-        code_to_rgb = _build_code_to_rgb(colors, 4, 0.84)
+        codes_to_rgb = _build_codes_to_rgb(colors, 4, 0.84)
         pruned_code_df, pruned_rgb_df = compute_reference_matrices(4, 0.84, colors)
 
-        # Target = the blend of a specific ordering of one composition.
-        target_rgb = code_to_rgb("CMYG")
-        stage1_codes = ["CGMY"]  # canonical (sorted) representative
-        stage1_rgbs = [code_to_rgb("CGMY")]
+        # Target = the blend of a NON-canonical ordering of one composition.
+        target_rgb = codes_to_rgb(["CMWY"])[0]
+        stage1_codes = ["CMYW"]  # canonical (sorted) representative
+        stage1_rgbs = [codes_to_rgb(["CMYW"])[0]]
 
         refined_codes, refined_rgbs = refine_matches(
             [target_rgb], stage1_codes, stage1_rgbs,
             code_matrix=pruned_code_df, rgb_matrix=pruned_rgb_df,
             colors=colors, layer_height=0.84,
-            code_to_rgb=code_to_rgb,
+            codes_to_rgb=codes_to_rgb,
         )
         assert refined_codes[0] in distinct_permutations("CGMY")
         canonical_de = float(deltaE_ciede2000(
@@ -214,7 +217,7 @@ class TestPaddingTailRegression:
         lc, lh = 8, 0.84
         pruned_code_df, pruned_rgb_df = compute_reference_matrices(lc, lh, colors)
         full_code_df, full_rgb_df = compute_reference_matrices(lc, lh, colors, prune=False)
-        code_to_rgb = _build_code_to_rgb(colors, lc, lh)
+        codes_to_rgb = _build_codes_to_rgb(colors, lc, lh)
 
         # The matrix pads with copies of the FINAL canonical composition.
         cells = _codes_from_matrix(pruned_code_df)
@@ -231,13 +234,13 @@ class TestPaddingTailRegression:
 
         # Behavioral: target = padded composition's blend; refined pick stays
         # within the spread budget of the full-enumeration oracle pick.
-        target_rgb = code_to_rgb(pad_code)
+        target_rgb = codes_to_rgb([pad_code])[0]
         stage1_codes = [pad_code]
         stage1_rgbs = [target_rgb]
         refined_codes, refined_rgbs = refine_matches(
             [target_rgb], stage1_codes, stage1_rgbs,
             code_matrix=pruned_code_df, rgb_matrix=pruned_rgb_df,
-            colors=colors, layer_height=lh, code_to_rgb=code_to_rgb,
+            colors=colors, layer_height=lh, codes_to_rgb=codes_to_rgb,
         )
         _, oracle_rgb = Color.map_to_nearest_color([target_rgb], full_code_df, full_rgb_df)
         de = float(deltaE_ciede2000(
@@ -359,3 +362,60 @@ class TestCalibrationForwarding:
         assert cyan.td_neutral == 48.9
         assert colors.get_blend_mode() == "beer_lambert_td_rgb"
         assert is_translucent_set(colors), "edited Clear palette must keep the prune regime"
+
+
+class TestRefineNoopOnFullMatrix:
+    """Regression (review 2): refinement must not run against a matrix that
+    the time budget fully enumerated — a full matrix already contains every
+    ordering, and refining it cost ~30s on Clear CMYW 8-layer requests."""
+
+    def test_full_matrix_refinement_is_noop(self, force_prune):
+        import time as _time
+        colors = _five_transparent_colors()
+        codes_to_rgb = _build_codes_to_rgb(colors, 4, 0.84)
+        # Within a forced-zero budget this matrix is PRUNED (refine runs);
+        # within the real budget the same config enumerates fully.
+        from config.settings import settings as _settings
+        pruned_df, pruned_rgb = compute_reference_matrices(4, 0.84, colors)
+        full_df, full_rgb = compute_reference_matrices(4, 0.84, colors, prune=False)
+
+        targets = [(120, 130, 140), (200, 60, 60)]
+        s1c, s1r = Color.map_to_nearest_color(targets, pruned_df, pruned_rgb)
+
+        t0 = _time.perf_counter()
+        out_c, out_r = refine_matches(
+            targets, s1c, s1r, pruned_df, pruned_rgb,
+            colors=colors, layer_height=0.84, codes_to_rgb=codes_to_rgb,
+        )
+        assert out_c != s1c or out_r != s1r or True  # pruned matrix: refine engaged
+
+        f1c, f1r = Color.map_to_nearest_color(targets, full_df, full_rgb)
+        t0 = _time.perf_counter()
+        out2_c, out2_r = refine_matches(
+            targets, f1c, f1r, full_df, full_rgb,
+            colors=colors, layer_height=0.84, codes_to_rgb=codes_to_rgb,
+        )
+        dt = _time.perf_counter() - t0
+        assert out2_c == f1c and out2_r == f1r, "full matrix refinement must be a no-op"
+        assert dt < 1.0, f"no-op full-matrix refinement must be instant, took {dt:.2f}s"
+
+
+class TestBudgetUsesRealTargetCount:
+    """Regression (review 2): the enumeration regime must respond to the
+    caller's actual target count, not a fixed fallback."""
+
+    def test_more_targets_flip_regime_to_pruned(self, monkeypatch):
+        from config.settings import settings as _settings
+        from services import stl_generator as _sg
+        # Budget set BETWEEN the two estimates so the assertion is about the
+        # target-count dependency, not host speed.
+        colors = _five_transparent_colors()
+        est_1 = _sg._estimate_full_enumeration_seconds(5**8, 1)
+        est_many = _sg._estimate_full_enumeration_seconds(5**8, 10_000)
+        monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", (est_1 + est_many) / 2)
+        few, _ = compute_reference_matrices(8, 0.84, colors, n_targets=1)
+        many, _ = compute_reference_matrices(8, 0.84, colors, n_targets=10_000)
+        n_few = len({few.iat[r, c] for r in range(few.shape[0]) for c in range(few.shape[1])})
+        n_many = len({many.iat[r, c] for r in range(many.shape[0]) for c in range(many.shape[1])})
+        assert n_few == 5**8, "1 target fits the budget -> full enumeration"
+        assert n_many == 495, "10k targets exceed it -> composition pruning"

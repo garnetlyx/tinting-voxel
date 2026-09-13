@@ -66,6 +66,7 @@ def generate_print_settings(
                 "name": color['name'],
                 "color": color['hex'],
                 "transmission_distance": color['transmission_distance'],
+                "k": color.get('k', 0.0),
             })
         except KeyError as e:
             raise ValueError(f"Missing required filament color key: {e}")

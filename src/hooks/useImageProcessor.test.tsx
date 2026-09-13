@@ -146,8 +146,8 @@ describe('useImageProcessor', () => {
   it('raises the default layer height only when every filament classifies as transparent', () => {
     const { result } = renderHook(() => useImageProcessor());
 
-    // Clear preset: every TD1S neutral TD >= 6.7 -> transparent default 0.84.
-    act(() => { result.current.loadPreset('clear_cmywg'); });
+    // Clear preset: every td >= 4.5 -> transparent default 0.84.
+    act(() => { result.current.loadPreset('clear_cmyw'); });
     expect(result.current.allTransparent).toBe(true);
     expect(result.current.layerHeight).toBe(0.84);
 
@@ -170,16 +170,15 @@ describe('useImageProcessor', () => {
     expect(result.current.layerHeight).toBe(0.3);
   });
 
-  it('reclassifies when the user adjusts the transparency threshold', () => {
+  it('classifies by the fixed threshold: clear transparent, bambu opaque', () => {
     const { result } = renderHook(() => useImageProcessor());
 
-    act(() => { result.current.loadPreset('clear_cmywg'); });
+    act(() => { result.current.loadPreset('clear_cmyw'); });
+    expect(result.current.allTransparent).toBe(true);
     expect(result.current.layerHeight).toBe(0.84);
 
-    // Raising the threshold past grey (7.3) makes the clear set non-transparent.
-    act(() => { result.current.setTransparentTdThreshold(50); });
+    act(() => { result.current.loadPreset('bambu_cmywk_phase6'); });
     expect(result.current.allTransparent).toBe(false);
-    expect(result.current.layerHeight).toBe(0.08);
   });
 
   it('sends filament config and layer settings when processing an image', async () => {
@@ -409,12 +408,9 @@ describe('useImageProcessor', () => {
     });
 
     expect(result.current.filamentColors).toHaveLength(5);
-    // Regression: a custom color without inherited alpha mixed 8.08 with the
-    // backend default 12.0 and crashed blending with a shared-alpha error.
+    // New colors default to plain Beer-Lambert — no silent k inheritance.
     const added = result.current.filamentColors[4];
-    expect(added.alpha).toBe(8.08);
-    expect(added.td_scale).toBe(1.48);
-    expect(added.td_gamma).toBe(0.20);
+    expect(added.k).toBeUndefined();
   });
 
   it('preserves calibrated material parameters when editing a calibrated preset', async () => {

@@ -42,7 +42,6 @@ describe('ParameterPanel', () => {
     onReprocess: vi.fn(),
     processing: false,
     hasImage: true,
-    transparentTdThreshold: 6.7,
     allTransparent: false,
     onTransparentTdThresholdChange: vi.fn(),
   };

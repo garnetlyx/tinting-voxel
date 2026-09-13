@@ -114,7 +114,7 @@ def generate_3mf(
 
     # Compute reference matrices locally (thread-safe)
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-        layer_count, layer_height, colors
+        layer_count, layer_height, colors, n_targets=len(color_blocks)
     )
 
     # Initialize per-color mesh arrays
@@ -274,7 +274,7 @@ def generate_svg_3mf(
                 )
 
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-        layer_count, layer_height, colors
+        layer_count, layer_height, colors, n_targets=len(vector_results)
     )
 
     labels = colors.get_labels()

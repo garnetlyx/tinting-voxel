@@ -133,22 +133,19 @@ export const LAYER_HEIGHT_MIN_MM = 0.08;
 export const LAYER_HEIGHT_MAX_MM = 0.84;
 export const DEFAULT_LAYER_HEIGHT_MM = 0.08;
 export const TRANSPARENT_LAYER_HEIGHT_MM = 0.84;
-// Default transparency threshold from TD1S strand measurements: highest
-// opaque filament TD1S is White 6.1, lowest transparent is Panchroma grey 7.3;
-// 6.7 is their midpoint and separates all measured data with margin.
-export const DEFAULT_TRANSPARENT_TD_THRESHOLD_MM = 6.7;
+// Transparency threshold (mm) on the stored td scale — the same number the
+// backend prune gate uses (core/stack_prune.py TRANSPARENT_TD_THRESHOLD_MM).
+// A literal constant, not user-adjustable: it is a property of the
+// calibrated data gap (bambu folded 0.27-0.61 vs clear means 4.7-18.0).
+export const TRANSPARENT_TD_THRESHOLD_MM = 4.5;
 
 /**
- * A filament set counts as transparent when every filament's neutral TD
- * (td_neutral when measured, else the config transmission distance) meets the
- * threshold. Drives the layer-height default; never gates user input.
+ * A filament set counts as transparent when every filament's td meets the
+ * fixed threshold. Drives the layer-height default; never gates user input.
  */
-export function isAllTransparentFilaments(
-  colors: FilamentColorConfig[],
-  thresholdMm: number,
-): boolean {
+export function isAllTransparentFilaments(colors: FilamentColorConfig[]): boolean {
   if (colors.length === 0) return false;
-  return colors.every(c => (c.td_neutral ?? c.transmission_distance) >= thresholdMm);
+  return colors.every(c => c.transmission_distance >= TRANSPARENT_TD_THRESHOLD_MM);
 }
 
 export interface FilamentPresetInfo {

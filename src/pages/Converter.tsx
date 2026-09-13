@@ -91,8 +91,6 @@ const Converter: React.FC = () => {
     setMinArea,
     setNumColors,
     setLayerHeight,
-    transparentTdThreshold,
-    setTransparentTdThreshold,
     allTransparent,
     setLayerCount,
     setPixelSize,
@@ -185,9 +183,7 @@ const Converter: React.FC = () => {
                   maxLayerCount={maxLayerCount}
                   pixelSize={pixelSize}
                   onLayerHeightChange={setLayerHeight}
-                  transparentTdThreshold={transparentTdThreshold}
                   allTransparent={allTransparent}
-                  onTransparentTdThresholdChange={setTransparentTdThreshold}
                   onLayerCountChange={setLayerCount}
                   onPixelSizeChange={setPixelSize}
                   detailSize={detailSize}

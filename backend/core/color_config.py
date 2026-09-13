@@ -209,60 +209,22 @@ BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
     ),
 ]
 
-# Clear filament parameters from staircase calibration.
-# Source: tinting-voxel-research repo (staircase-KX-B-default and PLATE-07 cross-validation).
-# Hex = WB-corrected thickest-step measured color:
-#   Cyan: #5489B4 (Ziro Light Cyan Clear)
-#   Magenta: #DE5740 (iSANMATE Light Pink)
-#   Yellow: #DDC465 (Sunlu Transparent Yellow)
-#   White: #D9D6C5 (Kingroon Transparent PLA)
-#   Grey: #9A9D9C (Panchroma Translucent Grey)
-CLEAR_CMYWG_PRESET: List[ColorConfig] = [
-    ColorConfig(
-        name="Cyan",
-        hex="#5489B4",
-        transmission_distance=4.7,
-        td_neutral=48.9,
-        alpha=12.0,
-        k=1.93,
-        td_rgb=(1.04, 4.66, 8.30),
-    ),  # Ziro Light Cyan Clear
-    ColorConfig(
-        name="Magenta",
-        hex="#DE5740",
-        transmission_distance=6.3,
-        td_neutral=100.0,
-        alpha=12.0,
-        k=1.44,
-        td_rgb=(12.87, 2.39, 3.70),
-    ),  # iSANMATE Light Pink
-    ColorConfig(
-        name="Yellow",
-        hex="#DDC465",
-        transmission_distance=10.1,
-        td_neutral=100.0,
-        alpha=12.0,
-        k=0.67,
-        td_rgb=(15.13, 12.29, 2.81),
-    ),  # Sunlu Transparent Yellow
-    ColorConfig(
-        name="White",
-        hex="#D9D6C5",
-        transmission_distance=18.0,
-        td_neutral=100.0,
-        alpha=12.0,
-        k=0.11,
-        td_rgb=(17.95, 18.90, 17.21),
-    ),  # Kingroon Transparent PLA
-    ColorConfig(
-        name="Grey",
-        hex="#9A9D9C",
-        transmission_distance=1.7,
-        td_neutral=7.3,
-        alpha=12.0,
-        k=10.0,
-        td_rgb=(2.23, 1.69, 1.19),
-    ),  # Panchroma Translucent Grey
+# Clear CMYW preset (stained-glass track), FROZEN to the deployed values
+# (acda338): hex from the production preset lineage, td = arithmetic mean of
+# the staircase-measured per-channel TDs (per-channel originals live in the
+# research repo — e.g. Ziro cyan (1.04, 4.66, 8.30) -> 4.7). k = 0: the
+# staircase round-trip measurement already accounts for all attenuation.
+# Grey is deliberately not part of this preset (physically opaque;
+# brand-name "translucent" not withstanding). The PLATE-08 certification
+# (backend/certification/) records both this shipped preset and the
+# same-batch staircase-hex reference for comparison.
+#   Cyan: #5489B4 td 4.7 | Magenta: #DE5740 td 6.3
+#   Yellow: #DDC465 td 10.1 | White: #D9D6C5 td 18.0
+CLEAR_CMYW_PRESET: List[ColorConfig] = [
+    ColorConfig(name="Cyan",    hex="#5489B4", transmission_distance=4.7,  k=0.0),
+    ColorConfig(name="Magenta", hex="#DE5740", transmission_distance=6.3,  k=0.0),
+    ColorConfig(name="Yellow",  hex="#DDC465", transmission_distance=10.1, k=0.0),
+    ColorConfig(name="White",   hex="#D9D6C5", transmission_distance=18.0, k=0.0),
 ]
 
 PRESETS = {

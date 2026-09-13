@@ -176,11 +176,12 @@ class Color:
         return rate
 
     @staticmethod
-    def get_transmission_rate(d, td, alpha=12):
+    def get_transmission_rate(d, td):
+        """Single-layer transmission under the unified base-10 convention:
+        t = 10^(-d/td). Non-positive td means fully opaque."""
         if td <= 0:
             return 0.0
-        x = alpha * d / td
-        return np.exp(-x)
+        return float(10.0 ** (-d / td))
 
     @staticmethod
     def get_lab(rgb):
@@ -255,17 +256,10 @@ class Color:
 
     @staticmethod
     def map_to_nearest_color(input_colors, reference_code, reference_rgb, weights=None):
-        ref_colors = []
-        ref_blend_codes = []
-
-        for r_idx in range(reference_code.shape[0]):
-            for c_idx in range(reference_code.shape[1]):
-                code = reference_code.iat[r_idx, c_idx]
-                rgb = reference_rgb.iat[r_idx, c_idx]
-                ref_colors.append(rgb)
-                ref_blend_codes.append(code)
-
-        ref_colors = np.array(ref_colors) / 255.0
+        # Vectorized extraction: iterating 800k+ pandas cells with .iat costs
+        # seconds on full-enumeration matrices; flattened arrays are equivalent.
+        ref_blend_codes = list(reference_code.values.flatten())
+        ref_colors = np.array(list(reference_rgb.values.flatten())) / 255.0
         ref_lab = rgb2lab(ref_colors.reshape(-1, 1, 3)).reshape(-1, 3)
 
         inp = np.array(input_colors) / 255.0
