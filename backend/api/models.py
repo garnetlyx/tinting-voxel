@@ -4,7 +4,7 @@ Pydantic models for API request and response validation
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ProcessingMode(str, Enum):
@@ -14,7 +14,14 @@ class ProcessingMode(str, Enum):
 
 
 class FilamentColorConfig(BaseModel):
-    """Configuration for a single filament color."""
+    """Configuration for a single filament color: name, hex, td, optional k.
+
+    Removed calibration fields (alpha, k_rgb, td_rgb, td_neutral, td_scale,
+    td_gamma) are forbidden — silently discarding them would give obsolete
+    clients quietly changed optical behavior.
+    """
+
+    model_config = ConfigDict(extra="forbid")
     name: str = Field(..., min_length=1, max_length=200, description="Display name for the color")
     hex: str = Field(..., description="Hex color code (e.g., '#00FFFF')")
     transmission_distance: float = Field(

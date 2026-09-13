@@ -344,7 +344,7 @@ def generate_svg_stl_zip(
 
     # Compute reference matrices locally (thread-safe)
     ref_code_matrix, ref_rgb_matrix = stl_generator.compute_reference_matrices(
-        layer_count, layer_height, active_colors
+        layer_count, layer_height, active_colors, n_targets=len(vector_results)
     )
 
     # Initialize mesh map for each primary color dynamically

@@ -100,8 +100,8 @@ tinting-voxel/
 │   │       ├── bug_report.py  # In-app bug reports
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
-│   │   ├── blend_color.py        # Color blending (Original/Kromacut/Hybrid/Per-channel modes)
-│   │   ├── blend_models.py       # Pluggable blend functions (hybrid_per_color_k, per_channel_k)
+│   │   ├── blend_color.py        # Color blending (BlendTestGenerator, colors_key)
+│   │   ├── blend_models.py       # The unified blend formula + vectorized batch path
 │   │   ├── color_config.py       # Filament presets single source of truth (Phase6 preset)
 │   │   ├── color_materials.py    # Material property definitions (k_rgb support)
 │   │   ├── code_grid.py          # Code grid generation utilities
@@ -163,8 +163,8 @@ tinting-voxel/
 | **SVG-STLGenerator** | Vector-based STL generation from SVG contours | numpy-stl, svg.path |
 | **3MFGenerator** | 3MF file generation with named color objects | trimesh, lxml |
 | **MeshOptimizer** | Greedy meshing to reduce box count, face culling | NumPy |
-| **BlendColor (core)** | Color blending (Original/Hybrid/per-color-k modes), CIEDE2000 matching | scikit-image, NumPy |
-| **BlendModels** | Pluggable blend functions (hybrid_per_color_k, hybrid_per_channel_k) | NumPy |
+| **BlendColor (core)** | BlendTestGenerator, colors_key, CIEDE2000 matching | scikit-image, NumPy |
+| **BlendModels** | The unified formula (mu_ch = ln10/td + k*A_ch) and its vectorized batch | NumPy |
 | **ColorConfig** | Filament presets (BAMBU_CMYW_PHASE6_PRESET with per-color k) | dataclasses |
 | **FilamentPreview** | Color matrix preview generation | PIL, NumPy |
 | **BatchProcessor** | Multi-image batch processing | concurrent.futures |
@@ -416,31 +416,30 @@ requests. `npm test` and `npm run build` validate this boundary.
 
 ### 1. Hybrid Per-Color k Color Mixing
 
-The production color mixing model uses a hybrid Beer-Lambert formula with per-color scattering coefficients (simplified Kubelka-Munk):
+The production color mixing model is ONE formula for every filament
+(transparent or opaque, preset or custom):
 
 ```
-T_ch(c) = exp(-(scatter_alpha / td_c  +  k_c × A_ch(c)) × d)
+mu_ch(color) = ln(10) / td + k × A_ch(color)
+T_ch         = exp(-mu_ch × d)
 
 Where:
-- T_ch    = per-channel transmission
-- scatter_alpha / td_c = base scattering (channel-neutral, handles White/Black)
-- k_c     = per-color scattering coefficient (Phase 6 calibrated)
-- A_ch(c) = per-channel absorption from filament hex color
+- td      = the filament's single composite transmission distance (mm),
+            broadcast across channels. bambu presets hold the exact fold of
+            the Phase-6 fitted scatter (ln10 × 1.48 × td_td1s^0.20 / 8.08);
+            the clear preset holds staircase-measured means; user-entered
+            values apply literally (base-10: t = 10^(-d/td)).
+- k       = optional pigment absorption gain (default 0 = plain Beer-Lambert)
+- A_ch    = per-channel absorption from the filament hex
 - d       = layer height (mm)
 ```
 
-Phase 6 CMYW calibrated values (W > M > C > Y scattering order):
+Stacked colors compose through the light-loss allocation (paper Eqs. 4-8).
+The Phase-6 fitted k values (K 17.65 > W 12.39 > M 8.42 > C 8.13 > Y 3.73)
+survive verbatim; the retired scatter-alpha/td-remap parameters exist only
+as the folded td numbers above.
 
-| Color | k | Raw transmission distance (mm) |
-|-------|---|---|
-| W (White) | 12.39 | 6.1 |
-| M (Magenta) | 8.42 | 2.9 |
-| C (Cyan) | 8.13 | 2.0 |
-| Y (Yellow) | 3.73 | 5.0 |
-
-All four colors use alpha 8.08 and TD mapping `1.48 * td ** 0.20`.
-
-Implementation: `blend_models.py:blend_hybrid_per_color_k()`, preset: `BAMBU_CMYW_PHASE6_PRESET`.
+Implementation: `blend_models.py` (unified formula + vectorized batch), presets: `core/color_config.py`.
 
 ### 2. Greedy Meshing
 

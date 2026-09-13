@@ -91,6 +91,7 @@ def _map_source_colors_to_blends(
         layer_count,
         layer_height,
         colors,
+        n_targets=len(source_colors),
     )
     return _map_and_refine(
         source_colors, ref_code_matrix, ref_rgb_matrix, colors, layer_count, layer_height,

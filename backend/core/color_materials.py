@@ -121,11 +121,12 @@ class Color:
         return rate
 
     @staticmethod
-    def get_transmission_rate(d, td, alpha=12):
+    def get_transmission_rate(d, td):
+        """Single-layer transmission under the unified base-10 convention:
+        t = 10^(-d/td). Non-positive td means fully opaque."""
         if td <= 0:
             return 0.0
-        x = alpha * d / td
-        return np.exp(-x)
+        return float(10.0 ** (-d / td))
 
     @staticmethod
     def get_lab(rgb):

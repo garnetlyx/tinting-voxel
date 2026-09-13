@@ -147,7 +147,7 @@ def compute_reference_matrices(
     # Serve every caller (process, downloads, batch) through the content-keyed
     # matrix cache: the key covers everything below that influences the output.
     from services.matrix_cache import get_cached_matrices, set_cached_matrices
-    cached = get_cached_matrices(colors, layer_count, layer_height, prune=prune)
+    cached = get_cached_matrices(colors, layer_count, layer_height, prune=prune, n_targets=n_targets)
     if cached is not None:
         return cached
 
@@ -234,7 +234,7 @@ def compute_reference_matrices(
         len(items), len(code_list),
         " (composition-pruned)" if use_prune else "",
     )
-    set_cached_matrices(colors, layer_count, layer_height, code_df, rgb_df, prune=prune)
+    set_cached_matrices(colors, layer_count, layer_height, code_df, rgb_df, prune=prune, n_targets=n_targets)
     return code_df, rgb_df
 
 
@@ -249,12 +249,13 @@ def map_color_blocks_to_blend_results(
 
     Uses the same reference matrices and LAB nearest-neighbor matching as STL export.
     """
+    input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
         layer_count,
         layer_height,
         colors,
+        n_targets=len(input_colors),
     )
-    input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
     result_codes, result_rgbs = Color.map_to_nearest_color(
         input_colors,
         ref_code_matrix,
@@ -584,33 +585,6 @@ def _find_white_label(colors: Colors) -> Optional[str]:
             return label
     return None
 
-
-def _calculate_white_layers(unique_codes, layer_height, colors, alpha=12.0):
-    """Return 0-5 white backing layers based on maximum transmittance.
-
-    Calculates the maximum light remaining after passing through the optical
-    stack for all unique blend codes. More transparent stacks need thicker
-    white backing to provide adequate reflection.
-
-    Args:
-        unique_codes: set of blend code strings, e.g. {"WWWW", "CCWW"}
-        layer_height: layer height in mm
-        colors: Colors instance with filament definitions
-        alpha: absorption coefficient for Beer-Lambert model
-
-    Returns:
-        Number of white backing layers (0-5)
-    """
-    max_remain = 0.0
-    for code in unique_codes:
-        remain = 1.0
-        for c in code:
-            remain *= Color.get_transmission_rate(layer_height, colors[c].td, alpha)
-        if remain > max_remain:
-            max_remain = remain
-    if max_remain < 0.01:
-        return 0
-    return max(1, int(max_remain * 5 + 0.5))
 
 
 def get_filename_prefix(colors: Colors) -> str:

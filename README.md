@@ -4,7 +4,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 
 ## Features
 
-- **Scientific Color Mixing** - Beer-Lambert optical model (hybrid per-channel-k) for accurate transparent filament color blending
+- **Scientific Color Mixing** - one unified Beer-Lambert optical model (`t = exp(-(ln10/td + k·A_ch)·d)`, light-loss allocation) for every filament, transparent or opaque
 - **N-Color Support (4–16 colors)** - Arbitrary color codes with custom hex values and per-color transmission/scattering parameters
 - **Multiple Output Formats** - STL ZIP, SVG-STL, **3MF** (with named color objects), SVG-3MF, CSV, and slicer print-settings JSON
 - **Batch Processing** - Process up to 20 images in one run
@@ -207,7 +207,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ## Calibration
 
-Beer-Lambert parameters (`alpha`, `td`, per-color `k`) in the filament presets are fitted offline against photos of printed test plates. Fitted values are promoted into presets in `backend/core/color_config.py` here.
+Each filament preset carries `hex`, a single composite `td` (transmission distance, mm — bambu presets hold the exact fold of the Phase-6 fitted scatter; the clear preset holds staircase-measured means), and an optional `k` (pigment absorption gain, 0 = plain Beer-Lambert). Calibration is fitted offline against photos of printed test plates in the research repo and promoted into `backend/core/color_config.py` here.
 
 The forward model, the staircase / dual-backing measurement procedure, and the validation behind these presets are published as a preprint:
 
