@@ -37,34 +37,32 @@ MAX_PERMS_PER_COMPOSITION = 8192
 
 # Stage-2 candidate pool: compositions whose representative ranks within this
 # ΔE00 margin of the best representative, by either the production metric or
-# raw CIEDE2000. The raw-CIEDE2000 channel guards against the production
-# metric's dark-chromatic hue penalty hiding such compositions.
-#
-# Retuned for the corrected per-channel blend (the reference-matrix cache key
-# previously dropped td_rgb, so production blended with scalar-td fallback
-# and these budgets were calibrated against that behavior). Under the real
-# staircase TDs the intra-composition order spread is wider: a 5c x 8L sweep
-# against the full-enumeration oracle gives, at margin=48/cap=128,
-# reachable ΔE00 mean 0.27 / max 1.15 and plausible-target metric excess
-# max 2.20 / mean 0.10 (budgets 1.5 / 7.5 / 4.0 / 1.0). The previous
-# margin=16/cap=32 values measured excess 8.52 at 8 layers under the same
-# corrected blend.
-CANDIDATE_MARGIN_DELTA_E = 48.0
+# raw CIEDE2000. The margin covers the measured intra-composition order
+# spread (mean ~3, max ~6.4 at 8 layers) plus slack, so a composition whose
+# canonical ordering ranks poorly but whose other orderings win stays in the
+# pool. The raw-CIEDE2000 channel guards against the production metric's
+# dark-chromatic hue penalty hiding such compositions.
+CANDIDATE_MARGIN_DELTA_E = 16.0
 
 # Upper bound on compositions refined per input color.
-MAX_CANDIDATE_COMPOSITIONS = 128
+MAX_CANDIDATE_COMPOSITIONS = 32
 
 
 def is_translucent_set(
     colors: Colors,
     threshold_mm: Optional[float] = None,
+    require_measured_td: bool = False,
 ) -> bool:
-    """True when every filament's td meets the transparency threshold.
+    """True when every filament's neutral TD meets the transparency threshold.
 
-    Single standard: the stored td value, the same number blending uses.
-    Preset values: bambu (folded fits) sit at 0.27-0.61, clear (staircase
-    means) at 4.7-18.0; the 4.5 mm default sits in that gap, so the clear
-    CMYW preset classifies transparent and every bambu set opaque.
+    Uses the same td_neutral data and default threshold (6.7 mm) as the
+    frontend transparency classification. With ``require_measured_td=False``
+    (the classification default, which drives the frontend layer-height hint)
+    unmeasured colors fall back to their configured transmission distance.
+    With ``require_measured_td=True`` (the prune gate) every color must carry
+    a measured td_neutral: the prune's ΔE budget is validated only on
+    TD1S-measured transparent sets, so approximation stays confined to that
+    proven domain and everything else keeps exact full enumeration.
     """
     if threshold_mm is None:
         threshold_mm = settings.transparent_td_threshold
@@ -72,7 +70,10 @@ def is_translucent_set(
     if not items:
         return False
     for color in items:
-        td = color.td
+        td_neutral = getattr(color, "td_neutral", None)
+        if require_measured_td and td_neutral is None:
+            return False
+        td = td_neutral if td_neutral is not None else color.td
         if td is None or td < threshold_mm:
             return False
     return True
@@ -153,7 +154,7 @@ def refine_matches(
     perceptual metric as the production mapper. No-op for non-translucent
     sets, whose reference matrix already enumerates every ordering exactly.
     """
-    if not is_translucent_set(colors):
+    if not is_translucent_set(colors, require_measured_td=True):
         return stage1_codes, stage1_rgbs
 
     ref_codes = []

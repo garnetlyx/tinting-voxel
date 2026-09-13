@@ -1,4 +1,3 @@
-import pytest
 """
 Integration tests for the /api/v2 download endpoints.
 """
@@ -16,8 +15,8 @@ def test_get_filament_presets(client):
     assert response.status_code == 200
     data = response.json()
     assert "presets" in data
-    assert [p["name"] for p in data["presets"]] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmyw"]
-    assert [p["display_name"] for p in data["presets"]] == ["Bambu CMYWK", "Bambu CMYW", "Clear CMYW"]
+    assert [p["name"] for p in data["presets"]] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmywg"]
+    assert [p["display_name"] for p in data["presets"]] == ["Bambu CMYWK", "Bambu CMYW", "Clear CMYWG"]
 
 
 def test_get_filament_presets_exposes_calibrated_material_params(client):
@@ -32,8 +31,11 @@ def test_get_filament_presets_exposes_calibrated_material_params(client):
     )
     cyan = next(color for color in calibrated["colors"] if color["name"] == "Cyan")
 
-    assert cyan["transmission_distance"] == pytest.approx(0.48447574859816506)
-    assert cyan["k"] == 8.13
+    assert cyan["transmission_distance"] == 2.0
+    assert cyan["alpha"] > 0
+    assert cyan["k"] >= 0
+    assert cyan["td_scale"] > 0
+    assert cyan["td_gamma"] > 0
 
 
 def test_get_filament_presets_exposes_phase6_cmyw_material_params(client):
@@ -56,22 +58,49 @@ def test_get_colors_from_request_preserves_calibrated_custom_params():
         None,
         [
             FilamentColorConfig(
-                name="Cyan", hex="#3D79C6", transmission_distance=0.49, k=1.2,
+                name="Cyan",
+                hex="#3D79C6",
+                transmission_distance=2.0,
+                alpha=5.75,
+                k=1.2,
+                td_scale=1.01,
+                td_gamma=0.45,
             ),
             FilamentColorConfig(
-                name="Magenta", hex="#B3356E", transmission_distance=0.52, k=0.35,
+                name="Magenta",
+                hex="#B3356E",
+                transmission_distance=2.9,
+                alpha=5.75,
+                k=0.35,
+                td_scale=1.01,
+                td_gamma=0.45,
             ),
             FilamentColorConfig(
-                name="Yellow", hex="#FFE665", transmission_distance=0.58, k=8.4,
+                name="Yellow",
+                hex="#FFE665",
+                transmission_distance=5.0,
+                alpha=5.75,
+                k=8.4,
+                td_scale=1.01,
+                td_gamma=0.45,
             ),
             FilamentColorConfig(
-                name="White", hex="#FFFFFF", transmission_distance=0.61, k=6.5,
+                name="White",
+                hex="#FFFFFF",
+                transmission_distance=6.1,
+                alpha=5.75,
+                k=6.5,
+                td_scale=1.01,
+                td_gamma=0.45,
             ),
         ],
     )
 
+    assert colors.get_blend_mode() == "hybrid_per_color_k_td1s_gamma"
+    assert colors["C"].alpha == 5.75
     assert colors["C"].k == 1.2
-    assert colors["C"].td == 0.49
+    assert colors["C"].td_scale == 1.01
+    assert colors["C"].td_gamma == 0.45
 
 
 def test_v2_stl_with_default_colors(client, sample_color_blocks_with_hex):

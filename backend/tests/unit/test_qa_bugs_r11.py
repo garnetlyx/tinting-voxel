@@ -143,6 +143,34 @@ class TestQA112FilamentNameNoMaxLength:
 # This means the same (layer_height, transmission_distance) pair gives
 # different transmission rates depending on the code path.
 
+class TestQA113AlphaInconsistency:
+    """_code_to_rgb_cached uses alpha=23 but get_transmission_rate defaults to alpha=12."""
+
+    def test_code_to_rgb_alpha_matches_default(self):
+        """The alpha value used in code_to_rgb should match get_transmission_rate default."""
+        source = inspect.getsource(Color.get_transmission_rate)
+
+        # Extract default alpha from get_transmission_rate signature (handles 12 or 12.0)
+        # Pattern must account for optional type annotations like "alpha: float = 12.0"
+        match = re.search(r'alpha[^=\n]*=\s*(\d+(?:\.\d+)?)', source)
+        default_alpha = float(match.group(1)) if match else None
+
+        from core.blend_color import _code_to_rgb_cached
+        cached_source = inspect.getsource(_code_to_rgb_cached)
+
+        # Extract alpha from _code_to_rgb_cached signature (handles 12 or 12.0)
+        match2 = re.search(r'alpha[^=\n]*=\s*(\d+(?:\.\d+)?)', cached_source)
+        cached_alpha = float(match2.group(1)) if match2 else None
+
+        assert default_alpha == cached_alpha, (
+            f"BUG QA-113: Alpha inconsistency. "
+            f"Color.get_transmission_rate defaults to alpha={default_alpha}, "
+            f"but _code_to_rgb_cached uses alpha={cached_alpha}. "
+            f"This means code_to_rgb produces different optical blending results "
+            f"than direct get_transmission_rate calls with the same parameters."
+        )
+
+
 class TestQA115BatchNoCustomColors:
     """Batch download endpoint doesn't support custom filament colors."""
 

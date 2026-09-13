@@ -8,8 +8,11 @@ import pandas as pd
 from PIL import Image, ImageDraw
 
 from core.blend_models import (
+    _blend_hybrid,
+    _blend_hybrid_per_color,
+    _blend_kromacut,
+    _blend_per_channel,
     _code_to_rgb_cached,
-    codes_to_rgb_batch,
     clear_rgb_cache,
     rgb_cache_info,
 )
@@ -31,22 +34,6 @@ from core.plate_geometry import generate_box, merge_stl_meshes
 logger = logging.getLogger(__name__)
 
 
-def colors_key(colors) -> tuple:
-    """Content key covering every filament field that influences blending:
-    (label, td, hex, k). Used by the per-code LRU cache and the
-    reference-matrix cache, so any edited value yields a distinct key.
-    """
-    return tuple(
-        (
-            label,
-            colors.colors[label].td,
-            colors.colors[label].hex,
-            getattr(colors.colors[label], 'k', 0.0),
-        )
-        for label in colors.get_labels()
-    )
-
-
 class BlendTestGenerator:
     def __init__(
         self,
@@ -62,6 +49,8 @@ class BlendTestGenerator:
         verbose=True,
         directory="output",
         colors=None,
+        alpha: float = 12.0,
+        blend_mode: str = "original",
         custom_code_grid=None,
         grid_origin_x: float = 0.0,
         grid_origin_y: float = 0.0,
@@ -79,6 +68,8 @@ class BlendTestGenerator:
         self.layer_height = layer_height
         self.layer_count_max = layer_count_max
         self.colors = colors if colors is not None else Colors()
+        self.alpha = alpha
+        self.blend_mode = blend_mode
         self.reshape = rearrange_by_size
         self.same_height = same_height
         self.sort_color = sort_color
@@ -196,7 +187,19 @@ class BlendTestGenerator:
         return df_rgb, df_code
 
     def _color_key(self) -> tuple:
-        return colors_key(self.colors)
+        return tuple(
+            (
+                label,
+                self.colors[label].td,
+                self.colors[label].hex,
+                getattr(self.colors[label], 'k', 10.0),
+                getattr(self.colors[label], 'alpha', 12.0),
+                getattr(self.colors[label], 'td_scale', 1.0),
+                getattr(self.colors[label], 'td_gamma', 1.0),
+                getattr(self.colors[label], 'k_rgb', None),
+            )
+            for label in self.colors.get_labels()
+        )
 
     def code_to_rgb(self, code: str):
         if not code or not code.strip():
@@ -206,18 +209,8 @@ class BlendTestGenerator:
             code,
             self.layer_height,
             self._color_key(),
-        )
-
-    def codes_to_rgb(self, codes) -> list[tuple]:
-        """Blend many codes at once.
-
-        Hoists per-configuration invariants out of the loop and vectorizes
-        the unified blend formula; see blend_models.codes_to_rgb_batch.
-        """
-        return codes_to_rgb_batch(
-            codes,
-            self.layer_height,
-            self._color_key(),
+            self.alpha,
+            self.blend_mode,
         )
 
     def save_matrix_image(self, save_blank=True):

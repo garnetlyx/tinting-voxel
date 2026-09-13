@@ -23,11 +23,38 @@ class FilamentColorConfig(BaseModel):
         le=1000,
         description="Beer-Lambert transmission distance (opacity control)"
     )
+    alpha: float = Field(
+        12.0,
+        gt=0,
+        le=1000,
+        description="Global scatter/absorption alpha for calibrated blend modes"
+    )
     k: float = Field(
-        0.0,
+        10.0,
         ge=0,
         le=1000,
-        description="Optional pigment absorption gain; 0 blends as plain Beer-Lambert (t = 10^(-d/td))"
+        description="Per-color absorption gain for calibrated blend modes"
+    )
+    td_scale: float = Field(
+        1.0,
+        gt=0,
+        le=1000,
+        description="TD remap scale for calibrated blend modes"
+    )
+    td_gamma: float = Field(
+        1.0,
+        gt=0,
+        le=1000,
+        description="TD remap exponent for calibrated blend modes"
+    )
+    td_rgb: Optional[tuple[float, float, float]] = Field(
+        None,
+        description="Staircase-measured per-channel transmission distances (td_R, td_G, td_B), mm; selects the per_channel blend mode"
+    )
+    td_neutral: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Neutral (dye-free) transmission distance from TD1S strand measurement, mm; drives transparency classification"
     )
 
     @field_validator('name')
@@ -65,7 +92,7 @@ class FilamentPreset(str, Enum):
     """Available filament presets."""
     BAMBU_CMYWK_PHASE6 = "bambu_cmywk_phase6"
     BAMBU_CMYW_PHASE6 = "bambu_cmyw_phase6"
-    CLEAR_CMYW = "clear_cmyw"
+    CLEAR_CMYWG = "clear_cmywg"
 
 
 class PixelCoordinate(BaseModel):

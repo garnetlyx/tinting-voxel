@@ -40,13 +40,10 @@ class Settings(BaseSettings):
     default_max_colors: int = 10
     default_color_threshold: float = 50.0
 
-    # Transparency classification threshold (mm) on the stored td scale —
-    # the same number blending uses, one standard for every set. 4.5 sits in
-    # the gap between the calibrated families (bambu folded 0.27-0.61 vs
-    # clear staircase means 4.7-18.0), so clear CMYW classifies transparent
-    # and bambu sets opaque. Also gates the composition-pruned stack search
-    # (core/stack_prune.py) and mirrors the frontend default.
-    transparent_td_threshold: float = 4.5
+    # Transparency classification threshold (TD1S neutral transmission distance,
+    # mm). Same default as DEFAULT_TRANSPARENT_TD_THRESHOLD_MM in the frontend;
+    # also gates the composition-pruned stack search (core/stack_prune.py).
+    transparent_td_threshold: float = 6.7
 
     # Param search: wall-clock budget per run. Must stay below the Railway edge
     # request timeout (~60s observed); the endpoint returns the best partial
@@ -59,13 +56,6 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
-
-    # Stack-search budget: full permutation enumeration (N^L codes) is used
-    # whenever its probe-extrapolated wall time fits this budget; larger
-    # translucent sets fall back to composition pruning, and larger opaque
-    # sets are rejected. 60s matches the Railway edge request timeout that
-    # bounds every sync endpoint anyway.
-    full_enumeration_budget_seconds: float = 60.0
 
     # STL/3MF generation: cap on total merged boxes per request. Greedy meshing
     # collapses runs of same-color pixels, so the guard is enforced on the REAL

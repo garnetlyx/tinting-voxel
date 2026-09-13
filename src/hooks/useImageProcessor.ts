@@ -32,13 +32,21 @@ const MIN_FILAMENT_COLORS = 4;
 const MAX_FILAMENT_COLORS = 16;
 const MIN_COLOR_LAYERS = 4;
 const MAX_COLOR_LAYERS = 10;
+const MAX_BLEND_PERMUTATIONS = 1_000_000;
 const DEFAULT_MAX_DIMENSION_MM = 200;
 const MIN_PIXEL_SIZE_MM = 0.01;
 const MAX_PIXEL_SIZE_MM = 5.0;
 
 const clampPixelSize = (value: number) => Math.max(MIN_PIXEL_SIZE_MM, Math.min(MAX_PIXEL_SIZE_MM, value));
 
-const computeMaxLayerCount = () => MAX_COLOR_LAYERS;
+const computeMaxLayerCount = (filamentCount: number) => {
+  let maxLayerCount = MIN_COLOR_LAYERS;
+  for (let candidate = MIN_COLOR_LAYERS; candidate <= MAX_COLOR_LAYERS; candidate += 1) {
+    if (filamentCount ** candidate > MAX_BLEND_PERMUTATIONS) break;
+    maxLayerCount = candidate;
+  }
+  return maxLayerCount;
+};
 
 const computeDefaultPixelSize = (widthPx: number, heightPx: number) => {
   const longestSidePx = Math.max(widthPx, heightPx);
@@ -187,14 +195,17 @@ export const useImageProcessor = () => {
   const addFilamentColor = useCallback(() => {
     setFilamentColors(prev => {
       if (prev.length >= MAX_FILAMENT_COLORS) return prev;
-      // Inherit k from the current set so a color added to a calibrated
-      // preset blends with the same pigment absorption gain.
+      // Inherit calibration-family params from the current set: blending
+      // requires a shared alpha, and td_scale/td_gamma must stay consistent
+      // within a calibrated preset instead of falling back to backend defaults.
       const family = prev[0];
       return [...prev, {
         name: '',
         hex: '#808080',
         transmission_distance: 5.0,
-        k: family?.k,
+        alpha: family?.alpha,
+        td_scale: family?.td_scale,
+        td_gamma: family?.td_gamma,
       }];
     });
     setFilamentPreset(null);
@@ -240,7 +251,10 @@ export const useImageProcessor = () => {
     [filamentColors, filamentPreset]
   );
 
-  const maxLayerCount = useMemo(() => computeMaxLayerCount(), []);
+  const maxLayerCount = useMemo(
+    () => computeMaxLayerCount(filamentColors.length),
+    [filamentColors.length]
+  );
 
   const handleSetLayerCount = useCallback((value: number) => {
     setLayerCount(Math.max(MIN_COLOR_LAYERS, Math.min(maxLayerCount, value)));

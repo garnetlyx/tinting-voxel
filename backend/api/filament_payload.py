@@ -83,7 +83,12 @@ def get_colors_from_request(
                 name=fc.name,
                 hex=fc.hex,
                 transmission_distance=fc.transmission_distance,
+                alpha=fc.alpha,
                 k=fc.k,
+                td_rgb=fc.td_rgb,
+                td_neutral=fc.td_neutral,
+                td_scale=fc.td_scale,
+                td_gamma=fc.td_gamma,
             )
             for fc in filament_colors
         ]

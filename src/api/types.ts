@@ -105,22 +105,26 @@ export interface DownloadSVGSTLParams {
 export type FilamentPreset =
   | 'bambu_cmywk_phase6'
   | 'bambu_cmyw_phase6'
-  | 'clear_cmyw';
+  | 'clear_cmywg';
 
 export const DEFAULT_FILAMENT_PRESET: FilamentPreset = 'bambu_cmywk_phase6';
 export const FILAMENT_PRESET_OPTIONS: { value: FilamentPreset; label: string }[] = [
   { value: 'bambu_cmywk_phase6', label: 'Bambu CMYWK' },
   { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW' },
-  { value: 'clear_cmyw', label: 'Clear CMYW' },
+  { value: 'clear_cmywg', label: 'Clear CMYWG' },
 ];
 
 export interface FilamentColorConfig {
   name: string;
   hex: string;
-  /** Channel-neutral transmission distance (mm), base-10: t = 10^(-d/td). */
   transmission_distance: number;
-  /** Optional pigment absorption gain; 0 blends as plain Beer-Lambert. */
+  alpha?: number;
   k?: number;
+  td_rgb?: [number, number, number];
+  /** Neutral (dye-free) transmission distance (TD1S strand measurement), mm. */
+  td_neutral?: number;
+  td_scale?: number;
+  td_gamma?: number;
 }
 
 // Layer-height bounds shared by every filament set. 0.84 mm is the clear-track
@@ -129,14 +133,14 @@ export const LAYER_HEIGHT_MIN_MM = 0.08;
 export const LAYER_HEIGHT_MAX_MM = 0.84;
 export const DEFAULT_LAYER_HEIGHT_MM = 0.08;
 export const TRANSPARENT_LAYER_HEIGHT_MM = 0.84;
-// Default transparency threshold (mm) on the stored td scale — the same
-// number blending uses. 4.5 sits in the gap between the calibrated families
-// (bambu folded 0.27-0.61 vs clear staircase means 4.7-18.0), so Clear CMYW
-// classifies transparent and every bambu set opaque.
-export const DEFAULT_TRANSPARENT_TD_THRESHOLD_MM = 4.5;
+// Default transparency threshold from TD1S strand measurements: highest
+// opaque filament TD1S is White 6.1, lowest transparent is Panchroma grey 7.3;
+// 6.7 is their midpoint and separates all measured data with margin.
+export const DEFAULT_TRANSPARENT_TD_THRESHOLD_MM = 6.7;
 
 /**
- * A filament set counts as transparent when every filament's td meets the
+ * A filament set counts as transparent when every filament's neutral TD
+ * (td_neutral when measured, else the config transmission distance) meets the
  * threshold. Drives the layer-height default; never gates user input.
  */
 export function isAllTransparentFilaments(
@@ -144,7 +148,7 @@ export function isAllTransparentFilaments(
   thresholdMm: number,
 ): boolean {
   if (colors.length === 0) return false;
-  return colors.every(c => c.transmission_distance >= thresholdMm);
+  return colors.every(c => (c.td_neutral ?? c.transmission_distance) >= thresholdMm);
 }
 
 export interface FilamentPresetInfo {
@@ -294,28 +298,158 @@ export interface PaletteLibraryResponse {
   palettes: PaletteInfo[];
 }
 
-// Default presets for frontend initialization. Mirrors the backend's
-// core/color_config.py — bambu tds are the exact fold of the Phase-6 fitted
-// scatter (bit-identical blending), clear is the staircase mean CMYW set.
+// Default presets for frontend initialization
 export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
   bambu_cmywk_phase6: [
-    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 0.48447574859816506, k: 8.13 },
-    { name: 'Magenta', hex: '#B3356E', transmission_distance: 0.5218499460436025,  k: 8.42 },
-    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 0.5819156593127012,  k: 3.73 },
-    { name: 'White',   hex: '#FFFFFF', transmission_distance: 0.6055249051606083,  k: 12.39 },
-    { name: 'Key',     hex: '#0B0F0C', transmission_distance: 0.26611297079931917, k: 17.65 },
+    {
+      name: 'Cyan',
+      hex: '#3D79C6',
+      transmission_distance: 2.0,
+      td_neutral: 2.0,
+      alpha: 8.08,
+      k: 8.13,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Magenta',
+      hex: '#B3356E',
+      transmission_distance: 2.9,
+      td_neutral: 2.9,
+      alpha: 8.08,
+      k: 8.42,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Yellow',
+      hex: '#FFE665',
+      transmission_distance: 5.0,
+      td_neutral: 5.0,
+      alpha: 8.08,
+      k: 3.73,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'White',
+      hex: '#FFFFFF',
+      transmission_distance: 6.1,
+      td_neutral: 6.1,
+      alpha: 8.08,
+      k: 12.39,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Key',
+      hex: '#0B0F0C',
+      transmission_distance: 0.1,
+      td_neutral: 0.1,
+      alpha: 8.08,
+      k: 17.65,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
   ],
   bambu_cmyw_phase6: [
-    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 0.48447574859816506, k: 8.13 },
-    { name: 'Magenta', hex: '#B3356E', transmission_distance: 0.5218499460436025,  k: 8.42 },
-    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 0.5819156593127012,  k: 3.73 },
-    { name: 'White',   hex: '#FFFFFF', transmission_distance: 0.6055249051606083,  k: 12.39 },
+    {
+      name: 'Cyan',
+      hex: '#3D79C6',
+      transmission_distance: 2.0,
+      td_neutral: 2.0,
+      alpha: 8.08,
+      k: 8.13,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Magenta',
+      hex: '#B3356E',
+      transmission_distance: 2.9,
+      td_neutral: 2.9,
+      alpha: 8.08,
+      k: 8.42,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'Yellow',
+      hex: '#FFE665',
+      transmission_distance: 5.0,
+      td_neutral: 5.0,
+      alpha: 8.08,
+      k: 3.73,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
+    {
+      name: 'White',
+      hex: '#FFFFFF',
+      transmission_distance: 6.1,
+      td_neutral: 6.1,
+      alpha: 8.08,
+      k: 12.39,
+      td_scale: 1.48,
+      td_gamma: 0.20,
+    },
   ],
-  clear_cmyw: [
-    { name: 'Cyan',    hex: '#5489B4', transmission_distance: 4.7,  k: 0 },
-    { name: 'Magenta', hex: '#DE5740', transmission_distance: 6.3,  k: 0 },
-    { name: 'Yellow',  hex: '#DDC465', transmission_distance: 10.1, k: 0 },
-    { name: 'White',   hex: '#D9D6C5', transmission_distance: 18.0, k: 0 },
+  clear_cmywg: [
+    {
+      name: 'Cyan',
+      hex: '#5489B4',
+      transmission_distance: 4.7,
+      td_neutral: 48.9,
+      alpha: 12.0,
+      k: 1.93,
+      td_rgb: [1.04, 4.66, 8.30],
+      td_scale: 1.0,
+      td_gamma: 1.0,
+    },
+    {
+      name: 'Magenta',
+      hex: '#DE5740',
+      transmission_distance: 6.3,
+      td_neutral: 100,
+      alpha: 12.0,
+      k: 1.44,
+      td_rgb: [12.87, 2.39, 3.70],
+      td_scale: 1.0,
+      td_gamma: 1.0,
+    },
+    {
+      name: 'Yellow',
+      hex: '#DDC465',
+      transmission_distance: 10.1,
+      td_neutral: 100,
+      alpha: 12.0,
+      k: 0.67,
+      td_rgb: [15.13, 12.29, 2.81],
+      td_scale: 1.0,
+      td_gamma: 1.0,
+    },
+    {
+      name: 'White',
+      hex: '#D9D6C5',
+      transmission_distance: 18.0,
+      td_neutral: 100,
+      alpha: 12.0,
+      k: 0.11,
+      td_rgb: [17.95, 18.90, 17.21],
+      td_scale: 1.0,
+      td_gamma: 1.0,
+    },
+    {
+      name: 'Grey',
+      hex: '#9A9D9C',
+      transmission_distance: 1.7,
+      td_neutral: 7.3,
+      alpha: 12.0,
+      k: 10.0,
+      td_rgb: [2.23, 1.69, 1.19],
+      td_scale: 1.0,
+      td_gamma: 1.0,
+    },
   ],
 };
 

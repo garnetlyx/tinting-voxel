@@ -9,7 +9,7 @@ import pytest
 from core.blend_color import Color, Colors
 from core.color_config import (
     BAMBU_CMYW_PHASE6_PRESET,
-    CLEAR_CMYW_PRESET,
+    CLEAR_CMYWG_PRESET,
     ColorConfig,
     get_available_presets,
     get_preset,
@@ -72,11 +72,11 @@ class TestPresets:
         labels = [c.label for c in BAMBU_CMYW_PHASE6_PRESET]
         assert set(labels) == {'C', 'M', 'Y', 'W'}
 
-    def test_clear_cmyw_preset_exists(self):
-        """CLEAR_CMYW_PRESET has 4 colors (stained-glass CMYW; grey dropped)."""
-        assert len(CLEAR_CMYW_PRESET) == 4
-        labels = [c.label for c in CLEAR_CMYW_PRESET]
-        assert set(labels) == {'C', 'M', 'Y', 'W'}
+    def test_clear_cmywg_preset_exists(self):
+        """CLEAR_CMYWG_PRESET has 5 colors (CMYWG includes grey for dark tones)."""
+        assert len(CLEAR_CMYWG_PRESET) == 5
+        labels = [c.label for c in CLEAR_CMYWG_PRESET]
+        assert set(labels) == {'C', 'M', 'Y', 'W', 'G'}
 
     def test_get_preset_bambu(self):
         """get_preset returns BAMBU_CMYW_PHASE6_PRESET for 'bambu_cmyw_phase6'."""
@@ -84,9 +84,9 @@ class TestPresets:
         assert preset == BAMBU_CMYW_PHASE6_PRESET
 
     def test_get_preset_clear(self):
-        """get_preset returns CLEAR_CMYW_PRESET for 'clear_cmyw'."""
-        preset = get_preset("clear_cmyw")
-        assert preset == CLEAR_CMYW_PRESET
+        """get_preset returns CLEAR_CMYWG_PRESET for 'clear_cmywg'."""
+        preset = get_preset("clear_cmywg")
+        assert preset == CLEAR_CMYWG_PRESET
 
 
     def test_get_preset_phase6_cmyw(self):
@@ -151,13 +151,36 @@ class TestColorsFromConfigs:
 
         assert colors['C'].td == 5.5
 
-    def test_from_configs_preserves_folded_td_and_k(self):
-        """from_configs carries the folded td and fitted k verbatim."""
+    def test_from_configs_preserves_alpha_and_k(self):
+        """from_configs preserves calibrated per-material alpha/k parameters."""
         colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
 
-        assert colors["C"].td == pytest.approx(0.48447574859816506)
+        assert colors["C"].alpha == pytest.approx(8.08)
         assert colors["C"].k == pytest.approx(8.13)
+        assert colors["C"].td_scale == pytest.approx(1.48)
+        assert colors["C"].td_gamma == pytest.approx(0.20)
+        assert colors["W"].alpha == pytest.approx(8.08)
         assert colors["W"].k == pytest.approx(12.39)
+
+    def test_from_configs_exposes_shared_blend_alpha(self):
+        """Calibrated presets should surface their learned global alpha."""
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
+
+        assert colors.get_blend_alpha() == pytest.approx(8.08)
+
+    def test_get_blend_alpha_rejects_inconsistent_values(self):
+        """Mixed alphas are invalid because the blend kernel uses one global alpha."""
+        colors = Colors.from_configs(
+            [
+                ColorConfig(name="Cyan", hex="#00FFFF", transmission_distance=3.0, alpha=4.0),
+                ColorConfig(name="Magenta", hex="#FF00FF", transmission_distance=2.0, alpha=5.0),
+                ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=2.5, alpha=4.0),
+                ColorConfig(name="White", hex="#FFFFFF", transmission_distance=7.0, alpha=4.0),
+            ]
+        )
+
+        with pytest.raises(ValueError, match="must share the same alpha value"):
+            colors.get_blend_alpha()
 
 
 class TestDynamicMeshMap:
@@ -305,11 +328,13 @@ class TestBackwardCompatibility:
         assert stl_generator._current_colors is not None
         assert len(stl_generator._current_colors) == 4
 
-    def test_calibrated_colors_init_matrix(self):
-        """Calibrated presets initialize the reference matrix under the
-        unified formula."""
+    def test_calibrated_colors_use_td1s_gamma_blend(self):
+        """Calibrated presets must enable the TD1S gamma hybrid blend."""
         colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
         initialize_color_mapping(layer_count=4, layer_height=0.08, colors=colors)
 
         from services import stl_generator
-        assert stl_generator._reference_code_matrix is not None
+        assert stl_generator._blend_generator.blend_mode == "hybrid_per_color_k_td1s_gamma"
+        assert stl_generator._blend_generator.alpha == pytest.approx(
+            BAMBU_CMYW_PHASE6_PRESET[0].alpha
+        )
