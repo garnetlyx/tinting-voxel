@@ -25,8 +25,8 @@ from services.print_stack import (
 logger = logging.getLogger(__name__)
 
 # Probe-calibrated throughput for the full-enumeration cost model (self-
-# adjusting to the host CPU; measured once, cached). Rates are per code;
-# the match rate is per code per target.
+# adjusting to the host CPU; measured once, cached). Covers the complete
+# build+match path; see _probe_throughput for the decomposition.
 _probe_state: dict = {}
 
 

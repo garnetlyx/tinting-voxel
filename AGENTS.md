@@ -34,7 +34,7 @@ tinting-voxel/
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py    # Color blending (Beer-Lambert model)
-│   │   ├── blend_models.py   # Pluggable blend functions (hybrid per-channel-k)
+│   │   ├── blend_models.py   # Unified blend formula + vectorized batch
 │   │   ├── code_grid.py      # Code grid generation utilities
 │   │   ├── color_config.py   # Filament presets (single source of truth)
 │   │   ├── color_materials.py # Material property definitions (Color: hex+td+k)

@@ -22,7 +22,8 @@ import numpy as np
 from PIL import Image
 from skimage.color import deltaE_ciede2000, rgb2lab
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.path.dirname(BACKEND_ROOT)  # the git worktree root
 RESEARCH = "/Users/gl/Dropbox/mine/projects/research/tinting-voxel-research"
 sys.path.insert(0, os.path.join(RESEARCH, "scripts"))
 sys.path.insert(0, RESEARCH)
@@ -58,7 +59,7 @@ def load_shipped_preset():
         "from core.color_config import get_preset;"
         "p = get_preset('clear_cmyw');"
         "print(json.dumps([{ 'hex': c.hex, 'td': c.transmission_distance, 'k': c.k } for c in p]))"
-    ) % REPO_ROOT
+    ) % BACKEND_ROOT
     out = _sp.run(
         [sys.executable, "-c", code], cwd=REPO_ROOT, capture_output=True, text=True, check=True,
     ).stdout
@@ -170,10 +171,13 @@ def main(check_only: bool = False):
                 ["git", "log", "-1", "--format=%H", "--", "backend/core/color_config.py"],
                 cwd=REPO_ROOT, capture_output=True, text=True,
             ).stdout.strip(),
-            "tree_sha256": subprocess.run(
+            "color_config_blob_sha1": subprocess.run(
                 ["git", "rev-parse", "HEAD:backend/core/color_config.py"],
                 cwd=REPO_ROOT, capture_output=True, text=True,
             ).stdout.strip(),
+            "color_config_sha256": hashlib.sha256(
+                open(os.path.join(BACKEND_ROOT, "core", "color_config.py"), "rb").read()
+            ).hexdigest(),
         },
         "backings": {},
     }
@@ -181,7 +185,7 @@ def main(check_only: bool = False):
     pp = PhotoPreprocessor(grid_size=16)
     for bk, bg in {"w": (255.0, 255.0, 255.0), "b": (20.0, 20.0, 20.0)}.items():
         res = pp.process(PHOTOS[bk])
-        warped = os.path.join("/tmp", f"plate08_warp_{bk}.png")
+        warped = os.path.join("/tmp", f"plate08_warp_{bk}.png")  # noqa: /tmp only
         Image.fromarray(res.image).save(warped)
         meas = sample_cells(warped)
         os.remove(warped)
@@ -194,10 +198,10 @@ def main(check_only: bool = False):
         report["backings"][bk] = {"shipped_preset": shipped_score, "same_batch_reference": ref_score}
         print(f"PLATE-08-KX-A {bk}: shipped {shipped_score:.2f} | same-batch ref {ref_score:.2f}")
 
-    out_dir = "/tmp" if check_only else os.path.join(REPO_ROOT, "certification")
+    out_dir = "/tmp" if check_only else os.path.join(BACKEND_ROOT, "certification")
     out = os.path.join(out_dir, "plate08_shipped_crossval.json")
     if check_only:
-        tracked = os.path.join(REPO_ROOT, "certification", "plate08_shipped_crossval.json")
+        tracked = os.path.join(BACKEND_ROOT, "certification", "plate08_shipped_crossval.json")
         existing = json.load(open(tracked))
         # Every provenance/input field must match, not just the scores:
         # formula, inputs (hashes, orientation, layer), both preset tables,
@@ -210,12 +214,14 @@ def main(check_only: bool = False):
             for k in compare_keys
             if existing.get(k) != report.get(k)
         }
-        for side in (existing.get("certified_values_source") or {}, report.get("certified_values_source") or {}):
-            if side.get("tree_sha256") and existing.get("certified_values_source", {}).get("tree_sha256") != side.get("tree_sha256"):
-                drift["certified_values_source.tree_sha256"] = (
-                    existing.get("certified_values_source", {}).get("tree_sha256"),
-                    side.get("tree_sha256"),
-                )
+        src_key = "certified_values_source"
+        for field in ("app_commit", "color_config_blob_sha1", "color_config_sha256"):
+            a = (existing.get(src_key) or {}).get(field)
+            b = (report.get(src_key) or {}).get(field)
+            if a != b:
+                drift[f"{src_key}.{field}"] = (a, b)
+        if not (report.get(src_key) or {}).get("app_commit"):
+            drift[f"{src_key}.app_commit"] = ("missing", "(empty)")
         if drift:
             print("CERTIFICATION DRIFT DETECTED:")
             print(json.dumps(drift, indent=2)[:2000])

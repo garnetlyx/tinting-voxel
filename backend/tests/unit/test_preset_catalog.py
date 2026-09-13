@@ -12,9 +12,8 @@ from core.color_config import PRESETS, get_available_presets, get_preset
 
 def test_catalog_matches_frontend_fixture():
     expected = json.loads((Path(__file__).parents[3] / "src/api/__fixtures__/filament-presets.json").read_text())
-    # Contract: the fixture carries every backend field except k_rgb
-    # (backend-only). td_rgb is part of the frontend contract; tuples are
-    # normalized to lists to match the JSON representation.
+    # Contract: the fixture carries exactly the surviving schema
+    # (name, hex, transmission_distance, k).
     def _norm(value):
         return list(value) if isinstance(value, tuple) else value
 

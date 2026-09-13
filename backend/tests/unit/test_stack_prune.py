@@ -346,7 +346,7 @@ class TestPrunedVsFullOracle:
 
 
 class TestCalibrationForwarding:
-    """Edited Clear palettes must keep td_rgb/td_neutral on every request path."""
+    """Edited Clear palettes must keep their hex+td+k on every request path."""
 
     EDITED_CLEAR = [
         {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "k": 0.0},
@@ -425,17 +425,27 @@ class TestBudgetUsesRealTargetCount:
 
 
 class TestEstimateAccuracy:
-    """The probe model must track the measured uncached wall time of a real
-    compute_reference_matrices call (complete build + match), within 3x."""
+    """The probe model must track the measured uncached wall time of the
+    complete production path — compute_reference_matrices (build) plus
+    map_to_nearest_color for the same target count — within 0.1x..3x."""
 
-    def test_estimate_tracks_measured_matrix_time(self):
+    def _measure_end_to_end(self, colors, layer_count, layer_height, n_targets):
         import time as _time
         from core.color_materials import Color as _C
         from services import matrix_cache as _mc
-        from services.stl_generator import (
-            _estimate_full_enumeration_seconds as _est,
-            compute_reference_matrices as _crm,
-        )
+        from services.stl_generator import compute_reference_matrices as _crm
+        _mc.clear_cache()
+        t0 = _time.perf_counter()
+        code_df, rgb_df = _crm(layer_count, layer_height, colors, n_targets=n_targets)
+        targets = [(120, 130, 140)] * n_targets
+        _C.map_to_nearest_color(targets, code_df, rgb_df)
+        measured = _time.perf_counter() - t0
+        _mc.clear_cache()
+        return measured
+
+    def test_estimate_tracks_measured_end_to_end(self):
+        from core.color_materials import Color as _C
+        from services.stl_generator import _estimate_full_enumeration_seconds as _est
         colors = Colors(colors={
             l: _C(l, td, h) for l, h, td in zip(
                 "CMYWK",
@@ -443,16 +453,41 @@ class TestEstimateAccuracy:
                 [0.5, 0.5, 0.6, 0.6, 0.3],
             )
         })
-        n = 5 ** 5  # 3,125 codes: fast, representative shape
-        est = _est(n, 10)
-        _mc.clear_cache()
-        t0 = _time.perf_counter()
-        _crm(5, 0.08, colors, n_targets=10)
-        measured = _time.perf_counter() - t0
-        _mc.clear_cache()
+        n, n_targets = 5 ** 5, 10  # 3,125 codes: fast, representative shape
+        est = _est(n, n_targets)
+        measured = self._measure_end_to_end(colors, 5, 0.08, n_targets)
         assert est <= measured * 3, (
-            f"estimate {est:.2f}s exceeds measured {measured:.2f}s by >3x"
+            f"estimate {est:.3f}s exceeds measured {measured:.3f}s by >3x"
         )
         assert est >= measured * 0.1, (
-            f"estimate {est:.2f}s is >10x below measured {measured:.2f}s"
+            f"estimate {est:.3f}s is >10x below measured {measured:.3f}s"
         )
+
+    def test_regime_flips_at_budget_boundary(self, monkeypatch):
+        """Behavior near the 60s boundary: the budget decides full vs prune
+        using the end-to-end estimate, and translucent sets over budget
+        prune while opaque sets reject."""
+        from config.settings import settings as _settings
+        from core.color_materials import Color as _C
+        from services import matrix_cache as _mc
+        from services import stl_generator as _sg
+        from services.stl_generator import compute_reference_matrices as _crm
+        translucent = Colors(colors={
+            l: _C(l, td, h) for l, h, td in zip(
+                "CMYWK", ["#4C72A0"] * 5, [5.0] * 5)
+        })
+        est = _sg._estimate_full_enumeration_seconds(5 ** 5, 10)
+        # Just over the measured cost -> within budget -> full enumeration.
+        monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", est * 2)
+        _mc.clear_cache()
+        df, _ = _crm(5, 0.08, translucent, n_targets=10)
+        # DataFrame is padded to a rectangle; the distinct-code count is
+        # the true enumeration size.
+        uniq = {df.iat[r, c] for r in range(df.shape[0]) for c in range(df.shape[1])}
+        assert len(uniq) == 5 ** 5
+        # Just under the measured cost -> over budget -> pruned (translucent).
+        monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", est * 0.5)
+        _mc.clear_cache()
+        df_p, _ = _crm(5, 0.08, translucent, n_targets=10)
+        assert df_p.size < 5 ** 5  # composition representatives
+        _mc.clear_cache()
