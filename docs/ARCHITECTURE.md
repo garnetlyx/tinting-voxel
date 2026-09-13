@@ -416,30 +416,35 @@ requests. `npm test` and `npm run build` validate this boundary.
 
 ### 1. Hybrid Per-Color k Color Mixing
 
+### 1. Unified blend model
+
 The production color mixing model is ONE formula for every filament
 (transparent or opaque, preset or custom):
 
 ```
 mu_ch(color) = ln(10) / td + k × A_ch(color)
 T_ch         = exp(-mu_ch × d)
-
-Where:
-- td      = the filament's single composite transmission distance (mm),
-            broadcast across channels. bambu presets hold the exact fold of
-            the Phase-6 fitted scatter (ln10 × 1.48 × td_td1s^0.20 / 8.08);
-            the clear preset holds staircase-measured means; user-entered
-            values apply literally (base-10: t = 10^(-d/td)).
-- k       = optional pigment absorption gain (default 0 = plain Beer-Lambert)
-- A_ch    = per-channel absorption from the filament hex
-- d       = layer height (mm)
 ```
+
+- `td` — the filament's single composite transmission distance (mm),
+  broadcast across channels. bambu presets hold the exact fold of the
+  Phase-6 fitted scatter (`ln10 × 1.48 × td_td1s^0.20 / 8.08`); the clear
+  preset holds staircase-measured per-channel means; user-entered values
+  apply literally (base-10: `t = 10^(-d/td)`).
+- `k` — optional pigment absorption gain (default 0 = plain Beer-Lambert).
+- `A_ch` — per-channel absorption from the filament hex. `d` — layer height.
 
 Stacked colors compose through the light-loss allocation (paper Eqs. 4-8).
 The Phase-6 fitted k values (K 17.65 > W 12.39 > M 8.42 > C 8.13 > Y 3.73)
 survive verbatim; the retired scatter-alpha/td-remap parameters exist only
-as the folded td numbers above.
+as the folded td numbers above. Historical per-channel-TD and hybrid-mode
+parameters are deleted (git history for archaeology).
 
-Implementation: `blend_models.py` (unified formula + vectorized batch), presets: `core/color_config.py`.
+Transparency classification is one fixed criterion for pruning and the
+layer-height hint: every filament's td ≥ 4.5 mm.
+
+Implementation: `blend_models.py` (unified formula + vectorized batch),
+presets: `core/color_config.py`.
 
 ### 2. Greedy Meshing
 
@@ -505,19 +510,19 @@ Groups similar colors using scikit-learn's MiniBatchKMeans:
 
 ### Built-in filament catalog
 
-The only built-in presets are `bambu_cmyw_phase6` (four colors, default) and
-`clear_cmywg` (five colors: CMYWG). `core/color_config.py` owns the canonical
-registry used by preset lookup, enumeration, API responses, and cache warmup.
-Removed presets have no aliases, archives, or fallback mappings. Unknown IDs
-are rejected. Download, batch, and default color construction use Phase 6 CMYW.
-The palette library's standard entries reference these same definitions.
-Frontend initialization is checked against a shared catalog fixture, which is
-also checked against the backend definitions; transparent material parameters
-must not diverge between the browser and server. Custom colors remain supported.
+The built-in presets are `bambu_cmywk_phase6` (five colors, default),
+`bambu_cmyw_phase6` (four colors), and `clear_cmyw` (four colors: CMYW).
+`core/color_config.py` owns the canonical registry used by preset lookup,
+enumeration, API responses, and cache warmup. Removed presets have no
+aliases, archives, or fallback mappings; unknown IDs are rejected. The
+palette library's standard entries reference these same definitions.
+Frontend initialization is checked against a shared catalog fixture, which
+is also checked against the backend definitions; preset values must not
+diverge between the browser and server. Custom colors remain supported.
 
-Palette API responses and application preserve the full material configuration
-(alpha, k, TD scale and gamma), matching direct preset selection. The frontend
-shares one preset option list between settings and automatic parameter search.
+Palette API responses and application preserve each color's full schema
+(hex, td, k), matching direct preset selection. The frontend shares one
+preset option list between settings and automatic parameter search.
 
-The palette browser exposes only these same two configurations. Category
+The palette browser exposes only these same configurations. Category
 filtering and all other built-in palette definitions have been removed.

@@ -159,6 +159,7 @@ async def api_process_image(
         layerCount,
         layerHeight,
         colors,
+        n_targets=len(vector_results),
     )
 
     # Render segmentation image: show quantized colors (BEFORE mapping) with vector outlines

@@ -61,14 +61,19 @@ def _probe_throughput() -> tuple[float, float, float]:
     blend = (_time.perf_counter() - t0) / len(codes)
     df_c = pd.DataFrame([codes[i:i + 128] for i in range(0, len(codes), 128)])
     df_r = pd.DataFrame([[(128.0, 128.0, 128.0)] * 128 for _ in range(len(df_c))])
-    targets = [(120 + i, 130, 140) for i in range(6)]
+    # The marginal per-target term is small (~0.1-1.5 µs/code) next to the
+    # fixed extraction cost, so the second measurement point uses many
+    # targets to lift its signal well above timing noise (a 6-target point
+    # can measure a negative delta under load, which clamps to 0 and makes
+    # the estimate target-blind).
+    targets = [(120 + i, 130 + i % 7, 140) for i in range(64)]
     t0 = _time.perf_counter()
     _C.map_to_nearest_color(targets[:1], df_c, df_r)
     per_code_1 = (_time.perf_counter() - t0) / len(codes)
     t0 = _time.perf_counter()
     _C.map_to_nearest_color(targets, df_c, df_r)
-    per_code_6 = (_time.perf_counter() - t0) / len(codes)
-    marginal = max((per_code_6 - per_code_1) / 5.0, 0.0)
+    per_code_64 = (_time.perf_counter() - t0) / len(codes)
+    marginal = max((per_code_64 - per_code_1) / 63.0, 0.0)
     fixed = max(per_code_1 - marginal, 0.0)
     _probe_state.update(
         blend_s_per_code=blend,
@@ -96,14 +101,14 @@ _current_colors = None
 _global_state_lock = threading.Lock()
 
 
-def _build_code_to_rgb(colors: Colors, layer_count: int, layer_height: float):
-    """Blend callable consistent with compute_reference_matrices."""
+def _build_codes_to_rgb(colors: Colors, layer_count: int, layer_height: float):
+    """Batch blend callable consistent with compute_reference_matrices."""
     generator = BlendTestGenerator(
         colors=colors,
         layer_height=layer_height,
         layer_count_max=layer_count,
     )
-    return generator.code_to_rgb
+    return generator.codes_to_rgb
 
 
 def compute_reference_matrices(
@@ -183,14 +188,18 @@ def compute_reference_matrices(
     )
     within_budget = estimated_seconds <= settings.full_enumeration_budget_seconds
     use_prune = translucent and prune is not False and not within_budget
-    if not within_budget and not translucent and prune is not False:
+    if not translucent and not within_budget:
+        # Opaque over-budget enumeration rejects unconditionally: composition
+        # pruning is not validated for opaque sets and there is no fallback.
+        # (A translucent set with prune=False is the bounded full-enumeration
+        # oracle and stays allowed — the caller explicitly accepted its cost.)
         raise ValueError(
             f"Full enumeration for {len(items)} colors x {layer_count} layers "
             f"({permutation_count:,} codes) is estimated at "
             f"{estimated_seconds:.0f}s, over the "
-            f"{settings.full_enumeration_budget_seconds:.0f}s budget, and the "
-            f"set is not transparent (composition pruning is not validated "
-            f"for it). Reduce the number of colors or layers."
+            f"{settings.full_enumeration_budget_seconds:.0f}s budget, and "
+            f"composition pruning is not validated for a non-transparent set. "
+            f"Reduce the number of colors or layers."
         )
     if use_prune:
         # Translucent regime over budget: one canonical representative per
@@ -272,7 +281,7 @@ def map_color_blocks_to_blend_results(
         ref_rgb_matrix,
         colors,
         layer_height,
-        code_to_rgb=_build_code_to_rgb(colors, layer_count, layer_height),
+        codes_to_rgb=_build_codes_to_rgb(colors, layer_count, layer_height),
     )
     normalized_rgbs = [
         tuple(int(channel) for channel in np.asarray(rgb).tolist())

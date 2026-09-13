@@ -91,21 +91,21 @@ BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
     ColorConfig(name="White",   hex="#FFFFFF", transmission_distance=0.6055249051606083, k=12.39),
 ]
 
-# Clear CMYW preset (stained-glass track).
-# td = arithmetic mean of the staircase-measured per-channel TDs (thin-range
-# fits, staircase-KX batch; per-channel originals live in the research repo —
-# e.g. Ziro cyan (1.04, 4.66, 8.30) -> 4.7). k = 0: the staircase round-trip
-# measurement already accounts for all attenuation. Grey is deliberately not
-# part of this preset (physically opaque; brand-name "translucent" not
-#withstanding).
-#   Cyan:    #5489B4 (Ziro Light Cyan Clear)      td mean 4.7
-#   Magenta: #DE5740 (iSANMATE Light Pink)        td mean 6.3
-#   Yellow:  #DDC465 (Sunlu Transparent Yellow)  td mean 10.1
+# Clear CMYW preset (stained-glass track). Every value is a direct
+# staircase-KX-A measurement: hex = wb_corrected thickest-step color, td =
+# arithmetic mean of the per-channel thin-range fits (per-channel originals
+# live in the research repo — e.g. Ziro cyan (1.04, 4.66, 8.30) -> 4.7). k = 0:
+# the staircase round-trip measurement already accounts for all attenuation.
+# Grey is deliberately not part of this preset (physically opaque;
+# brand-name "translucent" not withstanding).
+#   Cyan:    #4C72A0 (Ziro Light Cyan Clear)      td mean 4.7
+#   Magenta: #CE5E53 (iSANMATE Light Pink)        td mean 6.3
+#   Yellow:  #D8B695 (Sunlu Transparent Yellow)  td mean 10.1
 #   White:   #D9D6C5 (Kingroon Transparent PLA)   td mean 18.0
 CLEAR_CMYW_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan",    hex="#5489B4", transmission_distance=4.7,  k=0.0),
-    ColorConfig(name="Magenta", hex="#DE5740", transmission_distance=6.3,  k=0.0),
-    ColorConfig(name="Yellow",  hex="#DDC465", transmission_distance=10.1, k=0.0),
+    ColorConfig(name="Cyan",    hex="#4C72A0", transmission_distance=4.7,  k=0.0),
+    ColorConfig(name="Magenta", hex="#CE5E53", transmission_distance=6.3,  k=0.0),
+    ColorConfig(name="Yellow",  hex="#D8B695", transmission_distance=10.1, k=0.0),
     ColorConfig(name="White",   hex="#D9D6C5", transmission_distance=18.0, k=0.0),
 ]
 

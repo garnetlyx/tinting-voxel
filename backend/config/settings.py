@@ -40,14 +40,6 @@ class Settings(BaseSettings):
     default_max_colors: int = 10
     default_color_threshold: float = 50.0
 
-    # Transparency classification threshold (mm) on the stored td scale —
-    # the same number blending uses, one standard for every set. 4.5 sits in
-    # the gap between the calibrated families (bambu folded 0.27-0.61 vs
-    # clear staircase means 4.7-18.0), so clear CMYW classifies transparent
-    # and bambu sets opaque. Also gates the composition-pruned stack search
-    # (core/stack_prune.py) and mirrors the frontend default.
-    transparent_td_threshold: float = 4.5
-
     # Param search: wall-clock budget per run. Must stay below the Railway edge
     # request timeout (~60s observed); the endpoint returns the best partial
     # results collected within this budget.

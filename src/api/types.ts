@@ -129,22 +129,19 @@ export const LAYER_HEIGHT_MIN_MM = 0.08;
 export const LAYER_HEIGHT_MAX_MM = 0.84;
 export const DEFAULT_LAYER_HEIGHT_MM = 0.08;
 export const TRANSPARENT_LAYER_HEIGHT_MM = 0.84;
-// Default transparency threshold (mm) on the stored td scale — the same
-// number blending uses. 4.5 sits in the gap between the calibrated families
-// (bambu folded 0.27-0.61 vs clear staircase means 4.7-18.0), so Clear CMYW
-// classifies transparent and every bambu set opaque.
-export const DEFAULT_TRANSPARENT_TD_THRESHOLD_MM = 4.5;
+// Transparency threshold (mm) on the stored td scale — the same number the
+// backend prune gate uses (core/stack_prune.py TRANSPARENT_TD_THRESHOLD_MM).
+// A literal constant, not user-adjustable: it is a property of the
+// calibrated data gap (bambu folded 0.27-0.61 vs clear means 4.7-18.0).
+export const TRANSPARENT_TD_THRESHOLD_MM = 4.5;
 
 /**
  * A filament set counts as transparent when every filament's td meets the
- * threshold. Drives the layer-height default; never gates user input.
+ * fixed threshold. Drives the layer-height default; never gates user input.
  */
-export function isAllTransparentFilaments(
-  colors: FilamentColorConfig[],
-  thresholdMm: number,
-): boolean {
+export function isAllTransparentFilaments(colors: FilamentColorConfig[]): boolean {
   if (colors.length === 0) return false;
-  return colors.every(c => c.transmission_distance >= thresholdMm);
+  return colors.every(c => c.transmission_distance >= TRANSPARENT_TD_THRESHOLD_MM);
 }
 
 export interface FilamentPresetInfo {
@@ -312,9 +309,9 @@ export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
     { name: 'White',   hex: '#FFFFFF', transmission_distance: 0.6055249051606083,  k: 12.39 },
   ],
   clear_cmyw: [
-    { name: 'Cyan',    hex: '#5489B4', transmission_distance: 4.7,  k: 0 },
-    { name: 'Magenta', hex: '#DE5740', transmission_distance: 6.3,  k: 0 },
-    { name: 'Yellow',  hex: '#DDC465', transmission_distance: 10.1, k: 0 },
+    { name: 'Cyan',    hex: '#4C72A0', transmission_distance: 4.7,  k: 0 },
+    { name: 'Magenta', hex: '#CE5E53', transmission_distance: 6.3,  k: 0 },
+    { name: 'Yellow',  hex: '#D8B695', transmission_distance: 10.1, k: 0 },
     { name: 'White',   hex: '#D9D6C5', transmission_distance: 18.0, k: 0 },
   ],
 };

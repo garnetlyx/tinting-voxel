@@ -3,14 +3,14 @@ Reference matrix cache for color blend computations.
 
 Caches the (code, rgb) reference matrices produced by
 compute_reference_matrices, keyed by everything that influences the result:
-the filament blend parameters (Colors._color_key), blend alpha and mode,
-layer count/height, and the prune flag. Content addressing means custom
-configurations cache exactly like named presets — no preset-name special
-casing.
+the filament parameters (colors_key: label/td/hex/k), layer count/height,
+the prune flag, and the target count (it feeds the time-budget
+full-vs-pruned decision). Content addressing means custom configurations
+cache exactly like named presets — no preset-name special casing.
 
 The cache is a small LRU: entries are pandas DataFrames whose size grows
-with the candidate count (full 5-color x 8-layer enumeration is ~390k
-codes), so only the most recent configurations are retained.
+with the candidate count, so only the most recent configurations are
+retained.
 """
 import logging
 from collections import OrderedDict

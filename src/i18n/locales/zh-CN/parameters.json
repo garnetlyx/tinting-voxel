@@ -12,8 +12,6 @@
   "colorLayers": "颜色层数：",
   "layerHeight": "层高：",
   "allTransparentNote": "全部耗材判定为透明——默认层高已切换为 0.84 mm（3 × 0.28 mm 打印层）。",
-  "transparentTdThreshold": "透明判定 TD 阈值：",
-  "transparentTdThresholdHelp": "耗材的中性透射距离（TD1S 线材实测；未测量时回退到配置的 TD）达到该阈值即判定为透明。仅当全部耗材都透明时才会调高默认层高。",
   "detailSizeNozzleLineWidth": "细节尺寸（喷嘴线宽）：",
   "pixelSize": "像素尺寸：",
   "maxDimensionWidthOrHeight": "最大尺寸（宽或高）",

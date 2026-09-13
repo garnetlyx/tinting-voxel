@@ -133,11 +133,11 @@ class TestFrozenEquivalenceCertification:
 
         colors = Colors.from_configs(get_preset('bambu_cmywk_phase6'))
         gen = BlendTestGenerator(colors=colors, layer_height=0.08, layer_count_max=6)
-        codes = [''.join(p) for p in itertools.product('CMYWK', repeat=6)][::2][:3000]
+        codes = [''.join(p) for p in itertools.product('CMYWK', repeat=6)]
         reference = self._retired_reference_blends(codes, 0.08, spec)
-        unified = [gen.code_to_rgb(c) for c in codes]
+        unified = gen.codes_to_rgb(codes)  # batch: every code, vectorized
         max_diff = np.abs(np.array(reference) - np.array(unified)).max()
-        assert max_diff < 1e-9, f"bambu CMYWK folded equivalence broken: {max_diff}"
+        assert max_diff < 1e-9, f"bambu CMYWK folded equivalence broken over all {len(codes)} codes: {max_diff}"
 
     def test_bambu_cmyw_folded_matches_retired_fitted_model(self):
         from core.color_config import get_preset
@@ -149,17 +149,17 @@ class TestFrozenEquivalenceCertification:
 
         colors = Colors.from_configs(get_preset('bambu_cmyw_phase6'))
         gen = BlendTestGenerator(colors=colors, layer_height=0.08, layer_count_max=6)
-        codes = [''.join(p) for p in itertools.product('CMYW', repeat=6)][::2][:2000]
+        codes = [''.join(p) for p in itertools.product('CMYW', repeat=6)]
         reference = self._retired_reference_blends(codes, 0.08, spec)
-        unified = [gen.code_to_rgb(c) for c in codes]
+        unified = gen.codes_to_rgb(codes)  # batch: every code, vectorized
         max_diff = np.abs(np.array(reference) - np.array(unified)).max()
-        assert max_diff < 1e-9, f"bambu CMYW folded equivalence broken: {max_diff}"
+        assert max_diff < 1e-9, f"bambu CMYW folded equivalence broken over all {len(codes)} codes: {max_diff}"
 
     def test_clear_mean_flat_is_plain_base10(self):
         from core.color_config import get_preset
         import itertools
         means = {'C': 4.7, 'M': 6.3, 'Y': 10.1, 'W': 18.0}
-        hexes = {'C': '#5489B4', 'M': '#DE5740', 'Y': '#DDC465', 'W': '#D9D6C5'}
+        hexes = {'C': '#4C72A0', 'M': '#CE5E53', 'Y': '#D8B695', 'W': '#D9D6C5'}
         # Retired production behavior (strip condition): scalar td broadcast,
         # no k term — plain 10^(-d/td).
         spec = {ch: (self.LN10 / means[ch], 0.0, hexes[ch]) for ch in means}

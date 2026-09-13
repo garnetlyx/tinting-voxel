@@ -59,7 +59,7 @@ def _map_and_refine(
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
     """Nearest-code mapping plus order refinement for pruned (translucent) sets."""
     from core.stack_prune import refine_matches
-    from services.stl_generator import _build_code_to_rgb
+    from services.stl_generator import _build_codes_to_rgb
 
     result_codes, result_rgbs = Color.map_to_nearest_color(
         source_colors, ref_code_matrix, ref_rgb_matrix,
@@ -72,7 +72,7 @@ def _map_and_refine(
         ref_rgb_matrix,
         colors,
         layer_height,
-        code_to_rgb=_build_code_to_rgb(colors, layer_count, layer_height),
+        codes_to_rgb=_build_codes_to_rgb(colors, layer_count, layer_height),
     )
     normalized_rgbs = [
         tuple(int(channel) for channel in np.asarray(rgb).tolist())

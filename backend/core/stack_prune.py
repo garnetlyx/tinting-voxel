@@ -25,10 +25,18 @@ from typing import Callable, Optional
 
 import numpy as np
 
-from config.settings import settings
 from core.color_materials import Color, Colors
 
 logger = logging.getLogger(__name__)
+
+# Transparency classification threshold (mm) on the stored td scale — the
+# same number blending uses, one standard for every set. 4.5 sits in the gap
+# between the calibrated families (bambu folded 0.27-0.61 vs clear staircase
+# means 4.7-18.0), so clear CMYW classifies transparent and bambu sets
+# opaque. Deliberately a literal constant, not a setting: it is a property of
+# the calibrated data, not an environment knob, and the frontend hint uses
+# the same value (TRANSPARENT_TD_THRESHOLD_MM in src/api/types.ts).
+TRANSPARENT_TD_THRESHOLD_MM = 4.5
 
 # Distinct orderings considered per composition during refinement.
 # Covers the worst realistic case (5 filaments x 8 layers -> 5040 orderings);
@@ -67,7 +75,7 @@ def is_translucent_set(
     CMYW preset classifies transparent and every bambu set opaque.
     """
     if threshold_mm is None:
-        threshold_mm = settings.transparent_td_threshold
+        threshold_mm = TRANSPARENT_TD_THRESHOLD_MM
     items = colors.colors.values() if isinstance(colors.colors, dict) else []
     if not items:
         return False
@@ -131,6 +139,21 @@ def _cap_distinct_compositions(
     return sorted(chosen.values())
 
 
+def _matrix_is_fully_enumerated(code_matrix) -> bool:
+    """True when the matrix holds every ordered code (not pruned).
+
+    A pruned matrix contains only canonical (character-sorted)
+    representatives; any non-sorted cell proves full enumeration. Full
+    matrices are overwhelmingly unsorted, so the scan exits immediately.
+    """
+    for r in range(code_matrix.shape[0]):
+        for c in range(code_matrix.shape[1]):
+            code = code_matrix.iat[r, c]
+            if list(code) != sorted(code):
+                return True
+    return False
+
+
 def refine_matches(
     input_colors: list,
     stage1_codes: list,
@@ -139,7 +162,7 @@ def refine_matches(
     rgb_matrix,
     colors: Colors,
     layer_height: float,
-    code_to_rgb: Callable[[str], tuple],
+    codes_to_rgb: Callable[[list[str]], list[tuple]],
     margin_delta_e: float = CANDIDATE_MARGIN_DELTA_E,
     max_compositions: int = MAX_CANDIDATE_COMPOSITIONS,
 ) -> tuple:
@@ -150,10 +173,16 @@ def refine_matches(
     composition. Stage 2 re-ranks every composition whose representative
     falls within ``margin_delta_e`` of the best — by the production metric or
     raw CIEDE2000 — over all its distinct orderings, using the same
-    perceptual metric as the production mapper. No-op for non-translucent
-    sets, whose reference matrix already enumerates every ordering exactly.
+    perceptual metric as the production mapper.
+
+    No-op for non-translucent sets AND for matrices that were fully
+    enumerated (a full matrix already contains every ordering exactly, so
+    refinement cannot improve it — and running it anyway costs tens of
+    seconds on large translucent grids).
     """
     if not is_translucent_set(colors):
+        return stage1_codes, stage1_rgbs
+    if _matrix_is_fully_enumerated(code_matrix):
         return stage1_codes, stage1_rgbs
 
     ref_codes = []
@@ -192,10 +221,15 @@ def refine_matches(
         for idx in pool:
             rep_code = ref_codes[idx]
             if rep_code not in perm_cache:
-                perm_cache[rep_code] = distinct_permutations(rep_code)
-            perms = perm_cache[rep_code]
-            if len(perms) > 1:
-                perm_rgb = np.array([code_to_rgb(p) for p in perms], dtype=np.float64)
+                # Batch-blend every ordering of the composition once; the
+                # result is reused by every subsequent input color.
+                codes = distinct_permutations(rep_code)
+                perm_cache[rep_code] = (
+                    codes,
+                    np.array(codes_to_rgb(codes), dtype=np.float64),
+                )
+            perms, perm_rgb = perm_cache[rep_code]
+            if len(perm_rgb) > 1:
                 perm_lab = _lab(perm_rgb / 255.0)
                 perm_dists = Color.perceptual_distance(lab_color, perm_lab)
                 perms_evaluated += len(perms)

@@ -31,13 +31,30 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/** Normalize a persisted/imported color to the current schema:
+ * exactly name, hex, transmission_distance, and optional k. Fields removed
+ * from the model (alpha, td_rgb, td_neutral, td_scale, td_gamma, k_rgb) are
+ * stripped so outbound payloads never trip the backend's extra='forbid'. */
+function normalizeColor(c: Record<string, unknown>): FilamentColorConfig {
+  const out: FilamentColorConfig = {
+    name: String(c.name),
+    hex: String(c.hex),
+    transmission_distance: Number(c.transmission_distance),
+  };
+  if (typeof c.k === 'number' && Number.isFinite(c.k)) out.k = c.k;
+  return out;
+}
+
 function loadPresets(): SavedPreset[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isValidPreset);
+    return parsed.filter(isValidPreset).map((p) => ({
+      ...p,
+      colors: p.colors.map((c) => normalizeColor(c as unknown as Record<string, unknown>)),
+    }));
   } catch {
     return [];
   }
@@ -155,6 +172,7 @@ export const useFilamentStorage = (): FilamentStorage => {
         if (isValidPreset(parsed[i])) {
           validPresets.push({
             ...parsed[i],
+            colors: (parsed[i].colors as Record<string, unknown>[]).map(normalizeColor),
             id: generateId(), // assign new IDs to avoid collisions
             createdAt: parsed[i].createdAt || Date.now(),
             updatedAt: Date.now(),
