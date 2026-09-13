@@ -35,5 +35,8 @@
   "colorName": "Color name",
   "transmissionDistanceMustBe0": "Transmission distance (must be > 0)",
   "presetName": "Preset name...",
-  "gamutHelp": "Generic to the current filament setup, not this upload."
+  "gamutHelp": "Generic to the current filament setup, not this upload.",
+  "kEntry": "Color {{index}} pigment absorption gain k",
+  "kHelp": "Optional pigment absorption gain (0 = plain Beer-Lambert). Calibrated presets carry fitted values; edit only if you know your material.",
+  "tdEntry": "Color {{index}} transmission distance"
 }

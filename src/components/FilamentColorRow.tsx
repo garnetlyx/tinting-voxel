@@ -63,6 +63,7 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
           it drives blending, classification, everything. */}
       <input
         type="number"
+        aria-label={t('filaments:tdEntry', { index: index + 1 })}
         value={config.transmission_distance}
         onChange={(e) => {
           const val = parseFloat(e.target.value);
@@ -77,6 +78,30 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
         step={0.1}
         className="w-20 px-2 py-1 text-sm border rounded text-right border-gray-300"
         title={t('filaments:transmissionDistanceMustBe0')}
+      />
+
+      {/* Optional pigment absorption gain. Calibrated presets carry a
+          fitted value; 0 (or cleared) blends as plain Beer-Lambert. */}
+      <input
+        type="number"
+        aria-label={t('filaments:kEntry', { index: index + 1 })}
+        value={config.k ?? 0}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw === '') {
+            onChange(index, { ...config, k: 0 });
+            return;
+          }
+          const val = parseFloat(raw);
+          if (!isNaN(val) && val >= 0 && val <= 1000) {
+            onChange(index, { ...config, k: val });
+          }
+        }}
+        min={0}
+        max={1000}
+        step={0.01}
+        className="w-16 px-2 py-1 text-sm border rounded text-right border-gray-300"
+        title={t('filaments:kHelp')}
       />
 
       {/* Remove button */}

@@ -32,7 +32,8 @@ Current 3D-printing color solutions face a combination of limitations:
 tinting-voxel solves these by:
 
 - Using a scientifically-grounded color mixing model based on light
-  transmission (Beer-Lambert / hybrid per-channel Kubelka-Munk variant).
+  transmission (unified Beer-Lambert: mu_ch = ln10/td + k·A_ch, light-loss
+  allocation stacking).
 - Generating optimized meshes with greedy meshing (70–80% box-count
   reduction).
 - Supporting **any N-color filament configuration (4–16 colors)** with
@@ -151,11 +152,11 @@ tinting-voxel solves these by:
 
 **Color processing**
 - K-means clustering (vectorized, CIELAB distance) for color extraction
-- N-color mapping via hybrid per-channel-k Beer-Lambert model
+- N-color mapping via unified (ln10/td + k·A_ch) Beer-Lambert model
 - CIEDE2000 perceptual matching with hue-preservation for dark chromatic colors
 - Three built-in filament presets: Bambu CMYWK Phase 6 (default), Bambu CMYW, and Clear CMYW.
   Custom configurations remain supported; removed preset IDs are rejected.
-- Palette browser for the two supported filament configurations
+- Palette browser for the three supported filament configurations
 - Filament preview matrix with pagination for large N
 
 **Output formats**
@@ -199,8 +200,8 @@ tinting-voxel solves these by:
 - **Production hardening** — thread locks on global matrices, bounded
   analytics, non-root Docker user (see TODO P0/P1).
 
-Parameter fitting (k_rgb / per-channel-k optimization against printed
-plates) is performed offline, outside this repo.
+Parameter fitting (per-color k optimization against printed plates) is
+performed offline, outside this repo; presets carry the fitted results.
 
 ### 4.3 Out of Scope
 
@@ -316,7 +317,7 @@ plates) is performed offline, outside this repo.
   swap).
 - User has transparent CMYK (and optionally additional) filaments.
 - User understands basic slicing workflow.
-- The hybrid per-channel-k Beer-Lambert model generalizes within a filament
+- The unified (ln10/td + k·A_ch) Beer-Lambert model generalizes within a filament
   family (validated for Bambu CMYK transparent PETG).
 
 ### 7.3 Dependencies
@@ -411,7 +412,7 @@ Full OpenAPI spec at `/docs` when the backend is running.
 | **3MF** | 3D Manufacturing Format — modern mesh format supporting color/material metadata |
 | **AMS / MMU** | Automatic Material System (Bambu) / Multi-Material Unit (Prusa) |
 | **TD1S** | Single-parameter transmission-distance power-law remapping used in calibration |
-| **Phase 6 / Phase 7** | Calibration generations: Phase 6 = per-color k; Phase 7 = per-channel k_rgb |
+| **Phase 6** | Calibration generation: per-color k (survives as the optional k field; Phase 7 per-channel variant retired) |
 
 ### B. References
 

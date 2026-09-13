@@ -81,6 +81,7 @@ function isValidPreset(p: unknown): p is SavedPreset {
     if (typeof color.name !== 'string') return false;
     if (typeof color.hex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color.hex)) return false;
     if (typeof color.transmission_distance !== 'number') return false;
+    if (color.k !== undefined && (typeof color.k !== 'number' || color.k < 0 || color.k > 1000)) return false;
   }
   return true;
 }

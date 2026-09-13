@@ -33,7 +33,9 @@ from calibration.core.photo_preprocessor import PhotoPreprocessor  # noqa: E402
 
 LN10 = float(np.log(10.0))
 LAYER_MM = 0.84
-ORIENTATION = "rot0"
+# Registered capture geometry (research crossval report + SCF Table S7):
+# the black-backing photo was shot 180° rotated relative to white.
+ORIENTATIONS = {"w": "rot0", "b": "rot180"}
 
 CODE_CSV = os.path.join(
     RESEARCH,
@@ -157,7 +159,7 @@ def main(check_only: bool = False):
             "photos": {
                 bk: {"path": p, "sha256": sha256(p)} for bk, p in PHOTOS.items()
             },
-            "orientation": ORIENTATION,
+            "orientations": ORIENTATIONS,
             "layer_mm": LAYER_MM,
         },
         "command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py",
@@ -189,7 +191,7 @@ def main(check_only: bool = False):
         Image.fromarray(res.image).save(warped)
         meas = sample_cells(warped)
         os.remove(warped)
-        meas_o = apply_orientation(meas, ORIENTATION)
+        meas_o = apply_orientation(meas, ORIENTATIONS[bk])
         pred = predict_grid(code_grid, np.array(bg) / 255.0, shipped)
         shipped_score = round(de_mean(pred, meas_o), 2)
         ref_spec = {ch: (kxa_reference[ch]["hex"], kxa_reference[ch]["td"], 0.0) for ch in kxa_reference}

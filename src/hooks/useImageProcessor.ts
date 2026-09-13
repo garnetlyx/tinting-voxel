@@ -227,6 +227,9 @@ export const useImageProcessor = () => {
     // Transmission distance must be positive
     if (filamentColors.some(c => c.transmission_distance <= 0)) return false;
 
+    // Optional pigment absorption gain must be within the backend bounds
+    if (filamentColors.some(c => c.k !== undefined && (c.k < 0 || c.k > 1000))) return false;
+
     return true;
   }, [filamentColors]);
 

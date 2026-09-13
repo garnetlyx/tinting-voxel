@@ -18,7 +18,7 @@ def test_catalog_matches_frontend_fixture():
         return list(value) if isinstance(value, tuple) else value
 
     actual = {name: [{key: _norm(value) for key, value in asdict(c).items()
-                      if value is not None and key != "k_rgb"} for c in colors]
+                      if value is not None} for c in colors]
               for name, colors in PRESETS.items()}
     assert actual == expected
     assert get_available_presets() == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmyw"]

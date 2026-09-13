@@ -35,5 +35,8 @@
   "colorName": "颜色名称",
   "transmissionDistanceMustBe0": "透射距离（必须大于 0）",
   "presetName": "预设名称…",
-  "gamutHelp": "展示当前耗材配置的色域，与本次上传的图片无关。"
+  "gamutHelp": "展示当前耗材配置的色域，与本次上传的图片无关。",
+  "kEntry": "颜色 {{index}} 颜料吸收增益 k",
+  "kHelp": "可选的颜料吸收增益(0 = 纯 Beer-Lambert)。标定预设携带拟合值;仅在了解材料特性时修改。",
+  "tdEntry": "颜色 {{index}} 透射距离"
 }

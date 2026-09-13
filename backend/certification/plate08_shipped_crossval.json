@@ -60,7 +60,10 @@
         "sha256": "2bee657ff8c8eaa5ce0663136cdab3f472a58a2eeaf9f594a5ef104cc9391f89"
       }
     },
-    "orientation": "rot0",
+    "orientations": {
+      "w": "rot0",
+      "b": "rot180"
+    },
     "layer_mm": 0.84
   },
   "command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py",
@@ -77,8 +80,8 @@
       "same_batch_reference": 36.21
     },
     "b": {
-      "shipped_preset": 21.77,
-      "same_batch_reference": 24.08
+      "shipped_preset": 20.23,
+      "same_batch_reference": 21.92
     }
   }
 }

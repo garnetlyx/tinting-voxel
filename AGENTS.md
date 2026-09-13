@@ -205,9 +205,9 @@ npx playwright test
 
 ## Calibration & Research
 
-Beer-Lambert parameter calibration (alpha/td/k fitting against printed test plates) is performed offline, outside this repo. This repo consumes calibration results only, as presets in `core/color_config.py`.
+Beer-Lambert parameter calibration (td/k fitting against printed test plates) is performed offline, outside this repo. This repo consumes calibration results only, as presets in `core/color_config.py`.
 
-Calibrated parameters (td/alpha/k presets) are **process-conditioned**: they are valid for the filament × printer × profile combination they were fitted on, so calibration prints and application prints must share the same slicer profile.
+Calibrated parameters (td/k presets) are **process-conditioned**: they are valid for the filament × printer × profile combination they were fitted on, so calibration prints and application prints must share the same slicer profile.
 
 ## Common Tasks
 
