@@ -31,14 +31,14 @@ def test_filament_preview_with_bambu_preset(client):
 
 
 def test_filament_preview_with_clear_preset(client):
-    """POST /api/filament-preview with clear_cmywg preset."""
+    """POST /api/filament-preview with clear_cmyw preset."""
     response = client.post(
         "/api/filament-preview",
-        json={"filamentPreset": "clear_cmywg"},
+        json={"filamentPreset": "clear_cmyw"},
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["stats"]["colorCount"] == 5
+    assert data["stats"]["colorCount"] == 4
 
 
 def test_filament_preview_with_custom_colors(client):

@@ -125,22 +125,22 @@ describe('useImageProcessor', () => {
     expect(result.current.filamentPreset).toBe('bambu_cmywk_phase6');
     expect(result.current.filamentColors).toHaveLength(5);
     expect(result.current.layerCount).toBe(4);
-    expect(result.current.maxLayerCount).toBe(8);
+    expect(result.current.maxLayerCount).toBe(10);
     expect(result.current.filamentColors.some(color => color.name === 'Key')).toBe(true);
     expect(result.current.filamentColors[0].k).toBe(8.13);
   });
 
-  it('derives a lower max layer count for filament sets with more colors and clamps the current value', () => {
+  it('clamps the layer count to the fixed UI maximum', () => {
     const { result } = renderHook(() => useImageProcessor());
 
     act(() => {
-      result.current.loadPreset('clear_cmywg');
-      result.current.setLayerCount(9);
+      result.current.loadPreset('clear_cmyw');
+      result.current.setLayerCount(11);
     });
 
-    expect(result.current.filamentColors).toHaveLength(5);
-    expect(result.current.maxLayerCount).toBe(8);
-    expect(result.current.layerCount).toBe(8);
+    expect(result.current.filamentColors).toHaveLength(4);
+    expect(result.current.maxLayerCount).toBe(10);
+    expect(result.current.layerCount).toBe(10);
   });
 
   it('raises the default layer height only when every filament classifies as transparent', () => {
@@ -162,7 +162,7 @@ describe('useImageProcessor', () => {
 
     act(() => {
       result.current.setLayerHeight(0.3);
-      result.current.loadPreset('clear_cmywg');
+      result.current.loadPreset('clear_cmyw');
     });
     expect(result.current.layerHeight).toBe(0.3);
 
@@ -435,10 +435,7 @@ describe('useImageProcessor', () => {
           expect.objectContaining({
             name: 'Cyan',
             transmission_distance: 2.1,
-            alpha: 8.08,
             k: 8.13,
-            td_scale: 1.48,
-            td_gamma: 0.20,
           }),
         ]),
       })

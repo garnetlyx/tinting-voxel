@@ -150,8 +150,6 @@ async def api_process_image(
 
     vector_results, quantized = process_image_vector_with_preview(img_array, config)
 
-    # Try to get cached reference matrices for preset configurations
-    from services.matrix_cache import get_cached_matrices, set_cached_matrices
     from services.stl_generator import compute_reference_matrices
     from core.color_materials import Color
 

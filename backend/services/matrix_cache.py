@@ -12,9 +12,11 @@ The cache is a small LRU: entries are pandas DataFrames whose size grows
 with the candidate count, so only the most recent configurations are
 retained.
 """
-from typing import Optional, Tuple
+import logging
+from collections import OrderedDict
+from typing import Optional
+
 import pandas as pd
-from functools import lru_cache
 
 from core.blend_color import Colors, colors_key
 from core import color_config as _color_config
@@ -38,7 +40,7 @@ def _cache_key(colors: Colors, layer_count: int, layer_height: float, prune: Opt
 
 
 def get_cached_matrices(
-    preset_name: Optional[str],
+    colors: Colors,
     layer_count: int,
     layer_height: float,
     prune: Optional[bool] = None,
@@ -57,7 +59,7 @@ def get_cached_matrices(
 
 
 def set_cached_matrices(
-    preset_name: Optional[str],
+    colors: Colors,
     layer_count: int,
     layer_height: float,
     ref_code_matrix: pd.DataFrame,
@@ -81,13 +83,10 @@ def compute_and_cache_matrices(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Compute (or fetch cached) matrices for a named preset configuration."""
     from services.stl_generator import compute_reference_matrices
-    
-    # Get preset configuration
-    configs = get_preset(preset_name)
+
+    configs = _color_config.get_preset(preset_name)
     if configs is None:
         raise ValueError(f"Unknown preset: {preset_name}")
-    
-    # Create Colors instance
     colors = Colors.from_configs(configs)
     cached = get_cached_matrices(colors, layer_count, layer_height, n_targets=n_targets)
     if cached is not None:
@@ -102,27 +101,22 @@ def warmup_cache(
 ) -> int:
     """
     Pre-compute and cache matrices for common configurations.
-    
+
     Args:
-        preset_names: List of preset names to warm up (default: all available presets)
-        layer_counts: List of layer counts to warm up (default: [4, 5, 6, 7, 8])
-        layer_heights: List of layer heights to warm up (default: [0.08])
-        
+        preset_names: Presets to warm up (default: all available presets)
+        layer_counts: Layer counts to warm up (default: [4, 5])
+        layer_heights: Layer heights to warm up (default: [0.08])
+
     Returns:
         Number of cache entries created
     """
-    from core.color_config import get_available_presets
-    
     if preset_names is None:
-        # Warm up all available presets
-        preset_names = get_available_presets()
-    
+        preset_names = _color_config.get_available_presets()
     if layer_counts is None:
-        layer_counts = [4, 5, 6, 7, 8]
-    
+        layer_counts = [4, 5]
     if layer_heights is None:
         layer_heights = [0.08]
-    
+
     count = 0
     for preset_name in preset_names:
         for layer_count in layer_counts:
@@ -131,9 +125,8 @@ def warmup_cache(
                     compute_and_cache_matrices(preset_name, layer_count, layer_height)
                     count += 1
                 except Exception:
-                    # Skip presets that fail (e.g., too many permutations)
+                    # Skip configurations that fail (e.g. too many permutations)
                     pass
-    
     return count
 
 
@@ -146,5 +139,5 @@ def get_cache_stats() -> dict:
     """Get cache statistics."""
     return {
         "size": len(_MATRIX_CACHE),
-        "keys": list(_MATRIX_CACHE.keys()),
+        "keys": [repr(key) for key in _MATRIX_CACHE.keys()],
     }

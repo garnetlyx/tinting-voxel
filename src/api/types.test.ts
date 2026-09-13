@@ -3,11 +3,11 @@ import canonical from './__fixtures__/filament-presets.json';
 import { DEFAULT_PRESETS, isAllTransparentFilaments } from './types';
 
 describe('built-in presets', () => {
-  it('exposes exactly Bambu CMYWK, Bambu CMYW, and Clear CMYWG', () => {
-    expect(Object.keys(DEFAULT_PRESETS)).toEqual(['bambu_cmywk_phase6', 'bambu_cmyw_phase6', 'clear_cmywg']);
+  it('exposes exactly Bambu CMYWK, Bambu CMYW, and Clear CMYW', () => {
+    expect(Object.keys(DEFAULT_PRESETS)).toEqual(['bambu_cmywk_phase6', 'bambu_cmyw_phase6', 'clear_cmyw']);
     expect(DEFAULT_PRESETS.bambu_cmywk_phase6.map(c => c.name[0])).toEqual(['C', 'M', 'Y', 'W', 'K']);
     expect(DEFAULT_PRESETS.bambu_cmyw_phase6.map(c => c.name[0])).toEqual(['C', 'M', 'Y', 'W']);
-    expect(DEFAULT_PRESETS.clear_cmywg.map(c => c.name[0])).toEqual(['C', 'M', 'Y', 'W', 'G']);
+    expect(DEFAULT_PRESETS.clear_cmyw.map(c => c.name[0])).toEqual(['C', 'M', 'Y', 'W']);
   });
   it('classifies preset transparency from the stored td at the default threshold', () => {
     // All clear CMYW tds meet 4.5 (lowest is cyan at 4.7).

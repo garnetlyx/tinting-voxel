@@ -3,7 +3,7 @@ import { useTranslation } from '../i18n';
  * Single row for editing one filament color configuration
  */
 import React from 'react';
-import { Trash2, Lock } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import type { FilamentColorConfig } from '../api/types';
 
 interface FilamentColorRowProps {
@@ -14,18 +14,6 @@ interface FilamentColorRowProps {
   canRemove: boolean;
   existingLabels: string[];
 }
-
-/** True when any measured field overrides the scalar td for this color. */
-export const hasMeasuredParams = (config: FilamentColorConfig): boolean =>
-  config.td_rgb != null || config.td_neutral != null;
-
-/** Tooltip listing the parameters that actually drive blending/classification. */
-export const measuredParamsDescription = (config: FilamentColorConfig): string => {
-  const parts: string[] = [];
-  if (config.td_rgb) parts.push(`td_rgb (${config.td_rgb.map(v => v.toFixed(2)).join(', ')})`);
-  if (config.td_neutral != null) parts.push(`TD1S ${config.td_neutral}`);
-  return parts.join(' · ');
-};
 
 export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
   config,
@@ -39,7 +27,6 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
   const label = config.name?.[0]?.toUpperCase() ?? '';
   const isDuplicate = label && existingLabels.filter(l => l === label).length > 1;
   const isEmptyName = !config.name.trim();
-  const isMeasured = hasMeasuredParams(config);
 
   return (
     <div className="flex items-center gap-2">
@@ -72,12 +59,8 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
         />
       </div>
 
-      {/* Transmission distance.
-          Measured colors are locked: the scalar td is inert while td_rgb /
-          td_neutral drive blending and classification, so editing it here
-          would change nothing. The lock button downgrades the color to
-          custom semantics (clears measured fields), after which this td
-          drives both blending and the transparency fallback. */}
+      {/* Transmission distance — the one composite TD this color carries;
+          it drives blending, classification, everything. */}
       <input
         type="number"
         value={config.transmission_distance}
@@ -89,36 +72,12 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
             onChange(index, { ...config, transmission_distance: val });
           }
         }}
-        disabled={isMeasured}
         min={0.1}
         max={1000}
         step={0.1}
-        className={`w-20 px-2 py-1 text-sm border rounded text-right ${
-          isMeasured ? 'border-gray-200 bg-gray-100 text-gray-400' : 'border-gray-300'
-        }`}
-        title={
-          isMeasured
-            ? `${measuredParamsDescription(config)}${config.transmission_distance ? `\n${t('filaments:measuredTdInert')}` : ''}`
-            : t('filaments:transmissionDistanceMustBe0')
-        }
+        className="w-20 px-2 py-1 text-sm border rounded text-right border-gray-300"
+        title={t('filaments:transmissionDistanceMustBe0')}
       />
-
-      {isMeasured && (
-        <button
-          onClick={() =>
-            onChange(index, {
-              ...config,
-              td_rgb: undefined,
-              td_neutral: undefined,
-            })
-          }
-          className="p-1 rounded hover:bg-amber-50 transition-colors"
-          title={t('filaments:downgradeToCustom')}
-          aria-label={t('filaments:downgradeToCustom')}
-        >
-          <Lock className="w-4 h-4 text-amber-500" />
-        </button>
-      )}
 
       {/* Remove button */}
       <button

@@ -1,17 +1,12 @@
 """
-Real-image benchmark: process_image with the Clear CMYWG palette at 8 layers
-and 0.84 mm layer height — the frozen headline case — timed on both mapping
-paths with identical inputs:
+Real-image benchmark for the time-budget enumeration policy.
 
-- pruned: automatic transparency classification (composition-pruned matrix)
-- oracle: forced full enumeration by raising the transparency threshold so
-  that nothing classifies as translucent
-
-Both calls go through the complete pipeline (K-means extraction, mapping,
-simulated-print rendering). The pruned path must complete strictly faster at
-equal output quality (the mapping-quality budgets are asserted separately in
-TestPrunedVsFullOracle; here we assert pipeline success and the speedup).
-Metrics are written to the OS temp dir, never the working tree.
+The shipped clear preset (4-color CMYW) at 8 layers / 0.84 mm enumerates
+fully in seconds — well inside the 60 s budget — so production takes the
+exact full path. This benchmark pins that headline timing, then exercises
+the composition-pruned path by forcing the budget to ~zero, and records
+both timings plus palette drift between the paths. Metrics are written to
+the OS temp dir, never the working tree.
 """
 import os
 import tempfile
@@ -65,7 +60,7 @@ def test_cmywk_8l_process_image_latency_gate():
 
 @pytest.mark.skipif(not os.path.exists(LOCAL_PHOTO), reason="local-photo.JPG local fixture not present")
 def test_clear_8l_process_image_pruned_vs_full_enumeration_benchmark():
-    colors = Colors.from_configs(get_preset("clear_cmywg"))
+    colors = Colors.from_configs(get_preset("clear_cmyw"))
     image_bytes = open(LOCAL_PHOTO, "rb").read()
     common = dict(
         image_bytes=image_bytes,
@@ -134,11 +129,11 @@ def test_clear_8l_process_image_pruned_vs_full_enumeration_benchmark():
     metrics = {
         "layer_count": 8,
         "layer_height": 0.84,
-        "full_enumeration_codes": 5**8,
-        "composition_representatives": 495,
+        "full_enumeration_codes": 4**8,
+        "composition_representatives": 165,
         "pruned_process_image_s": round(t_pruned, 2),
         "full_process_image_s": round(t_full, 2),
-        "speedup": round(t_full / t_pruned, 1),
+        "full_over_pruned": round(t_full / t_pruned, 1),
         "palette_delta_e00_mean": round(float(de.mean()), 2),
         "palette_delta_e00_max": round(float(de.max()), 2),
     }

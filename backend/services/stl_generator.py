@@ -107,8 +107,6 @@ def _build_codes_to_rgb(colors: Colors, layer_count: int, layer_height: float):
         colors=colors,
         layer_height=layer_height,
         layer_count_max=layer_count,
-        alpha=colors.get_blend_alpha(),
-        blend_mode=colors.get_blend_mode(),
     )
     return generator.codes_to_rgb
 
@@ -118,6 +116,7 @@ def compute_reference_matrices(
     layer_height: float,
     colors: Colors,
     prune: Optional[bool] = None,
+    n_targets: Optional[int] = None,
 ) -> tuple:
     """
     Compute color reference matrices for Beer-Lambert mapping.
@@ -128,18 +127,24 @@ def compute_reference_matrices(
         layer_count: Number of layers for color blending
         layer_height: Height of each layer in mm
         colors: Colors instance defining the filament configuration
+        n_targets: Number of input colors that will be matched against the
+            matrix; included in the wall-time estimate so the enumeration
+            decision accounts for the matching pass, not just the build
 
     Returns:
         Tuple of (code_matrix, rgb_matrix) as DataFrames
 
     prune:
-        None (default) prunes to composition representatives in the translucent
-        regime and keeps full enumeration otherwise; False forces the full
-        ordered enumeration in every regime (correctness oracle for the
-        pruned path). Pruning is never forced outside the translucent regime.
+        None (default) enumerates fully whenever the probe-extrapolated wall
+        time fits the budget (settings.full_enumeration_budget_seconds) and
+        falls back to composition representatives when only a translucent
+        set could otherwise meet it; False forces the full ordered
+        enumeration in every regime (correctness oracle for the pruned path).
+        Pruning is never forced outside the translucent regime.
 
     Raises:
-        ValueError: If permutation count exceeds safety limit
+        ValueError: If the estimated full-enumeration time exceeds the budget
+            for a set that cannot be pruned (opaque/mixed)
     """
     if layer_count <= 0:
         raise ValueError(f"layer_count must be positive, got {layer_count}")
@@ -155,14 +160,11 @@ def compute_reference_matrices(
         colors=colors,
         layer_height=layer_height,
         layer_count_max=layer_count,
-        alpha=colors.get_blend_alpha(),
-        blend_mode=colors.get_blend_mode(),
     )
 
     items = colors.get_labels()
     if not items:
         raise ValueError("Colors instance has no colors defined")
-    max_permutations = 1_000_000
     permutation_count = len(items) ** layer_count
 
     if prune is True:
@@ -200,34 +202,24 @@ def compute_reference_matrices(
             f"Reduce the number of colors or layers."
         )
     if use_prune:
-        # Translucent regime: one canonical representative per composition
-        # (C(N+L-1, L) candidates; see core/stack_prune.py) instead of the
-        # full ordered product; order is recovered per match by
-        # refine_matches().
+        # Translucent regime over budget: one canonical representative per
+        # composition (C(N+L-1, L) candidates; see core/stack_prune.py)
+        # instead of the full ordered product; order is recovered per match
+        # by refine_matches().
         code_list = composition_codes(items, layer_count)
-        if len(code_list) > max_permutations:
-            raise ValueError(
-                f"Too many stack compositions: {len(items)} colors x {layer_count} layers = "
-                f"{len(code_list):,}. Maximum allowed is {max_permutations:,}. "
-                f"Reduce the number of colors or layers."
-            )
         logger.info(
             "Pruned stack candidates: %d compositions of %d colors x %d layers, "
-            "%d diverse orderings in matrix (full ordered set would be %d)",
+            "%d diverse orderings in matrix (full ordered set would be %d; "
+            "full estimate %.0fs over %.0fs budget)",
             len(set("".join(sorted(c)) for c in code_list)), len(items), layer_count,
             len(code_list), permutation_count,
+            estimated_seconds, settings.full_enumeration_budget_seconds,
         )
     else:
-        if permutation_count > max_permutations:
-            raise ValueError(
-                f"Too many color permutations: {len(items)} colors x {layer_count} layers = "
-                f"{permutation_count:,}. Maximum allowed is {max_permutations:,}. "
-                f"Reduce the number of colors or layers."
-            )
         perms = list(itertools.product(items, repeat=layer_count))
         code_list = [''.join(p) for p in perms]
 
-    rgb_list = [generator.code_to_rgb(code) for code in code_list]
+    rgb_list = generator.codes_to_rgb(code_list)
 
     n = len(code_list)
     rows = int(np.sqrt(n))
@@ -414,8 +406,6 @@ def initialize_color_mapping(
             colors=colors,
             layer_height=layer_height,
             layer_count_max=layer_count,
-            alpha=colors.get_blend_alpha(),
-            blend_mode=colors.get_blend_mode(),
         )
 
         _reference_code_matrix, _reference_rgb_matrix = compute_reference_matrices(

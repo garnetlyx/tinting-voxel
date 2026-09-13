@@ -28,7 +28,7 @@ def _palette_to_info(entry) -> PaletteInfo:
                 name=c.name,
                 hex=c.hex,
                 transmission_distance=c.transmission_distance,
-                alpha=c.alpha, k=c.k, td_scale=c.td_scale, td_gamma=c.td_gamma,
+                k=c.k,
             )
             for c in entry.colors
         ],

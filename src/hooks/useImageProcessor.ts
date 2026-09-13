@@ -32,21 +32,13 @@ const MIN_FILAMENT_COLORS = 4;
 const MAX_FILAMENT_COLORS = 16;
 const MIN_COLOR_LAYERS = 4;
 const MAX_COLOR_LAYERS = 10;
-const MAX_BLEND_PERMUTATIONS = 1_000_000;
 const DEFAULT_MAX_DIMENSION_MM = 200;
 const MIN_PIXEL_SIZE_MM = 0.01;
 const MAX_PIXEL_SIZE_MM = 5.0;
 
 const clampPixelSize = (value: number) => Math.max(MIN_PIXEL_SIZE_MM, Math.min(MAX_PIXEL_SIZE_MM, value));
 
-const computeMaxLayerCount = (filamentCount: number) => {
-  let maxLayerCount = MIN_COLOR_LAYERS;
-  for (let candidate = MIN_COLOR_LAYERS; candidate <= MAX_COLOR_LAYERS; candidate += 1) {
-    if (filamentCount ** candidate > MAX_BLEND_PERMUTATIONS) break;
-    maxLayerCount = candidate;
-  }
-  return maxLayerCount;
-};
+const computeMaxLayerCount = () => MAX_COLOR_LAYERS;
 
 const computeDefaultPixelSize = (widthPx: number, heightPx: number) => {
   const longestSidePx = Math.max(widthPx, heightPx);
@@ -243,10 +235,7 @@ export const useImageProcessor = () => {
     [filamentColors, filamentPreset]
   );
 
-  const maxLayerCount = useMemo(
-    () => computeMaxLayerCount(filamentColors.length),
-    [filamentColors.length]
-  );
+  const maxLayerCount = useMemo(() => computeMaxLayerCount(), []);
 
   const handleSetLayerCount = useCallback((value: number) => {
     setLayerCount(Math.max(MIN_COLOR_LAYERS, Math.min(maxLayerCount, value)));

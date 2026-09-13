@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # Stack-search budget: full permutation enumeration (N^L codes) is used
+    # whenever its probe-extrapolated wall time fits this budget; larger
+    # translucent sets fall back to composition pruning, and larger opaque
+    # sets are rejected. 60s matches the Railway edge request timeout that
+    # bounds every sync endpoint anyway.
+    full_enumeration_budget_seconds: float = 60.0
+
     # STL/3MF generation: cap on total merged boxes per request. Greedy meshing
     # collapses runs of same-color pixels, so the guard is enforced on the REAL
     # merged box count (cumulative across color blocks), not on the raw
