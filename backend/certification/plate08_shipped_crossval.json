@@ -66,7 +66,10 @@
   "command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py",
   "check_command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py --check",
   "research_engine_pin": "165fa55cba8e0a6fc6b6b2e1ab69cdf9d139f287",
-  "app_commit": "c4ff27082066928a1e341003ae952ac4dfd5b17c",
+  "certified_values_source": {
+    "app_commit": "",
+    "tree_sha256": "d18c3300294c46b2c37c3435326b1803754f517c"
+  },
   "backings": {
     "w": {
       "shipped_preset": 40.85,

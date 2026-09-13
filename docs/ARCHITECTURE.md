@@ -101,9 +101,9 @@ tinting-voxel/
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py        # Color blending (BlendTestGenerator, colors_key)
-│   │   ├── blend_models.py       # The unified blend formula + vectorized batch path
+│   │   ├── blend_models.py       # The unified blend formula (mu=ln10/td+k*A) + vectorized batch
 │   │   ├── color_config.py       # Filament presets single source of truth (Phase6 preset)
-│   │   ├── color_materials.py    # Material property definitions (k_rgb support)
+│   │   ├── color_materials.py    # Material property definitions (Color: hex+td+k)
 │   │   ├── code_grid.py          # Code grid generation utilities
 │   │   ├── grid_sampling.py      # Code-grid RGB assembly for blend fitting
 │   │   ├── plate_geometry.py     # Plate geometry calculations

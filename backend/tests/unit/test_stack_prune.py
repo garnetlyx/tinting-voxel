@@ -422,3 +422,37 @@ class TestBudgetUsesRealTargetCount:
         n_many = len({many.iat[r, c] for r in range(many.shape[0]) for c in range(many.shape[1])})
         assert n_few == 5**8, "1 target fits the budget -> full enumeration"
         assert n_many == 495, "10k targets exceed it -> composition pruning"
+
+
+class TestEstimateAccuracy:
+    """The probe model must track the measured uncached wall time of a real
+    compute_reference_matrices call (complete build + match), within 3x."""
+
+    def test_estimate_tracks_measured_matrix_time(self):
+        import time as _time
+        from core.color_materials import Color as _C
+        from services import matrix_cache as _mc
+        from services.stl_generator import (
+            _estimate_full_enumeration_seconds as _est,
+            compute_reference_matrices as _crm,
+        )
+        colors = Colors(colors={
+            l: _C(l, td, h) for l, h, td in zip(
+                "CMYWK",
+                ["#3D79C6", "#B3356E", "#FFE665", "#FFFFFF", "#0B0F0C"],
+                [0.5, 0.5, 0.6, 0.6, 0.3],
+            )
+        })
+        n = 5 ** 5  # 3,125 codes: fast, representative shape
+        est = _est(n, 10)
+        _mc.clear_cache()
+        t0 = _time.perf_counter()
+        _crm(5, 0.08, colors, n_targets=10)
+        measured = _time.perf_counter() - t0
+        _mc.clear_cache()
+        assert est <= measured * 3, (
+            f"estimate {est:.2f}s exceeds measured {measured:.2f}s by >3x"
+        )
+        assert est >= measured * 0.1, (
+            f"estimate {est:.2f}s is >10x below measured {measured:.2f}s"
+        )

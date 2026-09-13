@@ -37,7 +37,7 @@ tinting-voxel/
 │   │   ├── blend_models.py   # Pluggable blend functions (hybrid per-channel-k)
 │   │   ├── code_grid.py      # Code grid generation utilities
 │   │   ├── color_config.py   # Filament presets (single source of truth)
-│   │   ├── color_materials.py # Material property definitions (k_rgb support)
+│   │   ├── color_materials.py # Material property definitions (Color: hex+td+k)
 │   │   ├── grid_sampling.py  # Code-grid RGB assembly for blend fitting
 │   │   └── palette_library.py # Supported filament palettes
 │   ├── services/         # Business logic

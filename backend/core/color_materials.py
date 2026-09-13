@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 class Color:
     # Baseline "no absorption correction". Calibrated families set k
     # explicitly (e.g. bambu phase6 k=8.13); 0 makes default-parameter
-    # colors blend as plain Beer-Lambert t = exp(-alpha*d/td).
+    # colors blend as plain base-10 Beer-Lambert t = 10^(-d/td).
     DEFAULT_K = 0.0
     DEFAULT_HEX = {
         "C": "#00FFFF",

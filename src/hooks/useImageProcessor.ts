@@ -91,7 +91,7 @@ export const useImageProcessor = () => {
     [...DEFAULT_PRESETS[DEFAULT_FILAMENT_PRESET]]
   );
 
-  // Transparency classification (TD1S neutral TD threshold, mm). Data-driven:
+  // Transparency classification (stored td threshold, mm). Data-driven:
   // every filament must meet the threshold for the set to count as transparent.
   const allTransparent = useMemo(
     () => isAllTransparentFilaments(filamentColors),

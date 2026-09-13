@@ -67,7 +67,23 @@ def load_shipped_preset():
     return {labels[i]: (c["hex"], c["td"], c["k"]) for i, c in enumerate(colors)}
 
 
+def _engine_pin_ok() -> bool:
+    """The ENGINE submodule (the blend math used for conventions) must be
+    pinned at 165fa55; the research repo itself moves independently."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=os.path.join(RESEARCH, "engine"),
+            capture_output=True, text=True,
+        ).stdout.strip()
+        return out == "165fa55cba8e0a6fc6b6b2e1ab69cdf9d139f287"
+    except Exception:
+        return False
+
+
 def main(check_only: bool = False):
+    if not _engine_pin_ok():
+        print("research engine pin drifted from 165fa55 — certification invalid")
+        sys.exit(1)
     shipped = load_shipped_preset()
     abs_table = {}
     for ch, (hexv, td, k) in shipped.items():
@@ -146,9 +162,19 @@ def main(check_only: bool = False):
         "command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py",
         "check_command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py --check",
         "research_engine_pin": "165fa55cba8e0a6fc6b6b2e1ab69cdf9d139f287",
-        "app_commit": subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True
-        ).stdout.strip(),
+        # Non-circular provenance: the tree hash of the commit that last
+        # touched backend/core/color_config.py (the certified values), NOT
+        # the working HEAD — reruns from any branch check the same source.
+        "certified_values_source": {
+            "app_commit": subprocess.run(
+                ["git", "log", "-1", "--format=%H", "--", "backend/core/color_config.py"],
+                cwd=REPO_ROOT, capture_output=True, text=True,
+            ).stdout.strip(),
+            "tree_sha256": subprocess.run(
+                ["git", "rev-parse", "HEAD:backend/core/color_config.py"],
+                cwd=REPO_ROOT, capture_output=True, text=True,
+            ).stdout.strip(),
+        },
         "backings": {},
     }
 
@@ -173,11 +199,23 @@ def main(check_only: bool = False):
     if check_only:
         tracked = os.path.join(REPO_ROOT, "certification", "plate08_shipped_crossval.json")
         existing = json.load(open(tracked))
+        # Every provenance/input field must match, not just the scores:
+        # formula, inputs (hashes, orientation, layer), both preset tables,
+        # and the certified source revision. app_commit inside
+        # certified_values_source is HEAD-relative at certification time and
+        # re-derives per run, so compare its tree hash (immutable).
+        compare_keys = [k for k in report if k != "certified_values_source"]
         drift = {
             k: (existing.get(k), report.get(k))
-            for k in ("shipped_preset", "backings")
+            for k in compare_keys
             if existing.get(k) != report.get(k)
         }
+        for side in (existing.get("certified_values_source") or {}, report.get("certified_values_source") or {}):
+            if side.get("tree_sha256") and existing.get("certified_values_source", {}).get("tree_sha256") != side.get("tree_sha256"):
+                drift["certified_values_source.tree_sha256"] = (
+                    existing.get("certified_values_source", {}).get("tree_sha256"),
+                    side.get("tree_sha256"),
+                )
         if drift:
             print("CERTIFICATION DRIFT DETECTED:")
             print(json.dumps(drift, indent=2)[:2000])
