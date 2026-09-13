@@ -5,7 +5,7 @@ import { useTranslation } from './index';
 const presetKeys = {
   bambu_cmywk_phase6: 'filaments:bambu_cmywk_phase6',
   bambu_cmyw_phase6: 'filaments:bambu_cmyw_phase6',
-  clear_cmywg: 'filaments:clear_cmywg',
+  clear_cmyw: 'filaments:clear_cmyw',
 } as const;
 
 export function usePresetLabel() {

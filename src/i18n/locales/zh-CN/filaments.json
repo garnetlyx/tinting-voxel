@@ -28,7 +28,7 @@
   "custom": "自定义",
   "bambu_cmywk_phase6": "Bambu CMYWK",
   "bambu_cmyw_phase6": "Bambu CMYW",
-  "clear_cmywg": "透明 CMYWG",
+  "clear_cmyw": "透明 CMYW",
   "codeName": "编码",
   "codeHelp": "每种颜色使用不重复的字母编码（A–Z）。编码用于区分颜色，色值可自由配置。",
   "pickColor": "选择颜色",

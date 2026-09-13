@@ -29,19 +29,32 @@ logger = logging.getLogger(__name__)
 # build+match path; see _probe_throughput for the decomposition.
 _probe_state: dict = {}
 
+# Global reference-matrix state (module-level cache for the legacy
+# initialize_color_mapping path used by tests and warmup).
+_reference_code_matrix = None
+_reference_rgb_matrix = None
+_blend_generator = None
+_current_colors = None
+_global_state_lock = threading.Lock()
+
 
 def _probe_throughput() -> tuple[float, float, float]:
-    """Measure blend & match throughput once; both are linear in code count.
+    """Measure the COMPLETE per-code cost of the enumeration path.
 
-    Match cost is two-part per code: a fixed part (matrix cell extraction
-    + Lab conversion, independent of target count) plus a small marginal
-    per-target deltaE term. Measured at 1 and 6 targets and decomposed —
-    extrapolating the single-target rate linearly overestimates by >10x
-    at real target counts.
+    Both timed runs cover everything compute_reference_matrices plus its
+    callers' matching perform on a full enumeration: permutation
+    generation, code strings, batch blend, padding, DataFrame
+    construction, cell extraction, Lab conversion, and n-target deltaE
+    matching. Nothing is built before the timers start.
+
+    Decomposition: the 1-target run gives the full build + fixed-match
+    cost per code; the 64-target run isolates the marginal per-target
+    term (amplified above timing noise). All rates are per code and
+    linear in code count (verified 20k..1M codes).
     """
     if _probe_state:
         return (
-            _probe_state["blend_s_per_code"],
+            _probe_state["build_s_per_code"],
             _probe_state["match_fixed_s_per_code"],
             _probe_state["match_marginal_s_per_code_per_target"],
         )
@@ -54,51 +67,47 @@ def _probe_throughput() -> tuple[float, float, float]:
             [0.5, 0.5, 0.6, 0.6],
         )
     })
-    gen = BlendTestGenerator(colors=probe_colors, layer_height=0.08, layer_count_max=4)
-    codes = [''.join(p) for p in itertools.product("ABCD", repeat=8)][:16384]
-    t0 = _time.perf_counter()
-    gen.codes_to_rgb(codes)
-    blend = (_time.perf_counter() - t0) / len(codes)
-    df_c = pd.DataFrame([codes[i:i + 128] for i in range(0, len(codes), 128)])
-    df_r = pd.DataFrame([[(128.0, 128.0, 128.0)] * 128 for _ in range(len(df_c))])
-    # The marginal per-target term is small (~0.1-1.5 µs/code) next to the
-    # fixed extraction cost, so the second measurement point uses many
-    # targets to lift its signal well above timing noise (a 6-target point
-    # can measure a negative delta under load, which clamps to 0 and makes
-    # the estimate target-blind).
-    targets = [(120 + i, 130 + i % 7, 140) for i in range(64)]
-    t0 = _time.perf_counter()
-    _C.map_to_nearest_color(targets[:1], df_c, df_r)
-    per_code_1 = (_time.perf_counter() - t0) / len(codes)
-    t0 = _time.perf_counter()
-    _C.map_to_nearest_color(targets, df_c, df_r)
-    per_code_64 = (_time.perf_counter() - t0) / len(codes)
+    gen = BlendTestGenerator(colors=probe_colors, layer_height=0.08, layer_count_max=8)
+    labels = probe_colors.get_labels()
+    n = 4 ** 8  # 65,536 codes: a real full enumeration
+    targets_64 = [(120 + i, 130 + i % 7, 140) for i in range(64)]
+
+    def _timed_full_matrix(n_targets: int) -> float:
+        t0 = _time.perf_counter()
+        perms = list(itertools.product(labels, repeat=8))
+        codes = [''.join(p) for p in perms]
+        rgb_list = gen.codes_to_rgb(codes)
+        rows = int(np.sqrt(n))
+        cols = (n + rows - 1) // rows
+        pad = rows * cols - n
+        code_p = codes + [codes[-1]] * pad
+        rgb_p = rgb_list + [rgb_list[-1]] * pad
+        code_df = pd.DataFrame([code_p[i * cols:(i + 1) * cols] for i in range(rows)])
+        rgb_df = pd.DataFrame([rgb_p[i * cols:(i + 1) * cols] for i in range(rows)])
+        _C.map_to_nearest_color(targets_64[:n_targets], code_df, rgb_df)
+        return _time.perf_counter() - t0
+
+    per_code_1 = _timed_full_matrix(1) / n
+    per_code_64 = _timed_full_matrix(64) / n
     marginal = max((per_code_64 - per_code_1) / 63.0, 0.0)
     fixed = max(per_code_1 - marginal, 0.0)
+    build = fixed  # the 1-target run IS the complete build + fixed match
     _probe_state.update(
-        blend_s_per_code=blend,
+        build_s_per_code=build,
         match_fixed_s_per_code=fixed,
         match_marginal_s_per_code_per_target=marginal,
     )
     logger.info(
-        "Enumeration cost probe: blend %.2e s/code, match fixed %.2e s/code "
-        "+ %.2e s/code/target",
-        blend, fixed, marginal,
+        "Enumeration cost probe (complete path): build+fixed %.2e s/code, "
+        "marginal %.2e s/code/target",
+        build, marginal,
     )
-    return blend, fixed, marginal
+    return build, fixed, marginal
 
 
 def _estimate_full_enumeration_seconds(n_codes: int, n_targets: int) -> float:
-    blend_rate, match_fixed, match_marginal = _probe_throughput()
-    return n_codes * (blend_rate + match_fixed + match_marginal * n_targets)
-
-
-# Global reference matrices (initialized on app startup, used as fallback)
-_reference_code_matrix = None
-_reference_rgb_matrix = None
-_blend_generator = None
-_current_colors = None
-_global_state_lock = threading.Lock()
+    build_rate, match_fixed, match_marginal = _probe_throughput()
+    return n_codes * (build_rate + match_marginal * n_targets)
 
 
 def _build_codes_to_rgb(colors: Colors, layer_count: int, layer_height: float):
@@ -186,7 +195,10 @@ def compute_reference_matrices(
     estimated_seconds = _estimate_full_enumeration_seconds(
         permutation_count, n_targets or 10,
     )
-    within_budget = estimated_seconds <= settings.full_enumeration_budget_seconds
+    within_budget = (
+        estimated_seconds <= settings.full_enumeration_budget_seconds
+        and permutation_count <= settings.max_enumeration_codes
+    )
     use_prune = translucent and prune is not False and not within_budget
     if not translucent and not within_budget:
         # Opaque over-budget enumeration rejects unconditionally: composition

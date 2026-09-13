@@ -6,6 +6,6 @@
   "bambu_cmywk_phase6_description": "Calibrated Bambu Lab CMYWK filament set for full-color printing with true black",
   "bambu_cmyw_phase6_name": "Bambu CMYW",
   "bambu_cmyw_phase6_description": "Calibrated Bambu Lab CMYW filament set for full-color printing",
-  "clear_cmywg_name": "Clear CMYWG",
-  "clear_cmywg_description": "Translucent CMYWG filament set for light-diffusing prints"
+  "clear_cmyw_name": "Clear CMYW",
+  "clear_cmyw_description": "Translucent CMYW filament set for light-diffusing prints"
 }

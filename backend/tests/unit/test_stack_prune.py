@@ -463,6 +463,25 @@ class TestEstimateAccuracy:
             f"estimate {est:.3f}s is >10x below measured {measured:.3f}s"
         )
 
+    def test_memory_ceiling_rejects_beyond_max_codes(self, monkeypatch):
+        """Deterministic outside pytest instrumentation: enumeration beyond
+        settings.max_enumeration_codes rejects pre-materialization on any
+        host speed (the 512MB production container cannot hold 16.7M
+        codes even when a fast machine's time estimate fits the budget)."""
+        from config.settings import settings as _settings
+        from core.color_materials import Color as _C
+        from services import matrix_cache as _mc
+        from services.stl_generator import compute_reference_matrices as _crm
+        monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", 10_000.0)
+        opaque = Colors(colors={
+            l: _C(l, 0.5, h) for l, h in zip(
+                "ABCDEFGH", [f"#00{i:02d}00" for i in range(8)])
+        })
+        _mc.clear_cache()
+        with pytest.raises(ValueError, match="over the .* budget"):
+            _crm(8, 0.08, opaque, n_targets=10)  # 8^8 = 16.7M > 2M ceiling
+        _mc.clear_cache()
+
     def test_regime_flips_at_budget_boundary(self, monkeypatch):
         """Behavior near the 60s boundary: the budget decides full vs prune
         using the end-to-end estimate, and translucent sets over budget
