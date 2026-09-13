@@ -76,7 +76,7 @@ class TestFilamentPreviewService:
         assert result["stats"]["colorCount"] == 4
 
     def test_generate_preview_with_clear_preset(self):
-        """Preview works with Clear CMYWG preset (5 colors: CMYWG)."""
+        """Preview works with Clear CMYW preset (4 colors: CMYW)."""
         colors = Colors.from_configs(CLEAR_CMYW_PRESET)
         service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
         result = service.generate_preview()

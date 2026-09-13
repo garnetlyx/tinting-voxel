@@ -463,23 +463,27 @@ class TestEstimateAccuracy:
             f"estimate {est:.3f}s is >10x below measured {measured:.3f}s"
         )
 
-    def test_memory_ceiling_rejects_beyond_max_codes(self, monkeypatch):
-        """Deterministic outside pytest instrumentation: enumeration beyond
-        settings.max_enumeration_codes rejects pre-materialization on any
-        host speed (the 512MB production container cannot hold 16.7M
-        codes even when a fast machine's time estimate fits the budget)."""
+    def test_within_budget_accepted_regardless_of_code_count(self, monkeypatch):
+        """Frozen policy: the time budget is the ONLY enumeration gate —
+        no fixed code-count cap. A set whose probe estimate fits the budget
+        enumerates fully no matter how many codes that is."""
         from config.settings import settings as _settings
         from core.color_materials import Color as _C
         from services import matrix_cache as _mc
+        from services import stl_generator as _sg
         from services.stl_generator import compute_reference_matrices as _crm
-        monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", 10_000.0)
         opaque = Colors(colors={
             l: _C(l, 0.5, h) for l, h in zip(
                 "ABCDEFGH", [f"#00{i:02d}00" for i in range(8)])
         })
+        est = _sg._estimate_full_enumeration_seconds(8 ** 8, 10)
+        # Budget set comfortably ABOVE the estimate: the 8^8 (16.7M-code)
+        # enumeration must be admitted — there is no count ceiling.
+        monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", est * 10)
         _mc.clear_cache()
-        with pytest.raises(ValueError, match="over the .* budget"):
-            _crm(8, 0.08, opaque, n_targets=10)  # 8^8 = 16.7M > 2M ceiling
+        df, _ = _crm(8, 0.08, opaque, n_targets=10)
+        uniq = {df.iat[r, c] for r in range(df.shape[0]) for c in range(df.shape[1])}
+        assert len(uniq) == 8 ** 8
         _mc.clear_cache()
 
     def test_regime_flips_at_budget_boundary(self, monkeypatch):

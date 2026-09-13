@@ -30,7 +30,9 @@ test.describe('Param Search Modal', () => {
 
     // Config phase elements
     await expect(page.getByLabel(/Target longest edge/)).toBeVisible();
-    await expect(page.getByLabel(/Filament preset/)).toBeVisible();
+    // No filament selector inside the search dialog (it reuses the
+    // converter's current configuration).
+    expect(await page.getByLabel(/Filament preset/).count()).toBe(0);
     await expect(page.getByRole('button', { name: /Start Optimization/ })).toBeVisible();
   });
 
@@ -57,16 +59,23 @@ test.describe('Param Search Modal', () => {
     await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
-  test('preset selector has expected options', async ({ page }) => {
+  test('search reuses the converter’s current filament configuration', async ({ page }) => {
+    // The modal carries no preset selector (removed by design): the search
+    // runs against whatever the main UI has selected. With Clear CMYW
+    // active, starting a search must not reset the converter configuration.
     await uploadAndProcess(page);
+    await page.locator('select').nth(1).selectOption('clear_cmyw');
+    await page.waitForTimeout(600);
+
     await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    expect(await page.getByLabel(/Filament preset/).count()).toBe(0);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).not.toBeVisible();
 
-    const select = page.getByLabel(/Filament preset/);
-    await expect(select).toBeVisible();
-
-    // Check a few preset options exist
-    await expect(select.locator('option', { hasText: 'Bambu CMYW Phase 6' })).toHaveCount(1);
-    await expect(select.locator('option', { hasText: 'Clear CMYWG' })).toHaveCount(1);
+    // The converter still runs the Clear CMYW preset.
+    const selected = await page.locator('select').nth(1).inputValue();
+    expect(selected).toBe('clear_cmyw');
   });
 
   test('target size input accepts numeric input', async ({ page }) => {

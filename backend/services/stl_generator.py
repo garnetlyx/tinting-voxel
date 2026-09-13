@@ -195,10 +195,7 @@ def compute_reference_matrices(
     estimated_seconds = _estimate_full_enumeration_seconds(
         permutation_count, n_targets or 10,
     )
-    within_budget = (
-        estimated_seconds <= settings.full_enumeration_budget_seconds
-        and permutation_count <= settings.max_enumeration_codes
-    )
+    within_budget = estimated_seconds <= settings.full_enumeration_budget_seconds
     use_prune = translucent and prune is not False and not within_budget
     if not translucent and not within_budget:
         # Opaque over-budget enumeration rejects unconditionally: composition

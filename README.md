@@ -100,7 +100,7 @@ npm run dev:backend   # Backend only (port 8000)
 ## Usage
 
 1. Upload an image (PNG, JPG)
-2. Choose Bambu CMYW Phase 6 (default) or Clear CMYWG, or configure custom N-color filaments (hex / k / td values).
+2. Choose Bambu CMYWK Phase 6 (default), Bambu CMYW, or Clear CMYW, or configure custom N-color filaments (hex / td / k values).
 3. Adjust processing parameters:
    - **maxColors**: Number of colors to extract (1-20)
    - **colorThreshold**: Color merge sensitivity (0-100)

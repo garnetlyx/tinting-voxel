@@ -1,8 +1,9 @@
 /**
- * Prune-path E2E: Clear CMYWG palette at high layer counts (6 and 8) with the
+ * Clear-palette E2E: Clear CMYW at high layer counts (6 and 8) with the
  * 0.84 mm translucent layer-height default, driving the real UI. The clear
- * set is TD1S-transparent, so these runs exercise the composition-pruned
- * mapping path (see backend core/stack_prune.py).
+ * set is transparent by the fixed td threshold; at these sizes the
+ * time-budget enumeration decision takes the full path (4c x 8L = 65,536
+ * codes fits the budget; composition pruning engages only over budget).
  *
  * Each layer-count change is verified against its specific
  * /api/simulate-preview network response (request body carries layerCount),
@@ -66,7 +67,8 @@ async function setLayersAndWaitForPreview(page: Page, layerCount: number) {
 }
 
 for (const layerCount of [6, 8]) {
-  test(`clear palette ${layerCount} layers @0.84mm renders via pruned path`, async ({ page }) => {
+  test(`clear palette ${layerCount} layers @0.84mm renders via time-budgeted path`, async ({ page }) => {
+    test.setTimeout(300_000); // 0.84mm processing of the full photo takes >60s under E2E load
     const errors: string[] = [];
     page.on('console', m => {
       if (m.type() !== 'error') return;
@@ -82,7 +84,7 @@ for (const layerCount of [6, 8]) {
     });
 
     await page.goto('/');
-    await page.locator('select').nth(1).selectOption('clear_cmywg');
+    await page.locator('select').nth(1).selectOption('clear_cmyw');
     await page.waitForTimeout(600);
 
     // Translucent classification raises the default layer height to 0.84 mm.
@@ -104,11 +106,11 @@ for (const layerCount of [6, 8]) {
     await setLayersAndWaitForPreview(page, layerCount);
 
     await page.screenshot({
-      path: path.join(SHOT_DIR, `clear_${layerCount}L_pruned.png`),
+      path: path.join(SHOT_DIR, `clear_${layerCount}L.png`),
       fullPage: true,
     });
 
-    // No mapping/preview failures on the pruned path.
+    // No mapping/preview failures on the time-budgeted path.
     expect(errors, errors.join(' | ')).toEqual([]);
   });
 }

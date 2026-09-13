@@ -52,14 +52,6 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
-    # Enumeration memory ceiling: deterministic pre-materialization guard.
-    # Each code costs ~150 bytes across strings + DataFrames + RGB tuples, so
-    # 2M codes ≈ 300MB — the largest full enumeration that fits the 512MB
-    # production container with headroom. Host-speed probes cannot see
-    # container memory; this ceiling is independent of timing and rejects
-    # before a single permutation is materialized.
-    max_enumeration_codes: int = 2_000_000
-
     # Stack-search budget: full permutation enumeration (N^L codes) is used
     # whenever its probe-extrapolated wall time fits this budget; larger
     # translucent sets fall back to composition pruning, and larger opaque
