@@ -14,6 +14,6 @@ describe('PresetSelector', () => {
 
     const options = screen.getAllByRole('option').map((option) => option.textContent);
 
-    expect(options).toEqual(['Custom', 'Bambu CMYWK', 'Bambu CMYW', 'Clear CMYWG']);
+    expect(options).toEqual(['Custom', 'Bambu CMYWK', 'Bambu CMYW', 'Clear CMYW']);
   });
 });

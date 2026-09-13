@@ -70,7 +70,7 @@ class TestPermutationBombDoS:
             )
 
         # 8 colors x 8 layers = 16,777,216 permutations -> should be rejected
-        with pytest.raises(ValueError, match="Too many color permutations"):
+        with pytest.raises(ValueError, match="over the .* budget"):
             initialize_color_mapping(layer_count=8, colors=colors)
 
     def test_compute_reference_matrices_has_permutation_guard(self):
@@ -80,8 +80,11 @@ class TestPermutationBombDoS:
 
         source = inspect.getsource(compute_reference_matrices)
 
+        # The guard is now time-budget driven: probe-extrapolated cost over
+        # settings.full_enumeration_budget_seconds rejects (or prunes for
+        # transparent sets) instead of a fixed permutation-count cap.
         has_limit_check = (
-            'raise ValueError' in source and 'max_permutations' in source
+            'raise ValueError' in source and 'full_enumeration_budget_seconds' in source
         )
 
         assert has_limit_check, (

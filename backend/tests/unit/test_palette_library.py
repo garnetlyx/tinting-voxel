@@ -14,7 +14,7 @@ class TestPaletteLibrary:
 
     def test_all_palettes_not_empty(self):
         """Library has at least one palette."""
-        assert [p.id for p in ALL_PALETTES] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmywg"]
+        assert [p.id for p in ALL_PALETTES] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmyw"]
 
     def test_all_palettes_have_unique_ids(self):
         """All palette IDs are unique."""

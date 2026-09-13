@@ -33,36 +33,12 @@ def test_color_config_rejects_inf_transmission_distance():
         ColorConfig(name="Test", hex="#FF0000", transmission_distance=float('inf'))
 
 
-def test_color_config_rejects_nan_alpha():
-    """
-    QA-R29-03: ColorConfig accepts NaN alpha.
-    """
-    with pytest.raises(ValueError, match="[Ff]inite|[Nn]a[Nn]"):
-        ColorConfig(name="Test", hex="#FF0000", transmission_distance=1.0, alpha=float('nan'))
-
-
 def test_color_config_rejects_nan_k():
     """
     QA-R29-04: ColorConfig accepts NaN k (scattering coefficient).
     """
     with pytest.raises(ValueError, match="[Ff]inite|[Nn]a[Nn]"):
         ColorConfig(name="Test", hex="#FF0000", transmission_distance=1.0, k=float('nan'))
-
-
-def test_color_config_rejects_nan_td_scale():
-    """
-    QA-R29-05: ColorConfig accepts NaN td_scale.
-    """
-    with pytest.raises(ValueError, match="[Ff]inite|[Nn]a[Nn]"):
-        ColorConfig(name="Test", hex="#FF0000", transmission_distance=1.0, td_scale=float('nan'))
-
-
-def test_color_config_rejects_nan_td_gamma():
-    """
-    QA-R29-06: ColorConfig accepts NaN td_gamma.
-    """
-    with pytest.raises(ValueError, match="[Ff]inite|[Nn]a[Nn]"):
-        ColorConfig(name="Test", hex="#FF0000", transmission_distance=1.0, td_gamma=float('nan'))
 
 
 def test_color_config_rejects_negative_inf_transmission_distance():
@@ -79,10 +55,7 @@ def test_color_config_accepts_valid_values():
     """
     c = ColorConfig(name="TestColor", hex="#00FF00", transmission_distance=2.5)
     assert c.transmission_distance == 2.5
-    assert c.alpha == 12.0  # default
-    assert c.k == 10.0  # default
-    assert c.td_scale == 1.0  # default
-    assert c.td_gamma == 1.0  # default
+    assert c.k == 0.0  # default: plain Beer-Lambert
 
 
 if __name__ == '__main__':

@@ -148,7 +148,7 @@ class TestComputeReferenceMatricesEdgeCases:
         """
         colors = Colors()
 
-        with pytest.raises(ValueError, match="Too many color permutations"):
+        with pytest.raises(ValueError, match="over the .* budget"):
             compute_reference_matrices(
                 layer_count=10,  # 4^10 = 1,048,576 > 1,000,000
                 layer_height=0.08,

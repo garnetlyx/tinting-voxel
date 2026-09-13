@@ -54,7 +54,7 @@ async def api_get_filament_presets(request: Request):
             colors=[FilamentColorConfig(
                 name=c.name, hex=c.hex,
                 transmission_distance=c.transmission_distance,
-                alpha=c.alpha, k=c.k, td_scale=c.td_scale, td_gamma=c.td_gamma,
+                k=c.k,
             ) for c in configs],
         )
         for name, configs in PRESETS.items()

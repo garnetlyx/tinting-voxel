@@ -14,8 +14,6 @@ from core.blend_color import (
     BlendTestGenerator,
     Color,
     Colors,
-    _blend_hybrid,
-    _blend_hybrid_per_color,
 )
 from core.color_config import BAMBU_CMYW_PHASE6_PRESET, ColorConfig
 
@@ -346,86 +344,6 @@ class TestCodeToRgbCache:
         assert info.misses == 0
 
 
-class TestHybridPerColorBlend:
-    """Tests for per-color hybrid absorption scaling."""
-
-    @pytest.fixture
-    def color_map(self):
-        colors = Colors()
-        return {label: colors[label] for label in colors.get_labels()}
-
-    def test_matches_hybrid_when_all_k_equal(self, color_map):
-        code = "CMYW"
-        hybrid = _blend_hybrid(
-            code, 0.08, color_map, scatter_alpha=4.0, k=7.5
-        )
-        hybrid_kc = _blend_hybrid_per_color(
-            code,
-            0.08,
-            color_map,
-            scatter_alpha=4.0,
-            k_map={label: 7.5 for label in color_map},
-        )
-        assert hybrid_kc == pytest.approx(hybrid, abs=1e-6)
-
-    def test_higher_yellow_k_darkens_yellow_rich_code(self, color_map):
-        default_rgb = _blend_hybrid_per_color(
-            "YYYY", 0.08, color_map, scatter_alpha=4.0, k_map={"Y": 2.0}
-        )
-        boosted_rgb = _blend_hybrid_per_color(
-            "YYYY", 0.08, color_map, scatter_alpha=4.0, k_map={"Y": 12.0}
-        )
-        assert sum(boosted_rgb) < sum(default_rgb)
-
-    @pytest.mark.parametrize(
-        "blend_mode",
-        ["hybrid_calibrated", "hybrid_per_color_k_td1s_gamma"],
-    )
-    def test_calibrated_mode_aliases_share_same_kernel(self, blend_mode):
-        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
-        generator = BlendTestGenerator(
-            colors=colors,
-            layer_height=0.08,
-            layer_count_max=4,
-            verbose=False,
-            blend_mode=blend_mode,
-        )
-        baseline = BlendTestGenerator(
-            colors=colors,
-            layer_height=0.08,
-            layer_count_max=4,
-            verbose=False,
-            blend_mode="hybrid_calibrated",
-        )
-
-        assert generator.code_to_rgb("CMYW") == pytest.approx(
-            baseline.code_to_rgb("CMYW"),
-            abs=1e-6,
-        )
-
-    def test_hybrid_per_color_k_ignores_td_gamma_remap(self):
-        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
-        per_color_mode = BlendTestGenerator(
-            colors=colors,
-            layer_height=0.08,
-            layer_count_max=4,
-            verbose=False,
-            blend_mode="hybrid_per_color_k",
-        )
-        baseline = BlendTestGenerator(
-            colors=colors,
-            layer_height=0.08,
-            layer_count_max=4,
-            verbose=False,
-            blend_mode="hybrid_calibrated",
-        )
-
-        assert per_color_mode.code_to_rgb("CMYW") != pytest.approx(
-            baseline.code_to_rgb("CMYW"),
-            abs=1e-6,
-        )
-
-
 class TestBlendTestGeneratorGenerateBox:
     """Tests for BlendTestGenerator.generate_box()."""
 
@@ -701,11 +619,11 @@ class TestColorsInit:
     """Tests for Colors initialization variants."""
 
     def test_clear_mode(self):
-        from core.color_config import CLEAR_CMYWG_PRESET
+        from core.color_config import CLEAR_CMYW_PRESET
         colors = Colors(clear=True)
-        assert len(colors) == 5
-        # Clear mode mirrors the CLEAR_CMYWG_PRESET source of truth
-        preset_c = next(c for c in CLEAR_CMYWG_PRESET if c.label == 'C')
+        assert len(colors) == 4
+        # Clear mode mirrors the CLEAR_CMYW_PRESET source of truth
+        preset_c = next(c for c in CLEAR_CMYW_PRESET if c.label == 'C')
         assert colors['C'].td == preset_c.transmission_distance
         # Clear filaments are more translucent than the opaque set
         assert colors['C'].td > Colors()['C'].td

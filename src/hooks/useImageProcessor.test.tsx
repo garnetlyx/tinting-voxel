@@ -125,29 +125,29 @@ describe('useImageProcessor', () => {
     expect(result.current.filamentPreset).toBe('bambu_cmywk_phase6');
     expect(result.current.filamentColors).toHaveLength(5);
     expect(result.current.layerCount).toBe(4);
-    expect(result.current.maxLayerCount).toBe(8);
+    expect(result.current.maxLayerCount).toBe(10);
     expect(result.current.filamentColors.some(color => color.name === 'Key')).toBe(true);
     expect(result.current.filamentColors[0].k).toBe(8.13);
   });
 
-  it('derives a lower max layer count for filament sets with more colors and clamps the current value', () => {
+  it('clamps the layer count to the fixed UI maximum', () => {
     const { result } = renderHook(() => useImageProcessor());
 
     act(() => {
-      result.current.loadPreset('clear_cmywg');
-      result.current.setLayerCount(9);
+      result.current.loadPreset('clear_cmyw');
+      result.current.setLayerCount(11);
     });
 
-    expect(result.current.filamentColors).toHaveLength(5);
-    expect(result.current.maxLayerCount).toBe(8);
-    expect(result.current.layerCount).toBe(8);
+    expect(result.current.filamentColors).toHaveLength(4);
+    expect(result.current.maxLayerCount).toBe(10);
+    expect(result.current.layerCount).toBe(10);
   });
 
   it('raises the default layer height only when every filament classifies as transparent', () => {
     const { result } = renderHook(() => useImageProcessor());
 
     // Clear preset: every TD1S neutral TD >= 6.7 -> transparent default 0.84.
-    act(() => { result.current.loadPreset('clear_cmywg'); });
+    act(() => { result.current.loadPreset('clear_cmyw'); });
     expect(result.current.allTransparent).toBe(true);
     expect(result.current.layerHeight).toBe(0.84);
 
@@ -162,7 +162,7 @@ describe('useImageProcessor', () => {
 
     act(() => {
       result.current.setLayerHeight(0.3);
-      result.current.loadPreset('clear_cmywg');
+      result.current.loadPreset('clear_cmyw');
     });
     expect(result.current.layerHeight).toBe(0.3);
 
@@ -173,7 +173,7 @@ describe('useImageProcessor', () => {
   it('reclassifies when the user adjusts the transparency threshold', () => {
     const { result } = renderHook(() => useImageProcessor());
 
-    act(() => { result.current.loadPreset('clear_cmywg'); });
+    act(() => { result.current.loadPreset('clear_cmyw'); });
     expect(result.current.layerHeight).toBe(0.84);
 
     // Raising the threshold past grey (7.3) makes the clear set non-transparent.
@@ -409,12 +409,9 @@ describe('useImageProcessor', () => {
     });
 
     expect(result.current.filamentColors).toHaveLength(5);
-    // Regression: a custom color without inherited alpha mixed 8.08 with the
-    // backend default 12.0 and crashed blending with a shared-alpha error.
+    // A color added to a calibrated preset inherits the set's k.
     const added = result.current.filamentColors[4];
-    expect(added.alpha).toBe(8.08);
-    expect(added.td_scale).toBe(1.48);
-    expect(added.td_gamma).toBe(0.20);
+    expect(added.k).toBe(8.13);
   });
 
   it('preserves calibrated material parameters when editing a calibrated preset', async () => {
@@ -439,10 +436,7 @@ describe('useImageProcessor', () => {
           expect.objectContaining({
             name: 'Cyan',
             transmission_distance: 2.1,
-            alpha: 8.08,
             k: 8.13,
-            td_scale: 1.48,
-            td_gamma: 0.20,
           }),
         ]),
       })

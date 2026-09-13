@@ -9,10 +9,10 @@ if TYPE_CHECKING:
 
 
 class Color:
-    DEFAULT_ALPHA = 12.0
-    DEFAULT_K = 10.0
-    DEFAULT_TD_SCALE = 1.0
-    DEFAULT_TD_GAMMA = 1.0
+    # Baseline "no absorption correction". Calibrated families set k
+    # explicitly (e.g. bambu phase6 k=8.13); 0 makes default-parameter
+    # colors blend as plain Beer-Lambert t = exp(-alpha*d/td).
+    DEFAULT_K = 0.0
     DEFAULT_HEX = {
         "C": "#00FFFF",
         "M": "#FF00FF",
@@ -27,15 +27,17 @@ class Color:
         hex=None,
         absorption=None,
         rgb=None,
-        alpha=DEFAULT_ALPHA,
         k=DEFAULT_K,
-        k_rgb=None,
-        td_rgb=None,
-        td_neutral=None,
-        td_scale=DEFAULT_TD_SCALE,
-        td_gamma=DEFAULT_TD_GAMMA,
         display_name=None,
     ):
+        """A filament color: hex + td + k — the complete blend description.
+
+        td (mm) is channel-neutral (one composite number, broadcast to all
+        channels); k is the optional pigment absorption gain (default 0).
+        Historical calibration fields (alpha, k_rgb, td_rgb, td_neutral,
+        td_scale, td_gamma) were fold points of the retired mode dispatch —
+        deleted; git history for archaeology.
+        """
         if not name or not name[0].isalpha() or not name[0].isascii():
             raise ValueError(
                 f"Color name must start with an ASCII letter (A-Z, a-z): {name}. "
@@ -49,30 +51,6 @@ class Color:
             raise ValueError(
                 f"transmission_distance must be >= 0, got {transmission_distance}"
             )
-        if not np.isfinite(float(td_scale)):
-            raise ValueError(
-                f"td_scale must be finite and not NaN, got {td_scale}"
-            )
-        if td_scale <= 0:
-            raise ValueError(
-                f"td_scale must be positive, got {td_scale}"
-            )
-        if not np.isfinite(float(td_gamma)):
-            raise ValueError(
-                f"td_gamma must be finite and not NaN, got {td_gamma}"
-            )
-        if td_gamma <= 0:
-            raise ValueError(
-                f"td_gamma must be positive, got {td_gamma}"
-            )
-        if not np.isfinite(float(alpha)):
-            raise ValueError(
-                f"alpha must be finite and not NaN, got {alpha}"
-            )
-        if alpha <= 0:
-            raise ValueError(
-                f"alpha must be positive, got {alpha}"
-            )
         if not np.isfinite(float(k)):
             raise ValueError(
                 f"k must be finite and not NaN, got {k}"
@@ -82,44 +60,11 @@ class Color:
                 f"k must be non-negative, got {k}"
             )
 
-        # Validate k_rgb if provided
-        if k_rgb is not None:
-            if len(k_rgb) != 3:
-                raise ValueError(
-                    f"k_rgb must be a 3-tuple (k_R, k_G, k_B), got {k_rgb}"
-                )
-            for i, k_ch in enumerate(k_rgb):
-                if not np.isfinite(float(k_ch)):
-                    raise ValueError(
-                        f"k_rgb[{i}] must be finite and not NaN, got {k_ch}"
-                    )
-
         self.name = name
         self.td = transmission_distance
         self.rgb = rgb
         self.absorption = absorption
-        self.alpha = alpha
         self.k = k
-        self.k_rgb = tuple(float(x) for x in k_rgb) if k_rgb is not None else None
-        if td_rgb is not None:
-            if len(td_rgb) != 3:
-                raise ValueError(
-                    f"td_rgb must be a 3-tuple (td_R, td_G, td_B), got {td_rgb}"
-                )
-            for i, td_ch in enumerate(td_rgb):
-                if not np.isfinite(float(td_ch)) or float(td_ch) <= 0:
-                    raise ValueError(
-                        f"td_rgb[{i}] must be finite and > 0, got {td_ch}"
-                    )
-        self.td_rgb = tuple(float(x) for x in td_rgb) if td_rgb is not None else None
-        if td_neutral is not None:
-            if not np.isfinite(float(td_neutral)) or float(td_neutral) <= 0:
-                raise ValueError(
-                    f"td_neutral must be finite and > 0, got {td_neutral}"
-                )
-        self.td_neutral = float(td_neutral) if td_neutral is not None else None
-        self.td_scale = td_scale
-        self.td_gamma = td_gamma
         self.display_name = display_name
 
         if hex is None and rgb is not None:
@@ -283,10 +228,10 @@ class Color:
 
 
 class Colors:
-    from core.color_config import BAMBU_CMYW_PHASE6_PRESET, CLEAR_CMYWG_PRESET
+    from core.color_config import BAMBU_CMYW_PHASE6_PRESET, CLEAR_CMYW_PRESET
 
     _BAMBU_PRESET = {c.label: c for c in BAMBU_CMYW_PHASE6_PRESET}
-    _CLEAR_PRESET = {c.label: c for c in CLEAR_CMYWG_PRESET}
+    _CLEAR_PRESET = {c.label: c for c in CLEAR_CMYW_PRESET}
 
 
     def __init__(self, colors=None, clear=False, names=None):
@@ -310,11 +255,7 @@ class Colors:
                 cfg.name,
                 cfg.transmission_distance,
                 cfg.hex,
-                alpha=cfg.alpha,
                 k=cfg.k,
-                k_rgb=cfg.k_rgb,
-                td_scale=cfg.td_scale,
-                td_gamma=cfg.td_gamma,
                 display_name=cfg.label,
             )
 
@@ -343,41 +284,6 @@ class Colors:
 
     def get_labels(self):
         return [x for x in self.colors]
-
-    def get_blend_mode(self) -> str:
-        """Select the calibrated blend family implied by the material parameters."""
-        colors = self.colors.values() if isinstance(self.colors, dict) else []
-        for color in colors:
-            # Directly measured per-channel TDs bypass fitted families: the
-            # staircase-measured td_rgb tuple is consumed as-is (k_residual=0).
-            if getattr(color, "td_rgb", None) is not None:
-                return "beer_lambert_td_rgb"
-            if (
-                color.td_scale != Color.DEFAULT_TD_SCALE
-                or color.td_gamma != Color.DEFAULT_TD_GAMMA
-            ):
-                return "hybrid_per_color_k_td1s_gamma"
-            if color.alpha != Color.DEFAULT_ALPHA or color.k != Color.DEFAULT_K:
-                return "hybrid_per_color_k"
-        return "original"
-
-    def get_blend_alpha(self) -> float:
-        """Return the shared blend alpha used by the current material set.
-
-        The calibrated blend families still use a single global scatter/alpha
-        term. Reject mixed alpha values instead of silently picking one.
-        """
-        if not isinstance(self.colors, dict) or not self.colors:
-            return Color.DEFAULT_ALPHA
-
-        alphas = {round(float(color.alpha), 12) for color in self.colors.values()}
-        if len(alphas) != 1:
-            raise ValueError(
-                "All filament colors must share the same alpha value for blending. "
-                f"Got: {sorted(alphas)}"
-            )
-
-        return float(next(iter(self.colors.values())).alpha)
 
     @classmethod
     def from_configs(cls, configs) -> "Colors":
@@ -413,13 +319,7 @@ class Colors:
                 name=config.name,
                 transmission_distance=config.transmission_distance,
                 hex=config.hex,
-                alpha=config.alpha,
                 k=config.k,
-                k_rgb=config.k_rgb,
-                td_rgb=getattr(config, "td_rgb", None),
-                td_neutral=getattr(config, "td_neutral", None),
-                td_scale=config.td_scale,
-                td_gamma=config.td_gamma,
             )
             instance.colors[label] = color
 
