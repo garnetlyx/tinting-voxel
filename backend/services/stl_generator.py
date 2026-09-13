@@ -30,11 +30,21 @@ logger = logging.getLogger(__name__)
 _probe_state: dict = {}
 
 
-def _probe_throughput() -> tuple[float, float]:
-    """Measure blend & match throughput once; both are linear in code count
-    (verified 20k..1M codes)."""
+def _probe_throughput() -> tuple[float, float, float]:
+    """Measure blend & match throughput once; both are linear in code count.
+
+    Match cost is two-part per code: a fixed part (matrix cell extraction
+    + Lab conversion, independent of target count) plus a small marginal
+    per-target deltaE term. Measured at 1 and 6 targets and decomposed —
+    extrapolating the single-target rate linearly overestimates by >10x
+    at real target counts.
+    """
     if _probe_state:
-        return _probe_state["blend_s_per_code"], _probe_state["match_s_per_code_per_target"]
+        return (
+            _probe_state["blend_s_per_code"],
+            _probe_state["match_fixed_s_per_code"],
+            _probe_state["match_marginal_s_per_code_per_target"],
+        )
     import time as _time
     from core.color_materials import Color as _C
     probe_colors = Colors(colors={
@@ -51,20 +61,31 @@ def _probe_throughput() -> tuple[float, float]:
     blend = (_time.perf_counter() - t0) / len(codes)
     df_c = pd.DataFrame([codes[i:i + 128] for i in range(0, len(codes), 128)])
     df_r = pd.DataFrame([[(128.0, 128.0, 128.0)] * 128 for _ in range(len(df_c))])
+    targets = [(120 + i, 130, 140) for i in range(6)]
     t0 = _time.perf_counter()
-    _C.map_to_nearest_color([(120, 130, 140)], df_c, df_r)
-    match = (_time.perf_counter() - t0) / len(codes)
-    _probe_state.update(blend_s_per_code=blend, match_s_per_code_per_target=match)
-    logger.info(
-        "Enumeration cost probe: blend %.2e s/code, match %.2e s/code/target",
-        blend, match,
+    _C.map_to_nearest_color(targets[:1], df_c, df_r)
+    per_code_1 = (_time.perf_counter() - t0) / len(codes)
+    t0 = _time.perf_counter()
+    _C.map_to_nearest_color(targets, df_c, df_r)
+    per_code_6 = (_time.perf_counter() - t0) / len(codes)
+    marginal = max((per_code_6 - per_code_1) / 5.0, 0.0)
+    fixed = max(per_code_1 - marginal, 0.0)
+    _probe_state.update(
+        blend_s_per_code=blend,
+        match_fixed_s_per_code=fixed,
+        match_marginal_s_per_code_per_target=marginal,
     )
-    return blend, match
+    logger.info(
+        "Enumeration cost probe: blend %.2e s/code, match fixed %.2e s/code "
+        "+ %.2e s/code/target",
+        blend, fixed, marginal,
+    )
+    return blend, fixed, marginal
 
 
 def _estimate_full_enumeration_seconds(n_codes: int, n_targets: int) -> float:
-    blend_rate, match_rate = _probe_throughput()
-    return n_codes * (blend_rate + match_rate * n_targets)
+    blend_rate, match_fixed, match_marginal = _probe_throughput()
+    return n_codes * (blend_rate + match_fixed + match_marginal * n_targets)
 
 
 # Global reference matrices (initialized on app startup, used as fallback)

@@ -48,6 +48,10 @@ async def lifespan(app: FastAPI):
     logger.info("Warming up matrix cache for preset configurations...")
     from services.matrix_cache import warmup_cache
     cache_entries = warmup_cache(layer_counts=[4, 5])
+    # Warm the enumeration cost probe (absorbs cold-start numpy/BLAS init
+    # before the first real request reads its rates).
+    from services.stl_generator import _probe_throughput
+    _probe_throughput()
     logger.info("Matrix cache warmed up with %d entries", cache_entries)
 
     logger.info("Application startup complete")

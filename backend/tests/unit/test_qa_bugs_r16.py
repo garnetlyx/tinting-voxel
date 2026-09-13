@@ -143,16 +143,26 @@ class TestComputeReferenceMatricesEdgeCases:
 
     def test_compute_reference_matrices_excessive_permutations(self):
         """
-        QA-166: compute_reference_matrices should reject excessive permutation counts.
-        Test that 4^10 (1,048,576) exceeds the 1,000,000 limit.
+        QA-166: compute_reference_matrices rejects enumeration that the
+        probe-extrapolated cost puts over the time budget. 4^10 (1,048,576
+        codes, ~13s) is now comfortably affordable and must pass; an 8-color
+        x 8-layer opaque set (~16.8M codes, hundreds of seconds) must raise.
         """
-        colors = Colors()
+        from core.color_materials import Color
+        # 4 colors x 10 layers fits the budget — no cap, no raise.
+        compute_reference_matrices(layer_count=10, layer_height=0.08, colors=Colors())
 
+        big = Colors(colors={
+            l: Color(l, 0.5, h) for l, h in zip(
+                "ABCDEFGH",
+                ["#3D79C6", "#B3356E", "#FFE665", "#FFFFFF",
+                 "#112233", "#445566", "#778899", "#0B0F0C"])
+        })
         with pytest.raises(ValueError, match="over the .* budget"):
             compute_reference_matrices(
-                layer_count=10,  # 4^10 = 1,048,576 > 1,000,000
+                layer_count=8,  # 8^8 = 16,777,216 codes, hundreds of seconds
                 layer_height=0.08,
-                colors=colors
+                colors=big
             )
 
 
