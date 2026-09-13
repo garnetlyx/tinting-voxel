@@ -63,25 +63,20 @@ CANDIDATE_MARGIN_DELTA_E = 48.0
 MAX_CANDIDATE_COMPOSITIONS = 128
 
 
-def is_translucent_set(
-    colors: Colors,
-    threshold_mm: Optional[float] = None,
-) -> bool:
+def is_translucent_set(colors: Colors) -> bool:
     """True when every filament's td meets the transparency threshold.
 
-    Single standard: the stored td value, the same number blending uses.
-    Preset values: bambu (folded fits) sit at 0.27-0.61, clear (staircase
-    means) at 4.7-18.0; the 4.5 mm default sits in that gap, so the clear
-    CMYW preset classifies transparent and every bambu set opaque.
+    Single standard: the stored td value, the same number blending uses,
+    compared against the one fixed 4.5 mm constant. Preset values: bambu
+    (folded fits) sit at 0.27-0.61, clear (staircase means) at 4.7-18.0, so
+    the clear CMYW preset classifies transparent and every bambu set opaque.
     """
-    if threshold_mm is None:
-        threshold_mm = TRANSPARENT_TD_THRESHOLD_MM
     items = colors.colors.values() if isinstance(colors.colors, dict) else []
     if not items:
         return False
     for color in items:
         td = color.td
-        if td is None or td < threshold_mm:
+        if td is None or td < TRANSPARENT_TD_THRESHOLD_MM:
             return False
     return True
 

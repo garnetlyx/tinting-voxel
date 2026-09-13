@@ -268,6 +268,10 @@ def test_print_settings_with_preset(client):
     assert data["filament"]["extruder_count"] == 4
     assert data["object_dimensions"]["width_mm"] == 10.0
     assert data["object_dimensions"]["height_mm"] == 8.0
+    # The full surviving schema (hex + td + k) survives serialization.
+    cyan = next(e for e in data["filament"]["extruders"] if e["name"] == "Cyan")
+    assert cyan["k"] == 8.13
+    assert cyan["transmission_distance"] == pytest.approx(0.48447574859816506)
 
 
 def test_print_settings_with_custom_colors(client):

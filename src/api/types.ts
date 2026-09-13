@@ -309,9 +309,9 @@ export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
     { name: 'White',   hex: '#FFFFFF', transmission_distance: 0.6055249051606083,  k: 12.39 },
   ],
   clear_cmyw: [
-    { name: 'Cyan',    hex: '#4C72A0', transmission_distance: 4.7,  k: 0 },
-    { name: 'Magenta', hex: '#CE5E53', transmission_distance: 6.3,  k: 0 },
-    { name: 'Yellow',  hex: '#D8B695', transmission_distance: 10.1, k: 0 },
+    { name: 'Cyan',    hex: '#5489B4', transmission_distance: 4.7,  k: 0 },
+    { name: 'Magenta', hex: '#DE5740', transmission_distance: 6.3,  k: 0 },
+    { name: 'Yellow',  hex: '#DDC465', transmission_distance: 10.1, k: 0 },
     { name: 'White',   hex: '#D9D6C5', transmission_distance: 18.0, k: 0 },
   ],
 };

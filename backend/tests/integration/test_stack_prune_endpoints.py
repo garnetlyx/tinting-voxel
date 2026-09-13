@@ -10,19 +10,19 @@ import json
 from PIL import Image
 
 EDITED_CLEAR = [
-        {"name": "Cyan", "hex": "#4C72A0", "transmission_distance": 4.7, "k": 0.0},
-        {"name": "Magenta", "hex": "#CE5E53", "transmission_distance": 6.3, "k": 0.0},
-        {"name": "Yellow", "hex": "#D8B695", "transmission_distance": 10.1, "k": 0.0},
+        {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "k": 0.0},
+        {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3, "k": 0.0},
+        {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1, "k": 0.0},
         {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0, "k": 0.0},
     ]
 
 
 REMOVED_FIELDS = [
-    {"name": "Cyan", "hex": "#4C72A0", "transmission_distance": 4.7, "td_rgb": [1.0, 2.0, 3.0]},
-    {"name": "Cyan", "hex": "#4C72A0", "transmission_distance": 4.7, "td_neutral": 48.9},
-    {"name": "Cyan", "hex": "#4C72A0", "transmission_distance": 4.7, "alpha": 12.0},
-    {"name": "Cyan", "hex": "#4C72A0", "transmission_distance": 4.7, "td_scale": 1.48},
-    {"name": "Cyan", "hex": "#4C72A0", "transmission_distance": 4.7, "td_gamma": 0.2},
+    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "td_rgb": [1.0, 2.0, 3.0]},
+    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "td_neutral": 48.9},
+    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "alpha": 12.0},
+    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "td_scale": 1.48},
+    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "td_gamma": 0.2},
 ]
 
 

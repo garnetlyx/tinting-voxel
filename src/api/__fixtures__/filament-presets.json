@@ -60,19 +60,19 @@
   "clear_cmyw": [
     {
       "name": "Cyan",
-      "hex": "#4C72A0",
+      "hex": "#5489B4",
       "transmission_distance": 4.7,
       "k": 0
     },
     {
       "name": "Magenta",
-      "hex": "#CE5E53",
+      "hex": "#DE5740",
       "transmission_distance": 6.3,
       "k": 0
     },
     {
       "name": "Yellow",
-      "hex": "#D8B695",
+      "hex": "#DDC465",
       "transmission_distance": 10.1,
       "k": 0
     },

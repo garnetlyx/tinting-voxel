@@ -3,17 +3,17 @@
   "formula": "unified mu_ch = ln10/td + k*A_ch (k=0), light-loss allocation",
   "shipped_preset": {
     "C": {
-      "hex": "#4C72A0",
+      "hex": "#5489B4",
       "td": 4.7,
       "k": 0.0
     },
     "M": {
-      "hex": "#CE5E53",
+      "hex": "#DE5740",
       "td": 6.3,
       "k": 0.0
     },
     "Y": {
-      "hex": "#D8B695",
+      "hex": "#DDC465",
       "td": 10.1,
       "k": 0.0
     },
@@ -61,17 +61,19 @@
       }
     },
     "orientation": "rot0",
-    "layer_mm": 0.84,
-    "engine_commit": "ba2717a571715b31db7ca17f9f33c450771a6763"
+    "layer_mm": 0.84
   },
   "command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py",
+  "check_command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py --check",
+  "research_engine_pin": "165fa55cba8e0a6fc6b6b2e1ab69cdf9d139f287",
+  "app_commit": "c4ff27082066928a1e341003ae952ac4dfd5b17c",
   "backings": {
     "w": {
-      "shipped_preset": 41.0,
+      "shipped_preset": 40.85,
       "same_batch_reference": 36.21
     },
     "b": {
-      "shipped_preset": 21.91,
+      "shipped_preset": 21.77,
       "same_batch_reference": 24.08
     }
   }

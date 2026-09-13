@@ -36,7 +36,7 @@ describe('useFilamentStorage schema migration', () => {
   });
 
   it('strips retired fields from persisted presets on load', () => {
-    
+
     const { result } = renderHook(() => useFilamentStorage());
     expect(result.current.presets).toHaveLength(1);
     const colors = result.current.presets[0].colors;
@@ -50,7 +50,7 @@ describe('useFilamentStorage schema migration', () => {
   });
 
   it('strips retired fields from imported presets', () => {
-    
+
     const { result } = renderHook(() => useFilamentStorage());
     const res = result.current.importPresets(JSON.stringify([OLD_SCHEMA_PRESET]));
     expect(res.imported).toBe(1);

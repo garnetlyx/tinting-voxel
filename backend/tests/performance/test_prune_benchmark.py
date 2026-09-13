@@ -24,9 +24,9 @@ from services.image_processor import process_image
 LOCAL_PHOTO = os.path.join(
     os.path.dirname(__file__), "..", "..", "tests", "fixtures", "images-local", "local-photo.JPG"
 )
-
-pytestmark = pytest.mark.skipif(
-    not os.path.exists(LOCAL_PHOTO), reason="local-photo.JPG local fixture not present"
+# Committed synthetic fixture: the CMYWK performance gate runs everywhere.
+PERF_FIXTURE = os.path.join(
+    os.path.dirname(__file__), "..", "fixtures", "images", "perf_cmywk.jpg"
 )
 
 
@@ -35,6 +35,30 @@ def _lab(rgb):
     return rgb2lab(arr).reshape(-1, 3)
 
 
+def test_cmywk_8l_process_image_latency_gate():
+    """Permanent performance gate: 8-layer Bambu CMYWK process-image on the
+    committed fixture must finish within 10 s (the frozen bar; the unified
+    batch blend + content-keyed matrix cache keep it ~5-7 s locally)."""
+    from core.color_config import get_preset
+    from core.blend_color import Colors
+    colors = Colors.from_configs(get_preset("bambu_cmywk_phase6"))
+    image_bytes = open(PERF_FIXTURE, "rb").read()
+    t0 = time.monotonic()
+    result = process_image(
+        image_bytes=image_bytes, max_colors=10, color_threshold=50,
+        pixel_size=0.2, filament_colors=colors,
+        layer_count=8, layer_height=0.08,
+        white_backing_layers=1, detail_size=0.42,
+    )
+    elapsed = time.monotonic() - t0
+    assert result["colorBlocks"], "pipeline must produce blocks"
+    assert elapsed < 10.0, (
+        f"8-layer CMYWK process-image took {elapsed:.1f}s, over the 10s gate"
+    )
+    print(f"\nCMYWK 8L gate: {elapsed:.2f}s")
+
+
+@pytest.mark.skipif(not os.path.exists(LOCAL_PHOTO), reason="local-photo.JPG local fixture not present")
 def test_clear_8l_process_image_pruned_vs_full_enumeration_benchmark():
     colors = Colors.from_configs(get_preset("clear_cmyw"))
     image_bytes = open(LOCAL_PHOTO, "rb").read()

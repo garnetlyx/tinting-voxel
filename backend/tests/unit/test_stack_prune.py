@@ -54,7 +54,7 @@ def _five_transparent_colors() -> Colors:
         l: Color(name=l, hex=h, transmission_distance=td, k=0.0)
         for l, h, td in zip(
             "CMYWG",
-            ["#4C72A0", "#CE5E53", "#D8B695", "#D9D6C5", "#9A9D9C"],
+            ["#5489B4", "#DE5740", "#DDC465", "#D9D6C5", "#9A9D9C"],
             [4.7, 6.3, 10.1, 18.0, 5.0],
         )
     })
@@ -127,7 +127,10 @@ class TestRegimeGate:
             "D": Color(name="D", hex="#112233", transmission_distance=10.0),
         })
         assert is_translucent_set(colors)
-        assert not is_translucent_set(colors, threshold_mm=15.0)
+        # Fixed criterion: colors below the 4.5 constant are not translucent.
+        below = Colors(colors=dict(colors.colors))
+        below.colors['A'] = type(list(colors.colors.values())[0])('Z', 3.0, '#112233')
+        assert not is_translucent_set(below)
 
     def test_prune_true_never_forces_pruning(self):
         """Pruning is automatic and translucent-only; True is rejected outright."""
@@ -150,8 +153,8 @@ class TestRegimeGate:
             type(get_preset("clear_cmyw")[0])(
                 name=n, hex=h, transmission_distance=10.0,
             )
-            for n, h in (("Cyan", "#4C72A0"), ("Magenta", "#CE5E53"),
-                         ("Yellow", "#D8B695"), ("White", "#D9D6C5"))
+            for n, h in (("Cyan", "#5489B4"), ("Magenta", "#DE5740"),
+                         ("Yellow", "#DDC465"), ("White", "#D9D6C5"))
         ]
         colors = Colors.from_configs(custom)
         assert is_translucent_set(colors)
@@ -346,9 +349,9 @@ class TestCalibrationForwarding:
     """Edited Clear palettes must keep td_rgb/td_neutral on every request path."""
 
     EDITED_CLEAR = [
-        {"name": "Cyan", "hex": "#4C72A0", "transmission_distance": 4.7, "k": 0.0},
-        {"name": "Magenta", "hex": "#CE5E53", "transmission_distance": 6.3, "k": 0.0},
-        {"name": "Yellow", "hex": "#D8B695", "transmission_distance": 10.1, "k": 0.0},
+        {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "k": 0.0},
+        {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3, "k": 0.0},
+        {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1, "k": 0.0},
         {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0, "k": 0.0},
     ]
 

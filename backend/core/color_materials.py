@@ -201,17 +201,10 @@ class Color:
 
     @staticmethod
     def map_to_nearest_color(input_colors, reference_code, reference_rgb, weights=None):
-        ref_colors = []
-        ref_blend_codes = []
-
-        for r_idx in range(reference_code.shape[0]):
-            for c_idx in range(reference_code.shape[1]):
-                code = reference_code.iat[r_idx, c_idx]
-                rgb = reference_rgb.iat[r_idx, c_idx]
-                ref_colors.append(rgb)
-                ref_blend_codes.append(code)
-
-        ref_colors = np.array(ref_colors) / 255.0
+        # Vectorized extraction: iterating 800k+ pandas cells with .iat costs
+        # seconds on full-enumeration matrices; flattened arrays are equivalent.
+        ref_blend_codes = list(reference_code.values.flatten())
+        ref_colors = np.array(list(reference_rgb.values.flatten())) / 255.0
         ref_lab = rgb2lab(ref_colors.reshape(-1, 1, 3)).reshape(-1, 3)
 
         inp = np.array(input_colors) / 255.0

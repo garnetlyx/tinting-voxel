@@ -155,14 +155,30 @@ class TestFrozenEquivalenceCertification:
         max_diff = np.abs(np.array(reference) - np.array(unified)).max()
         assert max_diff < 1e-9, f"bambu CMYW folded equivalence broken over all {len(codes)} codes: {max_diff}"
 
+    # Immutable production baseline (acda338 clear preset): hexes and tds
+    # frozen at deploy time. The test fails if the shipped preset drifts
+    # from this deployed behavior in ANY value.
+    PROD_CLEAR = {
+        'hexes': {'C': '#5489B4', 'M': '#DE5740', 'Y': '#DDC465', 'W': '#D9D6C5'},
+        'means': {'C': 4.7, 'M': 6.3, 'Y': 10.1, 'W': 18.0},
+    }
+
     def test_clear_mean_flat_is_plain_base10(self):
         from core.color_config import get_preset
         import itertools
-        means = {'C': 4.7, 'M': 6.3, 'Y': 10.1, 'W': 18.0}
-        hexes = {'C': '#4C72A0', 'M': '#CE5E53', 'Y': '#D8B695', 'W': '#D9D6C5'}
+        means = self.PROD_CLEAR['means']
+        hexes = self.PROD_CLEAR['hexes']
         # Retired production behavior (strip condition): scalar td broadcast,
-        # no k term — plain 10^(-d/td).
+        # no k term — plain 10^(-d/td), at the frozen production hexes.
         spec = {ch: (self.LN10 / means[ch], 0.0, hexes[ch]) for ch in means}
+
+        # The shipped preset must carry exactly these frozen values.
+        preset = get_preset('clear_cmyw')
+        for c in preset:
+            assert c.hex == self.PROD_CLEAR['hexes'][c.name[0]], (
+                f"clear hex drifted from frozen production value: {c.name} {c.hex}"
+            )
+            assert c.transmission_distance == self.PROD_CLEAR['means'][c.name[0]]
 
         colors = Colors.from_configs(get_preset('clear_cmyw'))
         gen = BlendTestGenerator(colors=colors, layer_height=0.84, layer_count_max=4)

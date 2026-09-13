@@ -11,6 +11,7 @@ the app's unified formula directly:
 Usage:
     cd backend && .venv/bin/python certification/plate08_shipped_crossval.py
 """
+import argparse
 import hashlib
 import json
 import os
@@ -66,7 +67,7 @@ def load_shipped_preset():
     return {labels[i]: (c["hex"], c["td"], c["k"]) for i, c in enumerate(colors)}
 
 
-def main():
+def main(check_only: bool = False):
     shipped = load_shipped_preset()
     abs_table = {}
     for ch, (hexv, td, k) in shipped.items():
@@ -141,18 +142,20 @@ def main():
             },
             "orientation": ORIENTATION,
             "layer_mm": LAYER_MM,
-            "engine_commit": subprocess.run(
-                ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True
-            ).stdout.strip(),
         },
         "command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py",
+        "check_command": "cd backend && .venv/bin/python certification/plate08_shipped_crossval.py --check",
+        "research_engine_pin": "165fa55cba8e0a6fc6b6b2e1ab69cdf9d139f287",
+        "app_commit": subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True
+        ).stdout.strip(),
         "backings": {},
     }
 
     pp = PhotoPreprocessor(grid_size=16)
     for bk, bg in {"w": (255.0, 255.0, 255.0), "b": (20.0, 20.0, 20.0)}.items():
         res = pp.process(PHOTOS[bk])
-        warped = os.path.join(REPO_ROOT, "certification", f"_warp_{bk}.png")
+        warped = os.path.join("/tmp", f"plate08_warp_{bk}.png")
         Image.fromarray(res.image).save(warped)
         meas = sample_cells(warped)
         os.remove(warped)
@@ -165,10 +168,29 @@ def main():
         report["backings"][bk] = {"shipped_preset": shipped_score, "same_batch_reference": ref_score}
         print(f"PLATE-08-KX-A {bk}: shipped {shipped_score:.2f} | same-batch ref {ref_score:.2f}")
 
-    out = os.path.join(REPO_ROOT, "certification", "plate08_shipped_crossval.json")
+    out_dir = "/tmp" if check_only else os.path.join(REPO_ROOT, "certification")
+    out = os.path.join(out_dir, "plate08_shipped_crossval.json")
+    if check_only:
+        tracked = os.path.join(REPO_ROOT, "certification", "plate08_shipped_crossval.json")
+        existing = json.load(open(tracked))
+        drift = {
+            k: (existing.get(k), report.get(k))
+            for k in ("shipped_preset", "backings")
+            if existing.get(k) != report.get(k)
+        }
+        if drift:
+            print("CERTIFICATION DRIFT DETECTED:")
+            print(json.dumps(drift, indent=2)[:2000])
+            sys.exit(1)
+        print(f"check passed (identical to {tracked}); report also written to {out}")
     json.dump(report, open(out, "w"), indent=2)
-    print("report ->", out)
+    if not check_only:
+        print(f"report -> {out}")
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--check", action="store_true",
+                    help="read-only verification against the tracked report; writes only to /tmp")
+    args = ap.parse_args()
+    main(check_only=args.check)
