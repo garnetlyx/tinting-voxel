@@ -51,6 +51,13 @@ _FAST_FORM = {
     "layer_count": "4",
     "layer_height": "0.08",
     "pixel_size": "0.42",
+    "white_backing_layers": "1",
+    "max_colors": "10",
+    "color_threshold": "50",
+    "detail_size": "0.42",
+    "num_colors": "8",
+    "epsilon": "2",
+    "min_area": "4",
     "top_n": "2",
 }
 
@@ -107,6 +114,32 @@ class TestParamSearchEndpoint:
         )
         assert resp.status_code == 400
 
+    def test_search_keeps_current_stack_and_includes_current_params(self, client, png_bytes):
+        form = {
+            **_FAST_FORM,
+            "preset": "clear_cmyw",
+            "layer_count": "8",
+            "layer_height": "0.84",
+            "white_backing_layers": "0",
+            "max_colors": "50",
+            "color_threshold": "35",
+            "n_trials": "1",
+        }
+        resp = client.post(
+            "/api/param-search",
+            data=form,
+            files={"image": ("test.png", png_bytes, "image/png")},
+        )
+
+        assert resp.status_code == 200, resp.text
+        results = resp.json()["results"]
+        assert any(
+            item["params"]["max_colors"] == 50
+            and item["params"]["color_threshold"] == 35
+            and item["params"]["white_backing_layers"] == 0
+            for item in results
+        )
+
     def test_custom_filament_colors_run_search(self, client, png_bytes):
         """Custom color configs must be searchable, not just named presets."""
         colors = json.dumps([
@@ -117,7 +150,13 @@ class TestParamSearchEndpoint:
         ])
         resp = client.post(
             "/api/param-search",
-            data={**_FAST_FORM, "preset": None, "filamentColors": colors, "mode": "svg"},
+            data={
+                **_FAST_FORM,
+                "preset": None,
+                "filamentColors": colors,
+                "mode": "svg",
+                "white_backing_layers": "0",
+            },
             files={"image": ("test.png", png_bytes, "image/png")},
         )
         assert resp.status_code == 200

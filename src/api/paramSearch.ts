@@ -13,6 +13,14 @@ export interface ParamSearchConfig {
   filamentColors?: FilamentColorConfig[];
   mode: 'pixel' | 'svg' | 'both';
   layerCount: number;
+  layerHeight: number;
+  whiteBackingLayers: number;
+  maxColors: number;
+  colorThreshold: number;
+  detailSize: number;
+  numColors: number;
+  epsilon: number;
+  minArea: number;
   strategy?: 'grid' | 'random';
   nTrials?: number;
   seed?: number;
@@ -65,6 +73,14 @@ export async function startParamSearch(
   }
   formData.append('mode', config.mode);
   formData.append('layer_count', config.layerCount.toString());
+  formData.append('layer_height', config.layerHeight.toString());
+  formData.append('white_backing_layers', config.whiteBackingLayers.toString());
+  formData.append('max_colors', config.maxColors.toString());
+  formData.append('color_threshold', config.colorThreshold.toString());
+  formData.append('detail_size', config.detailSize.toString());
+  formData.append('num_colors', config.numColors.toString());
+  formData.append('epsilon', config.epsilon.toString());
+  formData.append('min_area', config.minArea.toString());
   formData.append('pixel_size', pixelSize.toString());
   formData.append('strategy', config.strategy ?? 'grid');
   if (config.nTrials !== undefined) formData.append('n_trials', config.nTrials.toString());

@@ -49,6 +49,7 @@ const computeDefaultPixelSize = (widthPx: number, heightPx: number) => {
 
 export const useImageProcessor = () => {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [currentImageFile, setCurrentImageFile] = useState<File | null>(null);
   const [rawImage, setRawImage] = useState<HTMLImageElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -315,6 +316,7 @@ export const useImageProcessor = () => {
       // Only update state if this request wasn't aborted
       if (controller.signal.aborted) return;
 
+      setCurrentImageFile(file);
       setImageDimensions(result.imageDimensions);
 
       // Sync backend-confirmed parameters. pixelSize remains the actual model pitch.
@@ -763,6 +765,7 @@ export const useImageProcessor = () => {
   return {
     // State
     image,
+    currentImageFile,
     rawImage,
     isEditing,
     processing,

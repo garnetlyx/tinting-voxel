@@ -38,6 +38,7 @@ const Converter: React.FC = () => {
 
   const {
     image,
+    currentImageFile,
     rawImage,
     isEditing,
     processing,
@@ -130,9 +131,6 @@ const Converter: React.FC = () => {
       setShowParamSearchPrompt(true);
     }
   }, [processing, hasResults]);
-  // Track the last uploaded File so we can pass it to the param search API
-  const imageFileRef = useRef<File | null>(null);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
       <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto">
@@ -271,15 +269,8 @@ const Converter: React.FC = () => {
                 <div className="space-y-6">
                   {/* Image Uploader */}
                   <ImageUploader
-                    onImageUpload={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) imageFileRef.current = file;
-                      handleImageUpload(e);
-                    }}
-                    onFileDrop={(file) => {
-                      imageFileRef.current = file;
-                      handleFile(file);
-                    }}
+                    onImageUpload={handleImageUpload}
+                    onFileDrop={handleFile}
                   />
 
                   {/* Image Editor (crop/resize) */}
@@ -433,17 +424,24 @@ const Converter: React.FC = () => {
         error={paramSearch.error}
         defaultTargetSizeMm={maxDimension}
         onStart={(targetLongestEdgeMm) => {
-          if (!image || !imageFileRef.current) return;
+          if (!image || !currentImageFile) return;
           paramSearch.startSearch(
-            imageFileRef.current,
+            currentImageFile,
             {
               targetLongestEdgeMm,
-              // Run the search against exactly what is selected in the UI,
-              // including fully custom filament configurations.
+              // Search the exact image and print configuration currently shown.
               preset: filamentPreset ?? undefined,
               filamentColors: filamentPreset ? undefined : filamentColors,
               mode,
               layerCount,
+              layerHeight,
+              whiteBackingLayers,
+              maxColors,
+              colorThreshold,
+              detailSize,
+              numColors,
+              epsilon,
+              minArea,
               strategy: 'random',
               nTrials: 20,
             },

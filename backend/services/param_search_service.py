@@ -36,6 +36,7 @@ class FixedParams:
     layer_count: int
     layer_height: float
     pixel_size: float
+    white_backing_layers: int
 
 
 @dataclass
@@ -59,6 +60,7 @@ class ParamSearchConfig:
     colors: Colors
     param_ranges: Optional[dict]
     top_n: int
+    baseline_params: Optional[dict] = None
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +120,7 @@ class Evaluator:
             filament_colors=self._colors,
             layer_count=self._fixed.layer_count,
             layer_height=self._fixed.layer_height,
-            white_backing_layers=int(params.get("white_backing_layers", 1)),
+            white_backing_layers=self._fixed.white_backing_layers,
             detail_size=float(params.get("detail_size", 0.42)),
         )
         return result["processedImage"]
@@ -158,7 +160,7 @@ class Evaluator:
             colors=self._colors,
             layer_count=self._fixed.layer_count,
             layer_height=self._fixed.layer_height,
-            white_backing_layers=int(params.get("white_backing_layers", 1)),
+            white_backing_layers=self._fixed.white_backing_layers,
         )
         return preview["processedImage"]
 
@@ -194,7 +196,6 @@ _GRID_DEFAULTS_PIXEL = {
     "max_colors": [6, 8, 10, 12],
     "color_threshold": [20, 40, 60, 80],
     "detail_size": [0.22, 0.42, 0.62],
-    "white_backing_layers": [0, 1],
 }
 
 _GRID_DEFAULTS_SVG = {
@@ -202,7 +203,6 @@ _GRID_DEFAULTS_SVG = {
     "epsilon": [1.0, 2.0, 3.0],
     "min_area": [2.0, 4.0, 6.0],
     "detail_size": [0.22, 0.42, 0.62],
-    "white_backing_layers": [0, 1],
 }
 
 # Default bounds for random search
@@ -210,7 +210,6 @@ _RANDOM_BOUNDS_PIXEL = {
     "max_colors": ("int", 4, 16),
     "color_threshold": ("float", 10, 100),
     "detail_size": ("float", 0.22, 0.82),
-    "white_backing_layers": ("choice", [0, 1]),
 }
 
 _RANDOM_BOUNDS_SVG = {
@@ -218,7 +217,6 @@ _RANDOM_BOUNDS_SVG = {
     "epsilon": ("float", 0.5, 5.0),
     "min_area": ("float", 1.0, 10.0),
     "detail_size": ("float", 0.22, 0.82),
-    "white_backing_layers": ("choice", [0, 1]),
 }
 
 
@@ -329,8 +327,22 @@ class ParamSearchService:
         evaluator = Evaluator(image_bytes, cfg.colors, cfg.fixed)
         modes = self._modes()
 
-        # Pre-compute total across all modes
-        total = sum(self._build_strategy(m).total() for m in modes)
+        # Evaluate the current UI parameters first. This guarantees a usable
+        # baseline under a tight timeout and prevents an "optimized" result
+        # from being worse than the settings the user already saw.
+        candidates_by_mode: dict[str, list[dict]] = {}
+        for candidate_mode in modes:
+            generated = list(self._build_strategy(candidate_mode).generate())
+            baseline = (cfg.baseline_params or {}).get(candidate_mode)
+            if baseline is not None:
+                # Copy so the stored baseline config is never mutated by the
+                # fixed white-backing annotation below.
+                generated = [dict(baseline)] + [
+                    params for params in generated if params != baseline
+                ]
+            candidates_by_mode[candidate_mode] = generated
+
+        total = sum(len(candidates) for candidates in candidates_by_mode.values())
         completed = 0
         best_mae = float("inf")
         all_results = out if out is not None else []
@@ -338,13 +350,13 @@ class ParamSearchService:
         job_id = ""  # filled by caller if needed
 
         for mode in modes:
-            strategy = self._build_strategy(mode)
-            for params in strategy.generate():
+            for params in candidates_by_mode[mode]:
                 if cancel is not None and cancel.is_set():
                     logger.info("Search cancelled after %d/%d evaluations", completed, total)
                     return self._rank_and_trim(all_results)
                 try:
                     result = evaluator.evaluate(params, mode)
+                    result.params["white_backing_layers"] = cfg.fixed.white_backing_layers
                     all_results.append(result)
                     if result.mae < best_mae:
                         best_mae = result.mae

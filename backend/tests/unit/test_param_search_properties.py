@@ -60,7 +60,12 @@ def _default_colors() -> Colors:
 
 
 def _default_fixed() -> FixedParams:
-    return FixedParams(layer_count=4, layer_height=0.08, pixel_size=0.42)
+    return FixedParams(
+        layer_count=4,
+        layer_height=0.08,
+        pixel_size=0.42,
+        white_backing_layers=1,
+    )
 
 
 # Strategy: small solid-color PIL images

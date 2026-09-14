@@ -18,7 +18,12 @@ from services.param_search_service import (
     ParamSearchService,
 )
 
-FIXED = FixedParams(layer_count=4, layer_height=0.08, pixel_size=0.42)
+FIXED = FixedParams(
+    layer_count=4,
+    layer_height=0.08,
+    pixel_size=0.42,
+    white_backing_layers=1,
+)
 
 # Wide enough that a full grid cannot finish inside the small timeouts used
 # below: 4 * 4 * 3 * 2 = 96 combinations.
@@ -26,7 +31,6 @@ _WIDE_GRID = {
     "max_colors": [6, 8, 10, 12],
     "color_threshold": [20, 40, 60, 80],
     "detail_size": [0.22, 0.42, 0.62],
-    "white_backing_layers": [0, 1],
 }
 
 _TINY_GRID = {
@@ -75,6 +79,31 @@ def _service(param_ranges, colors):
 
 
 class TestEvaluatorDownscale:
+    def test_pixel_evaluation_uses_fixed_print_stack(self, png_bytes, colors, monkeypatch):
+        captured = {}
+
+        def fake_process_image(**kwargs):
+            captured.update(kwargs)
+            return {"processedImage": "data:image/png;base64,"}
+
+        monkeypatch.setattr("services.image_processor.process_image", fake_process_image)
+        fixed = FixedParams(
+            layer_count=8,
+            layer_height=0.84,
+            pixel_size=0.15,
+            white_backing_layers=0,
+        )
+        evaluator = Evaluator(png_bytes, colors, fixed)
+        evaluator._run_pixel({
+            "max_colors": 10,
+            "color_threshold": 35,
+            "detail_size": 0.42,
+        })
+
+        assert captured["layer_count"] == 8
+        assert captured["layer_height"] == pytest.approx(0.84)
+        assert captured["white_backing_layers"] == 0
+
     def test_work_image_capped_to_max_edge(self, png_bytes, colors):
         ev = Evaluator(png_bytes, colors, FIXED)
         work = Image.open(io.BytesIO(ev._work_bytes))
@@ -140,6 +169,21 @@ class TestCooperativeCancel:
 
         assert len(results) == 4  # 2 * 2 * 1 * 1
         assert [r.rank for r in results] == [1, 2, 3, 4]
+
+    def test_current_params_are_always_evaluated_as_baseline(self, png_bytes, colors):
+        svc = _service(_TINY_GRID, colors)
+        baseline = {
+            "max_colors": 50,
+            "color_threshold": 35.0,
+            "detail_size": 0.42,
+        }
+        svc._config.baseline_params = {"pixel": baseline}
+
+        results = svc.run(png_bytes)
+
+        assert len(results) == 5
+        baseline_result = next(r for r in results if r.params["max_colors"] == 50)
+        assert baseline_result.params == {**baseline, "white_backing_layers": 1}
 
     def test_timeout_thread_exits_after_cancel(self, png_bytes, colors):
         """The worker thread must stop shortly after the budget expires."""

@@ -85,10 +85,17 @@ async def api_param_search(
     strategy: str = Form("grid"),
     n_trials: int = Form(50),
     seed: Optional[int] = Form(None),
-    layer_count: int = Form(4),
-    layer_height: float = Form(0.08),
-    pixel_size: float = Form(0.42),
-    top_n: int = Form(10),
+    layer_count: int = Form(4, ge=1, le=10),
+    layer_height: float = Form(0.08, gt=0, le=10),
+    pixel_size: float = Form(0.42, gt=0, le=10),
+    white_backing_layers: int = Form(1, ge=0, le=5),
+    max_colors: int = Form(10, ge=1, le=256),
+    color_threshold: float = Form(50, ge=0, le=1000),
+    detail_size: float = Form(0.42, ge=0.2, le=0.9),
+    num_colors: int = Form(8, ge=1, le=256),
+    epsilon: float = Form(2.0, gt=0, le=100),
+    min_area: float = Form(4.0, gt=0, le=100),
+    top_n: int = Form(10, ge=1, le=50),
 ):
     """Run parameter search and return top-N results sorted by MAE."""
     image_bytes = await image.read()
@@ -111,10 +118,24 @@ async def api_param_search(
             layer_count=layer_count,
             layer_height=layer_height,
             pixel_size=pixel_size,
+            white_backing_layers=white_backing_layers,
         ),
         colors=colors,
         param_ranges=None,
         top_n=top_n,
+        baseline_params={
+            "pixel": {
+                "max_colors": max_colors,
+                "color_threshold": color_threshold,
+                "detail_size": detail_size,
+            },
+            "svg": {
+                "num_colors": num_colors,
+                "epsilon": epsilon,
+                "min_area": min_area,
+                "detail_size": detail_size,
+            },
+        },
     )
 
     loop = asyncio.get_event_loop()
