@@ -38,5 +38,9 @@
   "gamutHelp": "Generic to the current filament setup, not this upload.",
   "kEntry": "Color {{index}} pigment absorption gain k",
   "kHelp": "Optional pigment absorption gain (0 = plain Beer-Lambert). Calibrated presets carry fitted values; edit only if you know your material.",
-  "tdEntry": "Color {{index}} transmission distance"
+  "tdEntry": "Color {{index}} transmission distance",
+  "tdRgbEntry": "Color {{index}} {{channel}}-channel transmission distance",
+  "tdRgbHelp": "Staircase-measured per-channel transmission distances (R, G, B). Same blend formula as the scalar td; per-channel data carries the measured selectivity.",
+  "tdPerChannelOn": "Switch to per-channel transmission distances (staircase-measured)",
+  "tdPerChannelOff": "Switch back to a single scalar transmission distance (uses the channel mean)"
 }

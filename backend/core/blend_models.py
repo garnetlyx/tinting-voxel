@@ -49,12 +49,10 @@ def _normalize_code(code: str) -> str:
 
 
 def _build_color_map_from_key(color_key: tuple) -> dict:
-    """Rebuild Color objects from the cache key (label, td, hex, k)."""
+    """Rebuild Color objects from the cache key (label, td, hex, k, td_rgb)."""
     color_map = {}
-    for item in color_key:
-        label, td, hex_val = item[0], item[1], item[2]
-        k = item[3] if len(item) >= 4 else Color.DEFAULT_K
-        color_map[label] = Color(label, td, hex_val, k=k)
+    for label, td, hex_val, k, td_rgb in color_key:
+        color_map[label] = Color(label, td, hex_val, k=k, td_rgb=td_rgb)
     return color_map
 
 
@@ -90,16 +88,24 @@ def _normalize_background_rgb(background_rgb: Optional[tuple]) -> np.ndarray:
 
 
 def _resolve_extinction(color: Color) -> np.ndarray:
-    """Per-channel extinction coefficient (1/mm): mu_ch = ln10/td + k*A_ch.
+    """Per-channel extinction coefficient (1/mm): mu_ch = ln10/td_ch + k*A_ch.
 
-    A non-positive td means fully opaque: mu = inf, t = 0.
+    td_ch is the staircase-measured per-channel transmission distance when
+    the filament carries td_rgb, otherwise the scalar td broadcast to all
+    channels. A non-positive td means fully opaque: mu = inf, t = 0.
     """
     absorption = color.get_absorption()
     k = float(color.k)
-    td = float(color.td)
-    if td <= 0:
-        return np.full(3, np.inf)
-    return LN10 / td + k * absorption
+    td_rgb = color.td_rgb
+    if td_rgb is not None:
+        td_ch = np.asarray(td_rgb, dtype=np.float64)
+        mu = np.where(td_ch > 0, LN10 / np.where(td_ch > 0, td_ch, 1.0), np.inf)
+    else:
+        td = float(color.td)
+        if td <= 0:
+            return np.full(3, np.inf)
+        mu = np.full(3, LN10 / td)
+    return mu + k * absorption
 
 
 def _compose_light_loss_allocation(

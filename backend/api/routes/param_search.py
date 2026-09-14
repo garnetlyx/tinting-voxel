@@ -89,7 +89,7 @@ async def api_param_search(
     layer_height: float = Form(0.08, gt=0, le=10),
     pixel_size: float = Form(0.42, gt=0, le=10),
     white_backing_layers: int = Form(1, ge=0, le=5),
-    max_colors: int = Form(10, ge=1, le=256),
+    max_colors: int = Form(10, ge=1, le=1024),
     color_threshold: float = Form(50, ge=0, le=1000),
     detail_size: float = Form(0.42, ge=0.2, le=0.9),
     num_colors: int = Form(8, ge=1, le=256),

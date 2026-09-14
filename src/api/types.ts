@@ -105,12 +105,14 @@ export interface DownloadSVGSTLParams {
 export type FilamentPreset =
   | 'bambu_cmywk_phase6'
   | 'bambu_cmyw_phase6'
+  | 'clear_cmyg'
   | 'clear_cmyw';
 
 export const DEFAULT_FILAMENT_PRESET: FilamentPreset = 'bambu_cmywk_phase6';
 export const FILAMENT_PRESET_OPTIONS: { value: FilamentPreset; label: string }[] = [
   { value: 'bambu_cmywk_phase6', label: 'Bambu CMYWK' },
   { value: 'bambu_cmyw_phase6', label: 'Bambu CMYW' },
+  { value: 'clear_cmyg', label: 'Clear CMYG' },
   { value: 'clear_cmyw', label: 'Clear CMYW' },
 ];
 
@@ -119,6 +121,9 @@ export interface FilamentColorConfig {
   hex: string;
   /** Channel-neutral transmission distance (mm), base-10: t = 10^(-d/td). */
   transmission_distance: number;
+  /** Staircase-measured per-channel transmission distances [R, G, B]
+   * (mm); absent means the scalar td broadcasts to all channels. */
+  td_rgb?: number[];
   /** Optional pigment absorption gain; 0 blends as plain Beer-Lambert. */
   k?: number;
 }
@@ -132,16 +137,22 @@ export const TRANSPARENT_LAYER_HEIGHT_MM = 0.84;
 // Transparency threshold (mm) on the stored td scale — the same number the
 // backend prune gate uses (core/stack_prune.py TRANSPARENT_TD_THRESHOLD_MM).
 // A literal constant, not user-adjustable: it is a property of the
-// calibrated data gap (bambu folded 0.27-0.61 vs clear means 4.7-18.0).
+// calibrated data gap (paper-fitted bambu folds 1.94-2.22 vs user clear
+// customs at 4.5+).
 export const TRANSPARENT_TD_THRESHOLD_MM = 4.5;
 
 /**
- * A filament set counts as transparent when every filament's td meets the
- * fixed threshold. Drives the layer-height default; never gates user input.
+ * A filament set counts as transparent when every filament's td data
+ * indicates the transparent track: staircase-measured per-channel td_rgb,
+ * or a scalar td that meets the fixed threshold (user-entered clear
+ * filaments). Drives the layer-height default; never gates user input.
  */
 export function isAllTransparentFilaments(colors: FilamentColorConfig[]): boolean {
   if (colors.length === 0) return false;
-  return colors.every(c => c.transmission_distance >= TRANSPARENT_TD_THRESHOLD_MM);
+  return colors.every(c =>
+    (Array.isArray(c.td_rgb) && c.td_rgb.length === 3)
+    || c.transmission_distance >= TRANSPARENT_TD_THRESHOLD_MM
+  );
 }
 
 export interface FilamentPresetInfo {
@@ -292,27 +303,34 @@ export interface PaletteLibraryResponse {
 }
 
 // Default presets for frontend initialization. Mirrors the backend's
-// core/color_config.py — bambu tds are the exact fold of the Phase-6 fitted
-// scatter (bit-identical blending), clear is the staircase mean CMYW set.
+// core/color_config.py — bambu tds are the exact fold of the paper's
+// PLATE-06-H2C-A standard fit; clear presets carry the staircase-measured
+// per-channel td_rgb (paper transparent track).
 export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
   bambu_cmywk_phase6: [
-    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 0.48447574859816506, k: 8.13 },
-    { name: 'Magenta', hex: '#B3356E', transmission_distance: 0.5218499460436025,  k: 8.42 },
-    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 0.5819156593127012,  k: 3.73 },
-    { name: 'White',   hex: '#FFFFFF', transmission_distance: 0.6055249051606083,  k: 12.39 },
-    { name: 'Key',     hex: '#0B0F0C', transmission_distance: 0.26611297079931917, k: 17.65 },
+    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 2.1381256008389844, k: 3.4996 },
+    { name: 'Magenta', hex: '#B3356E', transmission_distance: 2.16428365111357,  k: 4.3077 },
+    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 2.203209113788528,  k: 3.6572 },
+    { name: 'White',   hex: '#FFFFFF', transmission_distance: 2.217597459508237,  k: 6.3168 },
+    { name: 'Key',     hex: '#0B0F0C', transmission_distance: 1.9384419920975642, k: 23.1863 },
   ],
   bambu_cmyw_phase6: [
-    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 0.48447574859816506, k: 8.13 },
-    { name: 'Magenta', hex: '#B3356E', transmission_distance: 0.5218499460436025,  k: 8.42 },
-    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 0.5819156593127012,  k: 3.73 },
-    { name: 'White',   hex: '#FFFFFF', transmission_distance: 0.6055249051606083,  k: 12.39 },
+    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 2.1381256008389844, k: 3.4996 },
+    { name: 'Magenta', hex: '#B3356E', transmission_distance: 2.16428365111357,  k: 4.3077 },
+    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 2.203209113788528,  k: 3.6572 },
+    { name: 'White',   hex: '#FFFFFF', transmission_distance: 2.217597459508237,  k: 6.3168 },
+  ],
+  clear_cmyg: [
+    { name: 'Cyan',    hex: '#5489B4', transmission_distance: 4.667418746800521,  td_rgb: [1.039647851596278, 4.661388851322945, 8.301219537482337], k: 0 },
+    { name: 'Magenta', hex: '#DE5740', transmission_distance: 6.31945243505504,   td_rgb: [12.871171884721239, 2.3866487980887325, 3.700536622355147], k: 0 },
+    { name: 'Yellow',  hex: '#DDC465', transmission_distance: 10.074691453694577, td_rgb: [15.128418453030553, 12.290455104172315, 2.8052008038808633], k: 0 },
+    { name: 'Grey',    hex: '#9A9D9C', transmission_distance: 1.7030698349645412, td_rgb: [2.226964674889777, 1.688155998369564, 1.1940888316342828], k: 0 },
   ],
   clear_cmyw: [
-    { name: 'Cyan',    hex: '#5489B4', transmission_distance: 4.7,  k: 0 },
-    { name: 'Magenta', hex: '#DE5740', transmission_distance: 6.3,  k: 0 },
-    { name: 'Yellow',  hex: '#DDC465', transmission_distance: 10.1, k: 0 },
-    { name: 'White',   hex: '#D9D6C5', transmission_distance: 18.0, k: 0 },
+    { name: 'Cyan',    hex: '#4C72A0', transmission_distance: 2.6582813347278655, td_rgb: [1.3490352079515975, 2.5371501740106988, 4.088658622221301], k: 0 },
+    { name: 'Magenta', hex: '#CE5E53', transmission_distance: 5.252097918532708,  td_rgb: [11.210903332862577, 2.0338821311932, 2.511508291542347], k: 0 },
+    { name: 'Yellow',  hex: '#D8B695', transmission_distance: 14.295863422405146, td_rgb: [22.124563670499846, 15.378730904545765, 5.384295692169828], k: 0 },
+    { name: 'White',   hex: '#D9D6C5', transmission_distance: 18.02000330638548,  td_rgb: [17.949461574719358, 18.902845340687115, 17.207703003749966], k: 0 },
   ],
 };
 

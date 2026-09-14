@@ -10,6 +10,7 @@ from core.color_config import (
     ColorConfig,
     BAMBU_CMYWK_PHASE6_PRESET,
     BAMBU_CMYW_PHASE6_PRESET,
+    CLEAR_CMYG_PRESET,
     CLEAR_CMYW_PRESET,
 )
 
@@ -45,9 +46,17 @@ PALETTE_CLEAR_CMYW = PaletteEntry(
     colors=CLEAR_CMYW_PRESET,  # Reference source-of-truth constant
 )
 
+PALETTE_CLEAR_CMYG = PaletteEntry(
+    id="clear_cmyg",
+    name="Clear CMYG",
+    description="Translucent CMYG filament set (staircase per-channel TDs) for stained-glass prints",
+    colors=CLEAR_CMYG_PRESET,  # Reference source-of-truth constant
+)
+
 ALL_PALETTES: List[PaletteEntry] = [
     PALETTE_BAMBU_CMYWK_PHASE6,
     PALETTE_BAMBU_CMYW_PHASE6,
+    PALETTE_CLEAR_CMYG,
     PALETTE_CLEAR_CMYW,
 ]
 

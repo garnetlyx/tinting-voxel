@@ -178,23 +178,6 @@ class TestColorMapToNearestColor:
         assert codes[2] == "Y"
 
 
-class TestColorsWhiteBalance:
-    """Tests for Colors.update_white_balance()."""
-
-    def test_update_white_balance(self):
-        colors = Colors()
-        colors.update_white_balance(5, 15, 30)
-        assert colors.white_balance['r'] == 5
-        assert colors.white_balance['g'] == 15
-        assert colors.white_balance['b'] == 30
-
-    def test_default_white_balance(self):
-        colors = Colors()
-        assert colors.white_balance['r'] == 0
-        assert colors.white_balance['g'] == 10
-        assert colors.white_balance['b'] == 24
-
-
 class TestColorsSetItem:
     """Tests for Colors.__setitem__()."""
 
@@ -305,16 +288,17 @@ class TestCodeToRgbCache:
     def test_cache_isolated_between_generators(self):
         """Different generator configs don't share cached results."""
         from core.blend_color import clear_rgb_cache
+        from core.color_config import BAMBU_CMYW_PHASE6_PRESET, CLEAR_CMYW_PRESET
         clear_rgb_cache()
 
         gen1 = BlendTestGenerator(
-            colors=Colors(clear=False),
+            colors=Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET),
             layer_height=0.08,
             layer_count_max=4,
             verbose=False,
         )
         gen2 = BlendTestGenerator(
-            colors=Colors(clear=True),
+            colors=Colors.from_configs(CLEAR_CMYW_PRESET),
             layer_height=0.84,
             layer_count_max=4,
             verbose=False,
@@ -618,15 +602,10 @@ class TestColorConstructor:
 class TestColorsInit:
     """Tests for Colors initialization variants."""
 
-    def test_clear_mode(self):
-        from core.color_config import CLEAR_CMYW_PRESET
-        colors = Colors(clear=True)
+    def test_default_set_is_bambu_cmyw(self):
+        colors = Colors()
         assert len(colors) == 4
-        # Clear mode mirrors the CLEAR_CMYW_PRESET source of truth
-        preset_c = next(c for c in CLEAR_CMYW_PRESET if c.label == 'C')
-        assert colors['C'].td == preset_c.transmission_distance
-        # Clear filaments are more translucent than the opaque set
-        assert colors['C'].td > Colors()['C'].td
+        assert colors.get_labels() == ['C', 'M', 'Y', 'W']
 
     def test_names_subset(self):
         colors = Colors(names=['C', 'M'])

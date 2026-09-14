@@ -55,7 +55,7 @@ async def api_process_image(
     request: Request,
     image: UploadFile = File(...),
     mode: str = Form("pixel"),
-    maxColors: int = Form(10, ge=1, le=256),
+    maxColors: int = Form(10, ge=1, le=1024),
     colorThreshold: float = Form(50, ge=0, le=1000),
     pixelSize: float = Form(0.2, gt=0, le=10),
     epsilon: float = Form(2.0, gt=0, le=100),

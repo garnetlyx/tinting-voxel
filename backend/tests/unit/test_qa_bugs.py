@@ -135,6 +135,7 @@ class TestGlobalColorStateRace:
     def test_different_colors_produce_isolated_results(self):
         """Two calls with different colors don't interfere with each other."""
         from core.blend_color import Colors
+        from core.color_config import get_preset
         from services.stl_generator import generate_stl_zip
 
         sample_blocks = [
@@ -162,7 +163,7 @@ class TestGlobalColorStateRace:
             pixel_size=1.0,
             layer_count=4,
             image_dimensions=dims,
-            colors=Colors(clear=True)
+            colors=Colors.from_configs(get_preset('clear_cmyw'))
         )
 
         # Both produce valid results independently (different color configs)
@@ -591,46 +592,6 @@ class TestCsvInjection:
         )
 
 
-# -- BUG QA-17: update_white_balance parameter order is (r, b, g) -----------
-# File: backend/core/blend_color.py:215-218
-# Function signature is update_white_balance(self, new_r, new_b, new_g)
-# but the natural expectation is (r, g, b) order.
-
-
-class TestWhiteBalanceParameterOrder:
-    """
-    BUG QA-17: Colors.update_white_balance() has parameters in wrong order.
-
-    Signature: update_white_balance(self, new_r, new_b, new_g)
-    Expected:  update_white_balance(self, new_r, new_g, new_b)
-
-    The function body assigns:
-        self.white_balance['r'] = new_r  (correct)
-        self.white_balance['b'] = new_b  (second param is 'b')
-        self.white_balance['g'] = new_g  (third param is 'g')
-
-    Any caller using positional args (r, g, b) would swap green and blue.
-    """
-
-    def test_white_balance_parameter_order_matches_rgb(self):
-        """update_white_balance parameters should follow RGB convention."""
-        import inspect
-        from core.blend_color import Colors
-
-        sig = inspect.signature(Colors.update_white_balance)
-        params = list(sig.parameters.keys())
-        # Skip 'self'
-        params = params[1:]
-
-        # Natural convention: r, g, b
-        assert params == ['new_r', 'new_g', 'new_b'], (
-            f"BUG QA-17: update_white_balance() parameter order is {params}. "
-            f"Expected ['new_r', 'new_g', 'new_b'] (RGB convention). "
-            f"Current order (r, b, g) swaps green and blue for positional callers."
-        )
-
-
-# -- BUG QA-18: Mutable default argument in BlendTestGenerator.__init__ ------
 # File: backend/core/blend_color.py:262
 # colors = Colors() is a mutable default argument.
 
@@ -2489,7 +2450,6 @@ class TestComputeReferenceMatricesEmptyColors:
 
         colors = Colors.__new__(Colors)
         colors.colors = {}
-        colors.white_balance = {'r': 0, 'g': 0, 'b': 0}
 
         with pytest.raises(ValueError):
             compute_reference_matrices(4, 0.08, colors)
@@ -2501,7 +2461,6 @@ class TestComputeReferenceMatricesEmptyColors:
 
         colors = Colors.__new__(Colors)
         colors.colors = {}
-        colors.white_balance = {'r': 0, 'g': 0, 'b': 0}
 
         try:
             compute_reference_matrices(4, 0.08, colors)
@@ -2603,7 +2562,7 @@ class TestCodeToRgbShortCodeBackground:
         from core.blend_color import _code_to_rgb_cached, clear_rgb_cache
 
         clear_rgb_cache()
-        color_key = (('W', 7.2, '#FFFFFF'),)
+        color_key = (('W', 7.2, '#FFFFFF', 0.0, None),)
         r, g, b = _code_to_rgb_cached('W', 0.08, color_key)
 
         # Single layer of white should be very bright (>230)
@@ -2620,8 +2579,8 @@ class TestCodeToRgbShortCodeBackground:
         from core.blend_color import _code_to_rgb_cached, clear_rgb_cache
 
         clear_rgb_cache()
-        color_key = (('C', 3.0, '#0086D6'), ('M', 1.9, '#EC008C'),
-                     ('Y', 2.5, '#F4EE2A'), ('W', 7.2, '#FFFFFF'))
+        color_key = (('C', 3.0, '#0086D6', 0.0, None), ('M', 1.9, '#EC008C', 0.0, None),
+                     ('Y', 2.5, '#F4EE2A', 0.0, None), ('W', 7.2, '#FFFFFF', 0.0, None))
 
         r1, g1, b1 = _code_to_rgb_cached('W', 0.08, color_key)
         r4, g4, b4 = _code_to_rgb_cached('WWWW', 0.08, color_key)

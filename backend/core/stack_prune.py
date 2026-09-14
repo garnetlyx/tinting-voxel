@@ -64,19 +64,27 @@ MAX_CANDIDATE_COMPOSITIONS = 128
 
 
 def is_translucent_set(colors: Colors) -> bool:
-    """True when every filament's td meets the transparency threshold.
+    """True when every td value blending uses meets the transparency threshold.
 
-    Single standard: the stored td value, the same number blending uses,
-    compared against the one fixed 4.5 mm constant. Preset values: bambu
-    (folded fits) sit at 0.27-0.61, clear (staircase means) at 4.7-18.0, so
-    the clear CMYW preset classifies transparent and every bambu set opaque.
+    Single standard: the td numbers blending actually reads — per-channel
+    td_rgb when the filament carries staircase measurements, else the scalar
+    td broadcast — every channel >= the one fixed 4.5 mm constant. A set whose
+    every channel transmits weakly (all td_ch >= 4.5) has order-insensitive
+    stacking, which is what the composition-pruning ΔE oracle validates.
+    Paper-data presets: bambu (paper-fitted folds) sits at 1.94-2.22 and the
+    clear presets carry per-channel staircases down to ~1.0 mm in their most
+    absorbing channel — the accurate per-channel model makes real clear
+    stacks order-sensitive, so neither ships as prunable; only sets that are
+    uniformly high-td on every channel (e.g. customs at 10-30 mm) classify
+    transparent.
     """
     items = colors.colors.values() if isinstance(colors.colors, dict) else []
     if not items:
         return False
     for color in items:
-        td = color.td
-        if td is None or td < TRANSPARENT_TD_THRESHOLD_MM:
+        td_rgb = color.td_rgb
+        tds = tuple(td_rgb) if td_rgb is not None else (color.td,)
+        if any(td is None or td < TRANSPARENT_TD_THRESHOLD_MM for td in tds):
             return False
     return True
 
@@ -232,7 +240,9 @@ def refine_matches(
                 if float(perm_dists[local]) < best_dist:
                     best_dist = float(perm_dists[local])
                     best_code = perms[local]
-                    best_rgb = tuple(int(round(v)) for v in perm_rgb[local])
+                    # Keep the same float domain as the stage-1 rgb it may
+                    # replace; callers round to the image domain themselves.
+                    best_rgb = tuple(float(v) for v in perm_rgb[local])
                 # The stage-1 representative itself stays a candidate via the
                 # first entry of its (sorted) permutation list.
 

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Cyan slot: grey (Panchroma translucent)",
+    "hex": "#7B7872",
+    "transmission_distance": 3.574452502931685,
+    "k": 0.5006
+  },
+  {
+    "name": "Magenta slot: magenta (Sunlu matte)",
+    "hex": "#B43C74",
+    "transmission_distance": 0.6003216268677743,
+    "k": 7.2382
+  },
+  {
+    "name": "Yellow slot: ice-blue (matte)",
+    "hex": "#A9DDF3",
+    "transmission_distance": 1.4181333626981654,
+    "k": 7.902
+  },
+  {
+    "name": "White slot: beige (Bambu)",
+    "hex": "#F6E5CC",
+    "transmission_distance": 2.283619898834713,
+    "k": 6.0686
+  },
+  {
+    "name": "Key slot: purple (Bambu)",
+    "hex": "#5950B4",
+    "transmission_distance": 0.8701521736076145,
+    "k": 1.0591
+  }
+]

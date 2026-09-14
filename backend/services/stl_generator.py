@@ -228,7 +228,15 @@ def compute_reference_matrices(
         perms = list(itertools.product(items, repeat=layer_count))
         code_list = [''.join(p) for p in perms]
 
-    rgb_list = generator.codes_to_rgb(code_list)
+    # The reference palette lives in the 8-bit image domain: input pixels
+    # are 8-bit, so each code's reference color is its rendered color as it
+    # appears in an image. Comparing 8-bit inputs against float references
+    # inverts rounding boundaries (a neighbor code's float prediction can sit
+    # closer to the rounded pixel than the code that generated it).
+    rgb_list = [
+        tuple(int(channel) for channel in np.clip(np.round(rgb), 0, 255))
+        for rgb in generator.codes_to_rgb(code_list)
+    ]
 
     n = len(code_list)
     rows = int(np.sqrt(n))

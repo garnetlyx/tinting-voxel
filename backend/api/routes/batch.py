@@ -61,7 +61,7 @@ async def _read_batch_files(images: List[UploadFile]) -> list:
 async def api_batch_process(
     request: Request,
     images: List[UploadFile] = File(...),
-    maxColors: int = Form(10, ge=1, le=256),
+    maxColors: int = Form(10, ge=1, le=1024),
     colorThreshold: float = Form(50, ge=0, le=1000),
     pixelSize: float = Form(0.2, gt=0, le=10),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
@@ -93,7 +93,7 @@ async def api_batch_process(
 async def api_batch_download_stl(
     request: Request,
     images: List[UploadFile] = File(...),
-    maxColors: int = Form(10, ge=1, le=256),
+    maxColors: int = Form(10, ge=1, le=1024),
     colorThreshold: float = Form(50, ge=0, le=1000),
     pixelSize: float = Form(0.2, gt=0, le=10),
     layerHeight: float = Form(0.08, gt=0, le=10),

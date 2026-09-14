@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 # Safety cap only — prevents truly pathological inputs (e.g. 100MP raw photos).
 # Normal photos are processed at full resolution; pixelSize controls physical output size.
 MAX_PROCESSING_DIMENSION = 4096
+# Unique-color count at or below which merge_similar_colors runs the exact
+# O(n²) path without the lossy 5-bit bucket pre-quantization. Above it
+# (natural-photo scale) the pre-quantization engages to bound the merge cost.
+EXACT_MERGE_MAX_UNIQUE = 4096
 
 
 def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
@@ -359,21 +363,28 @@ def merge_similar_colors(colors: list[dict], threshold: float) -> list[dict]:
 
     Uses a fast pre-quantization step to reduce the number of unique colors
     before the O(n²) greedy merge, keeping performance acceptable even for
-    large natural photos with 200k+ unique RGB values.
+    large natural photos with 200k+ unique RGB values. The pre-quantization
+    is lossy (5-bit buckets); it engages only when the unique-color count
+    makes the exact O(n²) merge unaffordable, so small exact-palette inputs
+    (e.g. synthetic grids) keep full 8-bit fidelity.
     """
     if not colors:
         return colors
 
-    # --- Fast pre-quantization: bin RGB into 32-level buckets (8 bits → 5 bits) ---
-    # Colors that fall into the same bucket are merged immediately (weighted avg).
-    # This reduces 200k+ unique colors to at most 32³ = 32768 buckets in O(n).
-    QUANT_BITS = 3  # shift right by 3 → 32 levels per channel
-    bucket: dict[tuple[int, int, int], list[dict]] = {}
-    for c in colors:
-        key = (c['r'] >> QUANT_BITS, c['g'] >> QUANT_BITS, c['b'] >> QUANT_BITS)
-        bucket.setdefault(key, []).append(c)
+    # --- Exact path: small sets skip the lossy bucket pre-quantization ---
+    if len(colors) <= EXACT_MERGE_MAX_UNIQUE:
+        pre_merged: list[dict] = list(colors)
+    else:
+        # --- Fast pre-quantization: bin RGB into 32-level buckets (8 bits → 5 bits) ---
+        # Colors that fall into the same bucket are merged immediately (weighted avg).
+        # This reduces 200k+ unique colors to at most 32³ = 32768 buckets in O(n).
+        QUANT_BITS = 3  # shift right by 3 → 32 levels per channel
+        bucket: dict[tuple[int, int, int], list[dict]] = {}
+        for c in colors:
+            key = (c['r'] >> QUANT_BITS, c['g'] >> QUANT_BITS, c['b'] >> QUANT_BITS)
+            bucket.setdefault(key, []).append(c)
 
-    pre_merged: list[dict] = [cluster_avg_color(v) for v in bucket.values()]
+        pre_merged = [cluster_avg_color(v) for v in bucket.values()]
 
     # --- CIELAB conversion in one batch ---
     rgb_array = np.array(

@@ -54,6 +54,7 @@ async def api_get_filament_presets(request: Request):
             colors=[FilamentColorConfig(
                 name=c.name, hex=c.hex,
                 transmission_distance=c.transmission_distance,
+                td_rgb=c.td_rgb,
                 k=c.k,
             ) for c in configs],
         )
@@ -235,6 +236,7 @@ async def api_print_settings(request: Request, body: PrintSettingsRequest):
                     'name': c.name,
                     'hex': c.hex,
                     'transmission_distance': c.transmission_distance,
+                    'td_rgb': c.td_rgb,
                     'k': c.k,
                 }
                 for c in preset_configs
@@ -245,6 +247,7 @@ async def api_print_settings(request: Request, body: PrintSettingsRequest):
                 'name': c.name,
                 'hex': c.hex,
                 'transmission_distance': c.transmission_distance,
+                'td_rgb': c.td_rgb,
                 'k': c.k,
             })
         preset_name = 'bambu_cmywk_phase6'

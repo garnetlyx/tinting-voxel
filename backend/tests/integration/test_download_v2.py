@@ -16,8 +16,8 @@ def test_get_filament_presets(client):
     assert response.status_code == 200
     data = response.json()
     assert "presets" in data
-    assert [p["name"] for p in data["presets"]] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmyw"]
-    assert [p["display_name"] for p in data["presets"]] == ["Bambu CMYWK", "Bambu CMYW", "Clear CMYW"]
+    assert [p["name"] for p in data["presets"]] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmyg", "clear_cmyw"]
+    assert [p["display_name"] for p in data["presets"]] == ["Bambu CMYWK", "Bambu CMYW", "Clear CMYG", "Clear CMYW"]
 
 
 def test_get_filament_presets_exposes_calibrated_material_params(client):
@@ -32,8 +32,8 @@ def test_get_filament_presets_exposes_calibrated_material_params(client):
     )
     cyan = next(color for color in calibrated["colors"] if color["name"] == "Cyan")
 
-    assert cyan["transmission_distance"] == pytest.approx(0.48447574859816506)
-    assert cyan["k"] == 8.13
+    assert cyan["transmission_distance"] == pytest.approx(2.1381256008389844)
+    assert cyan["k"] == 3.4996
 
 
 def test_get_filament_presets_exposes_phase6_cmyw_material_params(client):
@@ -96,9 +96,9 @@ def test_get_colors_from_request_defaults_to_phase6_cmywk():
     colors = get_colors_from_request(None, None)
     assert len(colors) == 5
     assert "K" in colors.get_labels()
-    assert colors["K"].k == 17.65
-    assert colors["C"].k == 8.13
-    assert colors["W"].k == 12.39
+    assert colors["K"].k == 23.1863
+    assert colors["C"].k == 3.4996
+    assert colors["W"].k == 6.3168
 
 
 def test_v2_stl_with_bambu_preset(client, sample_color_blocks_with_hex):
@@ -270,8 +270,8 @@ def test_print_settings_with_preset(client):
     assert data["object_dimensions"]["height_mm"] == 8.0
     # The full surviving schema (hex + td + k) survives serialization.
     cyan = next(e for e in data["filament"]["extruders"] if e["name"] == "Cyan")
-    assert cyan["k"] == 8.13
-    assert cyan["transmission_distance"] == pytest.approx(0.48447574859816506)
+    assert cyan["k"] == 3.4996
+    assert cyan["transmission_distance"] == pytest.approx(2.1381256008389844)
 
 
 def test_print_settings_with_custom_colors(client):

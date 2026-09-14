@@ -9,6 +9,7 @@ import pytest
 from core.blend_color import Color, Colors
 from core.color_config import (
     BAMBU_CMYW_PHASE6_PRESET,
+    BAMBU_CMYWK_PHASE6_PRESET,
     CLEAR_CMYW_PRESET,
     ColorConfig,
     get_available_presets,
@@ -152,12 +153,25 @@ class TestColorsFromConfigs:
         assert colors['C'].td == 5.5
 
     def test_from_configs_preserves_folded_td_and_k(self):
-        """from_configs carries the folded td and fitted k verbatim."""
-        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
+        """from_configs carries the paper-fitted td/k and td_rgb verbatim."""
+        colors = Colors.from_configs(BAMBU_CMYWK_PHASE6_PRESET)
 
-        assert colors["C"].td == pytest.approx(0.48447574859816506)
-        assert colors["C"].k == pytest.approx(8.13)
-        assert colors["W"].k == pytest.approx(12.39)
+        assert colors["C"].td == pytest.approx(2.1381256008389844)
+        assert colors["C"].k == pytest.approx(3.4996)
+        assert colors["W"].k == pytest.approx(6.3168)
+        assert colors["K"].k == pytest.approx(23.1863)
+        assert colors["C"].td_rgb is None
+
+    def test_from_configs_preserves_per_channel_td(self):
+        """from_configs carries the staircase per-channel td_rgb verbatim."""
+        colors = Colors.from_configs(CLEAR_CMYW_PRESET)
+
+        assert colors["C"].td_rgb == (
+            1.3490352079515975, 2.5371501740106988, 4.088658622221301,
+        )
+        assert colors["W"].td_rgb == (
+            17.949461574719358, 18.902845340687115, 17.207703003749966,
+        )
 
 
 class TestDynamicMeshMap:

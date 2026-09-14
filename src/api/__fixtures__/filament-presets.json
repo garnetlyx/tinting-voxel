@@ -3,84 +3,150 @@
     {
       "name": "Cyan",
       "hex": "#3D79C6",
-      "transmission_distance": 0.48447574859816506,
-      "k": 8.13
+      "transmission_distance": 2.1381256008389844,
+      "k": 3.4996
     },
     {
       "name": "Magenta",
       "hex": "#B3356E",
-      "transmission_distance": 0.5218499460436025,
-      "k": 8.42
+      "transmission_distance": 2.16428365111357,
+      "k": 4.3077
     },
     {
       "name": "Yellow",
       "hex": "#FFE665",
-      "transmission_distance": 0.5819156593127012,
-      "k": 3.73
+      "transmission_distance": 2.203209113788528,
+      "k": 3.6572
     },
     {
       "name": "White",
       "hex": "#FFFFFF",
-      "transmission_distance": 0.6055249051606083,
-      "k": 12.39
+      "transmission_distance": 2.217597459508237,
+      "k": 6.3168
     },
     {
       "name": "Key",
       "hex": "#0B0F0C",
-      "transmission_distance": 0.26611297079931917,
-      "k": 17.65
+      "transmission_distance": 1.9384419920975642,
+      "k": 23.1863
     }
   ],
   "bambu_cmyw_phase6": [
     {
       "name": "Cyan",
       "hex": "#3D79C6",
-      "transmission_distance": 0.48447574859816506,
-      "k": 8.13
+      "transmission_distance": 2.1381256008389844,
+      "k": 3.4996
     },
     {
       "name": "Magenta",
       "hex": "#B3356E",
-      "transmission_distance": 0.5218499460436025,
-      "k": 8.42
+      "transmission_distance": 2.16428365111357,
+      "k": 4.3077
     },
     {
       "name": "Yellow",
       "hex": "#FFE665",
-      "transmission_distance": 0.5819156593127012,
-      "k": 3.73
+      "transmission_distance": 2.203209113788528,
+      "k": 3.6572
     },
     {
       "name": "White",
       "hex": "#FFFFFF",
-      "transmission_distance": 0.6055249051606083,
-      "k": 12.39
+      "transmission_distance": 2.217597459508237,
+      "k": 6.3168
+    }
+  ],
+  "clear_cmyg": [
+    {
+      "name": "Cyan",
+      "hex": "#5489B4",
+      "transmission_distance": 4.667418746800521,
+      "td_rgb": [
+        1.039647851596278,
+        4.661388851322945,
+        8.301219537482337
+      ],
+      "k": 0.0
+    },
+    {
+      "name": "Magenta",
+      "hex": "#DE5740",
+      "transmission_distance": 6.31945243505504,
+      "td_rgb": [
+        12.871171884721239,
+        2.3866487980887325,
+        3.700536622355147
+      ],
+      "k": 0.0
+    },
+    {
+      "name": "Yellow",
+      "hex": "#DDC465",
+      "transmission_distance": 10.074691453694577,
+      "td_rgb": [
+        15.128418453030553,
+        12.290455104172315,
+        2.8052008038808633
+      ],
+      "k": 0.0
+    },
+    {
+      "name": "Grey",
+      "hex": "#9A9D9C",
+      "transmission_distance": 1.7030698349645412,
+      "td_rgb": [
+        2.226964674889777,
+        1.688155998369564,
+        1.1940888316342828
+      ],
+      "k": 0.0
     }
   ],
   "clear_cmyw": [
     {
       "name": "Cyan",
-      "hex": "#5489B4",
-      "transmission_distance": 4.7,
-      "k": 0
+      "hex": "#4C72A0",
+      "transmission_distance": 2.6582813347278655,
+      "td_rgb": [
+        1.3490352079515975,
+        2.5371501740106988,
+        4.088658622221301
+      ],
+      "k": 0.0
     },
     {
       "name": "Magenta",
-      "hex": "#DE5740",
-      "transmission_distance": 6.3,
-      "k": 0
+      "hex": "#CE5E53",
+      "transmission_distance": 5.252097918532708,
+      "td_rgb": [
+        11.210903332862577,
+        2.0338821311932,
+        2.511508291542347
+      ],
+      "k": 0.0
     },
     {
       "name": "Yellow",
-      "hex": "#DDC465",
-      "transmission_distance": 10.1,
-      "k": 0
+      "hex": "#D8B695",
+      "transmission_distance": 14.295863422405146,
+      "td_rgb": [
+        22.124563670499846,
+        15.378730904545765,
+        5.384295692169828
+      ],
+      "k": 0.0
     },
     {
       "name": "White",
       "hex": "#D9D6C5",
-      "transmission_distance": 18,
-      "k": 0
+      "transmission_distance": 18.02000330638548,
+      "td_rgb": [
+        17.949461574719358,
+        18.902845340687115,
+        17.207703003749966
+      ],
+      "k": 0.0
     }
   ]
 }

@@ -1,8 +1,9 @@
 /**
  * Migration tests: persisted presets saved under the retired schema (with
- * alpha/td_rgb/td_neutral/td_scale/td_gamma) load and import as clean
- * hex+td(+k) objects, so outbound payloads never hit the backend's
- * extra='forbid' rejection.
+ * alpha/td_neutral/td_scale/td_gamma) load and import as clean
+ * hex+td(+td_rgb)(+k) objects, so outbound payloads never hit the backend's
+ * extra='forbid' rejection. td_rgb is the current per-channel td schema and
+ * survives; the retired mode-dispatch fields are stripped.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
@@ -44,6 +45,7 @@ describe('useFilamentStorage schema migration', () => {
       name: 'Cyan',
       hex: '#5489B4',
       transmission_distance: 4.7,
+      td_rgb: [1.04, 4.66, 8.3],
       k: 1.93,
     });
     expect(colors[1]).toEqual({ name: 'Magenta', hex: '#DE5740', transmission_distance: 6.3 });
@@ -59,6 +61,7 @@ describe('useFilamentStorage schema migration', () => {
       name: 'Cyan',
       hex: '#5489B4',
       transmission_distance: 4.7,
+      td_rgb: [1.04, 4.66, 8.3],
       k: 1.93,
     });
   });

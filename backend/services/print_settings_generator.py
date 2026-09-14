@@ -66,6 +66,7 @@ def generate_print_settings(
                 "name": color['name'],
                 "color": color['hex'],
                 "transmission_distance": color['transmission_distance'],
+                "td_rgb": color.get('td_rgb'),
                 "k": color.get('k', 0.0),
             })
         except KeyError as e:

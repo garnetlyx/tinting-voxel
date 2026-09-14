@@ -43,8 +43,19 @@ MEAN_DELTA_E_BUDGET = 1.5
 METRIC_EXCESS_BUDGET = 4.0
 
 
-def _clear_colors() -> Colors:
-    return Colors.from_configs(get_preset("clear_cmyw"))
+def _translucent_colors() -> Colors:
+    """Uniform scalar-td translucent set (every channel td >= 4.5): the
+    regime the composition-pruning oracle budgets were measured on. The
+    shipped clear presets carry paper per-channel staircases with strongly
+    absorbing channels and are no longer prunable."""
+    return Colors(colors={
+        l: Color(name=l, hex=h, transmission_distance=td, k=0.0)
+        for l, h, td in zip(
+            "CMYW",
+            ["#5489B4", "#DE5740", "#DDC465", "#D9D6C5"],
+            [4.7, 6.3, 10.1, 18.0],
+        )
+    })
 
 
 def _five_transparent_colors() -> Colors:
@@ -112,8 +123,15 @@ class TestCandidateGeneration:
 
 
 class TestRegimeGate:
-    def test_clear_set_is_translucent(self):
-        assert is_translucent_set(_clear_colors())
+    def test_shipped_clear_presets_are_not_translucent(self):
+        """Paper per-channel staircases have strongly absorbing channels
+        (e.g. cyan R ~1.0 mm), so real clear stacks are order-sensitive and
+        composition pruning is not validated for them."""
+        for name in ("clear_cmyw", "clear_cmyg"):
+            assert not is_translucent_set(Colors.from_configs(get_preset(name)))
+
+    def test_uniform_high_td_set_is_translucent(self):
+        assert is_translucent_set(_translucent_colors())
 
     def test_bambu_set_is_not_translucent(self):
         colors = Colors.from_configs(get_preset("bambu_cmywk_phase6"))
@@ -134,9 +152,9 @@ class TestRegimeGate:
 
     def test_prune_true_never_forces_pruning(self):
         """Pruning is automatic and translucent-only; True is rejected outright."""
-        clear = _clear_colors()
+        translucent = _translucent_colors()
         bambu = Colors.from_configs(get_preset("bambu_cmywk_phase6"))
-        for colors in (clear, bambu):
+        for colors in (translucent, bambu):
             with pytest.raises(ValueError, match="prune=True is not supported"):
                 compute_reference_matrices(4, 0.84, colors, prune=True)
 
@@ -190,7 +208,7 @@ class TestRefinement:
         assert out_rgbs == rgbs
 
     def test_refine_recovers_best_order_within_composition(self, force_prune):
-        colors = _clear_colors()
+        colors = _translucent_colors()
         codes_to_rgb = _build_codes_to_rgb(colors, 4, 0.84)
         pruned_code_df, pruned_rgb_df = compute_reference_matrices(4, 0.84, colors)
 
@@ -226,7 +244,7 @@ class TestPaddingTailRegression:
     def test_padded_tail_target_refines_within_budget(self, force_prune):
         from core.stack_prune import _cap_distinct_compositions
 
-        colors = _clear_colors()
+        colors = _translucent_colors()
         lc, lh = 8, 0.84
         pruned_code_df, pruned_rgb_df = compute_reference_matrices(lc, lh, colors)
         full_code_df, full_rgb_df = compute_reference_matrices(lc, lh, colors, prune=False)
@@ -276,7 +294,7 @@ class TestPrunedVsFullOracle:
           outside the printable gamut, where both paths are equally
           approximate.
         """
-        colors = _clear_colors()
+        colors = _translucent_colors()
         layer_height = 0.84
 
         full_code_df, full_rgb_df = compute_reference_matrices(

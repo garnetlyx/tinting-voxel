@@ -14,11 +14,14 @@ class ProcessingMode(str, Enum):
 
 
 class FilamentColorConfig(BaseModel):
-    """Configuration for a single filament color: name, hex, td, optional k.
+    """Configuration for a single filament color: name, hex, td, optional
+    td_rgb, optional k.
 
-    Removed calibration fields (alpha, k_rgb, td_rgb, td_neutral, td_scale,
-    td_gamma) are forbidden — silently discarding them would give obsolete
-    clients quietly changed optical behavior.
+    td_rgb is the staircase-measured per-channel transmission distance
+    triplet (paper transparent track). The remaining retired calibration
+    fields (alpha, k_rgb, td_neutral, td_scale, td_gamma) are forbidden —
+    silently discarding them would give obsolete clients quietly changed
+    optical behavior.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -30,12 +33,32 @@ class FilamentColorConfig(BaseModel):
         le=1000,
         description="Beer-Lambert transmission distance (opacity control)"
     )
+    td_rgb: Optional[List[float]] = Field(
+        None,
+        description="Staircase-measured per-channel transmission distances [R, G, B]; "
+                    "absent means the scalar td broadcasts to all channels"
+    )
     k: float = Field(
         0.0,
         ge=0,
         le=1000,
         description="Optional pigment absorption gain; 0 blends as plain Beer-Lambert (t = 10^(-d/td))"
     )
+
+    @field_validator('td_rgb')
+    @classmethod
+    def validate_td_rgb(cls, v):
+        """Per-channel TDs: exactly 3 positive finite values (R, G, B)."""
+        if v is None:
+            return v
+        if len(v) != 3:
+            raise ValueError("td_rgb must be exactly 3 per-channel distances [R, G, B]")
+        for ch, td_ch in enumerate(v):
+            if not (0 < td_ch <= 1000):
+                raise ValueError(
+                    f"td_rgb channel {'RGB'[ch]} must be in (0, 1000], got {td_ch}"
+                )
+        return v
 
     @field_validator('name')
     @classmethod
@@ -72,6 +95,7 @@ class FilamentPreset(str, Enum):
     """Available filament presets."""
     BAMBU_CMYWK_PHASE6 = "bambu_cmywk_phase6"
     BAMBU_CMYW_PHASE6 = "bambu_cmyw_phase6"
+    CLEAR_CMYG = "clear_cmyg"
     CLEAR_CMYW = "clear_cmyw"
 
 

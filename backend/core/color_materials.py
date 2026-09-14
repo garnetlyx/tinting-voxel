@@ -28,15 +28,22 @@ class Color:
         absorption=None,
         rgb=None,
         k=DEFAULT_K,
+        td_rgb=None,
         display_name=None,
     ):
-        """A filament color: hex + td + k — the complete blend description.
+        """A filament color: hex + td + k (+ optional per-channel td_rgb).
 
         td (mm) is channel-neutral (one composite number, broadcast to all
-        channels); k is the optional pigment absorption gain (default 0).
-        Historical calibration fields (alpha, k_rgb, td_rgb, td_neutral,
-        td_scale, td_gamma) were fold points of the retired mode dispatch —
-        deleted; git history for archaeology.
+        channels); k is the optional pigment absorption gain (default 0);
+        td_rgb is the optional per-channel transmission distance triplet
+        [R, G, B] (staircase-measured filaments). The blend formula is the
+        same either way — mu_ch = ln(10)/td_ch + k*A_ch — with td_ch taken
+        per-channel when td_rgb is present, broadcast from scalar td
+        otherwise. Filaments differ only in td (and hex); there is no
+        clear/regular material distinction.
+        Historical calibration fields (alpha, k_rgb, td_neutral, td_scale,
+        td_gamma) were fold points of the retired mode dispatch — deleted;
+        git history for archaeology.
         """
         if not name or not name[0].isalpha() or not name[0].isascii():
             raise ValueError(
@@ -51,6 +58,17 @@ class Color:
             raise ValueError(
                 f"transmission_distance must be >= 0, got {transmission_distance}"
             )
+        if td_rgb is not None:
+            td_rgb = tuple(float(ch) for ch in td_rgb)
+            if len(td_rgb) != 3:
+                raise ValueError(
+                    f"td_rgb must be exactly 3 per-channel distances [R, G, B], got {td_rgb}"
+                )
+            for ch_idx, td_ch in enumerate(td_rgb):
+                if not np.isfinite(td_ch) or td_ch <= 0:
+                    raise ValueError(
+                        f"td_rgb channel {'RGB'[ch_idx]} must be positive and finite, got {td_ch}"
+                    )
         if not np.isfinite(float(k)):
             raise ValueError(
                 f"k must be finite and not NaN, got {k}"
@@ -62,6 +80,7 @@ class Color:
 
         self.name = name
         self.td = transmission_distance
+        self.td_rgb = td_rgb
         self.rgb = rgb
         self.absorption = absorption
         self.k = k
@@ -222,20 +241,21 @@ class Color:
 
 
 class Colors:
-    from core.color_config import BAMBU_CMYW_PHASE6_PRESET, CLEAR_CMYW_PRESET
+    from core.color_config import BAMBU_CMYW_PHASE6_PRESET
 
-    _BAMBU_PRESET = {c.label: c for c in BAMBU_CMYW_PHASE6_PRESET}
-    _CLEAR_PRESET = {c.label: c for c in CLEAR_CMYW_PRESET}
+    _DEFAULT_PRESET = {c.label: c for c in BAMBU_CMYW_PHASE6_PRESET}
 
 
-    def __init__(self, colors=None, clear=False, names=None):
+    def __init__(self, colors=None, names=None):
+        """A filament set. No clear/regular distinction: a set is just its
+        colors (each described by hex + td (+ td_rgb) + k). The default set
+        when none is given is the bambu CMYW preset."""
         self.colors = colors if colors is not None else {}
-        self.white_balance = {"r": 0, "g": 10, "b": 24}
 
         if colors is not None:
             return
 
-        preset = self._CLEAR_PRESET if clear else self._BAMBU_PRESET
+        preset = self._DEFAULT_PRESET
         labels = names if names is not None else list(preset)
 
         for c in labels:
@@ -250,6 +270,7 @@ class Colors:
                 cfg.transmission_distance,
                 cfg.hex,
                 k=cfg.k,
+                td_rgb=cfg.td_rgb,
                 display_name=cfg.label,
             )
 
@@ -270,11 +291,6 @@ class Colors:
 
     def add(self, color):
         self.colors[color.get_label()] = color
-
-    def update_white_balance(self, new_r, new_g, new_b):
-        self.white_balance["r"] = new_r
-        self.white_balance["g"] = new_g
-        self.white_balance["b"] = new_b
 
     def get_labels(self):
         return [x for x in self.colors]
@@ -314,6 +330,7 @@ class Colors:
                 transmission_distance=config.transmission_distance,
                 hex=config.hex,
                 k=config.k,
+                td_rgb=config.td_rgb,
             )
             instance.colors[label] = color
 

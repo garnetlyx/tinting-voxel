@@ -32,15 +32,21 @@ function generateId(): string {
 }
 
 /** Normalize a persisted/imported color to the current schema:
- * exactly name, hex, transmission_distance, and optional k. Fields removed
- * from the model (alpha, td_rgb, td_neutral, td_scale, td_gamma, k_rgb) are
- * stripped so outbound payloads never trip the backend's extra='forbid'. */
+ * name, hex, transmission_distance, optional td_rgb, optional k.
+ * Fields removed from the model (alpha, td_neutral, td_scale, td_gamma,
+ * k_rgb) are stripped so outbound payloads never trip the backend's
+ * extra='forbid'. */
 function normalizeColor(c: Record<string, unknown>): FilamentColorConfig {
   const out: FilamentColorConfig = {
     name: String(c.name),
     hex: String(c.hex),
     transmission_distance: Number(c.transmission_distance),
   };
+  if (Array.isArray(c.td_rgb)
+      && c.td_rgb.length === 3
+      && c.td_rgb.every((ch: unknown) => typeof ch === 'number' && Number.isFinite(ch) && (ch as number) > 0)) {
+    out.td_rgb = c.td_rgb.map((ch: number) => Number(ch));
+  }
   if (typeof c.k === 'number' && Number.isFinite(c.k)) out.k = c.k;
   return out;
 }
@@ -81,6 +87,10 @@ function isValidPreset(p: unknown): p is SavedPreset {
     if (typeof color.name !== 'string') return false;
     if (typeof color.hex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color.hex)) return false;
     if (typeof color.transmission_distance !== 'number') return false;
+    if (color.td_rgb !== undefined
+      && (!Array.isArray(color.td_rgb)
+        || color.td_rgb.length !== 3
+        || !color.td_rgb.every((ch) => typeof ch === 'number' && ch > 0 && ch <= 1000))) return false;
     if (color.k !== undefined && (typeof color.k !== 'number' || color.k < 0 || color.k > 1000)) return false;
   }
   return true;

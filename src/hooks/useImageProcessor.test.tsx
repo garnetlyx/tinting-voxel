@@ -127,7 +127,7 @@ describe('useImageProcessor', () => {
     expect(result.current.layerCount).toBe(4);
     expect(result.current.maxLayerCount).toBe(10);
     expect(result.current.filamentColors.some(color => color.name === 'Key')).toBe(true);
-    expect(result.current.filamentColors[0].k).toBe(8.13);
+    expect(result.current.filamentColors[0].k).toBe(3.4996);
   });
 
   it('clamps the layer count to the fixed UI maximum', () => {
@@ -435,7 +435,7 @@ describe('useImageProcessor', () => {
           expect.objectContaining({
             name: 'Cyan',
             transmission_distance: 2.1,
-            k: 8.13,
+            k: 3.4996,
           }),
         ]),
       })

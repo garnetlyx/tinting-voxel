@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def colors_key(colors) -> tuple:
     """Content key covering every filament field that influences blending:
-    (label, td, hex, k). Used by the per-code LRU cache and the
+    (label, td, hex, k, td_rgb). Used by the per-code LRU cache and the
     reference-matrix cache, so any edited value yields a distinct key.
     """
     return tuple(
@@ -41,7 +41,8 @@ def colors_key(colors) -> tuple:
             label,
             colors.colors[label].td,
             colors.colors[label].hex,
-            getattr(colors.colors[label], 'k', 0.0),
+            colors.colors[label].k,
+            colors.colors[label].td_rgb,
         )
         for label in colors.get_labels()
     )
