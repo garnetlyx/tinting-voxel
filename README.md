@@ -20,7 +20,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 
 - **Frontend**: React 19 + TypeScript + Vite + build-time Tailwind CSS + three.js
 - **Backend**: Python 3 + FastAPI + numpy-stl + PIL + scikit-learn + trimesh + lxml
-- **Testing**: pytest (~670 backend tests), Vitest (frontend), Playwright (E2E)
+- **Testing**: pytest (~700 backend tests), Vitest (frontend), Playwright (E2E)
 
 ## Project Structure
 

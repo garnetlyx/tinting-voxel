@@ -58,7 +58,7 @@ tinting-voxel/
 │   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
 │   │   └── vector_processor.py   # Vector/contour processing
 │   ├── config/           # Configuration (settings, constants)
-│   └── tests/            # Test suite (~680 tests)
+│   └── tests/            # Test suite (~700 tests)
 │       ├── unit/             # Unit tests
 │       ├── integration/      # Integration tests
 │       ├── performance/      # Performance tests
@@ -77,7 +77,7 @@ tinting-voxel/
 │   ├── hooks/            # Custom hooks
 │   ├── i18n/             # Locale runtime and feature translations (en, zh-CN)
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (7 spec files, 38 tests)
+├── e2e/                  # Playwright E2E tests (8 spec files, 48 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config
@@ -172,13 +172,13 @@ docker compose up --build  # Build and run
 ## Testing
 
 ```bash
-# Backend (~680 tests)
+# Backend (~700 tests)
 cd backend && pytest -v
 
 # Frontend (Vitest, 20 test files)
 npm test
 
-# E2E (7 spec files, 38 tests)
+# E2E (8 spec files, 48 tests)
 npx playwright test
 ```
 

@@ -51,7 +51,7 @@ tinting-voxel solves these by:
 | Processing performance | Image processing time | < 5s for 512×512px |
 | User adoption | Active users | 100 users/month (6 months) |
 | Export success rate | Successful downloads | > 95% |
-| Test health | Backend test pass rate | > 95% across ~670 tests |
+| Test health | Backend test pass rate | > 95% across ~700 tests |
 
 ---
 
@@ -189,16 +189,17 @@ tinting-voxel solves these by:
 - Docker multi-stage build + Railway / Fly.io / docker-compose configs
 
 **Quality**
-- ~680 backend tests, ~145 frontend Vitest tests (20 files), 38 Playwright E2E tests (7 spec files)
+- ~700 backend tests, 171 frontend Vitest tests (22 files), 48 Playwright E2E tests (8 spec files)
 - QA regression suite (R1–R16+) documenting 190+ bugs fixed
 
 ### 4.2 In Progress / Planned
 
-- **Black (K) filament toggle** — add CMYWK 5-color support; current model
-  cannot reach true black at 0.08mm layer height (see TODO).
 - **Max-dimension preset chips** in the frontend (180 / 250 / 300mm).
 - **Production hardening** — thread locks on global matrices, bounded
   analytics, non-root Docker user (see TODO P0/P1).
+- **Clear CMYW hex upgrade** — frozen production hexes predate the PLATE-08
+  same-batch reference (36.21 vs shipped 40.85); revisit after the next
+  hardware spectrophotometer calibration round.
 
 Parameter fitting (per-color k optimization against printed plates) is
 performed offline, outside this repo; presets carry the fitted results.

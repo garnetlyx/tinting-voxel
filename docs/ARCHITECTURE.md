@@ -125,8 +125,11 @@ tinting-voxel/
 │   │   ├── param_search_service.py # Auto parameter sweep engine
 │   │   ├── bug_report.py        # Bug report storage + optional email delivery
 │   │   └── analytics.py         # In-memory usage analytics
+│   ├── certification/    # Shipped-preset cross-validation against calibration plates
+│   │   ├── plate08_shipped_crossval.py  # PLATE-08 CMYW ΔE00 report (--check for CI-grade verification)
+│   │   └── plate08_shipped_crossval.json # Tracked report: input SHA-256, source commit, scores
 │   ├── config/           # Configuration
-│   └── tests/            # Test suite (~680 tests)
+│   └── tests/            # Test suite (~700 tests)
 │       └── fixtures/
 │           ├── images/        # Committed small test images (200-500px, <100KB)
 │           └── images-local/  # Gitignored large images for local manual testing
@@ -144,7 +147,7 @@ tinting-voxel/
 │   │   └── locales/      # en/ and zh-CN/ feature namespaces
 │   ├── hooks/            # Custom hooks
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (7 spec files, 38 tests)
+├── e2e/                  # Playwright E2E tests (8 spec files, 48 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config
@@ -404,7 +407,7 @@ requests. `npm test` and `npm run build` validate this boundary.
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
 | **Color Space for Matching** | RGB Euclidean, HSV, LAB Euclidean, CIEDE2000 | CIEDE2000 | Perceptually uniform + hue weighting for dark chromatic colors |
-| **Color Mixing Model** | Beer-Lambert scalar, Hybrid per-color k, Full K-M | Hybrid per-color k | Per-color scattering + absorption; generalizes to arbitrary filaments |
+| **Color Mixing Model** | Beer-Lambert scalar, Unified mu=ln10/td+k·A_ch, Full K-M | Unified Beer-Lambert (mu=ln10/td+k·A_ch) | One formula for all filaments; k=0 is plain Beer-Lambert, fitted k refines calibrated presets; no mode dispatch |
 | **Mesh Optimization** | None, Greedy meshing, Marching cubes | Greedy meshing | 70-80% reduction with simple implementation |
 | **STL Format** | ASCII STL, Binary STL | Binary STL | 5x smaller files, faster parsing |
 | **Separate vs Single STL** | Multi-color single file, Separate per color | Separate files | Slicer compatibility, manual filament swap support |
