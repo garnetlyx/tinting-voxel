@@ -23,8 +23,6 @@ from services.print_stack import (
 )
 from services.stl_generator import (
     compute_reference_matrices,
-    generate_box,
-    generate_boxes_batch,
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
@@ -34,36 +32,65 @@ from services.vector_processor import normalize_regions, render_region_mask
 logger = logging.getLogger(__name__)
 
 
-def _triangles_to_trimesh(mesh_arrays: list[np.ndarray], color_rgb: tuple = None) -> trimesh.Trimesh:
-    """
-    Convert a list of triangle arrays (from generate_box) into a trimesh.Trimesh.
+BoxRange = tuple[
+    tuple[float, float],
+    tuple[float, float],
+    tuple[float, float],
+]
 
-    Args:
-        mesh_arrays: List of Nx3x3 numpy arrays (triangles × vertices × xyz)
-        color_rgb: Optional (R, G, B) tuple in 0-255 range for visual color
 
-    Returns:
-        trimesh.Trimesh object
-    """
-    if not mesh_arrays:
+def _boxes_to_trimesh(
+    box_batches: list[list[BoxRange]],
+    color_rgb: Optional[tuple[int, int, int]] = None,
+) -> trimesh.Trimesh:
+    """Build an indexed mesh directly from compact box ranges."""
+    box_count = sum(len(batch) for batch in box_batches)
+    if box_count == 0:
         return trimesh.Trimesh()
 
-    all_triangles = np.concatenate(mesh_arrays, axis=0)
-    mesh_arrays.clear()  # free source arrays for GC
-    num_triangles = all_triangles.shape[0]
+    vertices = np.empty((box_count * 8, 3), dtype=np.float32)
+    faces = np.empty((box_count * 12, 3), dtype=np.int64)
+    local_faces = np.array([
+        [0, 3, 1], [1, 3, 2],
+        [0, 4, 7], [0, 7, 3],
+        [4, 5, 6], [4, 6, 7],
+        [5, 1, 2], [5, 2, 6],
+        [2, 3, 6], [3, 7, 6],
+        [0, 1, 5], [0, 5, 4],
+    ], dtype=np.int64)
 
-    # Build vertex and face arrays from triangle soup
-    vertices = all_triangles.reshape(-1, 3)
-    faces = np.arange(num_triangles * 3).reshape(-1, 3)
+    box_offset = 0
+    for batch in box_batches:
+        if not batch:
+            continue
+        coords = np.asarray(batch, dtype=np.float32)
+        count = len(batch)
+        x1, x2 = coords[:, 0, 0], coords[:, 0, 1]
+        y1, y2 = coords[:, 1, 0], coords[:, 1, 1]
+        z1, z2 = coords[:, 2, 0], coords[:, 2, 1]
+        batch_vertices = np.empty((count, 8, 3), dtype=np.float32)
+        batch_vertices[:, 0] = np.column_stack((x1, y1, z1))
+        batch_vertices[:, 1] = np.column_stack((x2, y1, z1))
+        batch_vertices[:, 2] = np.column_stack((x2, y2, z1))
+        batch_vertices[:, 3] = np.column_stack((x1, y2, z1))
+        batch_vertices[:, 4] = np.column_stack((x1, y1, z2))
+        batch_vertices[:, 5] = np.column_stack((x2, y1, z2))
+        batch_vertices[:, 6] = np.column_stack((x2, y2, z2))
+        batch_vertices[:, 7] = np.column_stack((x1, y2, z2))
 
-    # process=False skips full processing; merge_vertices() deduplicates vertices
-    # to fix non-manifold edges while avoiding expensive winding/degenerate checks
+        vertex_start = box_offset * 8
+        face_start = box_offset * 12
+        vertices[vertex_start:vertex_start + count * 8] = batch_vertices.reshape(-1, 3)
+        offsets = (np.arange(count, dtype=np.int64) * 8 + vertex_start)[:, None, None]
+        faces[face_start:face_start + count * 12] = (local_faces[None, :, :] + offsets).reshape(-1, 3)
+        box_offset += count
+
+    box_batches.clear()
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
     mesh.merge_vertices()
 
     if color_rgb:
-        r, g, b = color_rgb
-        mesh.visual.face_colors = np.array([r, g, b, 255], dtype=np.uint8)
+        mesh.visual.face_colors = np.array([*color_rgb, 255], dtype=np.uint8)
 
     return mesh
 
@@ -117,9 +144,9 @@ def generate_3mf(
         layer_count, layer_height, colors, n_targets=len(color_blocks)
     )
 
-    # Initialize per-color mesh arrays
+    # Keep compact box ranges until the final indexed trimesh conversion.
     labels = colors.get_labels()
-    code_mesh_map: dict[str, list[np.ndarray]] = {label: [] for label in labels}
+    code_mesh_map: dict[str, list[list[BoxRange]]] = {label: [] for label in labels}
 
     # Map input colors to blend codes (with order refinement for pruned sets)
     from services.image_processor import _map_and_refine
@@ -157,9 +184,15 @@ def generate_3mf(
         pixels = color_block['pixels']
         blend_code = result_codes[idx]
 
-        for z_idx, code_char in enumerate(blend_code):
-            z_min = z_offset + z_idx * layer_height
-            z_max = z_offset + (z_idx + 1) * layer_height
+        # A run such as YYYYY is one solid extrusion, not five stacked
+        # copies of the same surface mesh. This matches the STL path and
+        # removes internal horizontal faces before trimesh export.
+        start_idx = 0
+        for code_char, group in itertools.groupby(blend_code):
+            group_len = len(list(group))
+            z_min = z_offset + start_idx * layer_height
+            z_max = z_offset + (start_idx + group_len) * layer_height
+            start_idx += group_len
 
             if use_greedy_meshing and len(pixels) > 1:
                 optimized_boxes = generate_optimized_boxes(
@@ -168,8 +201,7 @@ def generate_3mf(
                     max_rectangles=_remaining_box_budget(),
                 )
                 total_optimized_boxes += len(optimized_boxes)
-                batch_mesh = generate_boxes_batch(optimized_boxes)
-                code_mesh_map[code_char].append(batch_mesh)
+                code_mesh_map[code_char].append(optimized_boxes)
             else:
                 box_ranges = [
                     (
@@ -180,22 +212,25 @@ def generate_3mf(
                     for pixel in pixels
                 ]
                 if box_ranges:
-                    batch_mesh = generate_boxes_batch(box_ranges)
-                    code_mesh_map[code_char].append(batch_mesh)
+                    total_optimized_boxes += len(box_ranges)
+                    if total_optimized_boxes > settings.stl_max_boxes:
+                        raise ValueError(
+                            f"Request too complex: {total_optimized_boxes:,} boxes after "
+                            f"meshing (budget {settings.stl_max_boxes:,}). "
+                            f"Reduce image size or colors."
+                        )
+                    code_mesh_map[code_char].append(box_ranges)
 
     # Add white backing above optical layers (reflector behind colors)
     if n_white > 0:
         optical_top = z_offset + layer_count * layer_height
-        for i in range(n_white):
-            backing_mesh = generate_box(
-                xrange=(0, width * pixel_size),
-                yrange=(0, height * pixel_size),
-                zrange=(optical_top + i * layer_height,
-                        optical_top + (i + 1) * layer_height)
-            )
-            code_mesh_map[w_label].append(backing_mesh)
-        logger.info("3MF: added %d white backing layers at z=%.2f-%.2f mm",
-                     n_white, optical_top, optical_top + n_white * layer_height)
+        code_mesh_map[w_label].append([(
+            (0, width * pixel_size),
+            (0, height * pixel_size),
+            (optical_top, optical_top + n_white * layer_height),
+        )])
+        logger.info("3MF: added 1 merged white backing block at z=%.2f-%.2f mm",
+                     optical_top, optical_top + n_white * layer_height)
 
     logger.info("Mesh generation complete, converting to trimesh objects...")
 
@@ -216,7 +251,7 @@ def generate_3mf(
                 int(hex_color[5:7], 16),
             )
 
-        mesh_obj = _triangles_to_trimesh(mesh_arrays, color_rgb=rgb)
+        mesh_obj = _boxes_to_trimesh(mesh_arrays, color_rgb=rgb)
         geom_name = f"color_{label}"
         scene.add_geometry(mesh_obj, node_name=geom_name, geom_name=geom_name)
         logger.info("Converted color '%s': %d triangles", label, len(mesh_obj.faces))
@@ -278,7 +313,7 @@ def generate_svg_3mf(
     )
 
     labels = colors.get_labels()
-    code_mesh_map: dict[str, list[np.ndarray]] = {label: [] for label in labels}
+    code_mesh_map: dict[str, list[list[BoxRange]]] = {label: [] for label in labels}
 
     input_colors = [result['color'] for result in vector_results]
     # Map with order refinement for composition-pruned translucent sets
@@ -300,6 +335,11 @@ def generate_svg_3mf(
     w_label = resolve_white_backing_label(colors, n_white)
     if n_white > 0:
         logger.info("SVG-3MF: white backing label='%s', n_white=%d", w_label, n_white)
+
+    total_optimized_boxes = 0
+
+    def _remaining_box_budget() -> int:
+        return max(0, settings.stl_max_boxes - total_optimized_boxes)
 
     for idx, result in enumerate(vector_results):
         regions = normalize_regions(result)
@@ -324,21 +364,30 @@ def generate_svg_3mf(
             )
             if boxes:
                 total_optimized_boxes += len(boxes)
-                code_mesh_map[code_char].append(generate_boxes_batch(boxes))
+                code_mesh_map[code_char].append(boxes)
 
     # Add white backing above optical layers (reflector behind colors)
     if n_white > 0:
         optical_top = z_offset + layer_count * layer_height
-        for i in range(n_white):
-            backing_mesh = generate_box(
-                xrange=(0, width * pixel_size),
-                yrange=(0, height * pixel_size),
-                zrange=(optical_top + i * layer_height,
-                        optical_top + (i + 1) * layer_height)
-            )
-            code_mesh_map[w_label].append(backing_mesh)
-        logger.info("SVG-3MF: added %d white backing layers at z=%.2f-%.2f mm",
-                     n_white, optical_top, optical_top + n_white * layer_height)
+        code_mesh_map[w_label].append([(
+            (0, width * pixel_size),
+            (0, height * pixel_size),
+            (optical_top, optical_top + n_white * layer_height),
+        )])
+        logger.info("SVG-3MF: added 1 merged white backing block at z=%.2f-%.2f mm",
+                     optical_top, optical_top + n_white * layer_height)
+
+    scene = trimesh.Scene()
+    for label, mesh_arrays in code_mesh_map.items():
+        if not mesh_arrays:
+            continue
+        rgb = None
+        if color_hex_map and label in color_hex_map:
+            hex_color = color_hex_map[label]
+            rgb = tuple(int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+        mesh_obj = _boxes_to_trimesh(mesh_arrays, color_rgb=rgb)
+        geom_name = f"color_{label}"
+        scene.add_geometry(mesh_obj, node_name=geom_name, geom_name=geom_name)
 
     buf = BytesIO()
     scene.export(buf, file_type='3mf')
