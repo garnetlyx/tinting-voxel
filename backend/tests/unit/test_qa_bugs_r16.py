@@ -141,13 +141,14 @@ class TestComputeReferenceMatricesEdgeCases:
                 colors=colors
             )
 
-    def test_compute_reference_matrices_excessive_permutations(self):
+    def test_compute_reference_matrices_excessive_permutations(self, monkeypatch):
         """
         QA-166: compute_reference_matrices rejects enumeration that the
         probe-extrapolated cost puts over the time budget. 4^8 (65,536 codes,
         ~1s even under load) is comfortably affordable and must pass; an
-        8-color x 8-layer opaque set (~16.8M codes, hundreds of seconds)
-        must raise.
+        8-color x 8-layer opaque set (~16.8M codes) must raise once its
+        estimate sits over the budget. The estimate is pinned so the guard
+        decision is machine-speed independent.
         """
         from core.color_materials import Color
         # 4 colors x 8 layers fits the budget with margin — no cap, no raise.
@@ -159,6 +160,8 @@ class TestComputeReferenceMatricesEdgeCases:
                 ["#3D79C6", "#B3356E", "#FFE665", "#FFFFFF",
                  "#112233", "#445566", "#778899", "#0B0F0C"])
         })
+        import services.stl_generator as sg
+        monkeypatch.setattr(sg, "_estimate_full_enumeration_seconds", lambda n, t: 1e9)
         with pytest.raises(ValueError, match="over the .* budget"):
             compute_reference_matrices(
                 layer_count=8,  # 8^8 = 16,777,216 codes, hundreds of seconds

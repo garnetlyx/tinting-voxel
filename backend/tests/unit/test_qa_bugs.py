@@ -55,7 +55,7 @@ class TestPermutationBombDoS:
     - Even 8 colors, 8 layers -> 8^8 = 16 million -> ~1GB+ RAM
     """
 
-    def test_permutation_count_with_many_colors_and_layers(self):
+    def test_permutation_count_with_many_colors_and_layers(self, monkeypatch):
         """Verify that initialize_color_mapping rejects dangerous color+layer combos."""
         from core.blend_color import Color, Colors
         from services.stl_generator import initialize_color_mapping
@@ -69,7 +69,13 @@ class TestPermutationBombDoS:
                 hex='#' + f'{hash(name) % 0xFFFFFF:06X}'
             )
 
-        # 8 colors x 8 layers = 16,777,216 permutations -> should be rejected
+        # 8 colors x 8 layers = 16,777,216 permutations: the guard rejects an
+        # opaque set once the probe-extrapolated cost sits over the budget.
+        # Pin the estimate so the assertion is machine-speed independent (a
+        # probe-measured estimate can legitimately fit the budget on fast
+        # hosts; the guard decision is what this test pins).
+        import services.stl_generator as sg
+        monkeypatch.setattr(sg, "_estimate_full_enumeration_seconds", lambda n, t: 1e9)
         with pytest.raises(ValueError, match="over the .* budget"):
             initialize_color_mapping(layer_count=8, colors=colors)
 
