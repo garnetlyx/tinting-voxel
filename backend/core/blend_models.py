@@ -49,10 +49,14 @@ def _normalize_code(code: str) -> str:
 
 
 def _build_color_map_from_key(color_key: tuple) -> dict:
-    """Rebuild Color objects from the cache key (label, td, hex, k, td_rgb)."""
+    """Rebuild Color objects from the cache key
+    (label, td, hex, k, td_rgb, alpha_s, td_scale, td_gamma)."""
     color_map = {}
-    for label, td, hex_val, k, td_rgb in color_key:
-        color_map[label] = Color(label, td, hex_val, k=k, td_rgb=td_rgb)
+    for label, td, hex_val, k, td_rgb, alpha_s, td_scale, td_gamma in color_key:
+        color_map[label] = Color(
+            label, td, hex_val, k=k, td_rgb=td_rgb,
+            alpha_s=alpha_s, td_scale=td_scale, td_gamma=td_gamma,
+        )
     return color_map
 
 
@@ -87,12 +91,18 @@ def _normalize_background_rgb(background_rgb: Optional[tuple]) -> np.ndarray:
     return np.clip(bg, 0.0, 255.0) / 255.0
 
 
-def _resolve_extinction(color: Color) -> np.ndarray:
-    """Per-channel extinction coefficient (1/mm): mu_ch = ln10/td_ch + k*A_ch.
+def _resolve_extinction(color) -> np.ndarray:
+    """Per-channel extinction coefficient (1/mm), paper forward model.
 
-    td_ch is the staircase-measured per-channel transmission distance when
-    the filament carries td_rgb, otherwise the scalar td broadcast to all
-    channels. A non-positive td means fully opaque: mu = inf, t = 0.
+    Staircase characterization (td_rgb present, paper form (i)):
+        mu_ch = ln(10)/td_rgb[ch] + k*A_ch
+    Scalar characterization (paper Eqs. (1)-(2)):
+        td_eff = td_scale * td**td_gamma
+        mu_ch = alpha_s/td_eff + k*A_ch
+    Neutral defaults (alpha_s = ln 10, td_scale = td_gamma = 1) degrade the
+    scalar form to ln(10)/td + k*A_ch. A non-positive td means fully
+    opaque: mu = inf, t = 0. No filament-type flags — td shape alone
+    selects the branch.
     """
     absorption = color.get_absorption()
     k = float(color.k)
@@ -104,7 +114,8 @@ def _resolve_extinction(color: Color) -> np.ndarray:
         td = float(color.td)
         if td <= 0:
             return np.full(3, np.inf)
-        mu = np.full(3, LN10 / td)
+        td_eff = float(color.td_scale) * (td ** float(color.td_gamma))
+        mu = np.full(3, float(color.alpha_s) / td_eff)
     return mu + k * absorption
 
 

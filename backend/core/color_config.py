@@ -18,21 +18,26 @@ class ColorConfig:
     name: str
     hex: str
     # Channel-neutral transmission distance (mm), the one composite TD a
-    # filament carries. Preset provenance: bambu = exact fold of the
-    # paper-fitted scatter term (ln10 * 1.48 * td_effective^0.20 / alpha_s,
-    # PLATE-06-H2C-A standard fit); clear presets = arithmetic mean of the
-    # staircase-measured per-channel TDs. User-entered values are used
-    # literally (base-10: t = 10^(-d/td)).
+    # filament carries. For scalar-form filaments this is the raw TD
+    # reading remapped by td_scale/td_gamma (paper Eq. (2)); presets carry
+    # the fitted provenance in comments below. User-entered values are
+    # used literally (base-10: t = 10^(-d/td)) under neutral defaults.
     transmission_distance: float
     # Optional per-channel transmission distances (mm), [td_R, td_G, td_B].
-    # Present on filaments characterized by staircase measurement (clear
-    # track): the per-channel selectivity IS the td data, no fitted k needed.
-    # Absent -> scalar td broadcasts to all channels. Same formula either way:
-    # mu_ch = ln(10)/td_ch + k*A_ch.
+    # Present on filaments characterized by staircase measurement:
+    # the per-channel selectivity IS the td data. Absent -> scalar td form.
+    # Same forward family either way; see core.blend_models._resolve_extinction.
     td_rgb: Optional[List[float]] = None
     # Optional pigment absorption gain; 0 blends as plain Beer-Lambert.
     # Calibrated presets carry fitted values, customs default to 0.
     k: float = 0.0
+    # Scalar-form capture compensation (paper Eqs. (1)-(2)), used only when
+    # td_rgb is absent: td_eff = td_scale * td**td_gamma,
+    # mu_ch = alpha_s/td_eff + k*A_ch. Neutral defaults (alpha_s = ln 10,
+    # td_scale = td_gamma = 1) degrade to ln(10)/td + k*A_ch.
+    alpha_s: float = 2.302585092994046
+    td_scale: float = 1.0
+    td_gamma: float = 1.0
 
     def __post_init__(self):
         """Validate color configuration."""
@@ -77,36 +82,56 @@ class ColorConfig:
                 f"k (scattering coefficient) must be non-negative and finite, got {self.k}"
             )
 
+        for field_name in ("alpha_s", "td_scale", "td_gamma"):
+            value = getattr(self, field_name)
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(
+                    f"{field_name} must be positive and finite, got {value}"
+                )
+
     @property
     def label(self) -> str:
         """Get single-character label from name."""
         return self.name[0].upper()
 
 
-# Bambu CMYWK / CMYW presets.
-# td = exact algebraic fold of the paper's PLATE-06-H2C-A standard fit
-# (research repo, IJAMT Table 3 / fitted_params.json): the engine evaluated
-# transmission as exp(-(alpha_s/td_eff + k*A_ch)*d) with td_eff =
-# 1.48 * fitted_td_effective^0.20 (preset remap applied on top of the fitted
-# remap) and alpha_s = 2.2292. Folding alpha_s into a single base-10 td:
-# td = ln(10) * 1.48 * td_effective^0.20 / alpha_s, k = fitted per-color k.
-# Blending this set is bit-identical to the research engine's
-# hybrid_per_color_k_td1s_gamma predictions for PLATE-06-H2C-A.
-# Provenance: data/results/PLATE-06-H2C-paper-matrix/runs/A-standard/.
+# Bambu CMYWK / CMYW presets: paper PLATE-06-H2C-A standard fit
+# (data/results/PLATE-06-H2C-paper-matrix/runs/A-standard/fitted_params.json,
+# IJAMT Table 3 row "PLATE-06-H2C-A"). td = raw scalar TD readings
+# (td_reference); k = fitted per-color capture-compensation k_c. The
+# remap triple is the exact algebraic composition of the fitted remap
+# (s_td = 4.7782, gamma_td = 0.1636) with the preset remap the engine run
+# applied on top of it (1.48 * x^0.20), collapsed into one power law
+# (paper Eq. (2) form): td_scale = 1.48 * 4.7782**0.20,
+# td_gamma = 0.1636 * 0.20. Forward: mu_ch = alpha_s/(s*td^g) + k_c*A_ch
+# reproduces the research engine's PLATE-06-H2C-A predictions exactly
+# (780/780 cells within CSV rounding). Calibrated at layer height 0.32 mm.
+_ALPHA_S_A = 2.2292
+_TD_SCALE_A = 2.023552983514602
+_TD_GAMMA_A = 0.03272
 BAMBU_CMYWK_PHASE6_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan",    hex="#3D79C6", transmission_distance=2.1381256008389844, k=3.4996),
-    ColorConfig(name="Magenta", hex="#B3356E", transmission_distance=2.16428365111357,  k=4.3077),
-    ColorConfig(name="Yellow",  hex="#FFE665", transmission_distance=2.203209113788528,  k=3.6572),
-    ColorConfig(name="White",   hex="#FFFFFF", transmission_distance=2.217597459508237,  k=6.3168),
-    ColorConfig(name="Key",     hex="#0B0F0C", transmission_distance=1.9384419920975642, k=23.1863),
+    ColorConfig(name="Cyan",    hex="#3D79C6", transmission_distance=2.0, k=3.4996,
+                 alpha_s=_ALPHA_S_A, td_scale=_TD_SCALE_A, td_gamma=_TD_GAMMA_A),
+    ColorConfig(name="Magenta", hex="#B3356E", transmission_distance=2.9, k=4.3077,
+                 alpha_s=_ALPHA_S_A, td_scale=_TD_SCALE_A, td_gamma=_TD_GAMMA_A),
+    ColorConfig(name="Yellow",  hex="#FFE665", transmission_distance=5.0, k=3.6572,
+                 alpha_s=_ALPHA_S_A, td_scale=_TD_SCALE_A, td_gamma=_TD_GAMMA_A),
+    ColorConfig(name="White",   hex="#FFFFFF", transmission_distance=6.1, k=6.3168,
+                 alpha_s=_ALPHA_S_A, td_scale=_TD_SCALE_A, td_gamma=_TD_GAMMA_A),
+    ColorConfig(name="Key",     hex="#0B0F0C", transmission_distance=0.1, k=23.1863,
+                 alpha_s=_ALPHA_S_A, td_scale=_TD_SCALE_A, td_gamma=_TD_GAMMA_A),
 ]
 
 # Same CMYW channels without Key (legacy 4-color option).
 BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
-    ColorConfig(name="Cyan",    hex="#3D79C6", transmission_distance=2.1381256008389844, k=3.4996),
-    ColorConfig(name="Magenta", hex="#B3356E", transmission_distance=2.16428365111357,  k=4.3077),
-    ColorConfig(name="Yellow",  hex="#FFE665", transmission_distance=2.203209113788528,  k=3.6572),
-    ColorConfig(name="White",   hex="#FFFFFF", transmission_distance=2.217597459508237,  k=6.3168),
+    ColorConfig(name="Cyan",    hex="#3D79C6", transmission_distance=2.0, k=3.4996,
+                 alpha_s=_ALPHA_S_A, td_scale=_TD_SCALE_A, td_gamma=_TD_GAMMA_A),
+    ColorConfig(name="Magenta", hex="#B3356E", transmission_distance=2.9, k=4.3077,
+                 alpha_s=_ALPHA_S_A, td_scale=_TD_SCALE_A, td_gamma=_TD_GAMMA_A),
+    ColorConfig(name="Yellow",  hex="#FFE665", transmission_distance=5.0, k=3.6572,
+                 alpha_s=_ALPHA_S_A, td_scale=_TD_SCALE_A, td_gamma=_TD_GAMMA_A),
+    ColorConfig(name="White",   hex="#FFFFFF", transmission_distance=6.1, k=6.3168,
+                 alpha_s=_ALPHA_S_A, td_scale=_TD_SCALE_A, td_gamma=_TD_GAMMA_A),
 ]
 
 # Clear CMYG preset (stained-glass track), P07-def staircase characterization

@@ -145,7 +145,7 @@ class TestQA52ShortCodeBackgroundIndex:
         clear_rgb_cache()
 
         # Create a white-only color config
-        color_key = (('W', 7.2, '#FFFFFF', 0.0, None),)
+        color_key = (('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),)
         result = _code_to_rgb_cached('W', 0.08, color_key)
 
         # Single layer of white filament should produce near-white
@@ -164,8 +164,8 @@ class TestQA52ShortCodeBackgroundIndex:
         clear_rgb_cache()
 
         color_key = (
-            ('C', 3.0, '#00FFFF', 0.0, None),
-            ('W', 7.2, '#FFFFFF', 0.0, None),
+            ('C', 3.0, '#00FFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),
+            ('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),
         )
 
         # 4-char code should work correctly
@@ -314,7 +314,7 @@ class TestQA59ShortCodeBackgroundIndex:
         """
         clear_rgb_cache()
 
-        color_key = (('C', 3.0, '#0086D6', 0.0, None), ('W', 7.2, '#FFFFFF', 0.0, None))
+        color_key = (('C', 3.0, '#0086D6', 0.0, None, 2.302585092994046, 1.0, 1.0), ('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0))
 
         # Single-char code 'C' should have proper background contribution
         r, g, b = _code_to_rgb_cached('C', 0.08, color_key)

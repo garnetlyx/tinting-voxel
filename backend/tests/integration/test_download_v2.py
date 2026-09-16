@@ -32,7 +32,7 @@ def test_get_filament_presets_exposes_calibrated_material_params(client):
     )
     cyan = next(color for color in calibrated["colors"] if color["name"] == "Cyan")
 
-    assert cyan["transmission_distance"] == pytest.approx(2.1381256008389844)
+    assert cyan["transmission_distance"] == pytest.approx(2.0)
     assert cyan["k"] == 3.4996
 
 
@@ -271,7 +271,7 @@ def test_print_settings_with_preset(client):
     # The full surviving schema (hex + td + k) survives serialization.
     cyan = next(e for e in data["filament"]["extruders"] if e["name"] == "Cyan")
     assert cyan["k"] == 3.4996
-    assert cyan["transmission_distance"] == pytest.approx(2.1381256008389844)
+    assert cyan["transmission_distance"] == pytest.approx(2.0)
 
 
 def test_print_settings_with_custom_colors(client):

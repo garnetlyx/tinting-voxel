@@ -10,16 +10,19 @@ describe('built-in presets', () => {
     expect(DEFAULT_PRESETS.clear_cmyg.map(c => c.name[0])).toEqual(['C', 'M', 'Y', 'G']);
     expect(DEFAULT_PRESETS.clear_cmyw.map(c => c.name[0])).toEqual(['C', 'M', 'Y', 'W']);
   });
-  it('classifies preset transparency from the td data (staircase channels or scalar threshold)', () => {
+  it('classifies preset transparency from the td data (staircase channels or effective scalar threshold)', () => {
     // Clear presets carry staircase-measured per-channel td_rgb (transparent
     // track), even where a channel mean falls below 4.5.
     expect(isAllTransparentFilaments(DEFAULT_PRESETS.clear_cmyg)).toBe(true);
     expect(isAllTransparentFilaments(DEFAULT_PRESETS.clear_cmyw)).toBe(true);
-    // Bambu paper-fitted folds (1.94-2.22) are all below the threshold.
+    // Bambu raw TDs (0.1-6.1) remap to ~1.8-2.1 mm effective — all below
+    // the threshold even though the raw White reading (6.1) exceeds it.
     expect(isAllTransparentFilaments(DEFAULT_PRESETS.bambu_cmywk_phase6)).toBe(false);
     expect(isAllTransparentFilaments(DEFAULT_PRESETS.bambu_cmyw_phase6)).toBe(false);
-    // Custom colors classify by their entered td.
+    // Custom colors classify by their entered td (neutral remap).
     expect(isAllTransparentFilaments([{ name: 'A', hex: '#000000', transmission_distance: 50 }])).toBe(true);
+    // Raw td above threshold but remapped below it stays opaque.
+    expect(isAllTransparentFilaments([{ name: 'A', hex: '#000000', transmission_distance: 10, td_scale: 0.2, td_gamma: 1 }])).toBe(false);
     expect(isAllTransparentFilaments([])).toBe(false);
   });
   it('keeps frontend initialization equal to the backend catalog fixture', () => {

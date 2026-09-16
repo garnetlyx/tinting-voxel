@@ -121,18 +121,22 @@ class TestFrozenEquivalenceCertification:
             out.append(np.clip((bw + (1 - bw) * rgb) * 255, 0, 255))
         return out
 
-    def test_bambu_cmywk_folded_matches_paper_plate06_fit(self):
+    def test_bambu_cmywk_matches_paper_scalar_form(self):
         from core.color_config import get_preset
         import itertools
-        # Paper PLATE-06-H2C-A standard fit (IJAMT Table 3 / ESM Table S6;
-        # research data/results/PLATE-06-H2C-paper-matrix/runs/A-standard/):
-        # engine evaluates mu_ch = alpha_s/(1.48 * td_effective^0.20)
-        # + k_c*A_ch (preset remap applied on top of the fitted remap).
-        alpha_s = 2.2292
-        td_eff = {'C': 5.3521, 'M': 5.6876, 'Y': 6.2178, 'W': 6.4235, 'K': 3.2781}
-        kf = {'C': 3.4996, 'M': 4.3077, 'Y': 3.6572, 'W': 6.3168, 'K': 23.1863}
-        hexes = {'C': '#3D79C6', 'M': '#B3356E', 'Y': '#FFE665', 'W': '#FFFFFF', 'K': '#0B0F0C'}
-        spec = {ch: (alpha_s / (1.48 * td_eff[ch] ** 0.20), kf[ch], hexes[ch]) for ch in td_eff}
+        # Paper PLATE-06-H2C-A standard fit, scalar form (Eqs. (1)-(2)):
+        # mu_ch = alpha_s/(s*td^g) + k_c*A_ch with the preset's composed
+        # compensation values. The reference below is an independent
+        # implementation; value provenance is certified by
+        # test_paper_alignment.py against the research engine outputs.
+        preset = get_preset('bambu_cmywk_phase6')
+        spec = {
+            c.name[0]: (
+                c.alpha_s / (c.td_scale * (c.transmission_distance ** c.td_gamma)),
+                c.k, c.hex,
+            )
+            for c in preset
+        }
 
         colors = Colors.from_configs(get_preset('bambu_cmywk_phase6'))
         gen = BlendTestGenerator(colors=colors, layer_height=0.08, layer_count_max=6)
@@ -140,16 +144,19 @@ class TestFrozenEquivalenceCertification:
         reference = self._retired_reference_blends(codes, 0.08, spec)
         unified = gen.codes_to_rgb(codes)  # batch: every code, vectorized
         max_diff = np.abs(np.array(reference) - np.array(unified)).max()
-        assert max_diff < 1e-9, f"bambu CMYWK folded equivalence broken over all {len(codes)} codes: {max_diff}"
+        assert max_diff < 1e-9, f"bambu CMYWK scalar-form equivalence broken over all {len(codes)} codes: {max_diff}"
 
-    def test_bambu_cmyw_folded_matches_paper_plate06_fit(self):
+    def test_bambu_cmyw_matches_paper_scalar_form(self):
         from core.color_config import get_preset
         import itertools
-        alpha_s = 2.2292
-        td_eff = {'C': 5.3521, 'M': 5.6876, 'Y': 6.2178, 'W': 6.4235}
-        kf = {'C': 3.4996, 'M': 4.3077, 'Y': 3.6572, 'W': 6.3168}
-        hexes = {'C': '#3D79C6', 'M': '#B3356E', 'Y': '#FFE665', 'W': '#FFFFFF'}
-        spec = {ch: (alpha_s / (1.48 * td_eff[ch] ** 0.20), kf[ch], hexes[ch]) for ch in td_eff}
+        preset = get_preset('bambu_cmyw_phase6')
+        spec = {
+            c.name[0]: (
+                c.alpha_s / (c.td_scale * (c.transmission_distance ** c.td_gamma)),
+                c.k, c.hex,
+            )
+            for c in preset
+        }
 
         colors = Colors.from_configs(get_preset('bambu_cmyw_phase6'))
         gen = BlendTestGenerator(colors=colors, layer_height=0.08, layer_count_max=6)
@@ -157,7 +164,7 @@ class TestFrozenEquivalenceCertification:
         reference = self._retired_reference_blends(codes, 0.08, spec)
         unified = gen.codes_to_rgb(codes)  # batch: every code, vectorized
         max_diff = np.abs(np.array(reference) - np.array(unified)).max()
-        assert max_diff < 1e-9, f"bambu CMYW folded equivalence broken over all {len(codes)} codes: {max_diff}"
+        assert max_diff < 1e-9, f"bambu CMYW scalar-form equivalence broken over all {len(codes)} codes: {max_diff}"
 
     # Paper transparent-track baseline (P08-kxa, PLATE-08-KX-A staircase
     # characterization): per-channel staircase TDs, k=0 — the unified
@@ -222,12 +229,16 @@ class TestPresetShape:
         from core.color_config import get_preset
         preset = get_preset('bambu_cmywk_phase6')
         assert [p.name[0] for p in preset] == ['C', 'M', 'Y', 'W', 'K']
-        assert [p.transmission_distance for p in preset] == [
-            2.1381256008389844, 2.16428365111357, 2.203209113788528,
-            2.217597459508237, 1.9384419920975642,
-        ]
+        # Raw scalar TD readings of the A-standard fit (td_reference).
+        assert [p.transmission_distance for p in preset] == [2.0, 2.9, 5.0, 6.1, 0.1]
         assert [p.k for p in preset] == [3.4996, 4.3077, 3.6572, 6.3168, 23.1863]
         assert all(p.td_rgb is None for p in preset)
+        # Composed capture compensation (paper Eqs. (1)-(2)); see
+        # core/color_config.py provenance.
+        for p in preset:
+            assert p.alpha_s == pytest.approx(2.2292)
+            assert p.td_scale == pytest.approx(2.023552983514602)
+            assert p.td_gamma == pytest.approx(0.03272)
 
     def test_clear_cmyw_preset_is_paper_p08_kxa(self):
         from core.color_config import get_preset

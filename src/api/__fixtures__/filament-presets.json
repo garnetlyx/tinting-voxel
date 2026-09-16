@@ -3,58 +3,85 @@
     {
       "name": "Cyan",
       "hex": "#3D79C6",
-      "transmission_distance": 2.1381256008389844,
-      "k": 3.4996
+      "transmission_distance": 2.0,
+      "k": 3.4996,
+      "alpha_s": 2.2292,
+      "td_scale": 2.023552983514602,
+      "td_gamma": 0.03272
     },
     {
       "name": "Magenta",
       "hex": "#B3356E",
-      "transmission_distance": 2.16428365111357,
-      "k": 4.3077
+      "transmission_distance": 2.9,
+      "k": 4.3077,
+      "alpha_s": 2.2292,
+      "td_scale": 2.023552983514602,
+      "td_gamma": 0.03272
     },
     {
       "name": "Yellow",
       "hex": "#FFE665",
-      "transmission_distance": 2.203209113788528,
-      "k": 3.6572
+      "transmission_distance": 5.0,
+      "k": 3.6572,
+      "alpha_s": 2.2292,
+      "td_scale": 2.023552983514602,
+      "td_gamma": 0.03272
     },
     {
       "name": "White",
       "hex": "#FFFFFF",
-      "transmission_distance": 2.217597459508237,
-      "k": 6.3168
+      "transmission_distance": 6.1,
+      "k": 6.3168,
+      "alpha_s": 2.2292,
+      "td_scale": 2.023552983514602,
+      "td_gamma": 0.03272
     },
     {
       "name": "Key",
       "hex": "#0B0F0C",
-      "transmission_distance": 1.9384419920975642,
-      "k": 23.1863
+      "transmission_distance": 0.1,
+      "k": 23.1863,
+      "alpha_s": 2.2292,
+      "td_scale": 2.023552983514602,
+      "td_gamma": 0.03272
     }
   ],
   "bambu_cmyw_phase6": [
     {
       "name": "Cyan",
       "hex": "#3D79C6",
-      "transmission_distance": 2.1381256008389844,
-      "k": 3.4996
+      "transmission_distance": 2.0,
+      "k": 3.4996,
+      "alpha_s": 2.2292,
+      "td_scale": 2.023552983514602,
+      "td_gamma": 0.03272
     },
     {
       "name": "Magenta",
       "hex": "#B3356E",
-      "transmission_distance": 2.16428365111357,
-      "k": 4.3077
+      "transmission_distance": 2.9,
+      "k": 4.3077,
+      "alpha_s": 2.2292,
+      "td_scale": 2.023552983514602,
+      "td_gamma": 0.03272
     },
     {
       "name": "Yellow",
       "hex": "#FFE665",
-      "transmission_distance": 2.203209113788528,
-      "k": 3.6572
+      "transmission_distance": 5.0,
+      "k": 3.6572,
+      "alpha_s": 2.2292,
+      "td_scale": 2.023552983514602,
+      "td_gamma": 0.03272
     },
     {
       "name": "White",
       "hex": "#FFFFFF",
-      "transmission_distance": 2.217597459508237,
-      "k": 6.3168
+      "transmission_distance": 6.1,
+      "k": 6.3168,
+      "alpha_s": 2.2292,
+      "td_scale": 2.023552983514602,
+      "td_gamma": 0.03272
     }
   ],
   "clear_cmyg": [

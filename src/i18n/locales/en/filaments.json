@@ -42,5 +42,11 @@
   "tdRgbEntry": "Color {{index}} {{channel}}-channel transmission distance",
   "tdRgbHelp": "Staircase-measured per-channel transmission distances (R, G, B). Same blend formula as the scalar td; per-channel data carries the measured selectivity.",
   "tdPerChannelOn": "Switch to per-channel transmission distances (staircase-measured)",
-  "tdPerChannelOff": "Switch back to a single scalar transmission distance (uses the channel mean)"
+  "tdPerChannelOff": "Switch back to a single scalar transmission distance (uses the channel mean)",
+  "alphaSEntry": "Color {{index}} scatter coefficient alpha_s",
+  "alphaSHelp": "Scalar-form scatter coefficient alpha_s (paper Eq. 1). Neutral default ln(10) = 2.3026; calibrated presets carry fitted values.",
+  "tdScaleEntry": "Color {{index}} TD remap scale s_td",
+  "tdScaleHelp": "Scalar-form TD remap scale s_td (paper Eq. 2): td_eff = s_td * td^gamma_td. Neutral default 1.",
+  "tdGammaEntry": "Color {{index}} TD remap exponent gamma_td",
+  "tdGammaHelp": "Scalar-form TD remap exponent gamma_td (paper Eq. 2). Neutral default 1."
 }

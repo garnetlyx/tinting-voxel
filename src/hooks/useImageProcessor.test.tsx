@@ -146,15 +146,16 @@ describe('useImageProcessor', () => {
   it('raises the default layer height only when every filament classifies as transparent', () => {
     const { result } = renderHook(() => useImageProcessor());
 
-    // Clear preset: every td >= 4.5 -> transparent default 0.84.
+    // Clear preset: staircase td_rgb -> transparent default 0.84.
     act(() => { result.current.loadPreset('clear_cmyw'); });
     expect(result.current.allTransparent).toBe(true);
     expect(result.current.layerHeight).toBe(0.84);
 
-    // Back to Bambu CMYWK (Key 0.1 blocks) -> non-transparent default 0.08.
+    // Back to Bambu CMYWK (Key 0.1 blocks) -> non-transparent, calibrated
+    // at the paper fit's 0.32 mm layer height.
     act(() => { result.current.loadPreset('bambu_cmywk_phase6'); });
     expect(result.current.allTransparent).toBe(false);
-    expect(result.current.layerHeight).toBe(0.08);
+    expect(result.current.layerHeight).toBe(0.32);
   });
 
   it('preserves a manually chosen layer height across classification flips', () => {
@@ -193,7 +194,7 @@ describe('useImageProcessor', () => {
       expect.any(File),
       expect.objectContaining({
         mode: 'pixel',
-        layerHeight: 0.08,
+        layerHeight: 0.32,
         layerCount: 4,
         whiteBackingLayers: 1,
         filamentPreset: 'bambu_cmywk_phase6',

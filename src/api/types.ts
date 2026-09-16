@@ -119,13 +119,20 @@ export const FILAMENT_PRESET_OPTIONS: { value: FilamentPreset; label: string }[]
 export interface FilamentColorConfig {
   name: string;
   hex: string;
-  /** Channel-neutral transmission distance (mm), base-10: t = 10^(-d/td). */
+  /** Channel-neutral transmission distance (mm). Raw scalar TD reading;
+   * remapped by td_scale/td_gamma (paper Eq. (2)) in the scalar form. */
   transmission_distance: number;
   /** Staircase-measured per-channel transmission distances [R, G, B]
-   * (mm); absent means the scalar td broadcasts to all channels. */
+   * (mm); present means the per-channel form (mu = ln10/td_ch + k*A_ch). */
   td_rgb?: number[];
   /** Optional pigment absorption gain; 0 blends as plain Beer-Lambert. */
   k?: number;
+  /** Scalar-form capture compensation (paper Eqs. (1)-(2)):
+   * mu_ch = alpha_s/(td_scale * td**td_gamma) + k*A_ch. Neutral defaults
+   * (alpha_s = ln 10, td_scale = td_gamma = 1) degrade to ln(10)/td. */
+  alpha_s?: number;
+  td_scale?: number;
+  td_gamma?: number;
 }
 
 // Layer-height bounds shared by every filament set. 0.84 mm is the clear-track
@@ -134,25 +141,32 @@ export const LAYER_HEIGHT_MIN_MM = 0.08;
 export const LAYER_HEIGHT_MAX_MM = 0.84;
 export const DEFAULT_LAYER_HEIGHT_MM = 0.08;
 export const TRANSPARENT_LAYER_HEIGHT_MM = 0.84;
-// Transparency threshold (mm) on the stored td scale — the same number the
+// Bambu A-standard calibration layer height (PLATE-06-H2C-A,
+// research fitted_params.json layer_height_mm). The paper fit is
+// process-conditioned: predictions are calibrated at this layer height.
+export const BAMBU_LAYER_HEIGHT_MM = 0.32;
+// Transparency threshold (mm) on the EFFECTIVE td scale — the same value the
 // backend prune gate uses (core/stack_prune.py TRANSPARENT_TD_THRESHOLD_MM).
-// A literal constant, not user-adjustable: it is a property of the
-// calibrated data gap (paper-fitted bambu folds 1.94-2.22 vs user clear
-// customs at 4.5+).
+// Scalar tds are compared after the Eq. (2) remap (td_scale * td ** td_gamma).
 export const TRANSPARENT_TD_THRESHOLD_MM = 4.5;
 
 /**
  * A filament set counts as transparent when every filament's td data
  * indicates the transparent track: staircase-measured per-channel td_rgb,
- * or a scalar td that meets the fixed threshold (user-entered clear
- * filaments). Drives the layer-height default; never gates user input.
+ * or a scalar td whose EFFECTIVE value (td_scale * td ** td_gamma, paper
+ * Eq. (2)) meets the fixed threshold. Drives the layer-height default;
+ * never gates user input.
  */
 export function isAllTransparentFilaments(colors: FilamentColorConfig[]): boolean {
   if (colors.length === 0) return false;
-  return colors.every(c =>
-    (Array.isArray(c.td_rgb) && c.td_rgb.length === 3)
-    || c.transmission_distance >= TRANSPARENT_TD_THRESHOLD_MM
-  );
+  return colors.every(c => {
+    if (Array.isArray(c.td_rgb) && c.td_rgb.length === 3) return true;
+    const td = c.transmission_distance;
+    if (!(td > 0)) return false;
+    const scale = c.td_scale ?? 1.0;
+    const gamma = c.td_gamma ?? 1.0;
+    return scale * Math.pow(td, gamma) >= TRANSPARENT_TD_THRESHOLD_MM;
+  });
 }
 
 export interface FilamentPresetInfo {
@@ -306,19 +320,24 @@ export interface PaletteLibraryResponse {
 // core/color_config.py — bambu tds are the exact fold of the paper's
 // PLATE-06-H2C-A standard fit; clear presets carry the staircase-measured
 // per-channel td_rgb (paper transparent track).
+// Bambu A-standard paper fit (PLATE-06-H2C-A): raw scalar TDs + composed
+// capture compensation (alpha_s / td_scale / td_gamma, see backend
+// core/color_config.py provenance comment). Calibrated at lh 0.32 mm.
+const BAMBU_A = { alpha_s: 2.2292, td_scale: 2.023552983514602, td_gamma: 0.03272 };
+
 export const DEFAULT_PRESETS: Record<FilamentPreset, FilamentColorConfig[]> = {
   bambu_cmywk_phase6: [
-    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 2.1381256008389844, k: 3.4996 },
-    { name: 'Magenta', hex: '#B3356E', transmission_distance: 2.16428365111357,  k: 4.3077 },
-    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 2.203209113788528,  k: 3.6572 },
-    { name: 'White',   hex: '#FFFFFF', transmission_distance: 2.217597459508237,  k: 6.3168 },
-    { name: 'Key',     hex: '#0B0F0C', transmission_distance: 1.9384419920975642, k: 23.1863 },
+    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 2.0, k: 3.4996, ...BAMBU_A },
+    { name: 'Magenta', hex: '#B3356E', transmission_distance: 2.9, k: 4.3077, ...BAMBU_A },
+    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 5.0, k: 3.6572, ...BAMBU_A },
+    { name: 'White',   hex: '#FFFFFF', transmission_distance: 6.1, k: 6.3168, ...BAMBU_A },
+    { name: 'Key',     hex: '#0B0F0C', transmission_distance: 0.1, k: 23.1863, ...BAMBU_A },
   ],
   bambu_cmyw_phase6: [
-    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 2.1381256008389844, k: 3.4996 },
-    { name: 'Magenta', hex: '#B3356E', transmission_distance: 2.16428365111357,  k: 4.3077 },
-    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 2.203209113788528,  k: 3.6572 },
-    { name: 'White',   hex: '#FFFFFF', transmission_distance: 2.217597459508237,  k: 6.3168 },
+    { name: 'Cyan',    hex: '#3D79C6', transmission_distance: 2.0, k: 3.4996, ...BAMBU_A },
+    { name: 'Magenta', hex: '#B3356E', transmission_distance: 2.9, k: 4.3077, ...BAMBU_A },
+    { name: 'Yellow',  hex: '#FFE665', transmission_distance: 5.0, k: 3.6572, ...BAMBU_A },
+    { name: 'White',   hex: '#FFFFFF', transmission_distance: 6.1, k: 6.3168, ...BAMBU_A },
   ],
   clear_cmyg: [
     { name: 'Cyan',    hex: '#5489B4', transmission_distance: 4.667418746800521,  td_rgb: [1.039647851596278, 4.661388851322945, 8.301219537482337], k: 0 },

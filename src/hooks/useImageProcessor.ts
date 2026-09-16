@@ -13,7 +13,7 @@ import type {
   FilamentPreset,
   FilamentColorConfig,
 } from '../api/types';
-import { DEFAULT_PRESETS, DEFAULT_FILAMENT_PRESET, DEFAULT_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM, isAllTransparentFilaments } from '../api/types';
+import { DEFAULT_PRESETS, DEFAULT_FILAMENT_PRESET, DEFAULT_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM, BAMBU_LAYER_HEIGHT_MM, isAllTransparentFilaments } from '../api/types';
 import type { ProcessingStage } from '../components/LoadingSpinner';
 import {
   processImage,
@@ -114,6 +114,24 @@ export const useImageProcessor = () => {
       return prev;
     });
   }, [allTransparent]);
+
+  // Preset-calibrated layer height: the paper fits are process-conditioned
+  // at their calibration layer heights (bambu A-standard 0.32 mm, clear
+  // staircase 0.84 mm). Swap to the calibration height when the preset
+  // changes; manually chosen values are preserved.
+  useEffect(() => {
+    if (!filamentPreset) return;
+    const calibrated = filamentPreset.startsWith('bambu')
+      ? BAMBU_LAYER_HEIGHT_MM
+      : TRANSPARENT_LAYER_HEIGHT_MM;
+    setLayerHeight(prev => {
+      const knownDefaults = [DEFAULT_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM, BAMBU_LAYER_HEIGHT_MM];
+      if (knownDefaults.some(d => Math.abs(prev - d) < 1e-9)) {
+        return calibrated;
+      }
+      return prev;
+    });
+  }, [filamentPreset]);
 
   // Filament preset storage (localStorage persistence)
   const filamentStorage = useFilamentStorage();

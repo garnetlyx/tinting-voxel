@@ -15,13 +15,14 @@ class ProcessingMode(str, Enum):
 
 class FilamentColorConfig(BaseModel):
     """Configuration for a single filament color: name, hex, td, optional
-    td_rgb, optional k.
+    td_rgb, optional k, optional scalar-form capture compensation
+    (alpha_s/td_scale/td_gamma, paper Eqs. (1)-(2)).
 
     td_rgb is the staircase-measured per-channel transmission distance
-    triplet (paper transparent track). The remaining retired calibration
-    fields (alpha, k_rgb, td_neutral, td_scale, td_gamma) are forbidden —
-    silently discarding them would give obsolete clients quietly changed
-    optical behavior.
+    triplet. Scalar td (absent td_rgb) is remapped by
+    td_scale * td**td_gamma and scattered at alpha_s; neutral defaults
+    (alpha_s = ln 10, td_scale = td_gamma = 1) degrade to plain
+    ln(10)/td + k*A_ch.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -36,13 +37,31 @@ class FilamentColorConfig(BaseModel):
     td_rgb: Optional[List[float]] = Field(
         None,
         description="Staircase-measured per-channel transmission distances [R, G, B]; "
-                    "absent means the scalar td broadcasts to all channels"
+                    "present selects the per-channel form"
     )
     k: float = Field(
         0.0,
         ge=0,
         le=1000,
         description="Optional pigment absorption gain; 0 blends as plain Beer-Lambert (t = 10^(-d/td))"
+    )
+    alpha_s: float = Field(
+        2.302585092994046,
+        gt=0,
+        le=1000,
+        description="Scalar-form scatter coefficient (paper Eq. (1)); neutral ln(10)"
+    )
+    td_scale: float = Field(
+        1.0,
+        gt=0,
+        le=1000,
+        description="Scalar-form s_td remap (paper Eq. (2)); neutral 1"
+    )
+    td_gamma: float = Field(
+        1.0,
+        gt=0,
+        le=1000,
+        description="Scalar-form gamma_td remap exponent (paper Eq. (2)); neutral 1"
     )
 
     @field_validator('td_rgb')

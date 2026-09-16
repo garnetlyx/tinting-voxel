@@ -10,9 +10,12 @@ if TYPE_CHECKING:
 
 class Color:
     # Baseline "no absorption correction". Calibrated families set k
-    # explicitly (e.g. bambu phase6 k=8.13); 0 makes default-parameter
-    # colors blend as plain base-10 Beer-Lambert t = 10^(-d/td).
+    # explicitly (e.g. bambu A-standard k_C = 3.4996); 0 blends as plain
+    # Beer-Lambert.
     DEFAULT_K = 0.0
+    # Neutral scalar-form compensation: Eqs. (1)-(2) with
+    # alpha_s = ln 10, s_td = gamma_td = 1 degrade to ln(10)/td + k*A_ch.
+    LN10 = float(np.log(10.0))
     DEFAULT_HEX = {
         "C": "#00FFFF",
         "M": "#FF00FF",
@@ -29,21 +32,27 @@ class Color:
         rgb=None,
         k=DEFAULT_K,
         td_rgb=None,
+        alpha_s=LN10,
+        td_scale=1.0,
+        td_gamma=1.0,
         display_name=None,
     ):
-        """A filament color: hex + td + k (+ optional per-channel td_rgb).
+        """A filament color: hex + td + k (+ optional per-channel td_rgb,
+        + optional scalar-form capture compensation alpha_s/td_scale/td_gamma).
 
-        td (mm) is channel-neutral (one composite number, broadcast to all
-        channels); k is the optional pigment absorption gain (default 0);
-        td_rgb is the optional per-channel transmission distance triplet
-        [R, G, B] (staircase-measured filaments). The blend formula is the
-        same either way — mu_ch = ln(10)/td_ch + k*A_ch — with td_ch taken
-        per-channel when td_rgb is present, broadcast from scalar td
-        otherwise. Filaments differ only in td (and hex); there is no
-        clear/regular material distinction.
-        Historical calibration fields (alpha, k_rgb, td_neutral, td_scale,
-        td_gamma) were fold points of the retired mode dispatch — deleted;
-        git history for archaeology.
+        Two characterizations of td, same forward family — there is no
+        clear/regular material distinction:
+        - td_rgb present (staircase-measured, paper form (i)):
+          mu_ch = ln(10)/td_rgb[ch] + k*A_ch.
+        - scalar td (paper Eqs. (1)-(2)):
+          mu_ch = alpha_s/(td_scale * td**td_gamma) + k*A_ch.
+          td is the raw scalar TD reading; td_scale/td_gamma are the fitted
+          s_td/gamma_td remap and alpha_s the fitted scatter coefficient of
+          the calibrated set. Neutral defaults (alpha_s = ln 10,
+          td_scale = td_gamma = 1) degrade to plain ln(10)/td + k*A_ch.
+        W is a semi-opaque neutral scatterer through the same formula
+        (A_ch = 0, mu = alpha_s/td_eff, finite) — never treated as a
+        transparent or special layer.
         """
         if not name or not name[0].isalpha() or not name[0].isascii():
             raise ValueError(
@@ -77,6 +86,13 @@ class Color:
             raise ValueError(
                 f"k must be non-negative, got {k}"
             )
+        for field_name, value in (
+            ("alpha_s", alpha_s), ("td_scale", td_scale), ("td_gamma", td_gamma),
+        ):
+            if not np.isfinite(float(value)) or float(value) <= 0:
+                raise ValueError(
+                    f"{field_name} must be positive and finite, got {value}"
+                )
 
         self.name = name
         self.td = transmission_distance
@@ -84,6 +100,9 @@ class Color:
         self.rgb = rgb
         self.absorption = absorption
         self.k = k
+        self.alpha_s = float(alpha_s)
+        self.td_scale = float(td_scale)
+        self.td_gamma = float(td_gamma)
         self.display_name = display_name
 
         if hex is None and rgb is not None:
@@ -271,6 +290,9 @@ class Colors:
                 cfg.hex,
                 k=cfg.k,
                 td_rgb=cfg.td_rgb,
+                alpha_s=cfg.alpha_s,
+                td_scale=cfg.td_scale,
+                td_gamma=cfg.td_gamma,
                 display_name=cfg.label,
             )
 
@@ -331,6 +353,9 @@ class Colors:
                 hex=config.hex,
                 k=config.k,
                 td_rgb=config.td_rgb,
+                alpha_s=config.alpha_s,
+                td_scale=config.td_scale,
+                td_gamma=config.td_gamma,
             )
             instance.colors[label] = color
 

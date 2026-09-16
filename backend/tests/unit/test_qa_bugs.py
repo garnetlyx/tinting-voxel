@@ -2325,7 +2325,7 @@ class TestCodeToRgbShortCodeBackground:
         from core.blend_color import _code_to_rgb_cached, clear_rgb_cache
 
         clear_rgb_cache()
-        color_key = (('W', 7.2, '#FFFFFF', 0.0, None),)
+        color_key = (('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),)
         r, g, b = _code_to_rgb_cached('W', 0.08, color_key)
 
         # Single layer of white should be very bright (>230)
@@ -2342,8 +2342,8 @@ class TestCodeToRgbShortCodeBackground:
         from core.blend_color import _code_to_rgb_cached, clear_rgb_cache
 
         clear_rgb_cache()
-        color_key = (('C', 3.0, '#0086D6', 0.0, None), ('M', 1.9, '#EC008C', 0.0, None),
-                     ('Y', 2.5, '#F4EE2A', 0.0, None), ('W', 7.2, '#FFFFFF', 0.0, None))
+        color_key = (('C', 3.0, '#0086D6', 0.0, None, 2.302585092994046, 1.0, 1.0), ('M', 1.9, '#EC008C', 0.0, None, 2.302585092994046, 1.0, 1.0),
+                     ('Y', 2.5, '#F4EE2A', 0.0, None, 2.302585092994046, 1.0, 1.0), ('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0))
 
         r1, g1, b1 = _code_to_rgb_cached('W', 0.08, color_key)
         r4, g4, b4 = _code_to_rgb_cached('WWWW', 0.08, color_key)

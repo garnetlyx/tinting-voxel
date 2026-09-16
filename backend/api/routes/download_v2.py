@@ -56,6 +56,9 @@ async def api_get_filament_presets(request: Request):
                 transmission_distance=c.transmission_distance,
                 td_rgb=c.td_rgb,
                 k=c.k,
+                alpha_s=c.alpha_s,
+                td_scale=c.td_scale,
+                td_gamma=c.td_gamma,
             ) for c in configs],
         )
         for name, configs in PRESETS.items()
@@ -238,6 +241,9 @@ async def api_print_settings(request: Request, body: PrintSettingsRequest):
                     'transmission_distance': c.transmission_distance,
                     'td_rgb': c.td_rgb,
                     'k': c.k,
+                    'alpha_s': c.alpha_s,
+                    'td_scale': c.td_scale,
+                    'td_gamma': c.td_gamma,
                 }
                 for c in preset_configs
             ]

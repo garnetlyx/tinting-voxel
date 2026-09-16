@@ -35,7 +35,7 @@ const renderRow = (onChange = vi.fn()) => {
 describe('FilamentColorRow (single-td model)', () => {
   it('edits the transmission distance directly — no measured-parameter lock', () => {
     const { onChange } = renderRow();
-    const tdInput = screen.getByRole('spinbutton', { name: /transmission|td/i });
+    const tdInput = screen.getByRole('spinbutton', { name: /transmission distance/i });
     expect(tdInput).not.toBeDisabled();
     fireEvent.change(tdInput, { target: { value: '5.5' } });
     const last = onChange.mock.calls[onChange.mock.calls.length - 1]?.[1];
@@ -44,7 +44,7 @@ describe('FilamentColorRow (single-td model)', () => {
 
   it('keeps k when editing td (preset params survive unrelated edits)', () => {
     const { onChange } = renderRow();
-    const tdInput = screen.getByRole('spinbutton', { name: /transmission|td/i });
+    const tdInput = screen.getByRole('spinbutton', { name: /transmission distance/i });
     fireEvent.change(tdInput, { target: { value: '6' } });
     const last = onChange.mock.calls[onChange.mock.calls.length - 1]?.[1];
     expect(last.k).toBe(0);

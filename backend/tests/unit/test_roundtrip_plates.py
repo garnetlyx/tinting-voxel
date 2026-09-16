@@ -19,13 +19,11 @@ Codes are grouped by stack length and each length runs with layer_count
 equal to it: the app's model space for one job is fixed-length codes, and
 the plate's 1-3 layer cells are recovered at their own depth.
 
-The simulated image is rendered from the app model's full-precision
-predictions — test_paper_alignment.py proves those equal the research
-engine's (the fixture CSVs are 2-dp reports of the same values).
+The plate codes come from the research repo directly (no copies here);
+the whole module skips when the repo is absent (CI).
 """
 import csv
 import itertools
-import json
 from io import BytesIO
 from pathlib import Path
 
@@ -34,30 +32,37 @@ import pytest
 from PIL import Image
 
 from core.blend_color import BlendTestGenerator, Colors
-from core.color_config import ColorConfig, get_preset
+from core.color_config import get_preset
 from services.image_processor import process_image
+from tests.unit.test_paper_alignment import RESEARCH, _randmix_colors, _read_clear_plate
 
-FIXTURES = Path(__file__).parents[1] / "fixtures" / "paper_alignment"
+pytestmark = pytest.mark.skipif(
+    not RESEARCH.exists(), reason=f"research repo not present: {RESEARCH}"
+)
+
 CELL_PX = 8
 
 
-def _load_codes(name: str) -> list[str]:
-    with open(FIXTURES / f"{name}.csv", encoding="utf-8") as fh:
-        rows = list(csv.DictReader(fh))
-    return [r["code"] for r in rows]
-
-
-def _randmix5_colors() -> Colors:
-    materials = json.load(open(FIXTURES / "randmix5_materials.json", encoding="utf-8"))
-    return Colors.from_configs([
-        ColorConfig(
-            name=m["name"],
-            hex=m["hex"],
-            transmission_distance=m["transmission_distance"],
-            k=m["k"],
+def _plate_codes(which: str) -> list[str]:
+    """Load benchmark codes from the research repo."""
+    if which == "plate06_a_standard":
+        path = RESEARCH / "data/results/PLATE-06-H2C-paper-matrix/runs/A-standard/per_cell_de.csv"
+    elif which == "randmix5_a_beige_safe":
+        path = RESEARCH / "data/results/RANDMIX5-H2C-fit/runs/A-beige-safe/per_cell_de.csv"
+    elif which == "clear_cmyg_p07_def":
+        return _read_clear_plate(
+            RESEARCH / "calibration/plates/clear_cmyg/CMYG_208x208x3.36",
+            "CMYG_208x208x3.36",
         )
-        for m in materials
-    ])
+    elif which == "clear_cmyw_p08_kxa":
+        return _read_clear_plate(
+            RESEARCH / "calibration/plates/clear_cmyw/CMYW_208x208x3.36",
+            "CMYW_208x208x3.36",
+        )
+    else:
+        raise ValueError(which)
+    with open(path, encoding="utf-8") as fh:
+        return [r["code"] for r in csv.DictReader(fh)]
 
 
 def _quantized(rgb: np.ndarray) -> tuple[int, int, int]:
@@ -72,7 +77,7 @@ BENCHMARKS = [
     ),
     pytest.param(
         "randmix5_a_beige_safe",
-        _randmix5_colors,
+        _randmix_colors,
         0.32, id="randmix5_a_beige_safe",
     ),
     pytest.param(
@@ -90,7 +95,7 @@ BENCHMARKS = [
 
 @pytest.mark.parametrize("fixture,colors_fn,layer_height", BENCHMARKS)
 def test_roundtrip_paper_plates(fixture, colors_fn, layer_height):
-    codes = _load_codes(fixture)
+    codes = _plate_codes(fixture)
     colors = colors_fn()
     gen = BlendTestGenerator(
         colors=colors, layer_height=layer_height, layer_count_max=4, verbose=False,

@@ -42,5 +42,11 @@
   "tdRgbEntry": "颜色 {{index}} {{channel}} 通道透射距离",
   "tdRgbHelp": "楼梯法实测的逐通道透射距离（R/G/B）。与标量 td 用同一混合公式；逐通道数据携带实测的选择性。",
   "tdPerChannelOn": "切换为逐通道透射距离（楼梯法实测）",
-  "tdPerChannelOff": "切回单一标量透射距离（取通道均值）"
+  "tdPerChannelOff": "切回单一标量透射距离（取通道均值）",
+  "alphaSEntry": "颜色 {{index}} 散射系数 alpha_s",
+  "alphaSHelp": "标量形式散射系数 alpha_s(论文公式 1)。中性默认 ln(10) = 2.3026;标定预设携带拟合值。",
+  "tdScaleEntry": "颜色 {{index}} TD 重映射尺度 s_td",
+  "tdScaleHelp": "标量形式 TD 重映射尺度 s_td(论文公式 2):td_eff = s_td * td^gamma_td。中性默认 1。",
+  "tdGammaEntry": "颜色 {{index}} TD 重映射指数 gamma_td",
+  "tdGammaHelp": "标量形式 TD 重映射指数 gamma_td(论文公式 2)。中性默认 1。"
 }

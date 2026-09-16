@@ -64,26 +64,30 @@ MAX_CANDIDATE_COMPOSITIONS = 128
 
 
 def is_translucent_set(colors: Colors) -> bool:
-    """True when every td value blending uses meets the transparency threshold.
+    """True when every effective td value blending uses meets the threshold.
 
     Single standard: the td numbers blending actually reads — per-channel
-    td_rgb when the filament carries staircase measurements, else the scalar
-    td broadcast — every channel >= the one fixed 4.5 mm constant. A set whose
-    every channel transmits weakly (all td_ch >= 4.5) has order-insensitive
-    stacking, which is what the composition-pruning ΔE oracle validates.
-    Paper-data presets: bambu (paper-fitted folds) sits at 1.94-2.22 and the
-    clear presets carry per-channel staircases down to ~1.0 mm in their most
-    absorbing channel — the accurate per-channel model makes real clear
-    stacks order-sensitive, so neither ships as prunable; only sets that are
-    uniformly high-td on every channel (e.g. customs at 10-30 mm) classify
-    transparent.
+    td_rgb when the filament carries staircase measurements, else the
+    scalar-form effective td (td_scale * td**td_gamma, paper Eq. (2)). A set
+    whose every channel transmits weakly (all td_ch >= 4.5 mm) has
+    order-insensitive stacking, which is what the composition-pruning ΔE
+    oracle validates. Raw scalar readings are compensated: bambu A-standard
+    raw TDs span 0.1-6.1 mm but its effective tds sit at ~1.8-2.1 mm, so it
+    stays on the full-enumeration track; only uniformly high-effective-td
+    sets (e.g. customs at 10-30 mm) classify translucent.
     """
     items = colors.colors.values() if isinstance(colors.colors, dict) else []
     if not items:
         return False
     for color in items:
         td_rgb = color.td_rgb
-        tds = tuple(td_rgb) if td_rgb is not None else (color.td,)
+        if td_rgb is not None:
+            tds = tuple(td_rgb)
+        else:
+            td = color.td
+            if td is None or td <= 0:
+                return False
+            tds = (color.td_scale * (td ** color.td_gamma),)
         if any(td is None or td < TRANSPARENT_TD_THRESHOLD_MM for td in tds):
             return False
     return True

@@ -157,6 +157,64 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
         title={t('filaments:kHelp')}
       />
 
+      {/* Scalar-form capture compensation (paper Eqs. (1)-(2)); shown only
+          for scalar-td colors — per-channel staircase colors don't use it. */}
+      {!config.td_rgb && (
+        <>
+          <input
+            type="number"
+            aria-label={t('filaments:alphaSEntry', { index: index + 1 })}
+            value={config.alpha_s ?? 2.302585092994046}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const val = raw === '' ? 2.302585092994046 : parseFloat(raw);
+              if (!isNaN(val) && val > 0 && val <= 1000) {
+                onChange(index, { ...config, alpha_s: val });
+              }
+            }}
+            min={0.01}
+            max={1000}
+            step={0.01}
+            className="w-16 px-2 py-1 text-sm border rounded text-right border-gray-300"
+            title={t('filaments:alphaSHelp')}
+          />
+          <input
+            type="number"
+            aria-label={t('filaments:tdScaleEntry', { index: index + 1 })}
+            value={config.td_scale ?? 1}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const val = raw === '' ? 1 : parseFloat(raw);
+              if (!isNaN(val) && val > 0 && val <= 1000) {
+                onChange(index, { ...config, td_scale: val });
+              }
+            }}
+            min={0.01}
+            max={1000}
+            step={0.01}
+            className="w-16 px-2 py-1 text-sm border rounded text-right border-gray-300"
+            title={t('filaments:tdScaleHelp')}
+          />
+          <input
+            type="number"
+            aria-label={t('filaments:tdGammaEntry', { index: index + 1 })}
+            value={config.td_gamma ?? 1}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const val = raw === '' ? 1 : parseFloat(raw);
+              if (!isNaN(val) && val > 0 && val <= 1000) {
+                onChange(index, { ...config, td_gamma: val });
+              }
+            }}
+            min={0.01}
+            max={1000}
+            step={0.01}
+            className="w-16 px-2 py-1 text-sm border rounded text-right border-gray-300"
+            title={t('filaments:tdGammaHelp')}
+          />
+        </>
+      )}
+
       {/* Remove button */}
       <button
         onClick={() => onRemove(index)}

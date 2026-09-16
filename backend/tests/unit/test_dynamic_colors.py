@@ -152,15 +152,19 @@ class TestColorsFromConfigs:
 
         assert colors['C'].td == 5.5
 
-    def test_from_configs_preserves_folded_td_and_k(self):
-        """from_configs carries the paper-fitted td/k and td_rgb verbatim."""
+    def test_from_configs_preserves_raw_td_k_and_compensation(self):
+        """from_configs carries the raw scalar td, fitted k and the scalar-form
+        compensation triple verbatim."""
         colors = Colors.from_configs(BAMBU_CMYWK_PHASE6_PRESET)
 
-        assert colors["C"].td == pytest.approx(2.1381256008389844)
+        assert colors["C"].td == pytest.approx(2.0)
         assert colors["C"].k == pytest.approx(3.4996)
         assert colors["W"].k == pytest.approx(6.3168)
         assert colors["K"].k == pytest.approx(23.1863)
         assert colors["C"].td_rgb is None
+        assert colors["C"].alpha_s == pytest.approx(2.2292)
+        assert colors["C"].td_scale == pytest.approx(2.023552983514602)
+        assert colors["C"].td_gamma == pytest.approx(0.03272)
 
     def test_from_configs_preserves_per_channel_td(self):
         """from_configs carries the staircase per-channel td_rgb verbatim."""

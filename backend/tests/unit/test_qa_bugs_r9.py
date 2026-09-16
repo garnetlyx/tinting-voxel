@@ -98,7 +98,7 @@ class TestQA69LastLayerDoubleCountedInBackground:
         """
         clear_rgb_cache()
 
-        color_key = (('W', 7.2, '#FFFFFF', 0.0, None),)
+        color_key = (('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),)
         result = _code_to_rgb_cached('W', 0.08, color_key)
 
         r, g, b = result
@@ -118,7 +118,7 @@ class TestQA69LastLayerDoubleCountedInBackground:
         """
         clear_rgb_cache()
 
-        color_key = (('C', 3.0, '#0086D6', 0.0, None),)
+        color_key = (('C', 3.0, '#0086D6', 0.0, None, 2.302585092994046, 1.0, 1.0),)
         result_c = _code_to_rgb_cached('C', 0.08, color_key)
 
         # With bug: background is remain * (1-t) where t = cyan's transmission
@@ -379,7 +379,7 @@ class TestQA90ColorDirectTdZero:
         clear_rgb_cache()
 
         # td=0 means fully opaque
-        color_key = (('X', 0, '#FF0000', 0.0, None),)
+        color_key = (('X', 0, '#FF0000', 0.0, None, 2.302585092994046, 1.0, 1.0),)
 
         # Should not crash with ZeroDivisionError
         result = _code_to_rgb_cached('X', 0.08, color_key)

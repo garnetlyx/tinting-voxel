@@ -32,9 +32,10 @@ function generateId(): string {
 }
 
 /** Normalize a persisted/imported color to the current schema:
- * name, hex, transmission_distance, optional td_rgb, optional k.
- * Fields removed from the model (alpha, td_neutral, td_scale, td_gamma,
- * k_rgb) are stripped so outbound payloads never trip the backend's
+ * name, hex, transmission_distance, optional td_rgb, optional k, optional
+ * scalar-form capture compensation (alpha_s, td_scale, td_gamma — paper
+ * Eqs. (1)-(2)). Fields removed from the model (alpha, td_neutral, k_rgb)
+ * are stripped so outbound payloads never trip the backend's
  * extra='forbid'. */
 function normalizeColor(c: Record<string, unknown>): FilamentColorConfig {
   const out: FilamentColorConfig = {
@@ -48,6 +49,10 @@ function normalizeColor(c: Record<string, unknown>): FilamentColorConfig {
     out.td_rgb = c.td_rgb.map((ch: number) => Number(ch));
   }
   if (typeof c.k === 'number' && Number.isFinite(c.k)) out.k = c.k;
+  for (const field of ['alpha_s', 'td_scale', 'td_gamma'] as const) {
+    const v = c[field];
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[field] = v;
+  }
   return out;
 }
 
