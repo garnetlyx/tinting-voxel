@@ -31,41 +31,13 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** Normalize a persisted/imported color to the current schema:
- * name, hex, transmission_distance, optional td_rgb, optional k, optional
- * scalar-form capture compensation (alpha_s, td_scale, td_gamma — paper
- * Eqs. (1)-(2)). Fields removed from the model (alpha, td_neutral, k_rgb)
- * are stripped so outbound payloads never trip the backend's
- * extra='forbid'. */
-function normalizeColor(c: Record<string, unknown>): FilamentColorConfig {
-  const out: FilamentColorConfig = {
-    name: String(c.name),
-    hex: String(c.hex),
-    transmission_distance: Number(c.transmission_distance),
-  };
-  if (Array.isArray(c.td_rgb)
-      && c.td_rgb.length === 3
-      && c.td_rgb.every((ch: unknown) => typeof ch === 'number' && Number.isFinite(ch) && (ch as number) > 0)) {
-    out.td_rgb = c.td_rgb.map((ch: number) => Number(ch));
-  }
-  if (typeof c.k === 'number' && Number.isFinite(c.k)) out.k = c.k;
-  for (const field of ['alpha_s', 'td_scale', 'td_gamma'] as const) {
-    const v = c[field];
-    if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[field] = v;
-  }
-  return out;
-}
-
 function loadPresets(): SavedPreset[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isValidPreset).map((p) => ({
-      ...p,
-      colors: p.colors.map((c) => normalizeColor(c as unknown as Record<string, unknown>)),
-    }));
+    return parsed.filter(isValidPreset);
   } catch {
     return [];
   }
@@ -79,6 +51,10 @@ function savePresetsToStorage(presets: SavedPreset[]): void {
   }
 }
 
+const ALLOWED_COLOR_KEYS = new Set([
+  'name', 'hex', 'transmission_distance', 'td_rgb', 'k', 'alpha_s', 'td_scale', 'td_gamma',
+]);
+
 function isValidPreset(p: unknown): p is SavedPreset {
   if (typeof p !== 'object' || p === null) return false;
   const obj = p as Record<string, unknown>;
@@ -89,6 +65,10 @@ function isValidPreset(p: unknown): p is SavedPreset {
   for (const c of obj.colors) {
     if (typeof c !== 'object' || c === null) return false;
     const color = c as Record<string, unknown>;
+    // Strict schema: unknown keys (e.g. retired alpha/td_neutral/k_rgb)
+    // make the preset invalid — it would fail the backend's
+    // extra="forbid" validation anyway; no silent compatibility path.
+    if (Object.keys(color).some(k => !ALLOWED_COLOR_KEYS.has(k))) return false;
     if (typeof color.name !== 'string') return false;
     if (typeof color.hex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color.hex)) return false;
     if (typeof color.transmission_distance !== 'number') return false;
@@ -97,6 +77,11 @@ function isValidPreset(p: unknown): p is SavedPreset {
         || color.td_rgb.length !== 3
         || !color.td_rgb.every((ch) => typeof ch === 'number' && ch > 0 && ch <= 1000))) return false;
     if (color.k !== undefined && (typeof color.k !== 'number' || color.k < 0 || color.k > 1000)) return false;
+    for (const field of ['alpha_s', 'td_scale', 'td_gamma'] as const) {
+      const v = color[field];
+      if (v !== undefined
+        && (typeof v !== 'number' || !Number.isFinite(v) || v <= 0 || v > 1000)) return false;
+    }
   }
   return true;
 }
@@ -188,7 +173,7 @@ export const useFilamentStorage = (): FilamentStorage => {
         if (isValidPreset(parsed[i])) {
           validPresets.push({
             ...parsed[i],
-            colors: (parsed[i].colors as Record<string, unknown>[]).map(normalizeColor),
+            colors: parsed[i].colors,
             id: generateId(), // assign new IDs to avoid collisions
             createdAt: parsed[i].createdAt || Date.now(),
             updatedAt: Date.now(),

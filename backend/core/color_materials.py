@@ -238,7 +238,27 @@ class Color:
         return dists
 
     @staticmethod
-    def map_to_nearest_color(input_colors, reference_code, reference_rgb, weights=None):
+    def map_to_nearest_color(
+        input_colors: "list[tuple[int, int, int]] | np.ndarray",
+        reference_code,
+        reference_rgb,
+        weights=None,
+        white_labels: "set[str] | None" = None,
+        lightness_threshold: float = 85.0,
+        white_max_chroma: float = 6.0,
+    ) -> "tuple[list[str], list[tuple[int, int, int]]]":
+        """Nearest printable blend per input color (CIEDE2000, dark adjustments).
+
+        Forced-W rule: when white_labels is given (labels of the set's white
+        filament) and a target is near-WHITE — high lightness AND near-neutral
+        (Lab L >= lightness_threshold, chroma <= white_max_chroma) — the
+        candidate set is restricted to W-dominant codes (at least half the
+        stack's layers are the white filament). Genuinely white regions then
+        print as real white stacks instead of relying on the backing shining
+        through; chromatic lights (pale yellow/cyan, L >= 85 but chromatic)
+        keep the unrestricted search. Falls back to unrestricted when no
+        W-dominant code exists in the matrix.
+        """
         # Vectorized extraction: iterating 800k+ pandas cells with .iat costs
         # seconds on full-enumeration matrices; flattened arrays are equivalent.
         ref_blend_codes = list(reference_code.values.flatten())
@@ -248,11 +268,39 @@ class Color:
         inp = np.array(input_colors) / 255.0
         inp_lab = rgb2lab(inp.reshape(-1, 1, 3)).reshape(-1, 3)
 
+        if white_labels:
+            white_labels = set(white_labels)
+
+            def _w_dominant_mask():
+                mask = np.zeros(len(ref_blend_codes), dtype=bool)
+                for i, code in enumerate(ref_blend_codes):
+                    if not code:
+                        continue
+                    n_white = sum(1 for ch in code if ch in white_labels)
+                    if n_white * 2 >= len(code):
+                        mask[i] = True
+                return mask
+
+            w_mask = _w_dominant_mask()
+            any_w_dominant = bool(w_mask.any())
+        else:
+            w_mask = None
+            any_w_dominant = False
+
         results_code = []
         results_color = []
         for lab_color in inp_lab:
             dists = Color.perceptual_distance(lab_color, ref_lab)
-            nearest_idx = int(np.argmin(dists))
+            if w_mask is not None and any_w_dominant:
+                L, a, b = lab_color
+                near_white = L >= lightness_threshold and np.hypot(a, b) <= white_max_chroma
+                if near_white:
+                    masked = np.where(w_mask, dists, np.inf)
+                    nearest_idx = int(np.argmin(masked))
+                else:
+                    nearest_idx = int(np.argmin(dists))
+            else:
+                nearest_idx = int(np.argmin(dists))
             results_code.append(ref_blend_codes[nearest_idx])
             results_color.append(np.round(ref_colors[nearest_idx] * 255).astype(int))
 
@@ -316,6 +364,19 @@ class Colors:
 
     def get_labels(self):
         return [x for x in self.colors]
+
+    def white_labels(self) -> set[str]:
+        """Labels of the set's PURE-white filament(s): hex exactly #FFFFFF.
+        Drives the forced-W rule for near-white targets in
+        Color.map_to_nearest_color — light regions print as real white
+        stacks instead of backing shine-through. Tinted "white" filaments
+        (beige, warm-white translucent) render off-white themselves, so the
+        rule does not apply to them."""
+        out = set()
+        for label, color in self.colors.items():
+            if color.hex.upper() == "#FFFFFF":
+                out.add(label)
+        return out
 
     @classmethod
     def from_configs(cls, configs) -> "Colors":

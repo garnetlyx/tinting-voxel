@@ -20,20 +20,20 @@ Baselines:
 """
 import csv
 import json
-import os
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+import sys
 from core.blend_color import Colors, colors_key
 from core.blend_models import codes_to_rgb_batch
 from core.color_config import get_preset
 
-RESEARCH = Path(os.environ.get(
-    "TINTING_RESEARCH_REPO",
-    str(Path.home() / "Dropbox/mine/projects/research/tinting-voxel-research"),
-)).expanduser()
+# The research repo is referenced ONLY by this absolute path; no env
+# overrides, no relative fallbacks. Tests skip cleanly when it is absent
+# (CI runners).
+RESEARCH = Path("/Users/gl/Dropbox/mine/projects/research/tinting-voxel-research")
 
 requires_research = pytest.mark.skipif(
     not RESEARCH.exists(), reason=f"research repo not present: {RESEARCH}"
@@ -42,7 +42,7 @@ requires_research = pytest.mark.skipif(
 WHITE = (255, 255, 255)
 
 
-def _predict(colors: Colors, codes: list, layer_height: float):
+def _predict(colors: Colors, codes: "list[str]", layer_height: float) -> "dict[str, tuple]":
     """Batch-predict codes; codes_to_rgb_batch chunks assume uniform length,
     so group by code length first."""
     out: dict[str, tuple] = {}
@@ -104,6 +104,20 @@ def test_golden_cells_randmix5_beige_safe():
     got = _predict(colors, ["CCCC"], 0.32)["CCCC"]
     e = (193.0, 191.16, 187.41)
     assert max(abs(a - b) for a, b in zip(got, e)) <= 0.5, (got, e)
+
+
+def test_golden_cells_clear_staircase():
+    """Inline clear anchors (full-precision engine values, P07-def /
+    P08-kxa staircase characterizations at lh 0.84)."""
+    p08 = Colors.from_configs(get_preset("clear_cmyw"))
+    got = _predict(p08, ["WWWW", "CCCC"], 0.84)
+    assert max(abs(a - b) for a, b in zip(got["WWWW"], (250.340795, 250.374672, 247.394385))) < 1e-3
+    assert max(abs(a - b) for a, b in zip(got["CCCC"], (77.154814, 127.047109, 186.481179))) < 1e-3
+
+    p07 = Colors.from_configs(get_preset("clear_cmyg"))
+    got = _predict(p07, ["GGGG", "YYYG"], 0.84)
+    assert max(abs(a - b) for a, b in zip(got["GGGG"], (160.162958, 158.993851, 156.303718))) < 1e-3
+    assert max(abs(a - b) for a, b in zip(got["YYYG"], (218.739144, 203.782903, 114.043823))) < 1e-3
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +232,62 @@ def test_clear_plate_codes_load_and_predict(preset, plate_dir, stem, layer_heigh
     for code in codes:
         rgb = got[code]
         assert len(rgb) == 3 and all(0.0 <= v <= 255.0 for v in rgb)
+
+
+_ENGINE_PREDICT_SCRIPT = """
+import csv, json, sys
+research, plate_dir, stem, layer_height, bg = sys.argv[1:6]
+sys.path.insert(0, research + "/engine/backend")
+from core.color_materials import Color
+from core.blend_models import _blend_by_mode
+
+codes = []
+with open(f"{research}/{plate_dir}/{stem}_code.csv") as f:
+    rd = csv.reader(f); next(rd)
+    for row in rd: codes.extend(row)
+
+# Filament td_rgb data from the app preset, forwarded verbatim.
+materials = json.loads(sys.argv[6])
+cmap = {lab: Color(lab, m["td"], m["hex"], k=0.0, td_rgb=m["td_rgb"]) for lab, m in materials.items()}
+
+out = [list(_blend_by_mode(c, float(layer_height), cmap, blend_mode="beer_lambert_td_rgb",
+                           background_rgb=tuple(float(x) for x in bg.split(",")))) for c in codes]
+print(json.dumps(out))
+"""
+
+
+@pytest.mark.parametrize("preset,plate_dir,stem,layer_height", [
+    ("clear_cmyg", "calibration/plates/clear_cmyg/CMYG_208x208x3.36", "CMYG_208x208x3.36", 0.84),
+    ("clear_cmyw", "calibration/plates/clear_cmyw/CMYW_208x208x3.36", "CMYW_208x208x3.36", 0.84),
+])
+@requires_research
+def test_clear_plates_match_research_engine(preset, plate_dir, stem, layer_height):
+    """Direct research-engine comparison: run the engine's
+    beer_lambert_td_rgb forward over the paper's plate codes (subprocess —
+    both codebases own the `core` package name) and require the app's
+    predictions to match per cell within 0.5."""
+    import subprocess
+    colors = Colors.from_configs(get_preset(preset))
+    materials = {
+        lab: {"td": colors[lab].td, "hex": colors[lab].hex, "td_rgb": list(colors[lab].td_rgb)}
+        for lab in colors.get_labels()
+    }
+    proc = subprocess.run(
+        [sys.executable, "-c", _ENGINE_PREDICT_SCRIPT,
+         str(RESEARCH), plate_dir, stem, str(layer_height), "255,255,255",
+         json.dumps(materials)],
+        capture_output=True, text=True, timeout=300,
+    )
+    assert proc.returncode == 0, proc.stderr[-800:]
+    engine = json.loads(proc.stdout)
+    codes = _read_clear_plate(RESEARCH / plate_dir, stem)
+    assert len(engine) == len(codes) == 256
+    got = _predict(colors, codes, layer_height)
+    worst = 0.0
+    for code, e3 in zip(codes, engine):
+        g = got[code]
+        worst = max(worst, max(abs(a - b) for a, b in zip(g, e3)))
+    assert worst <= 0.5, f"{preset}: worst |dRGB| {worst:.4f} vs research engine over {len(codes)} cells"
 
 
 @requires_research

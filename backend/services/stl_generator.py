@@ -286,6 +286,7 @@ def map_color_blocks_to_blend_results(
         input_colors,
         ref_code_matrix,
         ref_rgb_matrix,
+        white_labels=colors.white_labels(),
     )
     # Translucent sets match against composition representatives; recover the
     # best ordering across the top compositions (no-op for opaque sets).

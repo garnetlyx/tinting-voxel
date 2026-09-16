@@ -443,3 +443,28 @@ describe('useImageProcessor', () => {
     );
   });
 });
+
+describe('useImageProcessor scalar-form compensation validation', () => {
+  const base = [
+    { name: 'Cyan', hex: '#00FFFF', transmission_distance: 4 },
+    { name: 'Magenta', hex: '#FF00FF', transmission_distance: 5 },
+    { name: 'Yellow', hex: '#FFFF00', transmission_distance: 8 },
+    { name: 'White', hex: '#FFFFFF', transmission_distance: 12 },
+  ];
+
+  it('accepts finite positive compensation values and rejects out-of-bounds ones', () => {
+    const { result } = renderHook(() => useImageProcessor());
+    act(() => { result.current.updateFilamentColor(0, { ...base[0], alpha_s: 2.2292, td_scale: 2.02, td_gamma: 0.03 }); });
+    act(() => { result.current.updateFilamentColor(1, { ...base[1] }); });
+    act(() => { result.current.updateFilamentColor(2, { ...base[2] }); });
+    act(() => { result.current.updateFilamentColor(3, { ...base[3] }); });
+    expect(result.current.isFilamentConfigValid).toBe(true);
+
+    act(() => { result.current.updateFilamentColor(0, { ...base[0], alpha_s: 0 }); });
+    expect(result.current.isFilamentConfigValid).toBe(false);
+    act(() => { result.current.updateFilamentColor(0, { ...base[0], alpha_s: 2.3, td_scale: Number.NaN }); });
+    expect(result.current.isFilamentConfigValid).toBe(false);
+    act(() => { result.current.updateFilamentColor(0, { ...base[0], alpha_s: 2.3, td_gamma: 1001 }); });
+    expect(result.current.isFilamentConfigValid).toBe(false);
+  });
+});

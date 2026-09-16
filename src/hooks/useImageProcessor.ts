@@ -249,6 +249,15 @@ export const useImageProcessor = () => {
     // Optional pigment absorption gain must be within the backend bounds
     if (filamentColors.some(c => c.k !== undefined && (c.k < 0 || c.k > 1000))) return false;
 
+    // Optional scalar-form compensation (paper Eqs. (1)-(2)) must be
+    // positive and finite within the backend bounds
+    for (const field of ['alpha_s', 'td_scale', 'td_gamma'] as const) {
+      if (filamentColors.some(c => c[field] !== undefined
+        && (!Number.isFinite(c[field]) || c[field] <= 0 || c[field] > 1000))) {
+        return false;
+      }
+    }
+
     return true;
   }, [filamentColors]);
 

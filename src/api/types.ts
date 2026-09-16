@@ -317,9 +317,11 @@ export interface PaletteLibraryResponse {
 }
 
 // Default presets for frontend initialization. Mirrors the backend's
-// core/color_config.py — bambu tds are the exact fold of the paper's
-// PLATE-06-H2C-A standard fit; clear presets carry the staircase-measured
-// per-channel td_rgb (paper transparent track).
+// core/color_config.py — bambu colors carry the raw scalar TDs of the
+// paper's PLATE-06-H2C-A standard fit plus the composed capture
+// compensation (paper Eqs. (1)-(2), see backend provenance comment);
+// clear presets carry the staircase-measured per-channel td_rgb (paper
+// form (i)).
 // Bambu A-standard paper fit (PLATE-06-H2C-A): raw scalar TDs + composed
 // capture compensation (alpha_s / td_scale / td_gamma, see backend
 // core/color_config.py provenance comment). Calibrated at lh 0.32 mm.

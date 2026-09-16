@@ -98,14 +98,22 @@ class ColorConfig:
 # Bambu CMYWK / CMYW presets: paper PLATE-06-H2C-A standard fit
 # (data/results/PLATE-06-H2C-paper-matrix/runs/A-standard/fitted_params.json,
 # IJAMT Table 3 row "PLATE-06-H2C-A"). td = raw scalar TD readings
-# (td_reference); k = fitted per-color capture-compensation k_c. The
-# remap triple is the exact algebraic composition of the fitted remap
-# (s_td = 4.7782, gamma_td = 0.1636) with the preset remap the engine run
-# applied on top of it (1.48 * x^0.20), collapsed into one power law
-# (paper Eq. (2) form): td_scale = 1.48 * 4.7782**0.20,
-# td_gamma = 0.1636 * 0.20. Forward: mu_ch = alpha_s/(s*td^g) + k_c*A_ch
-# reproduces the research engine's PLATE-06-H2C-A predictions exactly
-# (780/780 cells within CSV rounding). Calibrated at layer height 0.32 mm.
+# (td_reference); k = fitted per-color capture-compensation k_c.
+#
+# Compensation provenance: the research engine evaluated this fit's
+# predictions with a DOUBLE remap — the fitted remap
+# (td_eff = 4.7782 * TD**0.1636, scatter_alpha 2.2292) composed with the
+# legacy preset remap (1.48 * x**0.20) that the paper-matrix run carried in
+# its color definitions. The raw fitted triple alone does NOT reproduce the
+# paper artifacts (e.g. CCCC would evaluate to (160.54, 205.68, 243.54)
+# instead of the paper's (64.22, 127.34, 208.07)). The preset therefore
+# carries the exact algebraic composition of both remaps, collapsed into
+# ONE power law in the paper's Eq. (2) form:
+#   td_scale = 1.48 * 4.7782**0.20,  td_gamma = 0.1636 * 0.20
+# Forward: mu_ch = alpha_s/(s*td**g) + k_c*A_ch reproduces the research
+# engine's PLATE-06-H2C-A predictions exactly (780/780 cells within CSV
+# rounding — see tests/unit/test_paper_alignment.py). Calibrated at layer
+# height 0.32 mm.
 _ALPHA_S_A = 2.2292
 _TD_SCALE_A = 2.023552983514602
 _TD_GAMMA_A = 0.03272

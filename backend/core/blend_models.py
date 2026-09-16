@@ -1,29 +1,25 @@
 """
-The unified blend model for stacked translucent filaments.
+The paper's forward model for stacked translucent filaments.
 
-ONE formula, zero mode dispatch:
+Two td characterizations select the per-layer extinction — no material
+type flags, no mode dispatch:
 
-    mu_ch(color) = ln(10) / td + k * A_ch(color)
-    t_ch         = exp(-mu_ch * layer_height)
-    stack color  = light-loss allocation (paper Eqs. 4--8)
+- staircase (td_rgb present, paper form (i)):
+      mu_ch = ln(10)/td_rgb[ch] + k * A_ch
+- scalar td (paper Eqs. (1)-(2)):
+      td_eff = td_scale * td**td_gamma
+      mu_ch  = alpha_s/td_eff + k * A_ch
+  Neutral defaults (alpha_s = ln 10, td_scale = td_gamma = 1) degrade
+  the scalar form to plain ln(10)/td + k * A_ch.
 
-Every filament — calibrated preset or user-entered custom — is described by
-exactly three values: hex, td (one transmission distance in mm, broadcast to
-all channels), and an optional pigment absorption gain k (default 0).
-Channel selectivity comes solely from the k * A_ch term (A_ch is the
-per-channel darkness derived from hex); td itself is channel-neutral.
+t_ch = exp(-mu_ch * layer_height); stack color via light-loss allocation
+(paper Eqs. 4-8). Every filament is hex + td data (+ optional k and
+scalar-form compensation). Channel selectivity comes from k * A_ch with
+A_ch the per-channel darkness derived from hex; scalar td is
+channel-neutral, td_rgb carries measured per-channel structure.
 
-Provenance of preset values (see the research repo):
-- bambu presets: td = ln10 * td_scale * td_td1s**td_gamma / alpha_s, the exact
-  algebraic fold of the Phase-6 fitted scatter term, plus the fitted k —
-  predictions are bit-identical to the fitted hybrid model.
-- clear preset: td = arithmetic mean of the staircase-measured per-channel
-  TDs, k = 0.
-
-Historical blend modes (original / kromacut / per_channel / hybrid family /
-beer_lambert_td_rgb) were stages of the calibration research; the paper's
-final model is the single formula above. Deleted — git history for
-archaeology, research repo engine pin for reproduction.
+Preset provenance: see core/color_config.py (bambu A-standard composed
+remap, clear staircase td_rgb).
 """
 import functools
 import logging
@@ -91,7 +87,7 @@ def _normalize_background_rgb(background_rgb: Optional[tuple]) -> np.ndarray:
     return np.clip(bg, 0.0, 255.0) / 255.0
 
 
-def _resolve_extinction(color) -> np.ndarray:
+def _resolve_extinction(color: Color) -> np.ndarray:
     """Per-channel extinction coefficient (1/mm), paper forward model.
 
     Staircase characterization (td_rgb present, paper form (i)):

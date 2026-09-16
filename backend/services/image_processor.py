@@ -67,6 +67,7 @@ def _map_and_refine(
 
     result_codes, result_rgbs = Color.map_to_nearest_color(
         source_colors, ref_code_matrix, ref_rgb_matrix,
+        white_labels=colors.white_labels(),
     )
     result_codes, result_rgbs = refine_matches(
         source_colors,
@@ -627,9 +628,44 @@ def process_image(
     # Step 2: Sort by frequency
     color_blocks.sort(key=lambda c: c['count'], reverse=True)
 
-    # Step 3: Limit to max colors
+    # Step 3: Limit to max colors, keeping a near-white representative.
+    # Without this, low-frequency white areas (small highlights on an
+    # otherwise dark image) are cut by the frequency truncation and their
+    # pixels get absorbed into the nearest chromatic cluster — the printed
+    # region then deviates badly from the source (no real white stack). If
+    # a near-white block (Lab L >= 85, chroma <= 6 — same gate as the
+    # forced-W mapping rule) exists outside the top set, the highest-count
+    # one replaces the lowest-count non-near-white block of the top set.
     main_colors = color_blocks[:max_colors]
     rest_colors = color_blocks[max_colors:]
+
+    if main_colors and rest_colors:
+        from skimage.color import rgb2lab as _rgb2lab
+
+        def _is_near_white(blocks: list[dict]) -> np.ndarray:
+            if not blocks:
+                return np.zeros(0, dtype=bool)
+            labs = _rgb2lab(
+                np.array([[c['r'], c['g'], c['b']] for c in blocks], dtype=np.float64) / 255.0
+            )
+            return (labs[:, 0] >= 85.0) & (np.hypot(labs[:, 1], labs[:, 2]) <= 6.0)
+
+        top_white = _is_near_white(main_colors)
+        if not top_white.any():
+            rest_white = _is_near_white(rest_colors)
+            if rest_white.any():
+                candidate = max(
+                    (c for c, w in zip(rest_colors, rest_white) if w),
+                    key=lambda c: c['count'],
+                )
+                for i in range(len(main_colors) - 1, -1, -1):
+                    if not _is_near_white([main_colors[i]])[0]:
+                        replaced = main_colors.pop(i)
+                        main_colors.append(candidate)
+                        rest_colors.remove(candidate)
+                        rest_colors.append(replaced)
+                        main_colors.sort(key=lambda c: c['count'], reverse=True)
+                        break
 
     # Step 4: Reassign remaining colors to nearest main color (count-only, no pixels yet)
     if rest_colors:
