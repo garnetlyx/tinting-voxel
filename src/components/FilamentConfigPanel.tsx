@@ -86,6 +86,48 @@ export const FilamentConfigPanel: React.FC<FilamentConfigPanelProps> = ({
         className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-800 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
       >
         <Plus className="w-4 h-4" />{t('filaments:addColor')}</button>
+
+      {/* Scalar-form compensation (paper Eqs. 1-2) is a set-level fit:
+          one shared alpha_s/s_td/gamma_td applied to every scalar-TD color.
+          Editing here writes the value to all scalar rows at once. */}
+      {filamentColors.some((c) => !c.td_rgb) && (
+        <div className="pt-1 border-t border-gray-100">
+          <div className="text-xs text-gray-500 font-medium mt-2">{t('filaments:compensationGroup')}</div>
+          <p className="text-xs text-gray-400 mb-1">{t('filaments:compensationAppliesTo')}</p>
+          <div className="flex items-center gap-2">
+            {([
+              ['alpha_s', 'alphaSLabel', 2.302585092994046],
+              ['td_scale', 'tdScaleLabel', 1],
+              ['td_gamma', 'tdGammaLabel', 1],
+            ] as const).map(([field, labelKey, neutral]) => {
+              const scalarRows = filamentColors
+                .map((c, i) => ({ c, i }))
+                .filter(({ c }) => !c.td_rgb);
+              const current = (scalarRows[0]?.c[field] as number | undefined) ?? neutral;
+              return (
+                <input
+                  key={field}
+                  type="number"
+                  aria-label={t(`filaments:${labelKey}`)}
+                  value={current}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (isNaN(val) || val <= 0 || val > 1000) return;
+                    scalarRows.forEach(({ c, i }) =>
+                      onUpdateColor(i, { ...c, [field]: val })
+                    );
+                  }}
+                  min={0.01}
+                  max={1000}
+                  step={0.01}
+                  className="flex-1 px-1 py-1 text-sm border rounded text-right border-gray-300"
+                  title={t(`filaments:${field === 'alpha_s' ? 'alphaSHelp' : field === 'td_scale' ? 'tdScaleHelp' : 'tdGammaHelp'}`)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -48,5 +48,10 @@
   "tdScaleEntry": "Color {{index}} TD remap scale s_td",
   "tdScaleHelp": "Scalar-form TD remap scale s_td (paper Eq. 2): td_eff = s_td * td^gamma_td. Neutral default 1.",
   "tdGammaEntry": "Color {{index}} TD remap exponent gamma_td",
-  "tdGammaHelp": "Scalar-form TD remap exponent gamma_td (paper Eq. 2). Neutral default 1."
+  "tdGammaHelp": "Scalar-form TD remap exponent gamma_td (paper Eq. 2). Neutral default 1.",
+  "compensationGroup": "Scalar TD compensation (paper Eqs. 1-2)",
+  "compensationAppliesTo": "One shared fit applied to every scalar-TD color in this set.",
+  "alphaSLabel": "Scatter coefficient alpha_s",
+  "tdScaleLabel": "TD remap scale s_td",
+  "tdGammaLabel": "TD remap exponent gamma_td"
 }
