@@ -167,8 +167,8 @@ tinting-voxel/
 | **3MFGenerator** | 3MF file generation with named color objects | trimesh, lxml |
 | **MeshOptimizer** | Greedy meshing to reduce box count, face culling | NumPy |
 | **BlendColor (core)** | BlendTestGenerator, colors_key, CIEDE2000 matching | scikit-image, NumPy |
-| **BlendModels** | The unified formula (mu_ch = ln10/td + k*A_ch) and its vectorized batch | NumPy |
-| **ColorConfig** | Filament presets (BAMBU_CMYW_PHASE6_PRESET with per-color k) | dataclasses |
+| **BlendModels** | The paper's forward model (staircase: mu = ln10/td_rgb + k*A; scalar: mu = alpha_s/(s_td*td^gamma_td) + k*A) and its vectorized batch | NumPy |
+| **ColorConfig** | Filament presets (paper fits: raw td + alpha_s/td_scale/td_gamma or staircase td_rgb, per-color k) | dataclasses |
 | **FilamentPreview** | Color matrix preview generation | PIL, NumPy |
 | **BatchProcessor** | Multi-image batch processing | concurrent.futures |
 | **PaletteLibrary** | Curated color palette management | dataclasses |
@@ -425,26 +425,29 @@ The production color mixing model is ONE formula for every filament
 (transparent or opaque, preset or custom):
 
 ```
-mu_ch(color) = ln(10) / td + k × A_ch(color)
-T_ch         = exp(-mu_ch × d)
+staircase (td_rgb):   mu_ch = ln(10)/td_rgb[ch] + k × A_ch
+scalar td:            mu_ch = alpha_s/(s_td × td^gamma_td) + k × A_ch
+T_ch                 = exp(-mu_ch × d)
 ```
 
-- `td` — the filament's single composite transmission distance (mm),
-  broadcast across channels. bambu presets hold the exact fold of the
-  Phase-6 fitted scatter (`ln10 × 1.48 × td_td1s^0.20 / 8.08`); the clear
-  preset holds staircase-measured per-channel means; user-entered values
-  apply literally (base-10: `t = 10^(-d/td)`).
-- `k` — optional pigment absorption gain (default 0 = plain Beer-Lambert).
+- `td` — the filament's transmission-distance data. Present `td_rgb`
+  (staircase measurement, clear presets) selects the per-channel form and
+  `td` holds the channel mean for display. A scalar `td` (bambu presets:
+  the raw readings of the PLATE-06-H2C-A paper fit) selects the
+  compensated form with the preset's `alpha_s`/`td_scale`/`td_gamma`;
+  neutral defaults (alpha_s = ln 10, s_td = gamma_td = 1) degrade to plain
+  `ln(10)/td + k·A_ch`, which is how user-entered scalars apply.
+- `k` — pigment absorption gain (fitted values on presets, 0 = plain
+  Beer-Lambert).
 - `A_ch` — per-channel absorption from the filament hex. `d` — layer height.
 
 Stacked colors compose through the light-loss allocation (paper Eqs. 4-8).
-The Phase-6 fitted k values (K 17.65 > W 12.39 > M 8.42 > C 8.13 > Y 3.73)
-survive verbatim; the retired scatter-alpha/td-remap parameters exist only
-as the folded td numbers above. Historical per-channel-TD and hybrid-mode
-parameters are deleted (git history for archaeology).
+Preset provenance and the composed-remap derivation live in
+`backend/core/color_config.py`.
 
 Transparency classification is one fixed criterion for pruning and the
-layer-height hint: every filament's td ≥ 4.5 mm.
+layer-height hint: every filament's EFFECTIVE td (per-channel, or scalar
+after the remap) ≥ 4.5 mm.
 
 Implementation: `blend_models.py` (unified formula + vectorized batch),
 presets: `core/color_config.py`.

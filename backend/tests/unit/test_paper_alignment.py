@@ -20,12 +20,15 @@ Baselines:
 """
 import csv
 import json
+import re
+import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
+from PIL import Image
+from skimage.color import rgb2lab
 
-import sys
 from core.blend_color import Colors, colors_key
 from core.blend_models import codes_to_rgb_batch
 from core.color_config import get_preset
@@ -254,6 +257,72 @@ out = [list(_blend_by_mode(c, float(layer_height), cmap, blend_mode="beer_lamber
                            background_rgb=tuple(float(x) for x in bg.split(",")))) for c in codes]
 print(json.dumps(out))
 """
+
+
+def _read_clear_measured_grid(image_path: Path, side: int = 16) -> np.ndarray:
+    """Sample the research-frozen MEASURED photo (fair-baselines image,
+    e.g. P07-def-w_corrected.png) into a side x side per-cell mean grid —
+    an oracle fully independent of the app."""
+    img = np.asarray(Image.open(image_path).convert("RGB"), dtype=float)
+    h, w = img.shape[:2]
+    gy, gx = h // side, w // side
+    grid = np.zeros((side, side, 3))
+    for r in range(side):
+        for c in range(side):
+            grid[r, c] = img[r * gy:(r + 1) * gy, c * gx:(c + 1) * gx].reshape(-1, 3).mean(0)
+    return grid
+
+
+def _mean_de00(a: np.ndarray, b: np.ndarray) -> float:
+    from skimage.color import deltaE_ciede2000
+
+    la = rgb2lab(np.clip(np.asarray(a, float), 0, 255).reshape(-1, 1, 3) / 255.0)
+    lb = rgb2lab(np.clip(np.asarray(b, float), 0, 255).reshape(-1, 1, 3) / 255.0)
+    return float(deltaE_ciede2000(la, lb).mean())
+
+
+@pytest.mark.parametrize("preset,plate_dir,stem,published_key", [
+    ("clear_cmyg", "calibration/plates/clear_cmyg/CMYG_208x208x3.36",
+     "CMYG_208x208x3.36", "P07-def-w"),
+    ("clear_cmyw", "calibration/plates/clear_cmyw/CMYW_208x208x3.36",
+     "CMYW_208x208x3.36", "P08-kxa-w"),
+])
+@requires_research
+def test_clear_predictions_hit_published_measured_de(preset, plate_dir, stem, published_key):
+    """Independent full-artifact anchor: the research repo freezes no
+    per-cell ENGINE predictions for the clear plates, but it DOES freeze
+    the measured photos the paper scored against (fair-baselines
+    *_corrected.png images) and the published mean dE00 of the td_rgb
+    model on them (dE_td_rgb). The app's predictions are compared per
+    cell against the measured grid (block-mean sampled) and the mean dE00
+    must reproduce the published value within 0.5 — preset or formula
+    drift shifts the mean away. Orientation: the pairing grid rotation is
+    sampled over the 4 rotations (the documented rot180/rot0 conventions
+    hold after sampling; the minimum-over-rotations form guards against
+    axis-order differences between the code grid and the photo)."""
+    from PIL import Image  # noqa: F401  (used by _read_clear_measured_grid)
+
+    baselines = json.load(
+        open(RESEARCH / "data/results/clear-plate-fair-baselines/summary.json")
+    )
+    row = baselines["rows"][published_key]
+    published = float(row["dE_td_rgb"])
+
+    codes = _read_clear_plate(RESEARCH / plate_dir, stem)
+    side = int(np.sqrt(len(codes)))
+    measured = _read_clear_measured_grid(RESEARCH / row["image"], side)
+
+    colors = Colors.from_configs(get_preset(preset))
+    pred = np.array([
+        codes_to_rgb_batch([c], 0.84, colors_key(colors), background_rgb=(255, 255, 255))[0]
+        for c in codes
+    ]).reshape(side, side, 3)
+
+    best = min(_mean_de00(pred, np.rot90(measured, rot)) for rot in range(4))
+    assert abs(best - published) <= 0.5, (
+        f"{preset}: mean dE00 vs published measurement {best:.2f} vs {published:.2f} "
+        f"(fair-baselines {published_key})"
+    )
 
 
 @pytest.mark.parametrize("preset,plate_dir,stem,layer_height", [
