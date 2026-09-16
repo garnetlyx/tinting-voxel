@@ -226,8 +226,19 @@ def _read_clear_plate(plate_dir: Path, stem: str):
 @requires_research
 def test_clear_plate_codes_load_and_predict(preset, plate_dir, stem, layer_height):
     """Every designed code of the paper's clear plates blends without error
-    under the app preset. (The *_rgb.csv beside them is measured photo
-    pairing data, not model output — no prediction oracle there.)"""
+    under the app preset.
+
+    NOTE on the research repo's *_rgb.csv: it is MEASURED photo pairing
+    data, not model output — the app's predictions sit at mean dE00 ≈ 18.1
+    from it (P07-def-w), squarely inside the paper's published
+    model-vs-photo accuracy (dE_td_rgb 15.9-28.3). A <=0.5 per-cell
+    prediction oracle against measured cells cannot exist even for the
+    paper's own model; the independent prediction-side anchors are the
+    provenance td_rgb equality (test_clear_preset_td_data_matches_research),
+    the research-engine subprocess equivalence
+    (test_clear_plates_match_research_engine), and the published-dE
+    reproduction against the frozen measurement
+    (test_clear_predictions_hit_published_measured_de)."""
     codes = _read_clear_plate(RESEARCH / plate_dir, stem)
     assert len(codes) == 256
     colors = Colors.from_configs(get_preset(preset))
