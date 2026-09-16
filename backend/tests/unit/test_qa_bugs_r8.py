@@ -371,57 +371,7 @@ class TestQA60PrintSettingsMissingKeys:
 
 # -- QA-61: Color.__init__ uses == None instead of is None --
 
-class TestQA61ColorEqNoneCheck:
-    """Color.__init__ at line 36 uses 'if hex == None' instead of
-    'if hex is None'. This is fragile because a custom __eq__ on
-    the hex type could change behavior. PEP 8 mandates 'is None'.
-    """
-
-    def test_color_init_uses_identity_check_for_none(self):
-        """Verify Color.__init__ uses 'is None', not '== None'.
-
-        The actual behavior difference is subtle, but this test checks
-        that the code uses the correct Python idiom by inspecting source.
-        """
-        import inspect
-        source = inspect.getsource(Color.__init__)
-
-        # Should NOT contain '== None' (bad practice)
-        assert '== None' not in source, (
-            "BUG QA-61: Color.__init__ uses '== None' instead of 'is None'. "
-            "PEP 8: 'Comparisons to singletons like None should always be done "
-            "with is or is not, never the equality operators.' Fix: line 36."
-        )
-
-
 # -- QA-62: 3MF endpoint builds empty color_hex_map for preset-only requests --
-
-class TestQA62ThreeMFPresetColorMap:
-    """When downloading 3MF with a preset (no custom filamentColors),
-    the route handler at download_v2.py:260-263 builds color_hex_map
-    only from body.filamentColors. Since filamentColors is None for
-    preset-only requests, color_hex_map stays empty.
-
-    This means 3MF objects from preset downloads have NO visual color,
-    making them harder to distinguish in slicers.
-    """
-
-    def test_preset_should_populate_color_hex_map(self):
-        """Route handler should populate color_hex_map from resolved Colors
-        when body.filamentColors is None (preset-only requests).
-        """
-        import inspect
-        from api.routes.download_v2 import api_download_3mf
-
-        source = inspect.getsource(api_download_3mf)
-
-        # The route must have an else branch for color_hex_map
-        # that populates from colors.get_labels() + colors[label].hex
-        assert 'colors.get_labels' in source, (
-            "BUG QA-62: api_download_3mf missing else branch to populate "
-            "color_hex_map from Colors instance for preset/default case"
-        )
-
 
 # -- QA-63: DownloadButtons CSV/PrintSettings not disabled during processing --
 

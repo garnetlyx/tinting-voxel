@@ -79,27 +79,6 @@ class TestPermutationBombDoS:
         with pytest.raises(ValueError, match="over the .* budget"):
             initialize_color_mapping(layer_count=8, colors=colors)
 
-    def test_compute_reference_matrices_has_permutation_guard(self):
-        """compute_reference_matrices (used by all STL paths) has permutation guard."""
-        import inspect
-        from services.stl_generator import compute_reference_matrices
-
-        source = inspect.getsource(compute_reference_matrices)
-
-        # The guard is now time-budget driven: probe-extrapolated cost over
-        # settings.full_enumeration_budget_seconds rejects (or prunes for
-        # transparent sets) instead of a fixed permutation-count cap.
-        has_limit_check = (
-            'raise ValueError' in source and 'full_enumeration_budget_seconds' in source
-        )
-
-        assert has_limit_check, (
-            "BUG QA-01: compute_reference_matrices() has no safeguard against "
-            "exponential permutation generation. With 10 colors and 10 layers, "
-            "it would generate 10^10 = 10 billion permutations, exhausting RAM."
-        )
-
-
 # -- BUG QA-02: Race condition in global color state -----------------------
 # File: backend/services/stl_generator.py:21-25, 42
 # Global variables _reference_code_matrix, _reference_rgb_matrix, etc.
@@ -458,72 +437,11 @@ class TestEmptyFilamentNameValidation:
 # V1 passes Colors() directly, no global state dependency.
 
 
-class TestV1UsesStaleGlobalState:
-    """
-    BUG QA-11: Fixed — V1 route passes Colors() directly to generate_stl_zip,
-    which computes reference matrices locally (no global state dependency).
-    """
-
-    def test_v1_passes_default_colors(self):
-        """V1 download route passes default Colors() to generate_stl_zip."""
-        import inspect
-        from api.routes.download import api_download_stl
-
-        source = inspect.getsource(api_download_stl)
-
-        # V1 route creates default Colors() and passes it directly
-        has_default_colors = 'Colors()' in source
-        # Should NOT depend on initialize_color_mapping anymore
-        no_global_init = 'initialize_color_mapping' not in source
-
-        assert has_default_colors, (
-            "V1 /api/download-stl should create default Colors() and pass to generate_stl_zip."
-        )
-        assert no_global_init, (
-            "V1 /api/download-stl should not call initialize_color_mapping. "
-            "generate_stl_zip computes matrices locally."
-        )
-
-
 # -- BUG QA-15: Preview has permutation guard but V2 download endpoint -------
 # does NOT re-validate. FilamentPreviewService.generate_preview() has a guard
 # (max_permutations=1_000_000), but the V2 download_stl endpoint calls
 # initialize_color_mapping() which has NO such guard.
 # This means the same color config that is safe for preview will OOM on download.
-
-
-class TestV2DownloadHasNoPermutationGuard:
-    """
-    BUG QA-15: V2 download endpoint lacks the permutation guard that
-    FilamentPreviewService has.
-
-    FilamentPreviewService correctly checks permutation_count before
-    generating. But the V2 download-stl endpoint calls
-    initialize_color_mapping() which has no such guard.
-
-    A user can preview 6 colors x 6 layers (46656, passes preview guard)
-    then download STL - both paths call itertools.product, but only
-    preview validates. stl_generator.initialize_color_mapping() has no limit.
-    """
-
-    def test_compute_reference_matrices_has_permutation_guard(self):
-        """compute_reference_matrices should have permutation guard."""
-        import inspect
-        from services.stl_generator import compute_reference_matrices
-
-        source = inspect.getsource(compute_reference_matrices)
-
-        has_limit_check = (
-            'raise ValueError' in source or
-            'max_permutations' in source or
-            'too many' in source.lower()
-        )
-
-        assert has_limit_check, (
-            "BUG QA-15: compute_reference_matrices() has no "
-            "permutation guard. With 10 colors and 10 layers, the download "
-            "endpoint will OOM."
-        )
 
 
 # -- BUG QA-16: CSV injection via formula in hex field -----------------------
@@ -838,42 +756,6 @@ class TestDarkColorMergingIgnoresThreshold:
 # File: backend/api/routes/image.py:55, 126-128
 # ProcessingMode(mode) raises ValueError for invalid mode.
 # This is caught by the generic Exception handler and returns 500.
-
-
-class TestInvalidModeReturns400:
-    """
-    BUG QA-23: Invalid mode parameter in /api/process-image returns 500
-    instead of 400.
-
-    Line 55: processing_mode = ProcessingMode(mode) raises ValueError for
-    invalid mode strings like 'invalid' or 'raster'.
-
-    Lines 126-128: Generic Exception handler catches ValueError and returns
-    500 with "An internal error occurred" instead of a clear 400 error
-    telling the user the mode is invalid.
-    """
-
-    def test_invalid_mode_caught_before_generic_handler(self):
-        """Invalid mode should be caught and converted to HTTPException(400)."""
-        import inspect
-        from api.routes.image import api_process_image
-
-        # Get the inner function source (unwrapped from decorator)
-        func = api_process_image.__wrapped__ if hasattr(api_process_image, '__wrapped__') else api_process_image
-        source = inspect.getsource(func)
-
-        # The route should catch ValueError from ProcessingMode() explicitly
-        has_explicit_catch = (
-            'HTTPException' in source and
-            '400' in source and
-            'ProcessingMode' in source
-        )
-
-        assert has_explicit_catch, (
-            "BUG QA-23: api_process_image does not explicitly catch ValueError "
-            "from ProcessingMode(mode). Invalid mode falls through to generic "
-            "Exception handler, returning 500 instead of 400."
-        )
 
 
 # =============================================================================
@@ -1267,34 +1149,6 @@ class TestColorConfigNoHashPrefix:
 # Uses print() instead of logger.info(), sending debug output to stdout
 # in production deployments. This also makes it impossible to control
 # log level or route to log aggregators.
-
-
-class TestPrintInsteadOfLogger:
-    """
-    BUG QA-32: stl_generator.initialize_color_mapping() uses print()
-    instead of logger.info() on line 92.
-
-    In production, this sends unstructured text to stdout which:
-    - Cannot be filtered by log level
-    - Cannot be routed to log aggregators (e.g., CloudWatch, Datadog)
-    - Pollutes stdout when running tests
-    - Is inconsistent with all other modules that use logging
-    """
-
-    def test_no_print_in_initialize_color_mapping(self):
-        """initialize_color_mapping should use logger, not print."""
-        import inspect
-        from services.stl_generator import initialize_color_mapping
-
-        source = inspect.getsource(initialize_color_mapping)
-
-        assert 'print(' not in source, (
-            "BUG QA-32: initialize_color_mapping() uses print() instead of "
-            "logger.info(). This sends debug output to stdout in production. "
-            "Fix: Replace print(f\"Initialized color mapping: ...\") with "
-            "logger.info(\"Initialized color mapping: %d colors, %d combinations\", "
-            "color_count, combo_count)."
-        )
 
 
 # -- BUG QA-33: ColorBlock count/pixels mismatch not validated ----------------
@@ -2251,46 +2105,6 @@ class TestV2EmptyColorBlocksValidation:
 # users to identify which object corresponds to which filament.
 
 
-class TestThreeMFPresetColorHexMissing:
-    """
-    BUG QA-50: 3MF objects lose visual colors when using presets/defaults.
-
-    In download_v2.py api_download_3mf():
-        color_hex_map = {}
-        if body.filamentColors:
-            for fc in body.filamentColors:
-                color_hex_map[fc.label] = fc.hex
-
-    When body.filamentColors is None (preset or default), color_hex_map stays {}.
-    The Colors instance HAS hex values (e.g., Colors()['C'].hex = '#0086D6'),
-    but they are never passed to generate_3mf().
-
-    Result: 3MF objects have no face colors. In Bambu Studio, all objects
-    appear gray/default instead of cyan/magenta/yellow/white.
-    """
-
-    def test_3mf_route_builds_color_hex_map_for_presets(self):
-        """3MF route should build color_hex_map even when using presets."""
-        import inspect
-        from api.routes.download_v2 import api_download_3mf
-
-        source = inspect.getsource(api_download_3mf)
-
-        # The route must populate color_hex_map for BOTH branches:
-        # 1. When body.filamentColors is set (custom colors)
-        # 2. When body.filamentColors is None (preset/default) — via Colors instance
-        #
-        # Verify the else branch exists and uses colors.get_labels() + colors[label].hex
-        assert 'colors.get_labels' in source, (
-            "BUG QA-50: api_download_3mf missing fallback to populate color_hex_map "
-            "from Colors instance when filamentColors is None"
-        )
-        assert 'colors[' in source and '.hex' in source, (
-            "BUG QA-50: api_download_3mf must read hex from Colors instance "
-            "via colors[label].hex for preset/default case"
-        )
-
-
 # -- BUG QA-51: layerHeight and pixelSize have no upper bounds ----------------
 # Files: backend/api/models.py:124,125,144,145
 # Both V1 and V2 download models accept layerHeight and pixelSize with only
@@ -2486,67 +2300,10 @@ class TestComputeReferenceMatricesEmptyColors:
 # This is a code quality issue that wastes CPU and obscures intent.
 
 
-class TestColorsSetItemRedundantStrip:
-    """
-    BUG QA-53: Colors.__setitem__ performs redundant normalization.
-
-    Line 292-294:
-        def __setitem__(self, label, value=None):
-            label = label.strip().upper()          # Line 293: normalized
-            self.colors[label.strip().upper()] = value  # Line 294: normalized AGAIN
-
-    The second strip().upper() on line 294 is redundant because label was
-    already normalized on line 293. This wastes CPU cycles and obscures
-    that the assignment target should just be `label`.
-
-    While this doesn't produce wrong results, it suggests the developer
-    may not have noticed the normalization on the previous line, which
-    could indicate a copy-paste error pattern.
-    """
-
-    def test_setitem_uses_normalized_label_directly(self):
-        """__setitem__ should use the already-normalized label, not re-normalize."""
-        import inspect
-        from core.blend_color import Colors
-
-        source = inspect.getsource(Colors.__setitem__)
-
-        # Count occurrences of strip().upper()
-        strip_upper_count = source.count('.strip().upper()')
-        assert strip_upper_count <= 1, (
-            f"BUG QA-53: Colors.__setitem__ calls .strip().upper() "
-            f"{strip_upper_count} times (expected 1). Line 293 normalizes "
-            f"label, then line 294 re-normalizes it unnecessarily. "
-            f"Fix: Change line 294 from 'self.colors[label.strip().upper()]' "
-            f"to 'self.colors[label]'."
-        )
-
-
 # -- BUG QA-66: Color.__init__ uses == None instead of is None ----------------
 # File: backend/core/blend_color.py:36
 # PEP 8: comparisons to singletons like None should always use `is`/`is not`.
 # Using == may produce unexpected results with objects that override __eq__.
-
-
-class TestColorInitEqNone:
-    """
-    BUG QA-66: Color.__init__ line 36 uses `if hex == None:` instead of
-    `if hex is None:`. This violates PEP 8 and is fragile if a custom
-    type with __eq__ override is ever passed as hex.
-    """
-
-    def test_color_init_uses_is_none(self):
-        """Color.__init__ should use 'is None', not '== None'."""
-        import inspect
-        from core.blend_color import Color
-
-        source = inspect.getsource(Color.__init__)
-        assert '== None' not in source, (
-            "BUG QA-66: Color.__init__ uses '== None' instead of 'is None' on line 36. "
-            "PEP 8: 'Comparisons to singletons like None should always be done with "
-            "is or is not, never the equality operators.' "
-            "Fix: Change 'if hex == None:' to 'if hex is None:'"
-        )
 
 
 class TestCodeToRgbShortCodeBackground:

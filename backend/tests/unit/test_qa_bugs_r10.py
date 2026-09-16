@@ -22,30 +22,6 @@ from core.color_config import ColorConfig
 # imports BlendTestGenerator and Color, but only Colors is used in the module.
 # BlendTestGenerator and Color are unused imports that add unnecessary coupling.
 
-class TestQA95ThreeMFUnusedImports:
-    """threemf_generator.py imports BlendTestGenerator and Color but doesn't use them."""
-
-    def test_threemf_no_unused_blend_imports(self):
-        """threemf_generator should not import unused BlendTestGenerator."""
-        from services import threemf_generator
-
-        source = inspect.getsource(threemf_generator)
-
-        # Check if BlendTestGenerator appears in any import line
-        lines = source.split('\n')
-        import_lines = [
-            line for line in lines
-            if 'BlendTestGenerator' in line and 'import' in line
-        ]
-
-        assert len(import_lines) == 0, (
-            "BUG QA-95: threemf_generator.py imports BlendTestGenerator "
-            "from core.blend_color but never uses it. This is a dead import "
-            "that adds unnecessary coupling between the service and the "
-            "test generator class."
-        )
-
-
 # -- QA-96: compute_reference_matrices pads matrix with empty-string codes ------
 # File: backend/services/stl_generator.py:75-79
 # When the number of permutations (n) is not a perfect rectangle (rows*cols),

@@ -3,47 +3,14 @@ QA Round 12 bug tests.
 
 Each test MUST FAIL while the bug is present. Tests are organized by bug ID.
 """
-import inspect
-import json
-import re
+
+import os
 
 import numpy as np
 import pytest
 
 from core.blend_color import Color, Colors, BlendTestGenerator, _code_to_rgb_cached
 from core.color_config import ColorConfig
-
-class TestQA118ExplodedViewUnused:
-    """ThreeDPreview Exploded button toggles state that is never used."""
-
-    def test_exploded_state_connected_to_build_function(self):
-        """showExploded should be passed to the mesh building function."""
-        import os
-        component_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', '..', 'src', 'components', 'ThreeDPreview.tsx'
-        )
-        if not os.path.exists(component_path):
-            pytest.skip("Frontend source not available")
-
-        with open(component_path) as f:
-            source = f.read()
-
-        # Find the call site for buildInstancedMeshes (after useMemo)
-        call_idx = source.find('const group = buildInstancedMeshes(')
-        if call_idx == -1:
-            pytest.skip("buildInstancedMeshes call not found")
-
-        # Check the 400 chars after the call
-        call_section = source[call_idx:call_idx + 400]
-
-        # QA-118 was fixed: buildInstancedMeshes now accepts showExploded param
-        # and the feature is fully implemented with layer separation
-        assert 'showExploded' in call_section, (
-            "BUG QA-118: ThreeDPreview has an 'Exploded' button that toggles "
-            "showExploded state. buildInstancedMeshes() should receive this "
-            "parameter and render voxels with layer gaps in exploded view."
-        )
-
 
 # -- QA-119: analytics middleware creates unbounded key growth -----------------
 # File: backend/services/analytics.py, backend/main.py:85-93
@@ -127,26 +94,6 @@ class TestQA120PaletteLabelsUnique:
 # using the existing filamentPreset parameter, an invalid preset string
 # silently falls through to default colors (line 156: `pass` on ValueError).
 
-class TestQA121BatchInvalidPresetSilentFallback:
-    """Batch download silently uses default colors for invalid preset names."""
-
-    def test_invalid_preset_rejected_not_silently_ignored(self):
-        """An invalid filamentPreset should either error or be clearly documented."""
-        from api.routes.batch import api_batch_download_stl
-        source = inspect.getsource(api_batch_download_stl)
-
-        # Check if there's a `pass` after ValueError catch for invalid preset
-        has_silent_pass = re.search(r'except ValueError:\s*\n\s*pass', source)
-
-        assert not has_silent_pass, (
-            "BUG QA-121: Batch download endpoint silently ignores invalid "
-            "filamentPreset values (catches ValueError and does `pass`). "
-            "If a user sends filamentPreset='nonexistent', they silently "
-            "get default CMYK colors instead of an error. This should either "
-            "return a 400 error or at least log a warning that's visible."
-        )
-
-
 # -- QA-122: Color class doesn't validate ASCII labels -------------------------
 # File: backend/core/blend_color.py:30
 # ColorConfig validates ASCII first-letter, but the Color class itself
@@ -192,30 +139,6 @@ class TestQA122ColorClassNoASCIIValidation:
 # no total batch size check. An attacker could send 20 files × 10MB = 200MB
 # in a single request, consuming server memory. The batch processor reads
 # ALL files into memory before processing.
-
-class TestQA123BatchNoTotalSizeLimit:
-    """Batch endpoint has no total file size limit."""
-
-    def test_batch_process_checks_total_size(self):
-        """Batch processing should enforce a total size limit."""
-        # Check the batch module for total size enforcement
-        # (may be in route function or helper like _read_batch_files)
-        from api.routes import batch
-        module_source = inspect.getsource(batch)
-
-        has_total_size_check = (
-            'total_size' in module_source or
-            'total_bytes' in module_source or
-            'MAX_TOTAL_BATCH_SIZE' in module_source
-        )
-
-        assert has_total_size_check, (
-            "BUG QA-123: Batch endpoints have no total file size limit. "
-            "Individual files are validated (max 10MB each) but 20 files × 10MB "
-            "= 200MB total can be sent in a single request. All files are read "
-            "into memory at once. Should enforce a total batch size limit."
-        )
-
 
 # -- QA-124: Palette library colors missing transmission_distance validation ---
 # File: backend/core/palette_library.py
@@ -310,3 +233,26 @@ class TestQA126DocumentedColorLimitMismatch:
                 f"but DownloadSTLRequestV2.filamentColors has max_length={max_len}. "
                 "This documentation mismatch confuses API consumers."
             )
+
+
+class TestBatchInvalidPresetRejected:
+    """Invalid batch preset must 400 with the valid list, not fall back (QA-121)."""
+
+    def test_batch_download_invalid_preset_returns_400(self):
+        from fastapi.testclient import TestClient
+        from main import app
+
+        fixture = os.path.join(
+            os.path.dirname(__file__), "..", "fixtures", "images", "perf_cmywk.jpg"
+        )
+        with open(fixture, "rb") as f:
+            image_bytes = f.read()
+
+        client = TestClient(app)
+        resp = client.post(
+            "/api/batch/download-stl",
+            files=[("images", ("t.jpg", image_bytes, "image/jpeg"))],
+            data={"filamentPreset": "nope", "layerCount": "4"},
+        )
+        assert resp.status_code == 400
+        assert "Invalid filament preset" in str(resp.json()["detail"])

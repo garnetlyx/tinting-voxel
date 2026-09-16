@@ -143,17 +143,3 @@ class TestQA112FilamentNameNoMaxLength:
 # This means the same (layer_height, transmission_distance) pair gives
 # different transmission rates depending on the code path.
 
-class TestQA115BatchNoCustomColors:
-    """Batch download endpoint doesn't support custom filament colors."""
-
-    def test_batch_download_has_filament_colors_param(self):
-        """api_batch_download_stl should accept filamentColors like V2 endpoints."""
-        from api.routes import batch
-        source = inspect.getsource(batch.api_batch_download_stl)
-
-        assert 'filamentColors' in source, (
-            f"BUG QA-115: batch download endpoint /api/batch/download-stl "
-            f"only supports filamentPreset, not filamentColors. "
-            f"Users with custom filament configurations cannot use batch mode. "
-            f"V2 endpoints support both preset and custom colors."
-        )

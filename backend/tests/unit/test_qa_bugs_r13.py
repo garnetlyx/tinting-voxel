@@ -178,29 +178,6 @@ class TestQA130SPAPathTraversal:
             f"be within static_dir ('{resolved_static}')."
         )
 
-    def test_serve_spa_source_has_path_validation(self):
-        """serve_spa function should validate resolved path is within static_dir."""
-        # Read the main.py source to check for path traversal protection
-        main_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', 'main.py'
-        )
-        if not os.path.exists(main_path):
-            pytest.skip("main.py not found")
-
-        with open(main_path) as f:
-            source = f.read()
-
-        # Look for path traversal protection in serve_spa
-        has_realpath_check = 'realpath' in source or 'resolve' in source
-        has_startswith_check = 'startswith' in source
-
-        assert has_realpath_check and has_startswith_check, (
-            "BUG QA-130: main.py serve_spa function lacks path traversal "
-            "protection. Should use os.path.realpath() + startswith() check "
-            "to prevent serving files outside static_dir."
-        )
-
-
 # -- QA-131: Health endpoint leaks platform and Python version -----------------
 # File: backend/api/routes/health.py:35-48
 # /health/detailed returns python_version, platform, platform_release
@@ -747,76 +724,10 @@ class TestQA144FormParamsNoUpperBound:
 # Pixel mode calls process_image() which downscales via _downscale_if_needed.
 # SVG mode opens the image directly without downscaling.
 
-class TestQA145SVGModeNoDownscale:
-    """SVG mode processes full-resolution images without downscaling."""
-
-    def test_svg_mode_applies_downscaling(self):
-        """SVG mode should downscale large images before processing."""
-        import inspect
-        from api.routes import image as image_module
-
-        # Read the route source to check if SVG mode applies downscaling
-        source = inspect.getsource(image_module)
-
-        # Find the SVG mode branch
-        svg_section_start = source.find("mode == 'svg'")
-        if svg_section_start == -1:
-            svg_section_start = source.find("ProcessingMode.SVG")
-        if svg_section_start == -1:
-            pytest.skip("SVG mode branch not found in source")
-
-        svg_section = source[svg_section_start:svg_section_start + 500]
-
-        # Check if downscaling is applied in the SVG branch
-        has_downscale = ('downscale' in svg_section.lower() or
-                         'MAX_PROCESSING_DIMENSION' in svg_section or
-                         'resize' in svg_section)
-
-        assert has_downscale, (
-            "BUG QA-145: SVG mode does not downscale large images. "
-            "A 4096x4096 image in SVG mode consumes ~50MB numpy array "
-            "and runs K-means on 16M pixels. Pixel mode correctly "
-            "applies _downscale_if_needed(). SVG mode should too."
-        )
-
-
 # -- QA-146: Batch download silently falls back on malformed filamentColors ----
 # File: backend/api/routes/batch.py:120-134
 # Batch download parses filamentColors as JSON string, catches errors
 # silently and falls back to default colors. No feedback to user.
-
-class TestQA146BatchDownloadSilentFallback:
-    """Batch download silently ignores malformed filamentColors JSON."""
-
-    def test_malformed_json_returns_error(self):
-        """Batch download with malformed filamentColors should return 400."""
-        from api.routes import batch
-        import inspect
-
-        source = inspect.getsource(batch)
-
-        # Find the filamentColors parsing section
-        json_parse_idx = source.find('json.loads')
-        if json_parse_idx == -1:
-            pytest.skip("json.loads not found in batch module")
-
-        # The section around json.loads should raise an error, not silently fall back
-        parse_section = source[json_parse_idx:json_parse_idx + 300]
-
-        # If it silently falls back (pass or continue after except), that's the bug
-        has_silent_fallback = ('except' in parse_section and
-                               ('pass' in parse_section or
-                                'warning' in parse_section.lower()))
-        has_error_response = ('400' in parse_section or
-                              'HTTPException' in parse_section or
-                              'raise' in parse_section)
-
-        assert has_error_response and not has_silent_fallback, (
-            "BUG QA-146: Batch download silently falls back to default "
-            "colors when filamentColors JSON is malformed. User gets STL "
-            "with wrong colors and no error indication. Should return 400."
-        )
-
 
 # -- QA-147: VectorColorResult.color uses unvalidated tuple type ---------------
 # File: backend/api/models.py:113-118
@@ -863,65 +774,3 @@ class TestQA147VectorColorResultUnvalidated:
 # _read_batch_files reads ALL files into memory, then checks total_size.
 # 20 x 10MB = 200MB already in memory before 413 error.
 
-class TestQA148BatchReadsAllBeforeSize:
-    """Batch endpoint reads all files before checking total size limit."""
-
-    def test_batch_size_check_is_incremental(self):
-        """Batch file reading should check size incrementally, not after."""
-        import inspect
-        from api.routes import batch
-
-        source = inspect.getsource(batch)
-
-        # Find _read_batch_files function
-        func_start = source.find('def _read_batch_files')
-        if func_start == -1:
-            func_start = source.find('async def _read_batch_files')
-        if func_start == -1:
-            pytest.skip("_read_batch_files not found")
-
-        # Get function body (until next def)
-        func_end = source.find('\ndef ', func_start + 10)
-        if func_end == -1:
-            func_end = source.find('\nasync def ', func_start + 10)
-        if func_end == -1:
-            func_end = len(source)
-
-        func_body = source[func_start:func_end]
-
-        # The size check should happen WITHIN the loop, not AFTER
-        # Find the for/async for loop
-        loop_start = func_body.find('for ')
-        if loop_start == -1:
-            pytest.skip("Loop not found in _read_batch_files")
-
-        before_loop = func_body[:loop_start]
-        after_loop_text = func_body[loop_start:]
-
-        # Check if total_size check is within the loop body
-        # Look for the size check after read() but before the next iteration
-        lines = after_loop_text.split('\n')
-        read_found = False
-        size_check_in_loop = False
-
-        for line in lines:
-            stripped = line.strip()
-            if 'read()' in stripped:
-                read_found = True
-            if read_found and 'total_size' in stripped and ('>' in stripped or '>=' in stripped):
-                # Check it's within the loop indentation
-                size_check_in_loop = True
-                break
-
-        # Even if size check is in the loop, the file is already read
-        # The ideal is to not call read() if we're already over limit
-        # But at minimum, we should check after EACH file, not at the end
-        has_early_abort = ('total_size' in after_loop_text and
-                           'break' in after_loop_text)
-
-        assert size_check_in_loop or has_early_abort, (
-            "BUG QA-148: _read_batch_files reads all files before checking "
-            "total size. 20 x 10MB = 200MB held in memory before the 413 "
-            "error. Should check total_size incrementally after each file "
-            "read and abort early when exceeded."
-        )

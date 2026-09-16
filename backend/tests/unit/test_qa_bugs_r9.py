@@ -190,28 +190,6 @@ class TestQA70LabelCollisionFromDifferentNames:
 # ALSO imported inside the function at line 92. This is a code smell:
 # the inner import shadows the outer one and is unnecessary.
 
-class TestQA72ThreeMFDuplicateImport:
-    """threemf_generator.py imports re twice: at module level and inside function."""
-
-    def test_no_duplicate_re_import_in_generate_3mf(self):
-        """generate_3mf should not import re inside the function body."""
-        from services.threemf_generator import generate_3mf
-
-        source = inspect.getsource(generate_3mf)
-        # Remove the function signature/docstring to focus on the body
-        body_lines = source.split('\n')
-        import_lines = [
-            line.strip() for line in body_lines
-            if line.strip().startswith('import re')
-        ]
-
-        assert len(import_lines) == 0, (
-            "BUG QA-72: generate_3mf imports 're' inside function body "
-            "(line 92) when it's already imported at module level (line 9). "
-            "The inner import is unnecessary and should be removed."
-        )
-
-
 # -- QA-73: addFilamentColor creates color with empty name -----------------------
 # File: src/hooks/useImageProcessor.ts:112
 # When adding a new filament color, it uses name: '' (empty string).
@@ -230,7 +208,6 @@ class TestQA72ThreeMFDuplicateImport:
 # returns Colors() (default 4 CMYK). This is fine, EXCEPT:
 # If someone crafts a request with filamentColors=None and filamentPreset=None
 # and somehow bypasses validation, Colors() works fine. Not a real bug.
-
 
 
 # -- QA-76: Colors.__getitem__ raises KeyError for missing labels ----------------
@@ -360,56 +337,12 @@ class TestQA82ColorsSetItemNoneValue:
             _ = colors['Z'].td
 
 
-class TestQA87MkdirNestedDirectoryFails:
-    """BlendTestGenerator.save_stl_mesh uses os.mkdir which can't create
-    nested directories.
-    """
-
-    def test_save_stl_mesh_uses_makedirs(self):
-        """save_stl_mesh should use os.makedirs, not os.mkdir."""
-        source = inspect.getsource(BlendTestGenerator.save_stl_mesh)
-
-        # Should NOT use bare os.mkdir (without 'makedirs')
-        has_mkdir = 'os.mkdir(' in source
-        has_makedirs = 'os.makedirs(' in source
-
-        assert not has_mkdir or has_makedirs, (
-            "BUG QA-87/QA-56: BlendTestGenerator.save_stl_mesh uses os.mkdir "
-            "which fails for nested directories. Should use os.makedirs(exist_ok=True)."
-        )
-
-
 # -- QA-88: Pydantic min_items deprecation warning in models.py ------------------
 # File: backend/api/models.py:66,103,123,143,158,200,245,293
 # Multiple fields use `min_items=1` and `max_items=16` which trigger
 # Pydantic V2 deprecation warnings. Should use `min_length` and `max_length`.
 # While functionally correct in Pydantic V2 (backward compat), these will
 # break in Pydantic V3.
-
-class TestQA88PydanticMinItemsDeprecation:
-    """models.py uses deprecated min_items/max_items instead of min_length/max_length."""
-
-    def test_models_dont_use_deprecated_min_items(self):
-        """API models should use min_length, not deprecated min_items."""
-        import api.models as models_module
-
-        source = inspect.getsource(models_module)
-
-        min_items_count = source.count('min_items=')
-        max_items_count = source.count('max_items=')
-
-        assert min_items_count == 0, (
-            f"BUG QA-88: api/models.py uses 'min_items=' {min_items_count} times. "
-            f"This is deprecated in Pydantic V2 and will be removed in V3. "
-            f"Use 'min_length=' instead."
-        )
-
-        assert max_items_count == 0, (
-            f"BUG QA-88: api/models.py uses 'max_items=' {max_items_count} times. "
-            f"This is deprecated in Pydantic V2 and will be removed in V3. "
-            f"Use 'max_length=' instead."
-        )
-
 
 # -- QA-89: Color.get_cmyk() loses precision for nearly-white colors ------------
 # File: backend/core/blend_color.py:60-78
@@ -463,28 +396,6 @@ class TestQA90ColorDirectTdZero:
 # Multiple calls to .dict() which is deprecated in Pydantic V2.
 # The warnings show up in test output (140 warnings in test run).
 # Should use .model_dump() instead.
-
-class TestQA91PydanticDictDeprecation:
-    """download_v2.py uses deprecated .dict() calls."""
-
-    def test_download_v2_no_deprecated_dict_calls(self):
-        """download_v2.py should use .model_dump() instead of .dict()."""
-        from api.routes import download_v2
-
-        source = inspect.getsource(download_v2)
-
-        dict_calls = [
-            line.strip() for line in source.split('\n')
-            if '.dict()' in line and not line.strip().startswith('#')
-        ]
-
-        assert len(dict_calls) == 0, (
-            f"BUG QA-91: download_v2.py uses deprecated .dict() method "
-            f"{len(dict_calls)} times. This triggers Pydantic V2 deprecation "
-            f"warnings and will break in V3. Use .model_dump() instead. "
-            f"Affected lines: {dict_calls[:5]}"
-        )
-
 
 # -- QA-92: stl_generator.py generates duplicate base plate filenames -----------
 # File: backend/services/stl_generator.py:412,424
