@@ -29,13 +29,30 @@ _MATRIX_CACHE: OrderedDict[tuple, tuple[pd.DataFrame, pd.DataFrame]] = OrderedDi
 _MAX_ENTRIES = 8
 
 
-def _cache_key(colors: Colors, layer_count: int, layer_height: float, prune: Optional[bool], n_targets: Optional[int]) -> tuple:
+def _default_backing_key_parts(colors: Colors) -> tuple[str, Optional[tuple]]:
+    """Key parts for the DEFAULT backing configuration (1 white layer) —
+    what compute_reference_matrices resolves for backing_layers=None and
+    what warmup stores. Explicit callers pass their own parts."""
+    from services.print_stack import backing_boundary_rgb, backing_suffix, resolve_backing_label
+
+    label = resolve_backing_label(colors, 1, 'white')
+    suffix = backing_suffix(label, 1)
+    boundary = backing_boundary_rgb('white') if suffix else None
+    return suffix, boundary
+
+
+def _cache_key(colors: Colors, layer_count: int, layer_height: float, prune: Optional[bool],
+                n_targets: Optional[int], backing_suffix: Optional[str], background_rgb: Optional[tuple]) -> tuple:
+    if backing_suffix is None:
+        backing_suffix, background_rgb = _default_backing_key_parts(colors)
     return (
         colors_key(colors),
         layer_count,
         layer_height,
         prune,
         n_targets,
+        backing_suffix,
+        None if background_rgb is None else tuple(background_rgb),
     )
 
 
@@ -45,13 +62,15 @@ def get_cached_matrices(
     layer_height: float,
     prune: Optional[bool] = None,
     n_targets: Optional[int] = None,
+    backing_suffix: Optional[str] = None,
+    background_rgb: Optional[tuple] = None,
 ) -> Optional[tuple[pd.DataFrame, pd.DataFrame]]:
     """Return cached matrices for this exact configuration, or None.
 
     n_targets participates in the key: it feeds the time-budget decision
     (full vs pruned), so matrices resolved under different target counts
     must not alias."""
-    key = _cache_key(colors, layer_count, layer_height, prune, n_targets)
+    key = _cache_key(colors, layer_count, layer_height, prune, n_targets, backing_suffix, background_rgb)
     cached = _MATRIX_CACHE.get(key)
     if cached is not None:
         _MATRIX_CACHE.move_to_end(key)
@@ -66,9 +85,11 @@ def set_cached_matrices(
     ref_rgb_matrix: pd.DataFrame,
     prune: Optional[bool] = None,
     n_targets: Optional[int] = None,
+    backing_suffix: Optional[str] = None,
+    background_rgb: Optional[tuple] = None,
 ) -> None:
     """Store matrices for this configuration, evicting the oldest entry."""
-    key = _cache_key(colors, layer_count, layer_height, prune, n_targets)
+    key = _cache_key(colors, layer_count, layer_height, prune, n_targets, backing_suffix, background_rgb)
     _MATRIX_CACHE[key] = (ref_code_matrix, ref_rgb_matrix)
     _MATRIX_CACHE.move_to_end(key)
     while len(_MATRIX_CACHE) > _MAX_ENTRIES:
@@ -81,7 +102,10 @@ def compute_and_cache_matrices(
     layer_height: float,
     n_targets: Optional[int] = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Compute (or fetch cached) matrices for a named preset configuration."""
+    """Compute (or fetch cached) matrices for a named preset configuration.
+
+    Warms the DEFAULT app backing configuration (1 white backing layer), the
+    same one compute_reference_matrices resolves for backing_layers=None."""
     from services.stl_generator import compute_reference_matrices
 
     configs = _color_config.get_preset(preset_name)

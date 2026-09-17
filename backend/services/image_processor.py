@@ -12,7 +12,7 @@ from PIL import Image
 
 from core.blend_color import Colors
 from core.color_materials import Color
-from services.print_stack import build_print_stack, resolve_white_backing_label
+from services.print_stack import build_print_stack, resolve_backing_label
 from services.raster_cleanup import color_distance, merge_small_label_regions
 from services.stl_generator import compute_reference_matrices
 from services.vector_processor import render_vector_results_image
@@ -60,8 +60,14 @@ def _map_and_refine(
     colors: Colors,
     layer_count: int,
     layer_height: float,
+    backing_suffix: str = '',
+    background_rgb: Optional[tuple] = None,
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
-    """Nearest-code mapping plus order refinement for pruned (translucent) sets."""
+    """Nearest-code mapping plus order refinement for pruned (translucent) sets.
+
+    The matrices must already be backing-aware when a printed backing block is
+    configured (same suffix/boundary); the returned codes carry the backing
+    as a trailing suffix — the physical stack that actually prints."""
     from core.stack_prune import refine_matches
     from services.stl_generator import _build_codes_to_rgb
 
@@ -77,13 +83,16 @@ def _map_and_refine(
         ref_rgb_matrix,
         colors,
         layer_height,
-        codes_to_rgb=_build_codes_to_rgb(colors, layer_count, layer_height),
+        codes_to_rgb=_build_codes_to_rgb(
+            colors, layer_count, layer_height,
+            backing_suffix=backing_suffix, background_rgb=background_rgb,
+        ),
     )
     normalized_rgbs = [
         tuple(int(channel) for channel in np.asarray(rgb).tolist())
         for rgb in result_rgbs
     ]
-    return result_codes, normalized_rgbs
+    return [code + backing_suffix for code in result_codes], normalized_rgbs
 
 
 def _map_source_colors_to_blends(
@@ -91,15 +100,26 @@ def _map_source_colors_to_blends(
     colors: Colors,
     layer_count: int,
     layer_height: float,
+    backing_layers: Optional[int] = None,
+    backing_mode: str = 'white',
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
+    from services.print_stack import (
+        backing_boundary_rgb, backing_suffix, resolve_backing_label,
+    )
+    b_label = resolve_backing_label(colors, backing_layers, backing_mode)
+    b_suffix = backing_suffix(b_label, backing_layers)
+    b_boundary = backing_boundary_rgb(backing_mode) if b_suffix else None
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
         layer_count,
         layer_height,
         colors,
         n_targets=len(source_colors),
+        backing_layers=backing_layers,
+        backing_mode=backing_mode,
     )
     return _map_and_refine(
         source_colors, ref_code_matrix, ref_rgb_matrix, colors, layer_count, layer_height,
+        backing_suffix=b_suffix, background_rgb=b_boundary,
     )
 
 
@@ -138,6 +158,7 @@ def build_simulated_print_preview(
     layer_count: int = 4,
     layer_height: float = 0.08,
     white_backing_layers: int = 1,
+    backing_mode: str = 'white',
 ) -> dict:
     """
     Build an image-specific print preview from current color blocks.
@@ -148,7 +169,7 @@ def build_simulated_print_preview(
         raise ValueError("No color blocks provided")
 
     active_colors = colors or Colors()
-    resolve_white_backing_label(active_colors, white_backing_layers)
+    resolve_backing_label(active_colors, white_backing_layers, backing_mode)
     width = image_dimensions['width']
     height = image_dimensions['height']
     total_pixels = max(1, sum(block.get('count', len(block['pixels'])) for block in color_blocks))
@@ -172,6 +193,8 @@ def build_simulated_print_preview(
         colors=active_colors,
         layer_height=layer_height,
         layer_count=layer_count,
+        backing_layers=white_backing_layers,
+        backing_mode=backing_mode,
     )
 
     processed_image = _render_color_block_image(
@@ -201,7 +224,8 @@ def build_simulated_print_preview(
         "printStack": build_print_stack(
             layer_count=layer_count,
             layer_height=layer_height,
-            white_backing_layers=white_backing_layers,
+            backing_layers=white_backing_layers,
+            backing_mode=backing_mode,
         ),
     }
 
@@ -213,11 +237,18 @@ def build_vector_simulated_preview(
     layer_count: int = 4,
     layer_height: float = 0.08,
     white_backing_layers: int = 1,
+    backing_mode: str = 'white',
     ref_matrices: Optional[tuple] = None,  # Pre-computed (ref_code_matrix, ref_rgb_matrix)
 ) -> dict:
     """Build an image-specific print preview for SVG mode from vectorized regions."""
     active_colors = colors or Colors()
-    resolve_white_backing_label(active_colors, white_backing_layers)
+    from services.print_stack import (
+        backing_boundary_rgb, backing_suffix, resolve_backing_label,
+    )
+    resolve_backing_label(active_colors, white_backing_layers, backing_mode)
+    b_label = resolve_backing_label(active_colors, white_backing_layers, backing_mode)
+    b_suffix = backing_suffix(b_label, white_backing_layers)
+    b_boundary = backing_boundary_rgb(backing_mode) if b_suffix else None
     image_dimensions = {
         'width': int(quantized_image.shape[1]),
         'height': int(quantized_image.shape[0]),
@@ -230,7 +261,8 @@ def build_vector_simulated_preview(
             "printStack": build_print_stack(
                 layer_count=layer_count,
                 layer_height=layer_height,
-                white_backing_layers=white_backing_layers,
+                backing_layers=white_backing_layers,
+                backing_mode=backing_mode,
             ),
         }
 
@@ -254,6 +286,7 @@ def build_vector_simulated_preview(
         result_codes, normalized_rgbs = _map_and_refine(
             source_colors, ref_code_matrix, ref_rgb_matrix,
             colors, layer_count, layer_height,
+            backing_suffix=b_suffix, background_rgb=b_boundary,
         )
         result_rgbs = normalized_rgbs
     else:
@@ -262,6 +295,8 @@ def build_vector_simulated_preview(
             colors=active_colors,
             layer_count=layer_count,
             layer_height=layer_height,
+            backing_layers=white_backing_layers,
+            backing_mode=backing_mode,
         )
     
     result_rgbs = normalized_rgbs
@@ -286,6 +321,7 @@ def build_vector_simulated_preview(
         all_codes, all_rgbs = _map_and_refine(
             unique_colors_in_quantized, ref_code_matrix, ref_rgb_matrix,
             colors, layer_count, layer_height,
+            backing_suffix=b_suffix, background_rgb=b_boundary,
         )
     else:
         all_codes, all_rgbs = _map_source_colors_to_blends(
@@ -293,6 +329,8 @@ def build_vector_simulated_preview(
             colors=active_colors,
             layer_count=layer_count,
             layer_height=layer_height,
+            backing_layers=white_backing_layers,
+            backing_mode=backing_mode,
         )
 
     # Build background via index scatter (no Python pixel loop)
@@ -324,7 +362,8 @@ def build_vector_simulated_preview(
         "printStack": build_print_stack(
             layer_count=layer_count,
             layer_height=layer_height,
-            white_backing_layers=white_backing_layers,
+            backing_layers=white_backing_layers,
+            backing_mode=backing_mode,
         ),
     }
 
@@ -560,6 +599,7 @@ def process_image(
     layer_count: int = 4,
     layer_height: float = 0.08,
     white_backing_layers: int = 1,
+    backing_mode: str = 'white',
     target_width: Optional[float] = None,
     detail_size: Optional[float] = None,
 ) -> dict:
@@ -741,6 +781,7 @@ def process_image(
         layer_count=layer_count,
         layer_height=layer_height,
         white_backing_layers=white_backing_layers,
+        backing_mode=backing_mode,
     )
 
     return {

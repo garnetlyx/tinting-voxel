@@ -27,5 +27,8 @@
   "detailSizeHelp": "Minimum printable feature size, generally equal to your hotend (nozzle) diameter. The slicer default line width is nozzle + 0.02 mm, which is what these presets represent. Regions narrower than this are merged into neighbors before export.",
   "pixelSizeHelp": "Base pixel size. Defaults to Detail Size (1 pixel = 1 line width). If set smaller than Detail Size, the slicer's line width must be adjusted manually to match.",
   "simplificationHelp": "Higher values produce simpler shapes with fewer vertices",
-  "minimumAreaHelp": "Filters out small contours below this physical area"
+  "minimumAreaHelp": "Filters out small contours below this physical area",
+  "backingMode_white": "White backing",
+  "backingMode_black": "Black backing",
+  "backingModeHelp": "Printed backing block: closest-to-white or closest-to-black filament in the set; participates in the color simulation."
 }

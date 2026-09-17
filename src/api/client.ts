@@ -68,6 +68,7 @@ export async function processImage(
   formData.append('layerHeight', (params.layerHeight ?? 0.08).toString());
   formData.append('layerCount', (params.layerCount ?? 4).toString());
   formData.append('whiteBackingLayers', (params.whiteBackingLayers ?? 1).toString());
+  formData.append('backingMode', params.backingMode ?? 'white');
 
   if (params.filamentPreset) {
     formData.append('filamentPreset', params.filamentPreset);
@@ -360,6 +361,7 @@ export async function batchDownloadSTL(
   formData.append('layerHeight', params.layerHeight.toString());
   formData.append('layerCount', params.layerCount.toString());
   formData.append('whiteBackingLayers', params.whiteBackingLayers.toString());
+  formData.append('backingMode', params.backingMode ?? 'white');
   if (params.filamentPreset) {
     formData.append('filamentPreset', params.filamentPreset);
   }

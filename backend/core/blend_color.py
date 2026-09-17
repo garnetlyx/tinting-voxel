@@ -72,11 +72,17 @@ class BlendTestGenerator:
         grid_origin_y: float = 0.0,
         extra_regions=None,
         filename_prefix: Optional[str] = None,
+        backing_suffix: str = '',
+        background_rgb: Optional[tuple] = None,
     ):
         if layer_count_max <= 0:
             raise ValueError(f"layer_count_max must be positive, got {layer_count_max}")
         if layer_height <= 0:
             raise ValueError(f"layer_height must be positive, got {layer_height}")
+        # Backing context (printed backing block as trailing layers over the
+        # mode boundary); empty suffix + None background = paper default.
+        self._backing_suffix = backing_suffix or ''
+        self._background_rgb = background_rgb
         self.length_total = plate_length
         self.width_total = plate_width
         self.grid_length = grid_length
@@ -207,6 +213,22 @@ class BlendTestGenerator:
         if not code or not code.strip():
             return (255, 255, 255)
         code = code.strip().upper()
+        if self._backing_suffix:
+            # Backing-aware evaluation: the printed backing block rides as
+            # trailing layers over the mode boundary (paper's backing
+            # reflectance). Keep the cached path for the default no-backing
+            # configuration.
+            return codes_to_rgb_batch(
+                [code + self._backing_suffix],
+                self.layer_height,
+                self._color_key(),
+                background_rgb=self._background_rgb,
+            )[0]
+        if self._background_rgb is not None:
+            return codes_to_rgb_batch(
+                [code], self.layer_height, self._color_key(),
+                background_rgb=self._background_rgb,
+            )[0]
         return _code_to_rgb_cached(
             code,
             self.layer_height,
@@ -218,7 +240,15 @@ class BlendTestGenerator:
 
         Hoists per-configuration invariants out of the loop and vectorizes
         the unified blend formula; see blend_models.codes_to_rgb_batch.
+        Carries the backing context (suffix + boundary) when configured.
         """
+        if self._backing_suffix or self._background_rgb is not None:
+            return codes_to_rgb_batch(
+                [c + self._backing_suffix for c in codes],
+                self.layer_height,
+                self._color_key(),
+                background_rgb=self._background_rgb,
+            )
         return codes_to_rgb_batch(
             codes,
             self.layer_height,

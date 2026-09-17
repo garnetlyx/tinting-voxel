@@ -40,6 +40,8 @@ interface ParameterPanelProps {
   onMaxDimensionChange: (value: number) => void;
   whiteBackingLayers: number;
   onWhiteBackingLayersChange: (value: number) => void;
+  backingMode: 'white' | 'black';
+  onBackingModeChange: (mode: 'white' | 'black') => void;
   // Transparency classification (drives the layer-height default)
   allTransparent: boolean;
   // Base plate
@@ -79,6 +81,8 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   onMaxDimensionChange,
   whiteBackingLayers,
   onWhiteBackingLayersChange,
+  backingMode,
+  onBackingModeChange,
   allTransparent,
   printStack,
   onReprocess,
@@ -311,6 +315,23 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
         <p className="text-xs text-gray-500 mt-1">
           {t('parameters:stack', { optical: printStack.opticalLayerCount, backing: printStack.whiteBackingLayers, total: printStack.totalLayerCount })}
         </p>
+        <div className="mt-2 flex gap-1">
+          {(['white', 'black'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => onBackingModeChange(m)}
+              className={`flex-1 py-1.5 px-2 text-xs rounded-md border transition-colors ${
+                backingMode === m
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400'
+              }`}
+            >
+              {t(`parameters:backingMode_${m}`)}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-1">{t('parameters:backingModeHelp')}</p>
       </div>
 
       <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">{t('parameters:actualExportHeight')}{' '}{printStack.totalHeightMm.toFixed(2)} mm

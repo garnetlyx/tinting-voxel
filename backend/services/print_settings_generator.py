@@ -20,6 +20,7 @@ def generate_print_settings(
     image_dimensions: dict,
     filament_colors: list[dict],
     white_backing_layers: int = 1,
+    backing_mode: str = 'white',
     filament_preset: Optional[str] = None,
 ) -> str:
     """
@@ -55,7 +56,8 @@ def generate_print_settings(
     print_stack = build_print_stack(
         layer_count=layer_count,
         layer_height=layer_height,
-        white_backing_layers=white_backing_layers,
+        backing_layers=white_backing_layers,
+        backing_mode=backing_mode,
     )
 
     extruders = []
@@ -79,6 +81,7 @@ def generate_print_settings(
             "layer_height": layer_height,
             "layer_count": layer_count,
             "white_backing_layers": print_stack["whiteBackingLayers"],
+            "backing_mode": print_stack["backingMode"],
         },
         "object_dimensions": {
             "width_mm": width_mm,

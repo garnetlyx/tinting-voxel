@@ -27,5 +27,8 @@
   "detailSizeHelp": "最小可打印细节通常与喷嘴直径相当。这些预设采用“喷嘴直径 + 0.02 mm”的切片线宽。导出前，小于此宽度的区域会合并到相邻区域。",
   "pixelSizeHelp": "基础像素尺寸默认等于细节尺寸（1 像素 = 1 条线宽）。若设得更小，需要手动调整切片器线宽使其匹配。",
   "simplificationHelp": "数值越大，形状越简单，顶点越少",
-  "minimumAreaHelp": "过滤小于此实际面积的轮廓"
+  "minimumAreaHelp": "过滤小于此实际面积的轮廓",
+  "backingMode_white": "白色背衬",
+  "backingMode_black": "黑色背衬",
+  "backingModeHelp": "打印背衬块：取耗材集中最接近白/黑的耗材；参与颜色模拟。"
 }

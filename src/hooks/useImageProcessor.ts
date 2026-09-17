@@ -81,6 +81,7 @@ export const useImageProcessor = () => {
   const [pixelSize, setPixelSize] = useState(0.42);
   const [layerCount, setLayerCount] = useState(MIN_COLOR_LAYERS);
   const [whiteBackingLayers, setWhiteBackingLayers] = useState(1);
+  const [backingMode, setBackingMode] = useState<'white' | 'black'>('white');
 
   // Base plate options
 
@@ -330,6 +331,7 @@ export const useImageProcessor = () => {
         layerHeight,
         layerCount,
         whiteBackingLayers: overrides?.whiteBackingLayers ?? whiteBackingLayers,
+        backingMode,
         ...filamentRequestPayload,
         detailSize: overrides?.detailSize ?? detailSize,
         pixelParams: processingMode === 'pixel'
@@ -409,6 +411,7 @@ export const useImageProcessor = () => {
     layerCount,
     filamentRequestPayload,
     whiteBackingLayers,
+    backingMode,
   ]);
 
   // Auto-load last used saved preset on mount
@@ -567,6 +570,7 @@ export const useImageProcessor = () => {
         pixelSize,
         layerCount,
         whiteBackingLayers,
+        backingMode,
         imageDimensions,
         detailSize,
         ...filamentRequestPayload,
@@ -603,6 +607,7 @@ export const useImageProcessor = () => {
         pixelSize,
         layerCount,
         whiteBackingLayers,
+        backingMode,
         imageDimensions,
         detailSize,
         ...filamentRequestPayload,
@@ -711,8 +716,9 @@ export const useImageProcessor = () => {
       layerCount,
       layerHeight,
       whiteBackingLayers,
+      backingMode,
     ),
-[layerCount, layerHeight, whiteBackingLayers]
+[layerCount, layerHeight, whiteBackingLayers, backingMode]
   );
 
   // Update a color block's RGB/hex values (manual color adjustment)
@@ -824,6 +830,8 @@ export const useImageProcessor = () => {
     detailSize,
     layerCount,
     whiteBackingLayers,
+    backingMode,
+    setBackingMode,
     targetWidth,
     targetHeight,
     maxDimension,

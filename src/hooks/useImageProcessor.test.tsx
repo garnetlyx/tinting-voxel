@@ -51,6 +51,7 @@ describe('useImageProcessor', () => {
       printStack: {
         opticalLayerCount: 4,
         whiteBackingLayers: 1,
+        backingMode: 'white' as const,
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },
@@ -62,6 +63,7 @@ describe('useImageProcessor', () => {
       printStack: {
         opticalLayerCount: 4,
         whiteBackingLayers: 1,
+        backingMode: 'white' as const,
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },
@@ -243,6 +245,7 @@ describe('useImageProcessor', () => {
       printStack: {
         opticalLayerCount: 4,
         whiteBackingLayers: 1,
+        backingMode: 'white' as const,
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },
@@ -348,6 +351,7 @@ describe('useImageProcessor', () => {
       printStack: {
         opticalLayerCount: 4,
         whiteBackingLayers: 1,
+        backingMode: 'white' as const,
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },

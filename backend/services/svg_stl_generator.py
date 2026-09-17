@@ -18,9 +18,12 @@ from config.settings import settings
 from services.mesh_optimizer import generate_optimized_boxes_from_grid
 from services import stl_generator
 from services.print_stack import (
+    backing_boundary_rgb,
+    backing_suffix,
     build_print_stack,
-    normalize_white_backing_layers,
-    resolve_white_backing_label,
+    normalize_backing_layers,
+    resolve_backing_label,
+    strip_backing_suffix,
 )
 from services.stl_generator import (
     generate_box,
@@ -318,6 +321,7 @@ def generate_svg_stl_zip(
     image_dimensions: dict,
     colors: Optional[Colors] = None,
     white_backing_layers: int = 1,
+    backing_mode: str = 'white',
 ) -> bytes:
     """
     Generate ZIP file containing STL files from vector contours.
@@ -342,9 +346,10 @@ def generate_svg_stl_zip(
     if active_colors is None:
         raise RuntimeError("No colors provided and no global colors initialized.")
 
-    # Compute reference matrices locally (thread-safe)
+    # Compute reference matrices locally (thread-safe, backing-aware)
     ref_code_matrix, ref_rgb_matrix = stl_generator.compute_reference_matrices(
-        layer_count, layer_height, active_colors, n_targets=len(vector_results)
+        layer_count, layer_height, active_colors, n_targets=len(vector_results),
+        backing_layers=white_backing_layers, backing_mode=backing_mode,
     )
 
     # Initialize mesh map for each primary color dynamically
@@ -354,11 +359,15 @@ def generate_svg_stl_zip(
     input_colors = [result['color'] for result in vector_results]
 
     # Map to blend codes using Beer-Lambert model (with order refinement
-    # for composition-pruned translucent sets)
+    # for composition-pruned translucent sets); codes carry the backing suffix.
     from services.image_processor import _map_and_refine
+    _b_label = resolve_backing_label(active_colors, white_backing_layers, backing_mode)
+    _b_suffix = backing_suffix(_b_label, white_backing_layers)
+    _b_boundary = backing_boundary_rgb(backing_mode) if _b_suffix else None
     result_codes, result_rgbs = _map_and_refine(
         input_colors, ref_code_matrix, ref_rgb_matrix,
         active_colors, layer_count, layer_height,
+        backing_suffix=_b_suffix, background_rgb=_b_boundary,
     )
 
     _log_input_color_brightness(input_colors, "SVG-STL")
@@ -371,10 +380,10 @@ def generate_svg_stl_zip(
 
     z_offset = 0.0
 
-    n_white = normalize_white_backing_layers(white_backing_layers)
-    w_label = resolve_white_backing_label(active_colors, n_white)
+    n_white = normalize_backing_layers(white_backing_layers)
+    w_label = resolve_backing_label(active_colors, n_white, backing_mode)
     if n_white > 0:
-        logger.info("SVG-STL: white backing label='%s', n_white=%d", w_label, n_white)
+        logger.info("SVG-STL: printed backing mode='%s', label='%s', layers=%d", backing_mode, w_label, n_white)
 
     # Rasterize all region masks upfront, then fill inter-region gaps via
     # Voronoi nearest-neighbour so no pixel is left unassigned (which would
@@ -392,7 +401,7 @@ def generate_svg_stl_zip(
         if not region_grid.any():
             continue
         total_regions += len(normalize_regions(result))
-        blend_code = result_codes[idx]
+        blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)
 
         # Generate mesh for each layer
         start_idx = 0
@@ -437,7 +446,8 @@ def generate_svg_stl_zip(
     print_stack = build_print_stack(
         layer_count=layer_count,
         layer_height=layer_height,
-        white_backing_layers=n_white,
+        backing_layers=n_white,
+        backing_mode=backing_mode,
     )
     physical_height = print_stack["totalHeightMm"]
     prefix = get_filename_prefix(active_colors)

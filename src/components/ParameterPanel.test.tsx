@@ -33,9 +33,12 @@ describe('ParameterPanel', () => {
     onMaxDimensionChange: vi.fn(),
     whiteBackingLayers: 1,
     onWhiteBackingLayersChange: vi.fn(),
+    backingMode: 'white' as const,
+    onBackingModeChange: vi.fn(),
         printStack: {
       opticalLayerCount: 4,
       whiteBackingLayers: 1,
+      backingMode: 'white' as const,
       totalLayerCount: 5,
       totalHeightMm: 0.4,
     },

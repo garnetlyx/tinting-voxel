@@ -70,6 +70,8 @@ const Converter: React.FC = () => {
     layerCount,
     maxLayerCount,
     whiteBackingLayers,
+    backingMode,
+    setBackingMode,
     targetWidth,
     targetHeight,
     maxDimension,
@@ -192,6 +194,8 @@ const Converter: React.FC = () => {
                   onMaxDimensionChange={setMaxDimension}
                   whiteBackingLayers={whiteBackingLayers}
                   onWhiteBackingLayersChange={setWhiteBackingLayers}
+                  backingMode={backingMode}
+                  onBackingModeChange={setBackingMode}
                   printStack={printStack}
                   onReprocess={() => handleReprocess()}
                   processing={processing}
@@ -436,6 +440,7 @@ const Converter: React.FC = () => {
               layerCount,
               layerHeight,
               whiteBackingLayers,
+              backingMode,
               maxColors,
               colorThreshold,
               detailSize,

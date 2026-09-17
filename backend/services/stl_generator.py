@@ -14,12 +14,14 @@ import numpy as np
 import pandas as pd
 
 from config.settings import settings
-from core.blend_color import BlendTestGenerator, Color, Colors
+from core.blend_color import BlendTestGenerator, Color, Colors, colors_key
 from services.mesh_optimizer import generate_optimized_boxes
 from services.print_stack import (
+    backing_suffix,
     build_print_stack,
-    normalize_white_backing_layers,
-    resolve_white_backing_label,
+    normalize_backing_layers,
+    resolve_backing_label,
+    strip_backing_suffix,
 )
 
 logger = logging.getLogger(__name__)
@@ -110,8 +112,21 @@ def _estimate_full_enumeration_seconds(n_codes: int, n_targets: int) -> float:
     return n_codes * (build_rate + match_marginal * n_targets)
 
 
-def _build_codes_to_rgb(colors: Colors, layer_count: int, layer_height: float):
+from core.blend_models import codes_to_rgb_batch
+
+
+def _build_codes_to_rgb(colors: Colors, layer_count: int, layer_height: float,
+                        backing_suffix: str = '', background_rgb: Optional[tuple] = None):
     """Batch blend callable consistent with compute_reference_matrices."""
+    if backing_suffix or background_rgb is not None:
+        def _codes_to_rgb_backing(codes):
+            return codes_to_rgb_batch(
+                [c + backing_suffix for c in codes],
+                layer_height,
+                colors_key(colors),
+                background_rgb=background_rgb,
+            )
+        return _codes_to_rgb_backing
     generator = BlendTestGenerator(
         colors=colors,
         layer_height=layer_height,
@@ -126,6 +141,8 @@ def compute_reference_matrices(
     colors: Colors,
     prune: Optional[bool] = None,
     n_targets: Optional[int] = None,
+    backing_layers: Optional[int] = None,
+    backing_mode: str = 'white',
 ) -> tuple:
     """
     Compute color reference matrices for Beer-Lambert mapping.
@@ -158,10 +175,22 @@ def compute_reference_matrices(
     if layer_count <= 0:
         raise ValueError(f"layer_count must be positive, got {layer_count}")
 
+    # Printed backing block: real trailing layers over the mode boundary —
+    # the simulation runs BEFORE mapping, so the backing thickness shifts
+    # every candidate color (paper setup, adapted: finite printed backing
+    # instead of an infinite external one).
+    from services.print_stack import (
+        backing_boundary_rgb, backing_suffix, resolve_backing_label,
+    )
+    b_label = resolve_backing_label(colors, backing_layers, backing_mode)
+    b_suffix = backing_suffix(b_label, backing_layers)
+    b_boundary = backing_boundary_rgb(backing_mode) if b_suffix else None
+
     # Serve every caller (process, downloads, batch) through the content-keyed
     # matrix cache: the key covers everything below that influences the output.
     from services.matrix_cache import get_cached_matrices, set_cached_matrices
-    cached = get_cached_matrices(colors, layer_count, layer_height, prune=prune, n_targets=n_targets)
+    cached = get_cached_matrices(colors, layer_count, layer_height, prune=prune, n_targets=n_targets,
+                                 backing_suffix=b_suffix, background_rgb=b_boundary)
     if cached is not None:
         return cached
 
@@ -169,6 +198,8 @@ def compute_reference_matrices(
         colors=colors,
         layer_height=layer_height,
         layer_count_max=layer_count,
+        backing_suffix=b_suffix,
+        background_rgb=b_boundary,
     )
 
     items = colors.get_labels()
@@ -260,7 +291,8 @@ def compute_reference_matrices(
         len(items), len(code_list),
         " (composition-pruned)" if use_prune else "",
     )
-    set_cached_matrices(colors, layer_count, layer_height, code_df, rgb_df, prune=prune, n_targets=n_targets)
+    set_cached_matrices(colors, layer_count, layer_height, code_df, rgb_df, prune=prune, n_targets=n_targets,
+                        backing_suffix=b_suffix, background_rgb=b_boundary)
     return code_df, rgb_df
 
 
@@ -269,18 +301,30 @@ def map_color_blocks_to_blend_results(
     layer_height: float,
     layer_count: int,
     colors: Colors,
+    backing_layers: Optional[int] = None,
+    backing_mode: str = 'white',
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
     """
     Map source RGB blocks to nearest printable blend codes and RGBs.
 
     Uses the same reference matrices and LAB nearest-neighbor matching as STL export.
+    The printed backing block participates in the simulation (backing-aware
+    matrices); returned codes carry the backing as a trailing suffix.
     """
+    from services.print_stack import (
+        backing_boundary_rgb, backing_suffix, resolve_backing_label,
+    )
+    b_label = resolve_backing_label(colors, backing_layers, backing_mode)
+    b_suffix = backing_suffix(b_label, backing_layers)
+    b_boundary = backing_boundary_rgb(backing_mode) if b_suffix else None
     input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
         layer_count,
         layer_height,
         colors,
         n_targets=len(input_colors),
+        backing_layers=backing_layers,
+        backing_mode=backing_mode,
     )
     result_codes, result_rgbs = Color.map_to_nearest_color(
         input_colors,
@@ -299,13 +343,16 @@ def map_color_blocks_to_blend_results(
         ref_rgb_matrix,
         colors,
         layer_height,
-        codes_to_rgb=_build_codes_to_rgb(colors, layer_count, layer_height),
+        codes_to_rgb=_build_codes_to_rgb(
+            colors, layer_count, layer_height,
+            backing_suffix=b_suffix, background_rgb=b_boundary,
+        ),
     )
     normalized_rgbs = [
         tuple(int(channel) for channel in np.asarray(rgb).tolist())
         for rgb in result_rgbs
     ]
-    return result_codes, normalized_rgbs
+    return [code + b_suffix for code in result_codes], normalized_rgbs
 
 
 def _log_blend_code_distribution(
@@ -643,6 +690,7 @@ def generate_stl_zip(
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
     white_backing_layers: int = 1,
+    backing_mode: str = 'white',
 ) -> bytes:
     """
     Generate ZIP file containing merged STL files by primary color
@@ -679,11 +727,15 @@ def generate_stl_zip(
     input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
 
     # Step 3: Map to blend codes using the shared preview/export mapping path
+    # (backing-aware: the printed block participates in the simulation and
+    # rides as a trailing suffix on every code)
     result_codes, result_rgbs = map_color_blocks_to_blend_results(
         color_blocks=color_blocks,
         layer_height=layer_height,
         layer_count=layer_count,
         colors=active_colors,
+        backing_layers=white_backing_layers,
+        backing_mode=backing_mode,
     )
 
     _log_input_color_brightness(input_colors, "STL")
@@ -704,10 +756,13 @@ def generate_stl_zip(
 
     z_offset = 0.0
 
-    n_white = normalize_white_backing_layers(white_backing_layers)
-    w_label = resolve_white_backing_label(active_colors, n_white)
+    n_white = normalize_backing_layers(white_backing_layers)
+    w_label = resolve_backing_label(active_colors, n_white, backing_mode)
     if n_white > 0:
-        logger.info("White backing: label='%s', n_white=%d (configured)", w_label, n_white)
+        logger.info(
+            "Printed backing: mode='%s', label='%s', layers=%d (closest %s filament)",
+            backing_mode, w_label, n_white, backing_mode,
+        )
 
     logger.info(
         "STL generation: %d color blocks, %d layers, %dx%d image, ~%d estimated boxes",
@@ -717,7 +772,10 @@ def generate_stl_zip(
     # Step 4: Generate meshes for each color block
     for idx, color_block in enumerate(color_blocks):
         pixels = color_block['pixels']
-        blend_code = result_codes[idx]  # e.g., "CCCM"
+        # The mapping result carries the printed backing as a trailing suffix;
+        # the backing block itself is a single merged box below — strip the
+        # suffix before per-pixel meshing to avoid double geometry.
+        blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)  # e.g., "CCCM"
 
         # Group contiguous identical colors vertically to eliminate internal faces
         start_idx = 0
@@ -794,7 +852,8 @@ def generate_stl_zip(
     print_stack = build_print_stack(
         layer_count=layer_count,
         layer_height=layer_height,
-        white_backing_layers=n_white,
+        backing_layers=n_white,
+        backing_mode=backing_mode,
     )
     physical_height = print_stack["totalHeightMm"]
     prefix = get_filename_prefix(active_colors)

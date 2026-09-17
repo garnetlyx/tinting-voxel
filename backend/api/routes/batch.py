@@ -99,6 +99,7 @@ async def api_batch_download_stl(
     layerHeight: float = Form(0.08, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
     whiteBackingLayers: int = Form(1, ge=0, le=5),
+    backingMode: str = Form("white", pattern=r'^(white|black)$'),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
@@ -129,6 +130,7 @@ async def api_batch_download_stl(
         layer_count=layerCount,
         colors=colors,
         white_backing_layers=whiteBackingLayers,
+        backing_mode=backingMode,
     )
 
     logger.info(

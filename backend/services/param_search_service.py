@@ -37,6 +37,7 @@ class FixedParams:
     layer_height: float
     pixel_size: float
     white_backing_layers: int
+    backing_mode: str = 'white'
 
 
 @dataclass
@@ -121,6 +122,7 @@ class Evaluator:
             layer_count=self._fixed.layer_count,
             layer_height=self._fixed.layer_height,
             white_backing_layers=self._fixed.white_backing_layers,
+            backing_mode=self._fixed.backing_mode,
             detail_size=float(params.get("detail_size", 0.42)),
         )
         return result["processedImage"]
@@ -161,6 +163,7 @@ class Evaluator:
             layer_count=self._fixed.layer_count,
             layer_height=self._fixed.layer_height,
             white_backing_layers=self._fixed.white_backing_layers,
+            backing_mode=self._fixed.backing_mode,
         )
         return preview["processedImage"]
 

@@ -76,6 +76,7 @@ export interface ProcessImageParams {
   layerHeight?: number;
   layerCount?: number;
   whiteBackingLayers?: number;
+  backingMode?: BackingMode;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   pixelParams?: PixelModeParams;
@@ -183,6 +184,7 @@ export interface DownloadSTLParamsV2 extends DownloadSTLParams {
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   whiteBackingLayers?: number;
+  backingMode?: BackingMode;
   detailSize?: number;
 }
 
@@ -190,6 +192,7 @@ export interface DownloadSVGSTLParamsV2 extends DownloadSVGSTLParams {
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   whiteBackingLayers?: number;
+  backingMode?: BackingMode;
   detailSize?: number;
 }
 
@@ -199,6 +202,7 @@ export interface PrintSettingsParams {
   layerCount: number;
   imageDimensions: ImageDimensions;
   whiteBackingLayers?: number;
+  backingMode?: BackingMode;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   detailSize?: number;
@@ -246,6 +250,7 @@ export interface SimulatedPrintPreviewParams {
   layerHeight: number;
   layerCount: number;
   whiteBackingLayers?: number;
+  backingMode?: BackingMode;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
 }
@@ -257,9 +262,12 @@ export interface SimulatedPrintPreviewResponse {
   printStack: PrintStackInfo;
 }
 
+export type BackingMode = 'white' | 'black';
+
 export interface PrintStackInfo {
   opticalLayerCount: number;
   whiteBackingLayers: number;
+  backingMode: BackingMode;
   totalLayerCount: number;
   totalHeightMm: number;
 }
@@ -296,6 +304,7 @@ export interface BatchDownloadSTLParams {
   layerHeight: number;
   layerCount: number;
   whiteBackingLayers: number;
+  backingMode?: BackingMode;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
   detailSize?: number;
@@ -363,6 +372,7 @@ export interface ConverterBugReportState {
   layerHeight: number;
   layerCount: number;
   whiteBackingLayers: number;
+  backingMode?: BackingMode;
   imageWidth: number;
   imageHeight: number;
   colorCount: number;

@@ -15,6 +15,7 @@ export interface ParamSearchConfig {
   layerCount: number;
   layerHeight: number;
   whiteBackingLayers: number;
+  backingMode?: 'white' | 'black';
   maxColors: number;
   colorThreshold: number;
   detailSize: number;
@@ -75,6 +76,7 @@ export async function startParamSearch(
   formData.append('layer_count', config.layerCount.toString());
   formData.append('layer_height', config.layerHeight.toString());
   formData.append('white_backing_layers', config.whiteBackingLayers.toString());
+  formData.append('backing_mode', config.backingMode ?? 'white');
   formData.append('max_colors', config.maxColors.toString());
   formData.append('color_threshold', config.colorThreshold.toString());
   formData.append('detail_size', config.detailSize.toString());

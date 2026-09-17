@@ -83,6 +83,7 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
         image_dimensions=image_dimensions,
         colors=colors,
         white_backing_layers=body.whiteBackingLayers,
+        backing_mode=body.backingMode,
     )
 
     logger.info(
@@ -115,6 +116,7 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
         image_dimensions=image_dimensions,
         colors=colors,
         white_backing_layers=body.whiteBackingLayers,
+        backing_mode=body.backingMode,
     )
 
     logger.info(
@@ -267,6 +269,7 @@ async def api_print_settings(request: Request, body: PrintSettingsRequest):
         image_dimensions=image_dimensions,
         filament_colors=filament_colors_dicts,
         white_backing_layers=body.whiteBackingLayers,
+        backing_mode=body.backingMode,
         filament_preset=preset_name,
     )
 

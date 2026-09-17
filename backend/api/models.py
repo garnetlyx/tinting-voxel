@@ -2,7 +2,7 @@
 Pydantic models for API request and response validation
 """
 from enum import Enum
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -261,12 +261,16 @@ class FilamentConfigMixin(BaseModel):
 
 
 class WhiteBackingMixin(BaseModel):
-    """Mixin for explicit white backing configuration."""
+    """Mixin for explicit printed backing configuration (white or black block)."""
     whiteBackingLayers: int = Field(
         1,
         ge=0,
         le=5,
-        description="Number of full-area white backing layers appended after optical layers"
+        description="Number of full-area backing layers printed behind the optical stack"
+    )
+    backingMode: Literal['white', 'black'] = Field(
+        'white',
+        description="Backing block filament: closest-to-white or closest-to-black in the set"
     )
 
 
@@ -341,6 +345,7 @@ class PrintStackInfo(BaseModel):
     """Actual exported stack metadata."""
     opticalLayerCount: int = Field(..., ge=0)
     whiteBackingLayers: int = Field(..., ge=0)
+    backingMode: Literal['white', 'black'] = 'white'
     totalLayerCount: int = Field(..., ge=0)
     totalHeightMm: float = Field(..., ge=0)
 
@@ -449,6 +454,7 @@ class SimulatePreviewRequest(FilamentConfigMixin):
     layerCount: int = Field(4, ge=1, le=10)
     layerHeight: float = Field(0.08, gt=0, le=10)
     whiteBackingLayers: int = Field(1, ge=0, le=5)
+    backingMode: Literal['white', 'black'] = 'white'
 
 
 class SimulatedPrintPreviewResponse(BaseModel):
@@ -517,6 +523,7 @@ class BugReportConverterState(BaseModel):
     layerHeight: float = Field(0, ge=0, le=1000)
     layerCount: int = Field(0, ge=0, le=10000)
     whiteBackingLayers: int = Field(0, ge=0, le=10000)
+    backingMode: Literal['white', 'black'] = 'white'
     imageWidth: int = Field(0, ge=0, le=100000)
     imageHeight: int = Field(0, ge=0, le=100000)
     colorCount: int = Field(0, ge=0, le=1000000)

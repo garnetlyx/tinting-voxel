@@ -66,6 +66,7 @@ async def api_process_image(
     layerHeight: float = Form(0.08, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
     whiteBackingLayers: int = Form(1, ge=0, le=5),
+    backingMode: str = Form("white", pattern=r'^(white|black)$'),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
 ):
@@ -99,6 +100,7 @@ async def api_process_image(
             layer_count=layerCount,
             layer_height=layerHeight,
             white_backing_layers=whiteBackingLayers,
+            backing_mode=backingMode,
             target_width=targetWidth,
             detail_size=detailSize,
         )
@@ -160,6 +162,8 @@ async def api_process_image(
         layerHeight,
         colors,
         n_targets=len(vector_results),
+        backing_layers=whiteBackingLayers,
+        backing_mode=backingMode,
     )
 
     # Render segmentation image: show quantized colors (BEFORE mapping) with vector outlines
@@ -206,6 +210,7 @@ async def api_process_image(
         layer_count=layerCount,
         layer_height=layerHeight,
         white_backing_layers=whiteBackingLayers,
+        backing_mode=backingMode,
         ref_matrices=(ref_code_matrix, ref_rgb_matrix),  # Pass pre-computed matrices
     )
 
@@ -234,5 +239,6 @@ async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
         layer_count=body.layerCount,
         layer_height=body.layerHeight,
         white_backing_layers=body.whiteBackingLayers,
+        backing_mode=body.backingMode,
     )
     return SimulatedPrintPreviewResponse(**result)

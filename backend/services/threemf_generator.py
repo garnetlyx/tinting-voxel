@@ -18,8 +18,11 @@ from core.blend_color import Color, Colors
 from config.settings import settings
 from services.mesh_optimizer import generate_optimized_boxes
 from services.print_stack import (
-    normalize_white_backing_layers,
-    resolve_white_backing_label,
+    backing_boundary_rgb,
+    backing_suffix,
+    normalize_backing_layers,
+    resolve_backing_label,
+    strip_backing_suffix,
 )
 from services.stl_generator import (
     compute_reference_matrices,
@@ -105,6 +108,7 @@ def generate_3mf(
     colors: Optional[Colors] = None,
     color_hex_map: Optional[dict] = None,
     white_backing_layers: int = 1,
+    backing_mode: str = 'white',
 ) -> bytes:
     """
     Generate a single 3MF file with color-separated objects.
@@ -139,20 +143,26 @@ def generate_3mf(
                     f"Invalid hex color '{hex_color}' for label '{label}'"
                 )
 
-    # Compute reference matrices locally (thread-safe)
+    # Compute reference matrices locally (thread-safe, backing-aware)
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-        layer_count, layer_height, colors, n_targets=len(color_blocks)
+        layer_count, layer_height, colors, n_targets=len(color_blocks),
+        backing_layers=white_backing_layers, backing_mode=backing_mode,
     )
 
     # Keep compact box ranges until the final indexed trimesh conversion.
     labels = colors.get_labels()
     code_mesh_map: dict[str, list[list[BoxRange]]] = {label: [] for label in labels}
 
-    # Map input colors to blend codes (with order refinement for pruned sets)
+    # Map input colors to blend codes (with order refinement for pruned sets);
+    # codes carry the printed backing as a trailing suffix.
     from services.image_processor import _map_and_refine
     input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
+    _b_label = resolve_backing_label(colors, white_backing_layers, backing_mode)
+    _b_suffix = backing_suffix(_b_label, white_backing_layers)
+    _b_boundary = backing_boundary_rgb(backing_mode) if _b_suffix else None
     result_codes, _ = _map_and_refine(
         input_colors, ref_code_matrix, ref_rgb_matrix, colors, layer_count, layer_height,
+        backing_suffix=_b_suffix, background_rgb=_b_boundary,
     )
 
     _log_input_color_brightness(input_colors, "3MF")
@@ -161,10 +171,10 @@ def generate_3mf(
     width, height = image_dimensions['width'], image_dimensions['height']
     z_offset = 0.0
 
-    n_white = normalize_white_backing_layers(white_backing_layers)
-    w_label = resolve_white_backing_label(colors, n_white)
+    n_white = normalize_backing_layers(white_backing_layers)
+    w_label = resolve_backing_label(colors, n_white, backing_mode)
     if n_white > 0:
-        logger.info("3MF: white backing label='%s', n_white=%d", w_label, n_white)
+        logger.info("3MF: printed backing mode='%s', label='%s', layers=%d", backing_mode, w_label, n_white)
 
     # Complexity guard: enforced on the REAL merged box count (see
     # settings.stl_max_boxes); the raw estimate is logged for observability.
@@ -182,7 +192,8 @@ def generate_3mf(
     # Generate meshes per color block
     for idx, color_block in enumerate(color_blocks):
         pixels = color_block['pixels']
-        blend_code = result_codes[idx]
+        # Backing suffix -> single merged block below; strip before meshing.
+        blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)
 
         # A run such as YYYYY is one solid extrusion, not five stacked
         # copies of the same surface mesh. This matches the STL path and
@@ -279,6 +290,7 @@ def generate_svg_3mf(
     colors: Optional[Colors] = None,
     color_hex_map: Optional[dict] = None,
     white_backing_layers: int = 1,
+    backing_mode: str = 'white',
 ) -> bytes:
     """
     Generate a single 3MF file from SVG vector contours with color-separated objects.
@@ -317,11 +329,15 @@ def generate_svg_3mf(
 
     input_colors = [result['color'] for result in vector_results]
     # Map with order refinement for composition-pruned translucent sets
-    # (same as the pixel STL/3MF paths).
+    # (same as the pixel STL/3MF paths); codes carry the backing suffix.
     from services.image_processor import _map_and_refine
+    _b_label = resolve_backing_label(colors, white_backing_layers, backing_mode)
+    _b_suffix = backing_suffix(_b_label, white_backing_layers)
+    _b_boundary = backing_boundary_rgb(backing_mode) if _b_suffix else None
     result_codes, _ = _map_and_refine(
         input_colors, ref_code_matrix, ref_rgb_matrix,
         colors, layer_count, layer_height,
+        backing_suffix=_b_suffix, background_rgb=_b_boundary,
     )
 
     _log_input_color_brightness(input_colors, "SVG-3MF")
@@ -331,10 +347,10 @@ def generate_svg_3mf(
     height = image_dimensions['height']
     z_offset = 0.0
 
-    n_white = normalize_white_backing_layers(white_backing_layers)
-    w_label = resolve_white_backing_label(colors, n_white)
+    n_white = normalize_backing_layers(white_backing_layers)
+    w_label = resolve_backing_label(colors, n_white, backing_mode)
     if n_white > 0:
-        logger.info("SVG-3MF: white backing label='%s', n_white=%d", w_label, n_white)
+        logger.info("SVG-3MF: printed backing mode='%s', label='%s', layers=%d", backing_mode, w_label, n_white)
 
     total_optimized_boxes = 0
 
@@ -346,7 +362,7 @@ def generate_svg_3mf(
         region_grid = render_region_mask(regions, width=width, height=height)
         if not region_grid.any():
             continue
-        blend_code = result_codes[idx]
+        blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)
 
         start_idx = 0
         for code_char, group in itertools.groupby(blend_code):
