@@ -44,5 +44,7 @@
   "imported": "Imported {{count}} preset(s) successfully",
   "importedWithErrors": "Imported {{count}} preset(s). Errors: {{details}}",
   "invalidPreset": "Preset at index {{index}} is invalid and was skipped",
-  "similarColors": "{{first}} and {{second}} are very similar (distance: {{distance}})"
+  "similarColors": "{{first}} and {{second}} are very similar (distance: {{distance}})",
+  "tooManyRequestsRetryIn": "Too many requests. Please try again in {{seconds}} seconds.",
+  "tooManyRequestsTryAgainShortly": "Too many requests. Please try again shortly."
 }

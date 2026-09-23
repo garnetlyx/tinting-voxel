@@ -174,6 +174,29 @@ describe('processImage', () => {
       processImage(file, { mode: 'pixel', pixelSize: 0.08 })
     ).rejects.toThrow('Failed to process image');
   });
+
+  it('reports a rate limit with the server retry delay', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'Retry-After': '42' }),
+      json: vi.fn().mockResolvedValue({ detail: 'Rate limit exceeded: 10 per 1 minute' }),
+    });
+
+    const file = new File(['test'], 'test.png', { type: 'image/png' });
+    await expect(
+      processImage(file, { mode: 'pixel', pixelSize: 0.08 })
+    ).rejects.toThrow('Too many requests. Please try again in 42 seconds.');
+  });
+
+  it('reports a rate limit without a retry delay', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 429, json: vi.fn() });
+
+    const file = new File(['test'], 'test.png', { type: 'image/png' });
+    await expect(
+      processImage(file, { mode: 'pixel', pixelSize: 0.08 })
+    ).rejects.toThrow('Too many requests. Please try again shortly.');
+  });
 });
 
 describe('simulatePrintPreview', () => {

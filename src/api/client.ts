@@ -25,12 +25,29 @@ import type {
 
 const API_BASE_URL = '/api';
 
+/** Milliseconds to wait from a Retry-After header (seconds or HTTP date). */
+export function retryAfterMs(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
+  return Number.isFinite(delay) && delay > 0 ? delay : undefined;
+}
+
+/** Canonical rate-limit message; the i18n adapter localizes it. */
+function rateLimitMessage(retryAfter: string | null): string {
+  const delay = retryAfterMs(retryAfter);
+  return delay === undefined
+    ? 'Too many requests. Please try again shortly.'
+    : `Too many requests. Please try again in ${Math.ceil(delay / 1000)} seconds.`;
+}
+
 /**
  * Safely extract error detail from a response that may not be JSON
  * FastAPI validation errors return detail as an array of objects
  */
 async function getErrorDetail(response: Response, fallback: string): Promise<string> {
   recordBugReportLog('error', `API request failed (${response.status}): ${response.url || fallback}`);
+  if (response.status === 429) return rateLimitMessage(response.headers?.get('Retry-After') ?? null);
   try {
     const body = await response.json();
     const detail = body.detail;

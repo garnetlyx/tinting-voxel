@@ -2,6 +2,7 @@
  * API client for parameter search optimization.
  */
 
+import { retryAfterMs } from './client';
 import type { FilamentColorConfig } from './types';
 
 const API_BASE_URL = '/api';
@@ -72,13 +73,6 @@ export class ParamSearchHttpError extends Error {
   constructor(message: string, readonly status: number, readonly retryAfterMs?: number) {
     super(message);
   }
-}
-
-function retryAfterMs(value: string | null): number | undefined {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
-  return Number.isFinite(delay) && delay > 0 ? delay : undefined;
 }
 
 function parseResult(raw: {

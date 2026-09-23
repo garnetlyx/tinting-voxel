@@ -14,6 +14,8 @@ describe('frontend message compatibility adapter', () => {
     ['Imported 7 preset(s) successfully', '成功导入 7 个预设'],
     ['Imported 2 preset(s). Errors: Failed to parse JSON', '已导入 2 个预设。错误：无法解析 JSON 文件'],
     ['Q and Z are very similar (distance: 2.5)', 'Q 与 Z 的颜色十分接近（距离：2.5）'],
+    ['Too many requests. Please try again in 42 seconds.', '请求过于频繁，请在 42 秒后重试。'],
+    ['Too many requests. Please try again shortly.', '请求过于频繁，请稍后重试。'],
   ])('adapts %s without changing the source message', (source, expected) => {
     setLocale('zh-CN');
     expect(localizeMessage(source, i18n)).toBe(expected);

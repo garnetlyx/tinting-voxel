@@ -196,6 +196,7 @@ class TestParamSearchEndpoint:
         )
         assert resp.status_code == 429
         assert int(resp.headers["Retry-After"]) > 0
+        assert resp.json() == {"detail": "Rate limit exceeded: 2 per 1 minute"}
 
 
 class TestParamSearchProgressEndpoint:

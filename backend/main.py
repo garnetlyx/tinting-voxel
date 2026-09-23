@@ -10,10 +10,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from api.client_ip import load_cloudflare_networks
 from api.rate_limiter import limiter
 from api.routes import bug_report, batch, download, download_v2, filament, health, image, palette, param_search
 from config.settings import get_cors_origins, settings
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
     logger.info("Environment: %s", settings.environment)
+    await load_cloudflare_networks()
     logger.info("Initializing color mapping reference matrices...")
 
     initialize_color_mapping(
@@ -85,8 +87,9 @@ app.add_middleware(
 app.state.limiter = limiter
 
 
-async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    response = _rate_limit_exceeded_handler(request, exc)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """Report a rate limit in the API's standard error shape, with Retry-After."""
+    response = JSONResponse({"detail": f"Rate limit exceeded: {exc.detail}"}, status_code=429)
     current_limit = getattr(request.state, "view_rate_limit", None)
     if current_limit is not None:
         reset_at, _ = limiter.limiter.get_window_stats(current_limit[0], *current_limit[1])

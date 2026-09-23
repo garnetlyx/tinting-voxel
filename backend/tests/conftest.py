@@ -1,6 +1,7 @@
 """
 Pytest configuration and fixtures
 """
+import os
 import sys
 from pathlib import Path
 
@@ -9,6 +10,9 @@ import pytest
 # Add backend directory to path for imports
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
+
+# The app lifespan must not fetch Cloudflare's edge ranges during tests.
+os.environ["CLOUDFLARE_IPS_URL"] = ""
 
 
 @pytest.fixture

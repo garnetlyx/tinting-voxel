@@ -55,6 +55,18 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # Per-client request limits. E2E runs disable them: one browser drives the
+    # whole suite from a single address.
+    rate_limit_enabled: bool = True
+
+    # Visitor address for rate limiting and telemetry. Railway's edge sets this
+    # header to the peer that connected to it; empty uses the socket peer.
+    client_ip_header: str = "X-Real-IP"
+    # Cloudflare's published edge ranges. CF-Connecting-IP is trusted only when
+    # the peer is inside them; empty disables the Cloudflare header.
+    cloudflare_ips_url: str = "https://api.cloudflare.com/client/v4/ips"
+    cloudflare_ips_timeout_seconds: float = 5.0
+
     # Stack-search budget: full permutation enumeration (N^L codes) is used
     # whenever its probe-extrapolated wall time fits this budget; larger
     # translucent sets fall back to composition pruning, and larger opaque
