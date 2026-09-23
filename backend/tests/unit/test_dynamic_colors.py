@@ -8,8 +8,8 @@ import pytest
 
 from core.blend_color import Color, Colors
 from core.color_config import (
-    BAMBU_CMYW_PHASE6_PRESET,
-    BAMBU_CMYWK_PHASE6_PRESET,
+    BAMBU_CMYW_PRESET,
+    BAMBU_CMYWK_PRESET,
     CLEAR_CMYW_PRESET,
     ColorConfig,
     get_available_presets,
@@ -68,10 +68,10 @@ class TestColorConfig:
 class TestPresets:
     """Tests for preset color configurations."""
 
-    def test_bambu_cmyw_phase6_preset_exists(self):
-        """BAMBU_CMYW_PHASE6_PRESET has 4 colors."""
-        assert len(BAMBU_CMYW_PHASE6_PRESET) == 4
-        labels = [c.label for c in BAMBU_CMYW_PHASE6_PRESET]
+    def test_bambu_cmyw_preset_exists(self):
+        """BAMBU_CMYW_PRESET has 4 colors."""
+        assert len(BAMBU_CMYW_PRESET) == 4
+        labels = [c.label for c in BAMBU_CMYW_PRESET]
         assert labels == ['C', 'M', 'Y', 'W']
 
     def test_clear_cmyw_preset_exists(self):
@@ -81,9 +81,9 @@ class TestPresets:
         assert labels == ['C', 'M', 'Y', 'W']
 
     def test_get_preset_bambu(self):
-        """get_preset returns BAMBU_CMYW_PHASE6_PRESET for 'bambu_cmyw_phase6'."""
-        preset = get_preset("bambu_cmyw_phase6")
-        assert preset == BAMBU_CMYW_PHASE6_PRESET
+        """get_preset returns BAMBU_CMYW_PRESET for 'bambu_cmyw'."""
+        preset = get_preset("bambu_cmyw")
+        assert preset == BAMBU_CMYW_PRESET
 
     def test_get_preset_clear(self):
         """get_preset returns CLEAR_CMYW_PRESET for 'clear_cmyw'."""
@@ -91,9 +91,9 @@ class TestPresets:
         assert preset == CLEAR_CMYW_PRESET
 
 
-    def test_get_preset_phase6_cmyw(self):
-        """get_preset returns Phase 6 CMYW preset for 'bambu_cmyw_phase6'."""
-        preset = get_preset("bambu_cmyw_phase6")
+    def test_get_preset_bambu_cmyw(self):
+        """get_preset returns Bambu CMYW preset for 'bambu_cmyw'."""
+        preset = get_preset("bambu_cmyw")
         assert preset is not None
         assert len(preset) == 4
         assert {color.label for color in preset} == {"C", "M", "Y", "W"}
@@ -124,7 +124,7 @@ class TestColorsFromConfigs:
 
     def test_from_configs_with_preset(self):
         """from_configs works with preset configurations."""
-        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PRESET)
 
         assert len(colors) == 4
         assert set(colors.get_labels()) == {'C', 'M', 'Y', 'W'}
@@ -154,8 +154,8 @@ class TestColorsFromConfigs:
         assert colors['C'].td == 5.5
 
     def test_from_configs_preserves_single_td_field(self):
-        colors = Colors.from_configs(BAMBU_CMYWK_PHASE6_PRESET)
-        for config in BAMBU_CMYWK_PHASE6_PRESET:
+        colors = Colors.from_configs(BAMBU_CMYWK_PRESET)
+        for config in BAMBU_CMYWK_PRESET:
             assert colors[config.label].td == config.transmission_distance
 
     def test_from_configs_preserves_per_channel_td(self):
@@ -213,7 +213,7 @@ class TestFilenamePrefix:
 
     def test_cmyw_produces_cmyw_prefix(self):
         """Standard CMYW colors produce 'CMYW' prefix."""
-        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PRESET)
         prefix = get_filename_prefix(colors)
         assert prefix == "CMYW"
 
@@ -317,7 +317,7 @@ class TestDefaultMaterialSet:
     def test_calibrated_colors_init_matrix(self):
         """Calibrated presets initialize the reference matrix under the
         unified formula."""
-        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PRESET)
         initialize_color_mapping(layer_count=4, layer_height=0.08, colors=colors)
 
         from services import stl_generator

@@ -18,12 +18,12 @@ def _custom(td):
 @pytest.mark.parametrize("material,height,expected", [
     ({"filamentPreset": "clear_cmyw"}, None, .84),
     ({"filamentPreset": "clear_cmyg"}, None, .84),
-    ({"filamentPreset": "bambu_cmyw_phase6"}, None, .08),
+    ({"filamentPreset": "bambu_cmyw"}, None, .08),
     ({"filamentColors": _custom([.1, 6.85, 6.85])}, None, .84),
     ({"filamentColors": _custom([.1, 6.5, 6.5])}, None, .08),
     ({"filamentColors": _custom(4.6)}, None, .84),
     ({"filamentPreset": "clear_cmyw"}, .08, .08),
-    ({"filamentPreset": "bambu_cmyw_phase6"}, .84, .84),
+    ({"filamentPreset": "bambu_cmyw"}, .84, .84),
     ({"filamentPreset": "clear_cmyw"}, .12, .12),
 ])
 def test_settings_height_uses_material_values_only_when_omitted(client, material, height, expected):

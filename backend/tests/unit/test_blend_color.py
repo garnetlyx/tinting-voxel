@@ -15,7 +15,7 @@ from core.blend_color import (
     Color,
     Colors,
 )
-from core.color_config import BAMBU_CMYW_PHASE6_PRESET, ColorConfig, get_preset
+from core.color_config import BAMBU_CMYW_PRESET, ColorConfig, get_preset
 from config.print_defaults import DEFAULT_FILAMENT_PRESET
 
 
@@ -276,11 +276,11 @@ class TestCodeToRgbCache:
     def test_cache_isolated_between_generators(self):
         """Different generator configs don't share cached results."""
         from core.blend_color import clear_rgb_cache
-        from core.color_config import BAMBU_CMYW_PHASE6_PRESET, CLEAR_CMYW_PRESET
+        from core.color_config import BAMBU_CMYW_PRESET, CLEAR_CMYW_PRESET
         clear_rgb_cache()
 
         gen1 = BlendTestGenerator(
-            colors=Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET),
+            colors=Colors.from_configs(BAMBU_CMYW_PRESET),
             layer_height=0.08,
             layer_count_max=4,
             verbose=False,

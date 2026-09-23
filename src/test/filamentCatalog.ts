@@ -10,11 +10,11 @@ const transparent: FilamentColorConfig[] = regular.map(color => ({ ...color, tra
 
 export const filamentCatalog: FilamentPresetsResponse = {
   presets: [
-    { name: 'bambu_cmywk_phase6', display_name: 'Bambu CMYWK', colors: [...regular, { name: 'Key', hex: '#000000', transmission_distance: [0.1, 0.2, 0.3] }] },
-    { name: 'bambu_cmyw_phase6', display_name: 'Bambu CMYW', colors: regular },
+    { name: 'bambu_cmywk', display_name: 'Bambu CMYWK', colors: [...regular, { name: 'Key', hex: '#000000', transmission_distance: [0.1, 0.2, 0.3] }] },
+    { name: 'bambu_cmyw', display_name: 'Bambu CMYW', colors: regular },
     { name: 'clear_cmyg', display_name: 'Clear CMYG', colors: [...transparent.slice(0, 3), { name: 'Grey', hex: '#999999', transmission_distance: [5, 6, 7] }] },
     { name: 'clear_cmyw', display_name: 'Clear CMYW', colors: transparent },
   ],
-  defaults: { filament_preset: 'bambu_cmywk_phase6', backing_layers: 3, regular_layer_height_mm: 0.08, transparent_layer_height_mm: 0.84 },
+  defaults: { filament_preset: 'bambu_cmywk', backing_layers: 3, regular_layer_height_mm: 0.08, transparent_layer_height_mm: 0.84 },
   transparency: { td_threshold_mm: 4.5, aggregation: 'mean' },
 };

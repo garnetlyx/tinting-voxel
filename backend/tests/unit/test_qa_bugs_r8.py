@@ -66,7 +66,7 @@ class TestQA50PresetAndColorsCoexist:
                 pixelSize=0.08,
                 layerCount=4,
                 imageDimensions={"width": 4, "height": 4},
-                filamentPreset="bambu_cmyw_phase6",
+                filamentPreset="bambu_cmyw",
                 filamentColors=[
                     {"name": "Cyan", "hex": "#0086D6", "transmission_distance": 3.0},
                     {"name": "Magenta", "hex": "#EC008C", "transmission_distance": 1.9},
@@ -95,7 +95,7 @@ class TestQA51ThreeMFPresetNoColorMap:
 
         # Simulate the preset-only case (no filamentColors)
         colors = get_colors_from_request(
-            filament_preset=FilamentPreset.BAMBU_CMYW_PHASE6,
+            filament_preset=FilamentPreset.BAMBU_CMYW,
             filament_colors=None,
         )
 
@@ -194,7 +194,7 @@ class TestQA52ShortCodeBackgroundIndex:
 
 class TestQA55PrintSettingsEmptyConfig:
     """print_settings endpoint should work when neither preset nor
-    custom colors are provided (defaults to bambu_cmyw_phase6), but should
+    custom colors are provided (defaults to bambu_cmyw), but should
     validate that the resulting extruder list is non-empty.
     """
 

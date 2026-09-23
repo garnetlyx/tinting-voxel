@@ -120,7 +120,7 @@ async def api_batch_download_stl(
     if batch_result['successCount'] == 0:
         raise HTTPException(status_code=422, detail="All images failed to process")
 
-    # Resolve colors: filamentColors > filamentPreset > default (Phase 6 CMYWK)
+    # Resolve colors: filamentColors > filamentPreset > default (Bambu CMYWK)
     parsed_preset, parsed_colors = parse_filament_form_payload(filamentPreset, filamentColors)
     colors = get_colors_from_request(parsed_preset, parsed_colors)
     layerHeight = resolve_layer_height(layerHeight, colors)

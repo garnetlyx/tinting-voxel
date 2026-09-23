@@ -1201,7 +1201,7 @@ class TestPresetAndCustomColorsMutualExclusivity:
 
         try:
             req = FilamentPreviewRequest(
-                filamentPreset=FilamentPreset.BAMBU_CMYW_PHASE6,
+                filamentPreset=FilamentPreset.BAMBU_CMYW,
                 filamentColors=[
                     FilamentColorConfig(
                         name='Red', hex='#FF0000', transmission_distance=3.0
@@ -1485,7 +1485,7 @@ class TestPaginationPartialParameters:
 
         try:
             req = FilamentPreviewRequest(
-                filamentPreset=FilamentPreset.BAMBU_CMYW_PHASE6,
+                filamentPreset=FilamentPreset.BAMBU_CMYW,
                 layerCount=4,
                 page=1,
                 pageSize=None,
@@ -1504,7 +1504,7 @@ class TestPaginationPartialParameters:
 
         try:
             req = FilamentPreviewRequest(
-                filamentPreset=FilamentPreset.BAMBU_CMYW_PHASE6,
+                filamentPreset=FilamentPreset.BAMBU_CMYW,
                 layerCount=4,
                 page=None,
                 pageSize=100,
@@ -1948,7 +1948,7 @@ class TestLayerHeightPixelSizeNoBounds:
 
         try:
             req = FilamentPreviewRequest(
-                filamentPreset=FilamentPreset.BAMBU_CMYW_PHASE6,
+                filamentPreset=FilamentPreset.BAMBU_CMYW,
                 layerHeight=999999.0,
             )
             pytest.fail(

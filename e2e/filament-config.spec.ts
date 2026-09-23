@@ -32,7 +32,7 @@ test.describe('Filament Configuration', () => {
     await expect(presetSelect).toBeVisible();
 
     // Select Bambu CMYK preset
-    await presetSelect.selectOption('bambu_cmyw_phase6');
+    await presetSelect.selectOption('bambu_cmyw');
 
     // Should have color inputs (preset loaded)
     const colorInputs = page.locator('input[type="color"]');

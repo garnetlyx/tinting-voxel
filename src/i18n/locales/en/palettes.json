@@ -2,8 +2,8 @@
   "paletteLibrary": "Palette Library",
   "browseCuratedPalettes": "Browse curated palettes",
   "noPalettesFound": "No palettes found",
-  "bambu_cmywk_phase6_name": "Bambu CMYWK",
-  "bambu_cmyw_phase6_name": "Bambu CMYW",
+  "bambu_cmywk_name": "Bambu CMYWK",
+  "bambu_cmyw_name": "Bambu CMYW",
   "clear_cmyw_name": "Clear CMYW",
   "clear_cmyg_name": "Clear CMYG"
 }

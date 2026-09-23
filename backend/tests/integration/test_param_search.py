@@ -36,7 +36,7 @@ def png_bytes():
 
 
 _FAST_FORM = {
-    "preset": "bambu_cmyw_phase6",
+    "preset": "bambu_cmyw",
     "mode": "pixel",
     "strategy": "random",
     "n_trials": "2",
@@ -184,6 +184,10 @@ class TestParamSearchEndpoint:
             )
             assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
             client.delete(f"/api/param-search/progress/{resp.json()['job_id']}")
+            deadline = time.monotonic() + 10
+            while not client.get("/api/param-search/availability").json()["available"]:
+                assert time.monotonic() < deadline
+                time.sleep(0.02)
 
         resp = client.post(
             "/api/param-search",
@@ -354,6 +358,32 @@ class TestParamSearchProgressEndpoint:
         assert finished["error"] == "Search stopped after 0.05s; 1 of 2 previews completed."
         assert finished["completed"] == 1
         assert [item["candidate_id"] for item in finished["results"]] == [1]
+
+    def test_job_abandoned_by_its_page_frees_the_search_slot(
+        self, client, png_bytes, monkeypatch,
+    ):
+        from api.routes import param_search
+        from services.param_search_service import Evaluator, SearchResult
+
+        monkeypatch.setattr(param_search.settings, "param_search_abandon_seconds", 0.05)
+
+        def slow_evaluate(self, params, mode):
+            time.sleep(0.1)
+            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==")
+
+        monkeypatch.setattr(Evaluator, "evaluate", slow_evaluate)
+        resp = client.post(
+            "/api/param-search", data={**_FAST_FORM, "n_trials": "5"},
+            files={"image": ("test.png", png_bytes, "image/png")},
+        )
+        assert resp.status_code == 200
+        deadline = time.monotonic() + 5
+        while not client.get("/api/param-search/availability").json()["available"]:
+            assert time.monotonic() < deadline, "abandoned job kept the search slot"
+            time.sleep(0.05)
+        snapshot = client.get(f"/api/param-search/progress/{resp.json()['job_id']}").json()
+        assert snapshot["status"] == "cancelled"
+        assert snapshot["completed"] == 1
 
     def test_single_flight_rejects_overlap_until_cancelled_worker_exits(
         self, client, png_bytes, monkeypatch,

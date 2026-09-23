@@ -129,7 +129,7 @@ class TestRegimeGate:
         assert is_translucent_set(_translucent_colors())
 
     def test_bambu_set_is_not_translucent(self):
-        colors = Colors.from_configs(get_preset("bambu_cmywk_phase6"))
+        colors = Colors.from_configs(get_preset("bambu_cmywk"))
         assert not is_translucent_set(colors)
 
     def test_custom_scalar_values_define_the_regime(self):
@@ -148,13 +148,13 @@ class TestRegimeGate:
     def test_prune_true_never_forces_pruning(self):
         """Pruning is automatic and translucent-only; True is rejected outright."""
         translucent = _translucent_colors()
-        bambu = Colors.from_configs(get_preset("bambu_cmywk_phase6"))
+        bambu = Colors.from_configs(get_preset("bambu_cmywk"))
         for colors in (translucent, bambu):
             with pytest.raises(ValueError, match="prune=True is not supported"):
                 compute_reference_matrices(4, 0.84, colors, prune=True)
 
     def test_opaque_set_keeps_full_enumeration(self):
-        bambu = Colors.from_configs(get_preset("bambu_cmywk_phase6"))
+        bambu = Colors.from_configs(get_preset("bambu_cmywk"))
         code_df, _ = compute_reference_matrices(4, 0.08, bambu)
         assert len(set(_codes_from_matrix(code_df))) == 5**4
 
@@ -190,7 +190,7 @@ class TestRegimeGate:
 
 class TestRefinement:
     def test_refine_is_noop_for_opaque_set(self):
-        colors = Colors.from_configs(get_preset("bambu_cmywk_phase6"))
+        colors = Colors.from_configs(get_preset("bambu_cmywk"))
         codes = ["CMYK"] * 3
         rgbs = [(1, 2, 3)] * 3
         out_codes, out_rgbs = refine_matches(

@@ -45,6 +45,13 @@ class SearchJob:
         self._status = "running"
         self._error: Optional[str] = None
         self.finished_at: Optional[float] = None
+        self.last_polled = time.monotonic()
+
+    def touch(self) -> None:
+        self.last_polled = time.monotonic()
+
+    def abandoned(self) -> bool:
+        return time.monotonic() - self.last_polled > settings.param_search_abandon_seconds
 
     def add_result(self, result: SearchResult) -> None:
         item = SearchResultItem(
@@ -140,11 +147,25 @@ _search_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="param-s
 
 def _execute_search(job: SearchJob, service: ParamSearchService, image_bytes: bytes) -> None:
     started = time.monotonic()
+
+    def stop_if_abandoned() -> None:
+        if job.abandoned() and not job.cancel_event.is_set():
+            logger.info("Param search abandoned by its client: job_id=%s", job.job_id)
+            job.cancel()
+
+    def on_result(result: SearchResult) -> None:
+        job.add_result(result)
+        stop_if_abandoned()
+
+    def on_candidate_error(candidate_id: int, reason: str) -> None:
+        job.add_candidate_error(candidate_id, reason)
+        stop_if_abandoned()
+
     try:
         results = service.run(
             image_bytes,
-            on_result=job.add_result,
-            on_candidate_error=job.add_candidate_error,
+            on_result=on_result,
+            on_candidate_error=on_candidate_error,
             cancel=job.cancel_event,
             budget_seconds=settings.param_search_job_budget_seconds,
         )
@@ -207,7 +228,7 @@ async def api_param_search(
     image_bytes = await image.read()
     validate_image_upload(image.filename, image_bytes)
 
-    # Resolve colors: filamentColors > preset > default (Phase 6 CMYWK).
+    # Resolve colors: filamentColors > preset > default (Bambu CMYWK).
     # Lets the search run against exactly what the user has selected in the
     # UI, including fully custom filament configurations.
     parsed_preset, parsed_colors = parse_filament_form_payload(preset, filamentColors)
@@ -267,6 +288,7 @@ def api_param_search_progress(job_id: str, after: int = Query(0, ge=0)):
     job = _job_store.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Unknown job_id: {job_id}")
+    job.touch()
     return job.snapshot(after=after)
 
 

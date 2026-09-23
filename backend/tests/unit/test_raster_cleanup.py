@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 
 import numpy as np
@@ -6,208 +5,107 @@ import pytest
 from PIL import Image
 
 from services.mesh_optimizer import generate_optimized_boxes
-from services.raster_cleanup import merge_small_label_regions, regularize_printable_regions
+from services.raster_cleanup import regularize_printable_regions, unprintable_pixels
+
+LOCAL_PHOTO_PIXEL_SIZE = 200 / 1270
 
 
-def test_batch_merges_multiple_islands_into_stable_neighbors(caplog):
-    """Independent islands touching a stable region should merge in one batch pass."""
-    labels = np.array([
-        [0, 0, 0],
-        [0, 1, 0],
-        [2, 0, 0],
-    ], dtype=np.int32)
-    colors = [
-        (255, 0, 0),
-        (0, 0, 255),
-        (0, 255, 0),
-    ]
-
-    with caplog.at_level(logging.INFO):
-        cleaned = merge_small_label_regions(
-            labels=labels,
-            colors=colors,
-            pixel_size=0.2,
-            detail_size=0.4,
-        )
-
-    assert np.all(cleaned == 0)
-    assert "batch merged 2 undersized components" in caplog.text
+def _radius(pixel_size, detail_size=0.42):
+    return detail_size / pixel_size / 2
 
 
-def test_adjacent_small_components_converge_without_oscillation():
-    """Small-small-large chains should converge to the stable region."""
-    labels = np.array([[0, 1, 2, 2, 2, 2]], dtype=np.int32)
-    colors = [
-        (255, 0, 0),
-        (250, 10, 10),
-        (0, 0, 255),
-    ]
+def test_connected_border_network_is_kept_and_widened():
+    """A stained-glass network of 1 px lines stays, widened to the detail width."""
+    labels = np.zeros((50, 50), dtype=np.int32)
+    for index in (10, 25, 40):
+        labels[index, :] = 1
+        labels[:, index] = 1
 
-    cleaned = merge_small_label_regions(
-        labels=labels,
-        colors=colors,
-        pixel_size=0.2,
-        detail_size=0.4,
-    )
+    cleaned = regularize_printable_regions(labels, [(200, 200, 200), (0, 0, 0)], 0.1, 0.4)
 
-    assert np.all(cleaned == 2)
+    assert np.all(cleaned[labels == 1] == 1)
+    assert np.all(cleaned[15:21, 15:21] == 0)
+    assert not unprintable_pixels(cleaned, _radius(0.1, 0.4)).any()
 
 
-def test_fallback_merge_breaks_all_small_deadlock():
-    """If no stable neighbor exists, cleanup still makes bounded progress."""
-    labels = np.array([[0, 1, 2]], dtype=np.int32)
-    colors = [
-        (255, 0, 0),
-        (250, 10, 10),
-        (0, 0, 255),
-    ]
-
-    cleaned = merge_small_label_regions(
-        labels=labels,
-        colors=colors,
-        pixel_size=0.2,
-        detail_size=0.4,
-    )
-
-    assert len(np.unique(cleaned)) == 1
-
-
-# ---------------------------------------------------------------------------
-# Fix 2: fill_density stroke detection for connected border networks
-# ---------------------------------------------------------------------------
-
-def test_remove_thin_features_preserves_connected_border_network():
-    """
-    A connected network of thin lines (stained-glass border) must be preserved.
-
-    The network spans a large bounding box but fills only a small fraction of
-    it (low fill_density), so it should be classified as a stroke even though
-    its bounding-box aspect ratio is close to 1.0.
-    """
-    from services.raster_cleanup import remove_thin_features
-
-    H, W = 20, 20
-    labels = np.zeros((H, W), dtype=np.int32)  # label 0 = fill color
-
-    # Draw a thin connected border network (label 1) as a grid of 1px lines
-    # spanning the full image — aspect ratio ≈ 1.0, fill_density ≈ 0.10
-    for row in range(0, H, 4):
-        labels[row, :] = 1
-    for col in range(0, W, 4):
-        labels[:, col] = 1
-
-    border_pixel_count_before = int((labels == 1).sum())
-    assert border_pixel_count_before > 0
-
-    colors = [(200, 200, 200), (0, 0, 0)]  # fill=gray, border=black
-
-    # pixel_size=0.1mm, detail_size=0.4mm → min_width=4px
-    cleaned = remove_thin_features(
-        labels=labels,
-        colors=colors,
-        pixel_size=0.1,
-        detail_size=0.4,
-    )
-
-    # The border network must survive (may be dilated, but label 1 must remain)
-    border_pixel_count_after = int((cleaned == 1).sum())
-    assert border_pixel_count_after > 0, (
-        "Connected border network was incorrectly deleted by remove_thin_features"
-    )
-
-
-def test_remove_thin_features_deletes_compact_noise():
-    """
-    A compact noise blob (high fill_density, low aspect_ratio) must be deleted.
-    """
-    from services.raster_cleanup import remove_thin_features
-
-    H, W = 20, 20
-    labels = np.zeros((H, W), dtype=np.int32)
-
-    # 3×3 compact blob of label 1 in the center — aspect_ratio=1.0, fill_density=1.0
+def test_compact_noise_blob_joins_the_surrounding_material():
+    labels = np.zeros((20, 20), dtype=np.int32)
     labels[8:11, 8:11] = 1
 
-    colors = [(200, 200, 200), (0, 0, 0)]
+    cleaned = regularize_printable_regions(labels, [(200, 200, 200), (0, 0, 0)], 0.1, 0.4)
 
-    cleaned = remove_thin_features(
-        labels=labels,
-        colors=colors,
-        pixel_size=0.1,
-        detail_size=0.4,
-    )
-
-    # The compact blob should be reassigned to label 0
-    assert int((cleaned == 1).sum()) == 0, (
-        "Compact noise blob was not removed by remove_thin_features"
-    )
+    assert np.all(cleaned == 0)
 
 
-def test_remove_thin_features_reassigns_to_spatial_neighbor_not_top_left_origin():
-    """
-    Ensure noise pixels are reassigned to their true spatial neighbors rather
-    than erroneously indexing top-left pixels from flat array mismatch.
-    """
-    from services.raster_cleanup import remove_thin_features
-
-    H, W = 50, 50
-    # Top-left has label 0
-    labels = np.zeros((H, W), dtype=np.int32)
-    # Bottom-right has label 1
+def test_noise_joins_its_spatial_neighbour_not_a_distant_label():
+    labels = np.zeros((50, 50), dtype=np.int32)
     labels[25:, 25:] = 1
-    # Inside bottom-right, put a tiny 2x2 noise blob of label 2 at (40:42, 40:42)
     labels[40:42, 40:42] = 2
 
-    colors = [(0, 0, 255), (255, 0, 0), (0, 255, 0)]  # 0=blue, 1=red, 2=green
-
-    cleaned = remove_thin_features(
-        labels=labels,
-        colors=colors,
-        pixel_size=0.1,
-        detail_size=0.4,
+    cleaned = regularize_printable_regions(
+        labels, [(0, 0, 255), (255, 0, 0), (0, 255, 0)], 0.1, 0.4,
     )
 
-    # The noise blob was deep inside label 1 (red). It must become label 1, NOT label 0 (blue)
-    assert np.all(cleaned[40:42, 40:42] == 1), (
-        f"Noise blob was incorrectly reassigned to {cleaned[40:42, 40:42]} instead of neighbor 1"
+    assert np.all(cleaned[40:42, 40:42] == 1)
+
+
+def test_noise_on_a_boundary_joins_the_more_similar_color():
+    labels = np.zeros((40, 40), dtype=np.int32)
+    labels[:, 20:] = 1
+    labels[18:22, 18:22] = 2
+
+    cleaned = regularize_printable_regions(
+        labels, [(250, 250, 250), (0, 0, 0), (30, 30, 30)], 0.1, 0.42,
     )
 
+    assert np.all(cleaned[labels == 1] == 1)
+    assert not np.any(cleaned == 2)
+    assert np.count_nonzero(cleaned[18:22, 18:20] == 1) > 0
 
 
-def test_multicolor_region_cleanup_matches_pre_optimization_output():
-    """The old 4-neighbor merge is the pixel-exact oracle for this texture."""
-    from hashlib import sha256
+def test_diagonal_one_pixel_line_is_widened_not_erased():
+    labels = np.zeros((80, 80), dtype=np.int32)
+    for index in range(10, 70):
+        labels[index, index] = 1
 
-    y, x = np.indices((40, 48))
+    cleaned = regularize_printable_regions(
+        labels, [(255, 255, 255), (0, 0, 0)], LOCAL_PHOTO_PIXEL_SIZE, 0.42,
+    )
+
+    assert all(cleaned[index, index] == 1 for index in range(12, 68))
+    assert not unprintable_pixels(cleaned, _radius(LOCAL_PHOTO_PIXEL_SIZE)).any()
+
+
+def test_three_pixel_line_already_meets_the_detail_width():
+    labels = np.zeros((40, 40), dtype=np.int32)
+    labels[18:21, 5:35] = 1
+
+    cleaned = regularize_printable_regions(
+        labels, [(255, 255, 255), (0, 0, 0)], LOCAL_PHOTO_PIXEL_SIZE, 0.42,
+    )
+
+    assert np.array_equal(cleaned, labels)
+
+
+def test_random_texture_becomes_printable_everywhere():
+    y, x = np.indices((60, 72))
     labels = ((x // 3 + 2 * (y // 4)) % 5).astype(np.int32)
     rng = np.random.default_rng(7)
-    ys = rng.integers(0, 40, 130)
-    xs = rng.integers(0, 48, 130)
-    labels[ys, xs] = rng.integers(0, 5, 130)
-    colors = [
-        (255, 0, 0), (0, 0, 255), (0, 255, 0),
-        (255, 255, 0), (0, 0, 0),
-    ]
-    expected = {
-        0.13: (245, "e5c7f60ca95f8e00eb82ccb3bd98262c6aba7ee66cffc0c2ef84007925b300f9"),
-        0.16: (84, "b1835a29312f2f1db87e131b624046b77613e5162c8b547fe7a0c6dc275625da"),
-        0.22: (79, "8093738acbf691335df933242732815f5e7954ce2530a6c884e691ef538413eb"),
-    }
+    labels[rng.integers(0, 60, 200), rng.integers(0, 72, 200)] = rng.integers(0, 5, 200)
+    colors = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0), (0, 0, 0)]
 
-    for pixel_size, (changed, digest) in expected.items():
-        cleaned = merge_small_label_regions(labels, colors, pixel_size, 0.42)
-        assert cleaned.dtype == labels.dtype
-        assert int((cleaned != labels).sum()) == changed
-        assert sha256(cleaned.astype("<i4").tobytes()).hexdigest() == digest
+    cleaned = regularize_printable_regions(labels, colors, LOCAL_PHOTO_PIXEL_SIZE, 0.42)
+
+    assert cleaned.shape == labels.shape
+    assert unprintable_pixels(cleaned, _radius(LOCAL_PHOTO_PIXEL_SIZE)).sum() <= 0.01 * cleaned.size
 
 
-def test_single_color_component_has_no_background_id():
-    """A filled label can have no background pixels in the OpenCV label map."""
-    labels = np.full((6, 8), 2, dtype=np.int32)
-    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
-    cleaned = merge_small_label_regions(labels, colors, 0.13, 0.42)
-    assert np.array_equal(cleaned, labels)
-    assert cleaned.dtype == labels.dtype
+def test_pixels_at_least_as_large_as_the_detail_width_are_left_unchanged():
+    labels = np.zeros((6, 6), dtype=np.int32)
+    labels[2, 2] = 1
+    assert np.array_equal(
+        regularize_printable_regions(labels, [(0, 0, 0), (255, 255, 255)], 0.42, 0.42), labels,
+    )
 
 
 def test_one_pixel_print_stroke_is_physically_widened_without_rescaling():

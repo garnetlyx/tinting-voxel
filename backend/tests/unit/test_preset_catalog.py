@@ -24,9 +24,9 @@ def test_removed_presets_are_rejected(name):
         FilamentPreviewRequest(filamentPreset=name)
 
 
-@pytest.mark.parametrize("name", ["bambu_cmyw_phase6", "bambu_cmywk_phase6"])
+@pytest.mark.parametrize("name", ["bambu_cmyw", "bambu_cmywk"])
 def test_bambu_catalog_uses_measured_channels_from_one_material_set(name):
-    full = {material.label: material for material in get_preset("bambu_cmywk_phase6")}
+    full = {material.label: material for material in get_preset("bambu_cmywk")}
     for material in get_preset(name):
         td = material.transmission_distance
         assert isinstance(td, tuple) and len(td) == 3

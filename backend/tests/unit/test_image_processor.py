@@ -344,3 +344,43 @@ class TestProcessImageLargeHandling:
 
         assert len(merged) == 1
         assert merged[0]['count'] == 9
+
+
+def _stained_glass_bytes(width=240, height=180):
+    """Colored panes separated by thin diagonal and curved lead lines."""
+    from PIL import ImageDraw
+
+    image = Image.new('RGB', (width, height), (200, 30, 30))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 0, width // 2, height), fill=(40, 70, 200))
+    draw.polygon([(width // 2, 0), (width, 0), (width, height // 2)], fill=(230, 200, 40))
+    for offset in range(-height, width, 23):
+        draw.line((offset, 0, offset + height, height), fill=(10, 10, 10), width=1)
+    for offset in range(0, width + height, 31):
+        draw.line((offset, 0, offset - height, height), fill=(15, 15, 15), width=2)
+    draw.ellipse((60, 40, 180, 140), outline=(5, 5, 5), width=2)
+    buffer = BytesIO()
+    image.save(buffer, format='PNG')
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize('pixel_size', [200 / 1270, 0.1])
+def test_every_exported_pixel_region_holds_the_detail_width(pixel_size):
+    """Thin diagonal lines must leave no sub-detail material in the export grid."""
+    from services.raster_cleanup import unprintable_pixels
+
+    result = process_image(
+        _stained_glass_bytes(), max_colors=6, color_threshold=30,
+        pixel_size=pixel_size, layer_count=4, layer_height=0.08, detail_size=0.42,
+    )
+    width = result['imageDimensions']['width']
+    height = result['imageDimensions']['height']
+    labels = np.full((height, width), -1, dtype=np.int32)
+    for index, block in enumerate(result['colorBlocks']):
+        for pixel in block['pixels']:
+            labels[pixel['y'], pixel['x']] = index
+
+    assert np.all(labels >= 0)
+    assert unprintable_pixels(labels, 0.42 / pixel_size / 2).sum() <= 0.001 * labels.size
+    dark = [index for index, block in enumerate(result['colorBlocks']) if block['r'] + block['g'] + block['b'] < 150]
+    assert dark and np.isin(labels, dark).sum() > 0.05 * labels.size

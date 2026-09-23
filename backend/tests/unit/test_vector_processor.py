@@ -430,3 +430,25 @@ class TestHuePriorityQuantization:
         assert black_label != white_label, (
             "Black and white must be assigned to different clusters"
         )
+
+
+def test_final_svg_partition_holds_the_detail_width():
+    from PIL import Image, ImageDraw
+    from services.raster_cleanup import unprintable_pixels
+    from services.vector_processor import (
+        VectorProcessorConfig, finalize_vector_partition, process_image_vector_with_preview,
+    )
+
+    image = Image.new('RGB', (240, 180), (200, 30, 30))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 0, 120, 180), fill=(40, 70, 200))
+    for offset in range(-180, 240, 23):
+        draw.line((offset, 0, offset + 180, 180), fill=(10, 10, 10), width=1)
+    pixel_size = 200 / 1270
+    config = VectorProcessorConfig(
+        epsilon=1.0, min_area=1, num_colors=4, pixel_size=pixel_size, detail_size=0.42,
+    )
+    results, _ = process_image_vector_with_preview(np.array(image), config)
+    labels = finalize_vector_partition(results, {'width': 240, 'height': 180}, pixel_size, 0.42)
+
+    assert unprintable_pixels(labels, 0.42 / pixel_size / 2).sum() <= 0.001 * labels.size

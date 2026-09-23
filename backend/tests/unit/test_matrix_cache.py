@@ -16,7 +16,7 @@ def isolated_cache(monkeypatch):
 def test_warmup_populates_real_matrices_for_each_requested_height():
     from core.color_config import get_preset
     from core.blend_color import Colors
-    preset = 'bambu_cmyw_phase6'
+    preset = 'bambu_cmyw'
     assert matrix_cache.warmup_cache([preset], [2], [0.08, 0.12]) == 2
     for height in [0.08, 0.12]:
         colors = Colors.from_configs(get_preset(preset))
@@ -41,8 +41,8 @@ def test_default_warmup_visits_all_presets_and_layer_counts(monkeypatch):
 def test_warmup_continues_after_an_invalid_preset():
     from core.color_config import get_preset
     from core.blend_color import Colors
-    assert matrix_cache.warmup_cache(['invalid', 'bambu_cmyw_phase6'], [2], [0.08]) == 1
-    assert matrix_cache.get_cached_matrices(Colors.from_configs(get_preset('bambu_cmyw_phase6')), 2, 0.08) is not None
+    assert matrix_cache.warmup_cache(['invalid', 'bambu_cmyw'], [2], [0.08]) == 1
+    assert matrix_cache.get_cached_matrices(Colors.from_configs(get_preset('bambu_cmyw')), 2, 0.08) is not None
 
 
 
@@ -50,7 +50,7 @@ def test_default_backing_cache_matches_explicit_three_layers_only():
     from core.blend_color import Colors
     from core.color_config import get_preset
     from services.stl_generator import compute_reference_matrices
-    colors = Colors.from_configs(get_preset("bambu_cmyw_phase6"))
+    colors = Colors.from_configs(get_preset("bambu_cmyw"))
     actual = compute_reference_matrices(2, 0.08, colors, n_targets=2)
     default = matrix_cache.get_cached_matrices(colors, 2, 0.08, n_targets=2)
     explicit = matrix_cache.get_cached_matrices(

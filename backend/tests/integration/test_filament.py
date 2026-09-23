@@ -5,8 +5,8 @@ import base64
 
 
 def test_filament_preview_default(client):
-    """POST /api/filament-preview with bambu preset uses default Phase 6 CMYW."""
-    response = client.post("/api/filament-preview", json={"filamentPreset": "bambu_cmyw_phase6"})
+    """POST /api/filament-preview with bambu preset uses default Bambu CMYW."""
+    response = client.post("/api/filament-preview", json={"filamentPreset": "bambu_cmyw"})
     assert response.status_code == 200
     data = response.json()
     assert "image" in data
@@ -19,10 +19,10 @@ def test_filament_preview_default(client):
 
 
 def test_filament_preview_with_bambu_preset(client):
-    """POST /api/filament-preview with bambu_cmyw_phase6 preset."""
+    """POST /api/filament-preview with bambu_cmyw preset."""
     response = client.post(
         "/api/filament-preview",
-        json={"filamentPreset": "bambu_cmyw_phase6"},
+        json={"filamentPreset": "bambu_cmyw"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -81,7 +81,7 @@ def test_filament_preview_with_6_colors(client):
 
 def test_filament_preview_returns_valid_base64_png(client):
     """Preview image is a valid base64-encoded PNG."""
-    response = client.post("/api/filament-preview", json={"filamentPreset": "bambu_cmyw_phase6"})
+    response = client.post("/api/filament-preview", json={"filamentPreset": "bambu_cmyw"})
     assert response.status_code == 200
     data = response.json()
     decoded = base64.b64decode(data["image"])
@@ -92,7 +92,7 @@ def test_filament_preview_custom_layer_count(client):
     """Preview with custom layer count changes combination count."""
     response = client.post(
         "/api/filament-preview",
-        json={"filamentPreset": "bambu_cmyw_phase6", "layerCount": 3},
+        json={"filamentPreset": "bambu_cmyw", "layerCount": 3},
     )
     assert response.status_code == 200
     data = response.json()
@@ -152,7 +152,7 @@ def test_filament_preview_no_preset_or_colors_returns_422(client):
 
 def test_filament_preview_color_matrix_structure(client):
     """Color matrix entries have correct structure."""
-    response = client.post("/api/filament-preview", json={"filamentPreset": "bambu_cmyw_phase6"})
+    response = client.post("/api/filament-preview", json={"filamentPreset": "bambu_cmyw"})
     assert response.status_code == 200
     data = response.json()
     matrix = data["colorMatrix"]

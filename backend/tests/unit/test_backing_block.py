@@ -18,7 +18,7 @@ from services.print_stack import (
 from services.stl_generator import compute_reference_matrices
 
 
-BAMBU = Colors.from_configs(get_preset("bambu_cmyw_phase6"))
+BAMBU = Colors.from_configs(get_preset("bambu_cmyw"))
 
 
 # ---------------------------------------------------------------- resolution
@@ -106,7 +106,7 @@ def test_mapping_result_depends_on_backing_mode():
     """Backing changes the result when the front layers transmit enough light."""
     translucent = Colors.from_configs([
         ColorConfig(name=c.name, hex=c.hex, transmission_distance=2.0)
-        for c in get_preset("bambu_cmyw_phase6")
+        for c in get_preset("bambu_cmyw")
     ])
     dark = (0x1D, 0x1E, 0x1E)
     codes_w, rgb_w = _map_source_colors_to_blends([dark], translucent, 8, 0.08, 3, 'white')

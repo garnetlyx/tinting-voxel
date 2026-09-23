@@ -80,7 +80,6 @@ def test_svg_mode_ignores_detail_size_for_global_resizing(client, tiny_png_bytes
             "numColors": "4",
             "pixelSize": "0.1",
             "detailSize": "0.4",
-            "targetWidth": "100",
         },
     )
     assert response.status_code == 200
@@ -272,7 +271,7 @@ def test_simulate_preview_success(client, tiny_png_bytes):
             "imageDimensions": processed["imageDimensions"],
             "layerHeight": 0.08,
             "layerCount": 4,
-            "filamentPreset": "bambu_cmyw_phase6",
+            "filamentPreset": "bambu_cmyw",
         },
     )
     assert response.status_code == 200

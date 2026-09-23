@@ -8,7 +8,7 @@ import pytest
 from config.print_defaults import DEFAULT_FILAMENT_PRESET
 from core.blend_color import Colors
 from core.color_config import (
-    BAMBU_CMYW_PHASE6_PRESET,
+    BAMBU_CMYW_PRESET,
     CLEAR_CMYW_PRESET,
     ColorConfig,
     get_preset,
@@ -73,8 +73,8 @@ class TestFilamentPreviewService:
         assert result["stats"]["combinationCount"] == 256
 
     def test_generate_preview_with_bambu_preset(self):
-        """Preview works with Bambu CMYW Phase 6 preset."""
-        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
+        """Preview works with Bambu CMYW preset."""
+        colors = Colors.from_configs(BAMBU_CMYW_PRESET)
         service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
         result = service.generate_preview()
         assert result["stats"]["colorCount"] == 4
@@ -88,7 +88,7 @@ class TestFilamentPreviewService:
 
     def test_generate_preview_distinct_presets_blend_differently(self):
         """Distinct material parameters produce distinct predicted colors."""
-        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
+        colors = Colors.from_configs(BAMBU_CMYW_PRESET)
         service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
 
         baseline = FilamentPreviewService(

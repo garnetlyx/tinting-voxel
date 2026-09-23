@@ -470,10 +470,10 @@ def merge_small_pixels_to_neighbors(
     detail_size: float,
 ) -> list[dict]:
     """
-    Merge pixels smaller than detail_size with their nearest color-similar neighbor.
-    
-    This prevents tiny details from being printed at sub-detail-size scale,
-    without forcing the entire model to be scaled up.
+    Make every color region printable at detail_size without rescaling the model.
+
+    Sub-detail strokes are widened and sub-detail noise joins a neighboring
+    color (see ``regularize_printable_regions``).
     
     Args:
         color_blocks: List of color blocks with pixels
@@ -505,21 +505,17 @@ def merge_small_pixels_to_neighbors(
     )
 
     rebuilt_blocks = {}
-    for y in range(height):
-        for x in range(width):
-            idx = int(cleaned_labels[y, x])
-            if idx not in rebuilt_blocks:
-                r, g, b = palette[idx]
-                rebuilt_blocks[idx] = {
-                    'r': r,
-                    'g': g,
-                    'b': b,
-                    'hex': color_blocks[idx].get('hex', f"#{r:02x}{g:02x}{b:02x}"),
-                    'count': 0,
-                    'pixels': [],
-                }
-            rebuilt_blocks[idx]['pixels'].append({'x': x, 'y': y})
-            rebuilt_blocks[idx]['count'] += 1
+    for idx in np.unique(cleaned_labels):
+        ys, xs = np.nonzero(cleaned_labels == idx)
+        r, g, b = palette[idx]
+        rebuilt_blocks[int(idx)] = {
+            'r': r,
+            'g': g,
+            'b': b,
+            'hex': color_blocks[idx].get('hex', f"#{r:02x}{g:02x}{b:02x}"),
+            'count': int(len(xs)),
+            'pixels': [{'x': int(x), 'y': int(y)} for y, x in zip(ys.tolist(), xs.tolist())],
+        }
 
     result = list(rebuilt_blocks.values())
     result.sort(key=lambda c: c['count'], reverse=True)
@@ -536,7 +532,6 @@ def process_image(
     layer_height: float = 0.08,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_mode: str = 'white',
-    target_width: Optional[float] = None,
     detail_size: Optional[float] = None,
 ) -> dict:
     """
@@ -547,7 +542,6 @@ def process_image(
         max_colors: Maximum number of colors to extract
         color_threshold: Threshold for merging similar colors
         pixel_size: Physical size of each pixel in mm
-        target_width: Explicit physical target width in mm (deprecated, not used)
         detail_size: Minimum physical pixel size in mm
 
     Returns:

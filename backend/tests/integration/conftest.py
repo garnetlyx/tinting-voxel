@@ -21,7 +21,7 @@ def client():
     # Full preset enumeration is exponential and repeated for every test module.
     # Keep the startup/cache path real, using a 16-combination configuration.
     test_warmup = partial(
-        warmup_cache, preset_names=['bambu_cmyw_phase6'],
+        warmup_cache, preset_names=['bambu_cmyw'],
         layer_counts=[2], layer_heights=[0.08],
     )
     with patch('services.matrix_cache.warmup_cache', test_warmup), TestClient(app) as c:

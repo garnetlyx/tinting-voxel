@@ -9,6 +9,7 @@ vi.mock('../api/paramSearch', async (importOriginal) => ({
   startParamSearch: vi.fn(),
   getParamSearchProgress: vi.fn(),
   cancelParamSearch: vi.fn(),
+  isParamSearchAvailable: vi.fn(),
 }));
 
 const config = {

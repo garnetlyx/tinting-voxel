@@ -2,8 +2,8 @@
   "paletteLibrary": "配色库",
   "browseCuratedPalettes": "浏览精选配色",
   "noPalettesFound": "未找到配色",
-  "bambu_cmywk_phase6_name": "Bambu CMYWK",
-  "bambu_cmyw_phase6_name": "Bambu CMYW",
+  "bambu_cmywk_name": "Bambu CMYWK",
+  "bambu_cmyw_name": "Bambu CMYW",
   "clear_cmyw_name": "透明 CMYW",
   "clear_cmyg_name": "透明 CMYG"
 }

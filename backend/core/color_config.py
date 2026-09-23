@@ -59,7 +59,7 @@ class ColorConfig:
         return self.name[0].upper()
 
 
-BAMBU_CMYWK_PHASE6_PRESET: List[ColorConfig] = [
+BAMBU_CMYWK_PRESET: List[ColorConfig] = [
     ColorConfig(name='Cyan', hex='#3D79C6', transmission_distance=(0.14985206885995866, 0.2158019588968432, 0.34470002110761544)),
     ColorConfig(name='Magenta', hex='#B3356E', transmission_distance=(0.25394517301625485, 0.11741231747797068, 0.16740952089338004)),
     ColorConfig(name='Yellow', hex='#FFE665', transmission_distance=(0.24453692139115935, 0.4161395063139576, 0.11645416645362061)),
@@ -67,8 +67,8 @@ BAMBU_CMYWK_PHASE6_PRESET: List[ColorConfig] = [
     ColorConfig(name='Key', hex='#0B0F0C', transmission_distance=(0.11902961051255159, 0.09501141308426139, 0.09724992232345757)),
 ]
 
-BAMBU_CMYW_PHASE6_PRESET: List[ColorConfig] = [
-    color for color in BAMBU_CMYWK_PHASE6_PRESET if color.label != "K"
+BAMBU_CMYW_PRESET: List[ColorConfig] = [
+    color for color in BAMBU_CMYWK_PRESET if color.label != "K"
 ]
 
 CLEAR_CMYG_PRESET: List[ColorConfig] = [
@@ -86,15 +86,15 @@ CLEAR_CMYW_PRESET: List[ColorConfig] = [
 ]
 
 PRESETS = {
-    "bambu_cmywk_phase6": BAMBU_CMYWK_PHASE6_PRESET,
-    "bambu_cmyw_phase6": BAMBU_CMYW_PHASE6_PRESET,
+    "bambu_cmywk": BAMBU_CMYWK_PRESET,
+    "bambu_cmyw": BAMBU_CMYW_PRESET,
     "clear_cmyg": CLEAR_CMYG_PRESET,
     "clear_cmyw": CLEAR_CMYW_PRESET,
 }
 
 PRESET_DISPLAY_NAMES = {
-    "bambu_cmywk_phase6": "Bambu CMYWK",
-    "bambu_cmyw_phase6": "Bambu CMYW",
+    "bambu_cmywk": "Bambu CMYWK",
+    "bambu_cmyw": "Bambu CMYW",
     "clear_cmyg": "Clear CMYG",
     "clear_cmyw": "Clear CMYW",
 }

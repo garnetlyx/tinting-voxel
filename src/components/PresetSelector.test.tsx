@@ -7,7 +7,7 @@ describe('PresetSelector', () => {
   it('uses only API options and selects a supplied preset', () => {
     const onPresetChange = vi.fn();
     const presets = [...filamentCatalog.presets, { name: 'new-material', display_name: 'New Material', colors: [] }];
-    render(<PresetSelector presets={presets} selectedPreset="bambu_cmywk_phase6" onPresetChange={onPresetChange} />);
+    render(<PresetSelector presets={presets} selectedPreset="bambu_cmywk" onPresetChange={onPresetChange} />);
     expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual(['Bambu CMYWK', 'Bambu CMYW', 'Clear CMYG', 'Clear CMYW', 'New Material']);
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'new-material' } });
     expect(onPresetChange).toHaveBeenCalledWith('new-material');

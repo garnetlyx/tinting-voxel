@@ -17,7 +17,7 @@ RANGES = {"max_colors": [8, 4, 12], "color_threshold": [40], "detail_size": [0.6
 
 @pytest.fixture
 def colors():
-    return Colors.from_configs(get_preset("bambu_cmyw_phase6"))
+    return Colors.from_configs(get_preset("bambu_cmyw"))
 
 
 @pytest.fixture

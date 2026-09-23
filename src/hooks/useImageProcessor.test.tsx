@@ -135,7 +135,7 @@ describe('useImageProcessor', () => {
   it('defaults to the Bambu CMYWK filament preset', async () => {
     const { result } = await renderProcessor();
 
-    expect(result.current.filamentPreset).toBe('bambu_cmywk_phase6');
+    expect(result.current.filamentPreset).toBe('bambu_cmywk');
     expect(result.current.filamentColors).toHaveLength(5);
     expect(result.current.layerCount).toBe(4);
     expect(result.current.maxLayerCount).toBe(10);
@@ -208,7 +208,7 @@ describe('useImageProcessor', () => {
     expect(result.current.layerHeight).toBe(0.84);
 
     // The lower measured TDs restore the ordinary default.
-    act(() => { result.current.loadPreset('bambu_cmywk_phase6'); });
+    act(() => { result.current.loadPreset('bambu_cmywk'); });
     expect(result.current.allTransparent).toBe(false);
     expect(result.current.layerHeight).toBe(0.08);
   });
@@ -222,7 +222,7 @@ describe('useImageProcessor', () => {
     });
     expect(result.current.layerHeight).toBe(0.3);
 
-    act(() => { result.current.loadPreset('bambu_cmywk_phase6'); });
+    act(() => { result.current.loadPreset('bambu_cmywk'); });
     expect(result.current.layerHeight).toBe(0.3);
   });
 
@@ -232,7 +232,7 @@ describe('useImageProcessor', () => {
     act(() => result.current.setLayerHeight(height));
     act(() => result.current.loadPreset('clear_cmyw'));
     expect(result.current.layerHeight).toBe(height);
-    act(() => result.current.loadPreset('bambu_cmywk_phase6'));
+    act(() => result.current.loadPreset('bambu_cmywk'));
     expect(result.current.layerHeight).toBe(height);
   });
 
@@ -270,7 +270,7 @@ describe('useImageProcessor', () => {
     expect(result.current.allTransparent).toBe(true);
     expect(result.current.layerHeight).toBe(0.84);
 
-    act(() => { result.current.loadPreset('bambu_cmywk_phase6'); });
+    act(() => { result.current.loadPreset('bambu_cmywk'); });
     expect(result.current.allTransparent).toBe(false);
   });
 
@@ -289,7 +289,7 @@ describe('useImageProcessor', () => {
         layerHeight: 0.08,
         layerCount: 4,
         whiteBackingLayers: 3,
-        filamentPreset: 'bambu_cmywk_phase6',
+        filamentPreset: 'bambu_cmywk',
       }),
       expect.any(AbortSignal)
     );
@@ -416,7 +416,7 @@ describe('useImageProcessor', () => {
 
     expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
       expect.objectContaining({
-        filamentPreset: 'bambu_cmywk_phase6',
+        filamentPreset: 'bambu_cmywk',
       })
     );
     expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
@@ -436,12 +436,12 @@ describe('useImageProcessor', () => {
 
     expect(mockedDownload3MFV2).toHaveBeenCalledWith(
       expect.objectContaining({
-        filamentPreset: 'bambu_cmywk_phase6',
+        filamentPreset: 'bambu_cmywk',
       })
     );
     expect(mockedDownloadPrintSettings).toHaveBeenCalledWith(
       expect.objectContaining({
-        filamentPreset: 'bambu_cmywk_phase6',
+        filamentPreset: 'bambu_cmywk',
       })
     );
   });
@@ -546,7 +546,7 @@ describe('useImageProcessor', () => {
     const { result } = await renderProcessor();
 
     act(() => {
-      result.current.loadPreset('bambu_cmyw_phase6');
+      result.current.loadPreset('bambu_cmyw');
       result.current.addFilamentColor();
     });
 
@@ -561,7 +561,7 @@ describe('useImageProcessor', () => {
     const { result } = await renderProcessor();
 
     act(() => {
-      result.current.loadPreset('bambu_cmyw_phase6');
+      result.current.loadPreset('bambu_cmyw');
       result.current.updateFilamentColor(0, {
         name: 'Cyan',
         hex: '#3D79C6',

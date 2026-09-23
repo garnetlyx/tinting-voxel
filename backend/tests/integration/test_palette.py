@@ -12,7 +12,7 @@ class TestListPalettes:
         assert response.status_code == 200
         data = response.json()
         assert "palettes" in data
-        assert [p["id"] for p in data["palettes"]] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmyg", "clear_cmyw"]
+        assert [p["id"] for p in data["palettes"]] == ["bambu_cmywk", "bambu_cmyw", "clear_cmyg", "clear_cmyw"]
 
 
     def test_palette_has_required_fields(self, client):
@@ -40,10 +40,10 @@ class TestGetPalette:
 
     def test_get_existing_palette(self, client):
         """Get a known palette by ID."""
-        response = client.get("/api/palettes/bambu_cmyw_phase6")
+        response = client.get("/api/palettes/bambu_cmyw")
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == "bambu_cmyw_phase6"
+        assert data["id"] == "bambu_cmyw"
         assert data["name"] == "Bambu CMYW"
         assert len(data["colors"]) == 4
 

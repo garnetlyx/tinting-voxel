@@ -8,8 +8,8 @@ from typing import List, Optional
 
 from core.color_config import (
     ColorConfig,
-    BAMBU_CMYWK_PHASE6_PRESET,
-    BAMBU_CMYW_PHASE6_PRESET,
+    BAMBU_CMYWK_PRESET,
+    BAMBU_CMYW_PRESET,
     CLEAR_CMYG_PRESET,
     CLEAR_CMYW_PRESET,
 )
@@ -25,18 +25,18 @@ class PaletteEntry:
 
 
 # Palette metadata references the canonical filament presets.
-PALETTE_BAMBU_CMYWK_PHASE6 = PaletteEntry(
-    id="bambu_cmywk_phase6",
+PALETTE_BAMBU_CMYWK = PaletteEntry(
+    id="bambu_cmywk",
     name="Bambu CMYWK",
     description="Calibrated Bambu Lab CMYWK filament set for full-color printing with true black",
-    colors=BAMBU_CMYWK_PHASE6_PRESET,  # Reference source-of-truth constant
+    colors=BAMBU_CMYWK_PRESET,  # Reference source-of-truth constant
 )
 
-PALETTE_BAMBU_CMYW_PHASE6 = PaletteEntry(
-    id="bambu_cmyw_phase6",
+PALETTE_BAMBU_CMYW = PaletteEntry(
+    id="bambu_cmyw",
     name="Bambu CMYW",
     description="Calibrated Bambu Lab CMYW filament set for full-color printing",
-    colors=BAMBU_CMYW_PHASE6_PRESET,  # Reference source-of-truth constant
+    colors=BAMBU_CMYW_PRESET,  # Reference source-of-truth constant
 )
 
 PALETTE_CLEAR_CMYW = PaletteEntry(
@@ -54,8 +54,8 @@ PALETTE_CLEAR_CMYG = PaletteEntry(
 )
 
 ALL_PALETTES: List[PaletteEntry] = [
-    PALETTE_BAMBU_CMYWK_PHASE6,
-    PALETTE_BAMBU_CMYW_PHASE6,
+    PALETTE_BAMBU_CMYWK,
+    PALETTE_BAMBU_CMYW,
     PALETTE_CLEAR_CMYG,
     PALETTE_CLEAR_CMYW,
 ]

@@ -65,8 +65,8 @@ class FilamentColorConfig(BaseModel):
 
 class FilamentPreset(str, Enum):
     """Available filament presets."""
-    BAMBU_CMYWK_PHASE6 = "bambu_cmywk_phase6"
-    BAMBU_CMYW_PHASE6 = "bambu_cmyw_phase6"
+    BAMBU_CMYWK = "bambu_cmywk"
+    BAMBU_CMYW = "bambu_cmyw"
     CLEAR_CMYG = "clear_cmyg"
     CLEAR_CMYW = "clear_cmyw"
 

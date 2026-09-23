@@ -11,7 +11,7 @@ from services.image_processor import process_image
 
 
 @pytest.mark.parametrize("preset,layer_height", [
-    ("bambu_cmywk_phase6", .08), ("bambu_cmyw_phase6", .08),
+    ("bambu_cmywk", .08), ("bambu_cmyw", .08),
     ("clear_cmyg", .84), ("clear_cmyw", .84),
 ])
 def test_pipeline_assigned_codes_match_the_selected_model(preset, layer_height):

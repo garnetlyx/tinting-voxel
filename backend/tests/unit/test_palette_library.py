@@ -15,7 +15,7 @@ class TestPaletteLibrary:
 
     def test_all_palettes_not_empty(self):
         """Library has at least one palette."""
-        assert [p.id for p in ALL_PALETTES] == ["bambu_cmywk_phase6", "bambu_cmyw_phase6", "clear_cmyg", "clear_cmyw"]
+        assert [p.id for p in ALL_PALETTES] == ["bambu_cmywk", "bambu_cmyw", "clear_cmyg", "clear_cmyw"]
 
     def test_all_palettes_have_unique_ids(self):
         """All palette IDs are unique."""
@@ -55,9 +55,9 @@ class TestPaletteLibrary:
 
     def test_get_palette_found(self):
         """Get an existing palette by ID."""
-        palette = get_palette("bambu_cmyw_phase6")
+        palette = get_palette("bambu_cmyw")
         assert palette is not None
-        assert palette.id == "bambu_cmyw_phase6"
+        assert palette.id == "bambu_cmyw"
         assert palette.name == "Bambu CMYW"
 
     def test_get_palette_not_found(self):

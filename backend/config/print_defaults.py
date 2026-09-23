@@ -1,5 +1,5 @@
 """Shared defaults for printed color segments and slicer layers (millimetres)."""
-DEFAULT_FILAMENT_PRESET = "bambu_cmywk_phase6"
+DEFAULT_FILAMENT_PRESET = "bambu_cmywk"
 DEFAULT_BACKING_LAYERS = 3
 REGULAR_LAYER_HEIGHT_MM = 0.08
 TRANSPARENT_SLICER_LAYER_HEIGHT_MM = 0.28

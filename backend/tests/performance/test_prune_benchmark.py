@@ -42,7 +42,7 @@ def test_cmywk_8l_process_image_latency_gate():
     batch blend + content-keyed matrix cache keep it ~5-7 s locally)."""
     from core.color_config import get_preset
     from core.blend_color import Colors
-    colors = Colors.from_configs(get_preset("bambu_cmywk_phase6"))
+    colors = Colors.from_configs(get_preset("bambu_cmywk"))
     image_bytes = open(PERF_FIXTURE, "rb").read()
     t0 = time.monotonic()
     result = process_image(

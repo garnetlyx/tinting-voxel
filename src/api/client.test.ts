@@ -196,7 +196,7 @@ describe('simulatePrintPreview', () => {
       imageDimensions: { width: 10, height: 10 },
       layerHeight: 0.08,
       layerCount: 4,
-      filamentPreset: 'bambu_cmyw_phase6',
+      filamentPreset: 'bambu_cmyw',
     });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -238,7 +238,7 @@ describe('downloadCSV', () => {
 
 describe('getFilamentPresets', () => {
   it('fetches presets from V2 API', async () => {
-    const mockPresets = { presets: [{ name: 'bambu_cmyw_phase6', display_name: 'Bambu', colors: [] }] };
+    const mockPresets = { presets: [{ name: 'bambu_cmyw', display_name: 'Bambu', colors: [] }] };
     mockFetchResponse(mockPresets);
 
     const result = await getFilamentPresets();

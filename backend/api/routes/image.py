@@ -59,7 +59,6 @@ async def api_process_image(
     minArea: float = Form(4.0, gt=0, le=100),
     numColors: int = Form(8, ge=1, le=256),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
-    targetWidth: Optional[float] = Form(None, ge=1, le=500),
     layerHeight: Optional[float] = Form(None, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
     whiteBackingLayers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
@@ -99,13 +98,12 @@ async def api_process_image(
             layer_height=layerHeight,
             white_backing_layers=whiteBackingLayers,
             backing_mode=backingMode,
-            target_width=targetWidth,
             detail_size=detailSize,
         )
 
         logger.info(
-            "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.2f, detailSize=%s, targetWidth=%s",
-            maxColors, colorThreshold, pixelSize, str(detailSize), str(targetWidth)
+            "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.2f, detailSize=%s",
+            maxColors, colorThreshold, pixelSize, str(detailSize)
         )
         logger.info(
             "Processed image: %dx%d, extracted %d colors",
@@ -129,12 +127,6 @@ async def api_process_image(
         img = background
     else:
         img = img.convert('RGB')
-
-    if targetWidth is not None:
-        logger.info(
-            "SVG mode: ignoring targetWidth=%.1fmm for image resampling; model size is controlled by pixelSize",
-            targetWidth,
-        )
 
     # Standard safety downscale only; detailSize no longer drives global SVG resampling.
     img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)

@@ -86,11 +86,11 @@ class TestGeneratePrintSettings:
             layer_count=4,
             image_dimensions={'width': 10, 'height': 10},
             filament_colors=colors,
-            filament_preset='bambu_cmyw_phase6',
+            filament_preset='bambu_cmyw',
         )
         data = json.loads(result)
         filament = data['filament']
-        assert filament['preset'] == 'bambu_cmyw_phase6'
+        assert filament['preset'] == 'bambu_cmyw'
         assert filament['extruder_count'] == 4
         assert len(filament['extruders']) == 4
         assert filament['extruders'][0]['index'] == 0

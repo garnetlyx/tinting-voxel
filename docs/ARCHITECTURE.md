@@ -522,7 +522,7 @@ Groups similar colors using scikit-learn's MiniBatchKMeans:
 ### Built-in filament catalog
 
 `core/color_config.py` owns the four built-in presets:
-`bambu_cmywk_phase6` (five colors, default), `bambu_cmyw_phase6` (four colors),
+`bambu_cmywk` (five colors, default), `bambu_cmyw` (four colors),
 `clear_cmyg`, and `clear_cmyw`. All four presets use RGB-channel TD values. Bambu CMYW is derived from
 CMYWK without the K material. Their effective TDs come from the existing Bambu
 staircase observations; photo-specific calibration terms are not product parameters.

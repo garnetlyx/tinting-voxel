@@ -157,7 +157,7 @@ class TestBatchDownloadSTL:
                 "pixelSize": "0.08",
                 "layerHeight": "0.08",
                 "layerCount": "4",
-                "filamentPreset": "bambu_cmyw_phase6",
+                "filamentPreset": "bambu_cmyw",
             },
         )
         assert response.status_code == 200

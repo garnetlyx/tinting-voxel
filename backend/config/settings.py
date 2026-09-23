@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # Parameter search runs after the request returns. Stop between candidates
     # at this budget and keep all completed full-resolution previews.
     param_search_job_budget_seconds: float = 1800.0
+    # A job whose page stopped polling (closed, reloaded, crashed) stops after
+    # its current candidate, so it cannot hold the only search slot. Hidden
+    # browser tabs may poll only once a minute.
+    param_search_abandon_seconds: float = 180.0
 
     # File Upload
     max_upload_size: int = 10 * 1024 * 1024  # 10MB

@@ -81,7 +81,6 @@ export interface ProcessImageParams {
   pixelParams?: PixelModeParams;
   svgParams?: SVGModeParams;
   detailSize?: number;
-  targetWidth?: number;
 }
 
 export interface DownloadSTLParams {
