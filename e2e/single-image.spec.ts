@@ -24,10 +24,7 @@ test.describe('Single Image Processing', () => {
     await page.getByRole('button', { name: /Apply & Process/ }).click();
 
     // Wait for results
-    await expect(page.getByText(/Extracted Colors/)).toBeVisible({ timeout: 30_000 });
-
-    // Should show extracted color count
-    await expect(page.getByText(/Extracted Colors \(\d+\)/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Download STL/ })).toBeVisible({ timeout: 30_000 });
 
     // Reprocess button should be visible
     await expect(page.getByRole('button', { name: 'Reprocess' })).toBeVisible();

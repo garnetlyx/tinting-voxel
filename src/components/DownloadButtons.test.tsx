@@ -5,16 +5,10 @@ import { DownloadButtons } from './DownloadButtons';
 
 describe('DownloadButtons', () => {
   const defaultProps = {
-    colorCount: 5,
     onDownloadCSV: vi.fn(),
     onDownloadSTL: vi.fn(),
     processing: false,
   };
-
-  it('displays extracted color count', () => {
-    render(<DownloadButtons {...defaultProps} />);
-    expect(screen.getByText('Extracted Colors (5)')).toBeInTheDocument();
-  });
 
   it('shows CSV button by default', () => {
     render(<DownloadButtons {...defaultProps} />);

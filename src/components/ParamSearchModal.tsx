@@ -63,7 +63,7 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
             <div className="text-xs text-gray-500 space-y-0.5">
               {Object.entries(result.params).map(([key, value]) => (
                 <div key={key} className="flex justify-between">
-                  <span>{parameterLabel(key)}</span><span className="font-mono">{value.toFixed(2)}</span>
+                  <span>{parameterLabel(key)}</span><span className="font-mono">{Number.isInteger(value) ? value : value.toFixed(2)}</span>
                 </div>
               ))}
             </div>

@@ -3,7 +3,7 @@ import { useTranslation } from '../i18n';
 /**
  * Main converter page component
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Settings, Image as ImageIcon, Layers, Loader2 } from 'lucide-react';
 import { useImageProcessor } from '../hooks/useImageProcessor';
 import { useParamSearch } from '../hooks/useParamSearch';
@@ -126,17 +126,6 @@ const Converter: React.FC = () => {
   const backendReady = useBackendReady();
   const paramSearch = useParamSearch();
   const [paramSearchOpen, setParamSearchOpen] = useState(false);
-  const [showParamSearchPrompt, setShowParamSearchPrompt] = useState(false);
-  // Track whether the current processing run was triggered by a fresh image upload
-  const pendingParamSearchPromptRef = useRef(false);
-
-  // Show the prompt once processing completes after a fresh upload
-  useEffect(() => {
-    if (!processing && hasResults && pendingParamSearchPromptRef.current) {
-      pendingParamSearchPromptRef.current = false;
-      setShowParamSearchPrompt(true);
-    }
-  }, [processing, hasResults]);
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
       <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto">
@@ -216,7 +205,6 @@ const Converter: React.FC = () => {
                   processing={processing}
                   hasImage={image !== null}
                   onAutoOptimize={() => {
-                    setShowParamSearchPrompt(false);
                     paramSearch.openConfig();
                     setParamSearchOpen(true);
                   }}
@@ -299,11 +287,7 @@ const Converter: React.FC = () => {
                   {isEditing && rawImage && (
                     <ImageEditor
                       image={rawImage}
-                      onApply={(editedImg) => {
-                        setShowParamSearchPrompt(false);
-                        pendingParamSearchPromptRef.current = true;
-                        handleApplyEdit(editedImg);
-                      }}
+                      onApply={handleApplyEdit}
                       onCancel={handleCancelEdit}
                       disabled={processing}
                     />
@@ -319,26 +303,6 @@ const Converter: React.FC = () => {
                   {!processing && !isEditing && hasResults && (
                     <div className="space-y-6">
 
-                      {/* Param search prompt */}
-                      {showParamSearchPrompt && (
-                        <div className="flex items-center justify-between gap-4 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3">
-                          <p className="text-sm text-purple-800">{t('converter:optimizationPrompt')}</p>
-                          <div className="flex gap-2 shrink-0">
-                            <button
-                              onClick={() => {
-                                setShowParamSearchPrompt(false);
-                                paramSearch.openConfig();
-                                setParamSearchOpen(true);
-                              }}
-                              className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                            >{t('converter:optimize')}</button>
-                            <button
-                              onClick={() => setShowParamSearchPrompt(false)}
-                              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
-                            >{t('converter:skip')}</button>
-                          </div>
-                        </div>
-                      )}
                       {/* Before/After Comparison */}
                       <ImageComparison
                         originalImage={image}
@@ -355,7 +319,6 @@ const Converter: React.FC = () => {
 
                       {/* Download Buttons */}
                       <DownloadButtons
-                        colorCount={resultCount}
                         onDownloadCSV={handleDownloadCSV}
                         onDownloadSTL={handleDownloadSTL}
                         onDownload3MF={handleDownload3MF}

@@ -15,7 +15,6 @@
   "generatingPreview": "正在生成预览…",
   "filamentColorMatrixPreview": "耗材颜色矩阵预览",
   "filamentPreset": "耗材预设",
-  "colors": "颜色：",
   "capacity": "{{count}} / {{max}} 种颜色",
   "label": "编码：{{code}}",
   "loadPreset": "加载“{{name}}”（{{count}} 种颜色）",

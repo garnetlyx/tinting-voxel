@@ -32,7 +32,7 @@ const mockResults: SearchResultItem[] = [
     candidateId: 2,
     isBaseline: false,
     mode: 'pixel',
-    params: { max_colors: 8, color_threshold: 60 },
+    params: { max_colors: 8, color_threshold: 65.19, white_backing_layers: 3 },
     previewImage: 'data:image/png;base64,def',
   },
 ];
@@ -103,6 +103,9 @@ describe('ParamSearchModal', () => {
     // Both result cards should be visible
     expect(screen.getByText('Current settings')).toBeInTheDocument();
     expect(screen.getByText('Option 2')).toBeInTheDocument();
+    expect(screen.getByText('65.19')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.queryByText('3.00')).not.toBeInTheDocument();
 
     // Apply the current settings card without a quality ranking.
     const firstCard = screen.getByAltText('Current settings').closest('button');

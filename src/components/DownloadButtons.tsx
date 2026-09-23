@@ -6,7 +6,6 @@ import React from 'react';
 import { Download, Settings } from 'lucide-react';
 
 interface DownloadButtonsProps {
-  colorCount: number;
   onDownloadCSV: () => void;
   onDownloadSTL: () => void;
   onDownload3MF?: () => void;
@@ -16,7 +15,6 @@ interface DownloadButtonsProps {
 }
 
 export const DownloadButtons: React.FC<DownloadButtonsProps> = ({
-  colorCount,
   onDownloadCSV,
   onDownloadSTL,
   onDownload3MF,
@@ -26,10 +24,7 @@ export const DownloadButtons: React.FC<DownloadButtonsProps> = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center justify-between mb-6">
-      <h2 className="text-xl font-semibold text-gray-800">
-        {t('converter:extractedColors', { count: colorCount })}
-      </h2>
+    <div className="flex items-center justify-end mb-6">
       <div className="flex gap-3 flex-wrap justify-end">
         {showCSV && (
           <button

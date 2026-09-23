@@ -15,7 +15,6 @@
   "generatingPreview": "Generating preview...",
   "filamentColorMatrixPreview": "Filament color matrix preview",
   "filamentPreset": "Filament Preset",
-  "colors": "Colors:",
   "capacity": "{{count}} of {{max}} colors",
   "label": "Label: {{code}}",
   "loadPreset": "Load \"{{name}}\" ({{count}} colors)",
