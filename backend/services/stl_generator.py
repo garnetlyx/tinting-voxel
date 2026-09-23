@@ -187,22 +187,6 @@ def compute_reference_matrices(
     b_suffix = backing_suffix(b_label, backing_layers)
     b_boundary = PRINT_BACKGROUND_RGB if b_suffix else None
 
-    # Serve every caller (process, downloads, batch) through the content-keyed
-    # matrix cache: the key covers everything below that influences the output.
-    from services.matrix_cache import get_cached_matrices, set_cached_matrices
-    cached = get_cached_matrices(colors, layer_count, layer_height, prune=prune, n_targets=n_targets,
-                                 backing_suffix=b_suffix, background_rgb=b_boundary)
-    if cached is not None:
-        return cached
-
-    generator = BlendTestGenerator(
-        colors=colors,
-        layer_height=layer_height,
-        layer_count_max=layer_count,
-        backing_suffix=b_suffix,
-        background_rgb=b_boundary,
-    )
-
     items = colors.get_labels()
     if not items:
         raise ValueError("Colors instance has no colors defined")
@@ -242,6 +226,23 @@ def compute_reference_matrices(
             f"composition pruning is not validated for a non-transparent set. "
             f"Reduce the number of colors or layers."
         )
+    # Serve every caller (process, downloads, batch, search) through the
+    # content-keyed matrix cache. The target count only decides full vs
+    # pruned, so it is not part of the key.
+    from services.matrix_cache import get_cached_matrices, set_cached_matrices
+    cached = get_cached_matrices(colors, layer_count, layer_height, pruned=use_prune,
+                                 backing_suffix=b_suffix, background_rgb=b_boundary)
+    if cached is not None:
+        return cached
+
+    generator = BlendTestGenerator(
+        colors=colors,
+        layer_height=layer_height,
+        layer_count_max=layer_count,
+        backing_suffix=b_suffix,
+        background_rgb=b_boundary,
+    )
+
     if use_prune:
         # Translucent regime over budget: one canonical representative per
         # composition (C(N+L-1, L) candidates; see core/stack_prune.py)
@@ -292,7 +293,7 @@ def compute_reference_matrices(
         len(items), len(code_list),
         " (composition-pruned)" if use_prune else "",
     )
-    set_cached_matrices(colors, layer_count, layer_height, code_df, rgb_df, prune=prune, n_targets=n_targets,
+    set_cached_matrices(colors, layer_count, layer_height, code_df, rgb_df, pruned=use_prune,
                         backing_suffix=b_suffix, background_rgb=b_boundary)
     return code_df, rgb_df
 

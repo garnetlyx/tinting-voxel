@@ -51,21 +51,21 @@ def test_default_backing_cache_matches_explicit_three_layers_only():
     from core.color_config import get_preset
     from services.stl_generator import compute_reference_matrices
     colors = Colors.from_configs(get_preset("bambu_cmyw"))
-    actual = compute_reference_matrices(2, 0.08, colors, n_targets=2)
-    default = matrix_cache.get_cached_matrices(colors, 2, 0.08, n_targets=2)
+    actual = compute_reference_matrices(2, 0.08, colors)
+    default = matrix_cache.get_cached_matrices(colors, 2, 0.08)
     explicit = matrix_cache.get_cached_matrices(
-        colors, 2, 0.08, n_targets=2,
+        colors, 2, 0.08,
         backing_suffix="WWW", background_rgb=(255.0, 255.0, 255.0),
     )
     assert default is explicit
     assert default[0] is actual[0]
     assert default[1] is actual[1]
     assert matrix_cache.get_cached_matrices(
-        colors, 2, 0.08, n_targets=2,
+        colors, 2, 0.08,
         backing_suffix="W", background_rgb=(255.0, 255.0, 255.0),
     ) is None
     assert matrix_cache.get_cached_matrices(
-        colors, 2, 0.08, n_targets=2, backing_suffix="", background_rgb=None,
+        colors, 2, 0.08, backing_suffix="", background_rgb=None,
     ) is None
 
 
@@ -84,8 +84,32 @@ def test_td_channels_invalidate_cached_predictions_and_equal_channels_share_cach
         ])
 
     scalar = materials(0.4)
-    compute_reference_matrices(2, 0.08, scalar, n_targets=2)
-    cached = matrix_cache.get_cached_matrices(scalar, 2, 0.08, n_targets=2)
+    compute_reference_matrices(2, 0.08, scalar)
+    cached = matrix_cache.get_cached_matrices(scalar, 2, 0.08)
     assert cached is not None
-    assert matrix_cache.get_cached_matrices(materials([0.4, 0.4, 0.4]), 2, 0.08, n_targets=2) is cached
-    assert matrix_cache.get_cached_matrices(materials([0.4, 0.6, 0.8]), 2, 0.08, n_targets=2) is None
+    assert matrix_cache.get_cached_matrices(materials([0.4, 0.4, 0.4]), 2, 0.08) is cached
+    assert matrix_cache.get_cached_matrices(materials([0.4, 0.6, 0.8]), 2, 0.08) is None
+
+
+def test_requests_with_different_color_counts_share_one_matrix():
+    from core.blend_color import Colors
+    from core.color_config import get_preset
+    from services.stl_generator import compute_reference_matrices
+
+    colors = Colors.from_configs(get_preset("bambu_cmywk"))
+    first = compute_reference_matrices(4, 0.08, colors, n_targets=3)
+    assert compute_reference_matrices(4, 0.08, colors, n_targets=12)[0] is first[0]
+    assert matrix_cache.get_cache_stats()['size'] == 1
+
+
+def test_startup_warmup_serves_real_requests():
+    from core.blend_color import Colors
+    from core.color_config import get_preset
+    from services.stl_generator import compute_reference_matrices
+
+    assert matrix_cache.warmup_cache(['bambu_cmywk'], [4], [0.08]) == 1
+    warmed = matrix_cache.get_cached_matrices(Colors.from_configs(get_preset('bambu_cmywk')), 4, 0.08)
+    request = compute_reference_matrices(
+        4, 0.08, Colors.from_configs(get_preset('bambu_cmywk')), n_targets=10, backing_layers=3,
+    )
+    assert request[0] is warmed[0]

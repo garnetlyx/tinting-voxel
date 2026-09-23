@@ -2,10 +2,11 @@
 Reference matrix cache for color blend computations.
 
 Caches the (code, rgb) reference matrices produced by
-compute_reference_matrices, keyed by everything that influences the result:
+compute_reference_matrices, keyed by everything that determines their content:
 the filament parameters (colors_key: label/TD channels/hex), layer count/height,
-the prune flag, and the target count (it feeds the time-budget
-full-vs-pruned decision). Content addressing means custom configurations
+the printed backing, and whether the candidates are composition-pruned. The
+target count only feeds the full-vs-pruned decision, so requests with different
+color counts share one matrix. Content addressing means custom configurations
 cache exactly like named presets — no preset-name special casing.
 
 The cache is a small LRU: entries are pandas DataFrames whose size grows
@@ -24,8 +25,7 @@ from core import color_config as _color_config
 
 logger = logging.getLogger(__name__)
 
-# Cache key: (color_key, layer_count, layer_height, prune, n_targets) — n_targets
-# feeds the time-budget full-vs-pruned decision, so it must not alias.
+# Cache key: (color_key, layer_count, layer_height, pruned, backing).
 _MATRIX_CACHE: OrderedDict[tuple, tuple[pd.DataFrame, pd.DataFrame]] = OrderedDict()
 _MAX_ENTRIES = 8
 
@@ -42,16 +42,15 @@ def _default_backing_key_parts(colors: Colors) -> tuple[str, Optional[tuple]]:
     return suffix, boundary
 
 
-def _cache_key(colors: Colors, layer_count: int, layer_height: float, prune: Optional[bool],
-                n_targets: Optional[int], backing_suffix: Optional[str], background_rgb: Optional[tuple]) -> tuple:
+def _cache_key(colors: Colors, layer_count: int, layer_height: float, pruned: bool,
+               backing_suffix: Optional[str], background_rgb: Optional[tuple]) -> tuple:
     if backing_suffix is None:
         backing_suffix, background_rgb = _default_backing_key_parts(colors)
     return (
         colors_key(colors),
         layer_count,
         layer_height,
-        prune,
-        n_targets,
+        pruned,
         backing_suffix,
         None if background_rgb is None else tuple(background_rgb),
     )
@@ -61,17 +60,12 @@ def get_cached_matrices(
     colors: Colors,
     layer_count: int,
     layer_height: float,
-    prune: Optional[bool] = None,
-    n_targets: Optional[int] = None,
+    pruned: bool = False,
     backing_suffix: Optional[str] = None,
     background_rgb: Optional[tuple] = None,
 ) -> Optional[tuple[pd.DataFrame, pd.DataFrame]]:
-    """Return cached matrices for this exact configuration, or None.
-
-    n_targets participates in the key: it feeds the time-budget decision
-    (full vs pruned), so matrices resolved under different target counts
-    must not alias."""
-    key = _cache_key(colors, layer_count, layer_height, prune, n_targets, backing_suffix, background_rgb)
+    """Return cached matrices for this exact configuration, or None."""
+    key = _cache_key(colors, layer_count, layer_height, pruned, backing_suffix, background_rgb)
     cached = _MATRIX_CACHE.get(key)
     if cached is not None:
         _MATRIX_CACHE.move_to_end(key)
@@ -84,13 +78,12 @@ def set_cached_matrices(
     layer_height: float,
     ref_code_matrix: pd.DataFrame,
     ref_rgb_matrix: pd.DataFrame,
-    prune: Optional[bool] = None,
-    n_targets: Optional[int] = None,
+    pruned: bool = False,
     backing_suffix: Optional[str] = None,
     background_rgb: Optional[tuple] = None,
 ) -> None:
     """Store matrices for this configuration, evicting the oldest entry."""
-    key = _cache_key(colors, layer_count, layer_height, prune, n_targets, backing_suffix, background_rgb)
+    key = _cache_key(colors, layer_count, layer_height, pruned, backing_suffix, background_rgb)
     _MATRIX_CACHE[key] = (ref_code_matrix, ref_rgb_matrix)
     _MATRIX_CACHE.move_to_end(key)
     while len(_MATRIX_CACHE) > _MAX_ENTRIES:
@@ -101,7 +94,6 @@ def compute_and_cache_matrices(
     preset_name: str,
     layer_count: int,
     layer_height: float,
-    n_targets: Optional[int] = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Compute (or fetch cached) matrices for a named preset configuration.
 
@@ -112,11 +104,7 @@ def compute_and_cache_matrices(
     configs = _color_config.get_preset(preset_name)
     if configs is None:
         raise ValueError(f"Unknown preset: {preset_name}")
-    colors = Colors.from_configs(configs)
-    cached = get_cached_matrices(colors, layer_count, layer_height, n_targets=n_targets)
-    if cached is not None:
-        return cached
-    return compute_reference_matrices(layer_count, layer_height, colors, n_targets=n_targets)
+    return compute_reference_matrices(layer_count, layer_height, Colors.from_configs(configs))
 
 
 def warmup_cache(

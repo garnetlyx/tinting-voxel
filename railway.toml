@@ -4,8 +4,6 @@ dockerfilePath = "Dockerfile"
 
 [deploy]
 # No startCommand: the Dockerfile CMD already honors $PORT via ${PORT:-8000}.
-# Matrix-cache warmup at startup takes ~2-3 min (exhaustive preset enumeration),
-# so the healthcheck must tolerate a long cold start.
 healthcheckPath = "/api/health"
 healthcheckTimeout = 360
 restartPolicyType = "ON_FAILURE"
