@@ -162,12 +162,9 @@ class TestColorsFromConfigs:
         """from_configs carries the staircase per-channel TD verbatim."""
         colors = Colors.from_configs(CLEAR_CMYW_PRESET)
 
-        assert colors["C"].td == (
-            1.3490352079515975, 2.5371501740106988, 4.088658622221301,
-        )
-        assert colors["W"].td == (
-            17.949461574719358, 18.902845340687115, 17.207703003749966,
-        )
+        for config in CLEAR_CMYW_PRESET:
+            assert isinstance(config.transmission_distance, tuple)
+            assert colors[config.label].td == config.transmission_distance
 
 
 class TestDynamicMeshMap:

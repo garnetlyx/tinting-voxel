@@ -16,6 +16,7 @@ from api.models import (
 )
 from api.rate_limiter import limiter
 from api.validators import validate_image_upload
+from config.print_defaults import DEFAULT_BACKING_LAYERS
 from config.settings import settings
 from core.blend_color import Colors
 from services.param_search_service import (
@@ -215,7 +216,7 @@ async def api_param_search(
     layer_count: int = Form(4, ge=1, le=10),
     layer_height: Optional[float] = Form(None, gt=0, le=10),
     pixel_size: float = Form(0.42, gt=0, le=10),
-    white_backing_layers: int = Form(3, ge=0, le=5),
+    white_backing_layers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
     backing_mode: str = Form("white", pattern=r'^(white|black)$'),
     max_colors: int = Form(10, ge=1, le=1024),
     color_threshold: float = Form(50, ge=0, le=1000),

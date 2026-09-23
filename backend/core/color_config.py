@@ -79,10 +79,10 @@ CLEAR_CMYG_PRESET: List[ColorConfig] = [
 ]
 
 CLEAR_CMYW_PRESET: List[ColorConfig] = [
-    ColorConfig(name='Cyan', hex='#4C72A0', transmission_distance=(1.3490352079515975, 2.5371501740106988, 4.088658622221301)),
-    ColorConfig(name='Magenta', hex='#CE5E53', transmission_distance=(11.210903332862577, 2.0338821311932, 2.511508291542347)),
-    ColorConfig(name='Yellow', hex='#D8B695', transmission_distance=(22.124563670499846, 15.378730904545765, 5.384295692169828)),
-    ColorConfig(name='White', hex='#D9D6C5', transmission_distance=(17.949461574719358, 18.902845340687115, 17.207703003749966)),
+    ColorConfig(name='Cyan', hex='#345D91', transmission_distance=(1.1141956239474697, 5.112291201824843, 9.104207556905079)),
+    ColorConfig(name='Magenta', hex='#DC5447', transmission_distance=(12.871171884721239, 2.2789688588617327, 3.148395391092415)),
+    ColorConfig(name='Yellow', hex='#E2C265', transmission_distance=(22.921585589114137, 11.20644113148798, 2.077964578273299)),
+    ColorConfig(name='White', hex='#D9D6C5', transmission_distance=(16.213199124811382, 16.59181051437119, 15.48169799325276)),
 ]
 
 PRESETS = {

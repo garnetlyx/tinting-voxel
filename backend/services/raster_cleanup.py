@@ -9,11 +9,11 @@ import cv2
 
 
 def color_distance(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
-    """Calculate perceptual distance between two RGB colors using CIELAB space.
+    """Euclidean distance between two RGB colors in OpenCV's 8-bit Lab space.
 
-    CIELAB is a perceptually uniform color space where equal numerical
-    distances correspond to equal perceived color differences, unlike RGB
-    Euclidean distance which is not perceptually uniform.
+    OpenCV's uint8 Lab scales L to 0-255 and offsets a/b by 128, so a unit
+    here is not a CIELAB ΔE (black to white measures 255, not 100). The
+    color-merge threshold is expressed in these units.
     """
     rgb1 = np.array([[list(c1)]], dtype=np.uint8)
     rgb2 = np.array([[list(c2)]], dtype=np.uint8)

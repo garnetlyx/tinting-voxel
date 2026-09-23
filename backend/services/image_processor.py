@@ -345,7 +345,8 @@ def cluster_avg_color(cluster: list[dict]) -> dict:
 def merge_similar_colors(colors: list[dict], threshold: float) -> list[dict]:
     """
     Merge colors that are similar within threshold.
-    Distance is computed in CIELAB space for perceptual accuracy.
+    Distance is Euclidean in OpenCV's 8-bit Lab space (L scaled to 0-255),
+    so the threshold is in those units rather than CIELAB ΔE.
 
     Uses a fast pre-quantization step to reduce the number of unique colors
     before the O(n²) greedy merge, keeping performance acceptable even for
@@ -372,7 +373,8 @@ def merge_similar_colors(colors: list[dict], threshold: float) -> list[dict]:
 
         pre_merged = [cluster_avg_color(v) for v in bucket.values()]
 
-    # --- CIELAB conversion in one batch ---
+    # --- OpenCV 8-bit Lab conversion in one batch (L scaled to 0-255; the
+    # merge threshold is in these units, not CIELAB ΔE) ---
     rgb_array = np.array(
         [(c['r'], c['g'], c['b']) for c in pre_merged], dtype=np.uint8
     ).reshape(1, -1, 3)
