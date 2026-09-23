@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Dedicated ports keep E2E runs off the dev servers (8000/5173). The E2E
+// backend disables per-client rate limits: one browser drives every test.
+const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 8010);
+const FRONTEND_PORT = Number(process.env.E2E_FRONTEND_PORT ?? 5183);
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -9,7 +14,7 @@ export default defineConfig({
   reporter: 'list',
   timeout: 60_000,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: `http://localhost:${FRONTEND_PORT}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -21,14 +26,14 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'source backend/.venv/bin/activate && cd backend && python -m uvicorn main:app --port 8000',
-      port: 8000,
+      command: `cd backend && RATE_LIMIT_ENABLED=false .venv/bin/python -m uvicorn main:app --port ${BACKEND_PORT}`,
+      port: BACKEND_PORT,
       reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
+      timeout: 120_000,
     },
     {
-      command: 'npx vite --port 5173',
-      port: 5173,
+      command: `API_PROXY_TARGET=http://localhost:${BACKEND_PORT} npx vite --port ${FRONTEND_PORT} --strictPort`,
+      port: FRONTEND_PORT,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },

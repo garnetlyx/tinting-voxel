@@ -58,7 +58,7 @@ tinting-voxel/
 │   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
 │   │   └── vector_processor.py   # Vector/contour processing
 │   ├── config/           # Configuration (settings, constants)
-│   └── tests/            # Test suite (~700 tests)
+│   └── tests/            # Test suite (~750 tests)
 │       ├── unit/             # Unit tests
 │       ├── integration/      # Integration tests
 │       ├── performance/      # Performance tests
@@ -171,15 +171,21 @@ docker compose up --build  # Build and run
 ## Testing
 
 ```bash
-# Backend (~700 tests)
+# Backend (~750 tests)
 cd backend && pytest -v
 
-# Frontend (Vitest, 20 test files)
+# Frontend (Vitest, 24 test files)
 npm test
 
 # E2E (8 spec files, 48 tests)
 npx playwright test
 ```
+
+- E2E starts its own backend (port 8010, rate limits off via
+  `RATE_LIMIT_ENABLED=false`) and Vite (port 5183), so it never reuses the dev
+  servers. Override with `E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT`.
+- CI runs backend pytest, the frontend type check, Vitest, build, and E2E.
+  Specs that need `backend/tests/fixtures/images-local/` skip without it.
 
 - Unit tests: `backend/tests/unit/`
 - Integration tests: `backend/tests/integration/`
@@ -198,7 +204,9 @@ npx playwright test
 ### Key Patterns
 - `FilamentConfigMixin` in `models.py` provides shared filament validation
 - `@handle_api_errors` decorator in `error_handlers.py` standardizes error handling
-- Rate limiting via `slowapi` on all endpoints
+- Rate limiting via `slowapi` on all endpoints, keyed on the visitor address from
+  `api/client_ip.py` (Railway's `X-Real-IP`; `CF-Connecting-IP` only from
+  Cloudflare's published ranges)
 - File validation (extension, size, magic bytes) in `validators.py`
 - `Colors.from_configs()` creates N-color configurations from `ColorConfig` list
 

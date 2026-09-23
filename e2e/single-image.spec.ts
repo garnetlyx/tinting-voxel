@@ -35,7 +35,7 @@ test.describe('Single Image Processing', () => {
     await expect(page.getByText(/Max Colors:/)).toBeVisible();
     await expect(page.getByText(/Layer Height:/)).toBeVisible();
     await expect(page.getByText(/Pixel Size:/)).toBeVisible();
-    await expect(page.getByText(/Base Plate Thickness:/)).toBeVisible();
+    await expect(page.getByRole('spinbutton', { name: 'Backing layers' })).toBeVisible();
   });
 
   test('can toggle settings panel visibility', async ({ page }) => {
@@ -84,7 +84,7 @@ test.describe('Single Image Processing', () => {
 
     // After cancel, rawImage is cleared and isEditing is false.
     // Since image was never set via handleApplyEdit, the upload button should be visible again.
-    await expect(page.getByRole('button', { name: 'Click to Upload Image' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Click or drag image here/ })).toBeVisible();
 
     // Editor should be gone
     await expect(page.getByRole('button', { name: /Apply & Process/ })).not.toBeVisible();

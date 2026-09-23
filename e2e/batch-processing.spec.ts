@@ -76,7 +76,7 @@ test.describe('Batch Processing', () => {
     // Switch to single mode
     await page.getByRole('button', { name: 'Single Image' }).click();
     await expect(page.getByText(/Click to Select Images/)).not.toBeVisible();
-    await expect(page.getByText(/Click to Upload Image/)).toBeVisible();
+    await expect(page.getByText(/Click or drag image here/)).toBeVisible();
 
     // Switch back to batch
     await page.getByRole('button', { name: 'Batch Processing' }).click();

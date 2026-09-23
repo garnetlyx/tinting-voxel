@@ -3,49 +3,40 @@ import { test, expect } from '@playwright/test';
 test.describe('Filament Configuration', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-  });
-
-  test('filament config panel is visible in settings', async ({ page }) => {
-    // Should show filament color rows
+    // The converter stays inert until the material catalog has loaded.
     await expect(page.locator('input[type="color"]').first()).toBeVisible();
   });
 
-  test('can change filament color via color input', async ({ page }) => {
-    const colorInputs = page.locator('input[type="color"]');
-    const count = await colorInputs.count();
-    expect(count).toBeGreaterThanOrEqual(4);
+  test('filament config panel is visible in settings', async ({ page }) => {
+    await expect(page.getByRole('combobox', { name: 'Filament Preset' })).toBeVisible();
+  });
+
+  test('default preset lists at least four filament colors', async ({ page }) => {
+    expect(await page.locator('input[type="color"]').count()).toBeGreaterThanOrEqual(4);
   });
 
   test('can add a filament color', async ({ page }) => {
-    const initialCount = await page.locator('input[type="color"]').count();
+    const colorInputs = page.locator('input[type="color"]');
+    const initialCount = await colorInputs.count();
 
-    // Find and click Add Color button
     await page.getByRole('button', { name: /Add Color/i }).click();
 
-    const newCount = await page.locator('input[type="color"]').count();
-    expect(newCount).toBe(initialCount + 1);
+    await expect(colorInputs).toHaveCount(initialCount + 1);
   });
 
   test('can load a preset', async ({ page }) => {
-    // Look for preset selector and change it
-    const presetSelect = page.locator('select').first();
-    await expect(presetSelect).toBeVisible();
-
-    // Select Bambu CMYK preset
+    const presetSelect = page.getByRole('combobox', { name: 'Filament Preset' });
     await presetSelect.selectOption('bambu_cmyw');
 
-    // Should have color inputs (preset loaded)
-    const colorInputs = page.locator('input[type="color"]');
-    expect(await colorInputs.count()).toBeGreaterThanOrEqual(4);
+    await expect(presetSelect).toHaveValue('bambu_cmyw');
+    await expect(page.locator('input[type="color"]')).toHaveCount(4);
   });
 
-  test('filament preview section exists', async ({ page }) => {
-    // The filament preview section should be visible
-    await expect(page.getByText(/Color Preview/i)).toBeVisible();
+  test('filament gamut preview section exists', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Achievable Filament Gamut' })).toBeVisible();
   });
 
   test('palette library section exists', async ({ page }) => {
-    // Palette library should be visible
     await expect(page.getByText(/Palette Library/i)).toBeVisible();
   });
 });

@@ -83,11 +83,7 @@ def _lab(rgb):
 
 
 def _codes_from_matrix(code_df):
-    return [
-        code_df.iat[r, c]
-        for r in range(code_df.shape[0])
-        for c in range(code_df.shape[1])
-    ]
+    return code_df.to_numpy().ravel().tolist()
 
 
 class TestCandidateGeneration:
@@ -310,11 +306,7 @@ class TestPrunedVsFullOracle:
         n_arbitrary = 80 if layer_count >= 8 else 200
 
         # Reachable targets: sample blend outputs from the full matrix.
-        gamut = np.array([
-            full_rgb_df.iat[r, c]
-            for r in range(full_rgb_df.shape[0])
-            for c in range(full_rgb_df.shape[1])
-        ])
+        gamut = np.array(full_rgb_df.to_numpy().ravel().tolist())
         reachable = gamut[rng.choice(len(gamut), size=n_reachable, replace=False)].tolist()
 
         # The oracle is the exact argmin over every ordering in the full
@@ -431,8 +423,8 @@ class TestBudgetUsesRealTargetCount:
         monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", (est_1 + est_many) / 2)
         few, _ = compute_reference_matrices(8, 0.84, colors, n_targets=1)
         many, _ = compute_reference_matrices(8, 0.84, colors, n_targets=10_000)
-        n_few = len({few.iat[r, c] for r in range(few.shape[0]) for c in range(few.shape[1])})
-        n_many = len({many.iat[r, c] for r in range(many.shape[0]) for c in range(many.shape[1])})
+        n_few = len(set(_codes_from_matrix(few)))
+        n_many = len(set(_codes_from_matrix(many)))
         assert n_few == 5**8, "1 target fits the budget -> full enumeration"
         assert n_many == 495, "10k targets exceed it -> composition pruning"
 
@@ -495,7 +487,7 @@ class TestEstimateAccuracy:
         monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", est * 10)
         _mc.clear_cache()
         df, _ = _crm(8, 0.08, opaque, n_targets=10)
-        uniq = {df.iat[r, c] for r in range(df.shape[0]) for c in range(df.shape[1])}
+        uniq = set(_codes_from_matrix(df))
         assert len(uniq) == 8 ** 8
         _mc.clear_cache()
 
@@ -519,7 +511,7 @@ class TestEstimateAccuracy:
         df, _ = _crm(5, 0.08, translucent, n_targets=10)
         # DataFrame is padded to a rectangle; the distinct-code count is
         # the true enumeration size.
-        uniq = {df.iat[r, c] for r in range(df.shape[0]) for c in range(df.shape[1])}
+        uniq = set(_codes_from_matrix(df))
         assert len(uniq) == 5 ** 5
         # Just under the measured cost -> over budget -> pruned (translucent).
         monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", est * 0.5)

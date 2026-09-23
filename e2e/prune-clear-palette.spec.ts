@@ -19,13 +19,8 @@ import path from 'path';
 import fs from 'fs';
 
 const LOCAL_PHOTO_IMAGE = path.join(__dirname, '../backend/tests/fixtures/images-local/local-photo.JPG');
-const SHOT_DIR = path.join(__dirname, '../test-results/prune-clear-palette');
 
 test.skip(!fs.existsSync(LOCAL_PHOTO_IMAGE), 'local-photo.JPG local fixture not present');
-
-test.beforeAll(() => {
-  fs.mkdirSync(SHOT_DIR, { recursive: true });
-});
 
 /**
  * Set the layer-count slider and wait for the /api/simulate-preview response
@@ -84,7 +79,7 @@ for (const layerCount of [6, 8]) {
     });
 
     await page.goto('/');
-    await page.locator('select').nth(1).selectOption('clear_cmyw');
+    await page.getByRole('combobox', { name: 'Filament Preset' }).selectOption('clear_cmyw');
     await page.waitForTimeout(600);
 
     // Translucent classification raises the default layer height to 0.84 mm.
@@ -106,7 +101,7 @@ for (const layerCount of [6, 8]) {
     await setLayersAndWaitForPreview(page, layerCount);
 
     await page.screenshot({
-      path: path.join(SHOT_DIR, `clear_${layerCount}L.png`),
+      path: test.info().outputPath(`clear_${layerCount}L.png`),
       fullPage: true,
     });
 
