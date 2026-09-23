@@ -48,8 +48,8 @@ src/
 ### Backend Responsibilities
 - Image processing and color extraction
 - Color clustering (scikit-learn)
-- Mapping to CMYK primary colors (map_to_nearest_color)
-- Calculate color mixing using Beer-Lambert optical model
+- Mapping to configured filament colors (map_to_nearest_color)
+- Calculate color mixing using `T_ch = 10^(-d / TD_ch)` and the shared stacking rule
 - Generate layered STL files
 - Return processed preview image
 
@@ -232,7 +232,7 @@ Download color data as CSV
 
 **Response**: CSV file
 
-### 3. POST /api/download-stl
+### 3. POST /api/v2/download-stl
 Generate and download STL files merged by primary colors
 
 **Request**:
@@ -246,7 +246,18 @@ Generate and download STL files merged by primary colors
 }
 ```
 
-**Response**: ZIP file (containing CMYW_208x208x3.36_C.stl, etc.)
+**Response**: ZIP file containing one STL per used filament. With four color
+layers at 0.08 mm and the default three backing layers, total height is 0.56 mm.
+
+The N-color endpoints accept `filamentColors` entries containing `name`, `hex`,
+and `transmission_distance` (one positive number or three RGB values). The
+backend catalog supplies presets, defaults, and the TD threshold through
+`GET /api/v2/filament-presets`.
+
+`layerHeight` is color-layer thickness. The high-transmission default is 0.84 mm
+per color layer; print-settings export expresses this as three 0.28 mm slicer
+layers. Four color layers plus three backing layers therefore form a 5.88 mm
+stack spanning 21 slicer layers. Regular materials default to 0.08 mm.
 
 ## Project Structure
 

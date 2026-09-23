@@ -3,6 +3,7 @@ STL generation service with color mapping and mesh merging
 
 Includes optimization via greedy meshing to reduce file sizes.
 """
+from config.print_defaults import DEFAULT_BACKING_LAYERS
 import itertools
 import logging
 import threading
@@ -180,11 +181,11 @@ def compute_reference_matrices(
     # every candidate color (paper setup, adapted: finite printed backing
     # instead of an infinite external one).
     from services.print_stack import (
-        backing_boundary_rgb, backing_suffix, resolve_backing_label,
+        PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
     )
     b_label = resolve_backing_label(colors, backing_layers, backing_mode)
     b_suffix = backing_suffix(b_label, backing_layers)
-    b_boundary = backing_boundary_rgb(backing_mode) if b_suffix else None
+    b_boundary = PRINT_BACKGROUND_RGB if b_suffix else None
 
     # Serve every caller (process, downloads, batch) through the content-keyed
     # matrix cache: the key covers everything below that influences the output.
@@ -312,11 +313,11 @@ def map_color_blocks_to_blend_results(
     matrices); returned codes carry the backing as a trailing suffix.
     """
     from services.print_stack import (
-        backing_boundary_rgb, backing_suffix, resolve_backing_label,
+        PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
     )
     b_label = resolve_backing_label(colors, backing_layers, backing_mode)
     b_suffix = backing_suffix(b_label, backing_layers)
-    b_boundary = backing_boundary_rgb(backing_mode) if b_suffix else None
+    b_boundary = PRINT_BACKGROUND_RGB if b_suffix else None
     input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
         layer_count,
@@ -330,7 +331,6 @@ def map_color_blocks_to_blend_results(
         input_colors,
         ref_code_matrix,
         ref_rgb_matrix,
-        white_labels=colors.white_labels(),
     )
     # Translucent sets match against composition representatives; recover the
     # best ordering across the top compositions (no-op for opaque sets).
@@ -458,7 +458,7 @@ def initialize_color_mapping(
     Args:
         layer_count: Number of layers for color blending
         layer_height: Height of each layer in mm
-        colors: Optional Colors instance. If None, uses default Phase 6 CMYW.
+        colors: Optional Colors instance. If None, uses the default Phase 6 CMYWK.
     """
     global _reference_code_matrix, _reference_rgb_matrix, _blend_generator, _current_colors
 
@@ -642,43 +642,9 @@ def generate_boxes_batch(
     return triangles.reshape(-1, 3, 3)
 
 
-def _find_white_label(colors: Colors) -> Optional[str]:
-    """
-    Find the white filament label in a Colors instance.
-
-    Checks for label 'W' first, then falls back to any color with hex '#FFFFFF'.
-
-    Returns:
-        The label string (e.g. 'W') or None if no white filament found.
-    """
-    labels = colors.get_labels()
-    if 'W' in labels:
-        return 'W'
-    for label in labels:
-        if colors[label].hex.upper() == '#FFFFFF':
-            return label
-    return None
-
-
-
 def get_filename_prefix(colors: Colors) -> str:
-    """
-    Generate filename prefix from color labels.
-
-    Maintains backward compatibility: CMYW produces "CMYW" prefix.
-
-    Args:
-        colors: Colors instance
-
-    Returns:
-        String prefix for filenames
-    """
-    labels = colors.get_labels()
-    # Backward compatibility: if labels are exactly C, M, Y, W in any order,
-    # and we have exactly 4 colors, use CMYW for consistency
-    if set(labels) == {'C', 'M', 'Y', 'W'} and len(labels) == 4:
-        return "CMYW"
-    return ''.join(labels)
+    """Use the material code order for exported filenames."""
+    return ''.join(colors.get_labels())
 
 
 def generate_stl_zip(
@@ -689,7 +655,7 @@ def generate_stl_zip(
     image_dimensions: dict,
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
-    white_backing_layers: int = 1,
+    white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_mode: str = 'white',
 ) -> bytes:
     """

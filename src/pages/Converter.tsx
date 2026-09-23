@@ -53,6 +53,7 @@ const Converter: React.FC = () => {
     mappedBlendPalette,
     hasResults,
     resultCount,
+    renderReady,
 
     // Pixel mode params
     maxColors,
@@ -79,6 +80,10 @@ const Converter: React.FC = () => {
     printStack,
 
     // Filament state
+    filamentPresets,
+    filamentCatalogLoading,
+    filamentCatalogError,
+    reloadFilamentCatalog,
     filamentPreset,
     filamentColors,
     isFilamentConfigValid,
@@ -94,7 +99,6 @@ const Converter: React.FC = () => {
     setMinArea,
     setNumColors,
     setLayerHeight,
-    allTransparent,
     setLayerCount,
     setPixelSize,
     setDetailSize,
@@ -161,7 +165,19 @@ const Converter: React.FC = () => {
             </div>
           )}
 
-          <div className={`grid grid-cols-1 xl:grid-cols-12 gap-8 ${!backendReady ? 'pointer-events-none opacity-50' : ''}`}>
+          {filamentCatalogLoading && backendReady && (
+            <div role="status" className="mb-6 flex items-center gap-3 text-gray-600">
+              <Loader2 className="w-5 h-5 animate-spin" />{t('filaments:loadingPresets')}
+            </div>
+          )}
+          {filamentCatalogError && (
+            <div role="alert" className="mb-6 flex items-center gap-3 text-red-700">
+              {t('filaments:loadPresetsFailed')}
+              <button type="button" onClick={reloadFilamentCatalog} className="underline">{t('filaments:retry')}</button>
+            </div>
+          )}
+          <div inert={!backendReady || filamentCatalogLoading || !!filamentCatalogError} className={`grid grid-cols-1 xl:grid-cols-12 gap-8 ${!backendReady || filamentCatalogLoading || filamentCatalogError ? 'pointer-events-none opacity-50' : ''}`}>
+
             {/* Left Sidebar: Parameter Panel */}
             {showSettings && (
               <div className="xl:col-span-4 space-y-6">
@@ -183,7 +199,6 @@ const Converter: React.FC = () => {
                   maxLayerCount={maxLayerCount}
                   pixelSize={pixelSize}
                   onLayerHeightChange={setLayerHeight}
-                  allTransparent={allTransparent}
                   onLayerCountChange={setLayerCount}
                   onPixelSizeChange={setPixelSize}
                   detailSize={detailSize}
@@ -208,6 +223,7 @@ const Converter: React.FC = () => {
                 />
                 <div className="p-4 bg-gray-50 rounded-lg space-y-4">
                   <FilamentConfigPanel
+                    presets={filamentPresets}
                     filamentPreset={filamentPreset}
                     filamentColors={filamentColors}
                     isValid={isFilamentConfigValid}
@@ -222,6 +238,8 @@ const Converter: React.FC = () => {
                     filamentPreset={filamentPreset}
                     layerCount={layerCount}
                     layerHeight={layerHeight}
+                    whiteBackingLayers={whiteBackingLayers}
+                    backingMode={backingMode}
                     isConfigValid={isFilamentConfigValid}
                     disabled={processing}
                   />
@@ -342,7 +360,7 @@ const Converter: React.FC = () => {
                         onDownloadSTL={handleDownloadSTL}
                         onDownload3MF={handleDownload3MF}
                         onDownloadPrintSettings={handleDownloadPrintSettings}
-                        processing={processing}
+                        processing={processing || !renderReady}
                         showCSV={mode === 'pixel'}
                       />
 
@@ -351,6 +369,7 @@ const Converter: React.FC = () => {
                         <ThreeDPreview
                           colorBlocks={colorBlocks}
                           mappedBlockColors={mappedBlockColors}
+                          filamentColors={filamentColors}
                           imageDimensions={imageDimensions}
                           layerHeight={layerHeight}
                           pixelSize={pixelSize}
@@ -398,6 +417,7 @@ const Converter: React.FC = () => {
                   layerHeight={layerHeight}
                   layerCount={layerCount}
                   whiteBackingLayers={whiteBackingLayers}
+                  backingMode={backingMode}
                   filamentPreset={filamentPreset ?? undefined}
                   filamentColors={filamentPreset ? undefined : filamentColors}
                   detailSize={detailSize}
@@ -426,6 +446,7 @@ const Converter: React.FC = () => {
         progress={paramSearch.progress}
         results={paramSearch.results}
         error={paramSearch.error}
+        imageDimensions={imageDimensions}
         defaultTargetSizeMm={maxDimension}
         onStart={(targetLongestEdgeMm) => {
           if (!image || !currentImageFile) return;

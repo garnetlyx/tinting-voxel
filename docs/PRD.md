@@ -32,21 +32,17 @@ Current 3D-printing color solutions face a combination of limitations:
 tinting-voxel solves these by:
 
 - Using a scientifically-grounded color mixing model based on light
-  transmission (unified Beer-Lambert: mu_ch = ln10/td + k·A_ch, light-loss
-  allocation stacking).
+  transmission (`T_ch = 10^(-d / TD_ch)`, light-loss allocation stacking).
 - Generating optimized meshes with greedy meshing (70–80% box-count
   reduction).
 - Supporting **any N-color filament configuration (4–16 colors)** with
-  user-defined hex values and per-color transmission/scattering parameters.
-- Calibrating model parameters against a single printed-and-photographed test
-  plate rather than a full permutation board, so the model generalizes to new
-  filament combinations without re-measuring every combo.
+  user-defined hex values and scalar or RGB transmission distance.
 
 ### 1.3 Goals & Success Metrics
 
 | Goal | Metric | Target |
 |------|--------|--------|
-| Accurate color reproduction | CIELAB Delta-E vs printed plate | < 10 perceptually acceptable; current best P6 dE=39.69 on 16×16 plate |
+| Accurate color reproduction | CIELAB Delta-E vs printed plate | Target: < 10 |
 | File size optimization | STL box-count reduction | 70–80% vs naive per-pixel boxing |
 | Processing performance | Image processing time | < 5s for 512×512px |
 | User adoption | Active users | 100 users/month (6 months) |
@@ -111,15 +107,15 @@ tinting-voxel solves these by:
 #### Flow 1 — Basic Image-to-Mesh Conversion
 1. User uploads PNG/JPG (≤10MB, auto-downscaled past 1024px).
 2. Backend extracts dominant colors via K-means in CIELAB space.
-3. Backend maps colors to the configured N-color set using the hybrid
-   per-channel-k Beer-Lambert model with CIEDE2000 distance.
+3. Backend maps colors to the configured N-color set using shared transmission
+   and light-loss allocation with CIEDE2000 distance.
 4. Frontend shows side-by-side original vs. simulated print + 3D WebGL
    preview.
 5. User downloads STL ZIP / 3MF / CSV / print settings.
 
 #### Flow 2 — N-Color Filament Configuration
-1. User picks a preset (Bambu CMYWK Phase 6 default, Bambu CMYW, or Clear CMYW).
-2. User edits generic color codes (unique A–Z letters), hex values, and transmission distance. Codes identify arbitrary colors; they do not constrain the palette to CMYK.
+1. User picks Bambu CMYWK (default), Bambu CMYW, Clear CMYG, or Clear CMYW.
+2. User edits generic color codes (unique A–Z letters), hex values, and one TD value. TD optionally expands into three RGB channel values. Codes identify arbitrary colors; they do not constrain the palette to CMYK.
 3. Filament preview matrix regenerates showing achievable color gamut.
 4. Configuration persists across sessions via localStorage.
 
@@ -130,13 +126,12 @@ tinting-voxel solves these by:
 
 #### Flow 4 — Parameter Search (auto-tune)
 1. User uploads an image and opens the parameter-search modal.
-2. Backend warms up, then sweeps `maxColors` / `colorThreshold` combinations.
+2. Backend evaluates the current settings and sweeps `maxColors` / `colorThreshold` combinations. Every successful candidate remains available in evaluation order; candidate numbers are identifiers, not quality rankings.
 3. User picks the variant with the best perceived preview and proceeds to
    export.
 
-> **Calibration** (fitting `alpha`/`td`/`k` against printed plates) is not part
-> of this product. It is performed offline, and fitted values are promoted
-> into presets in `core/color_config.py`.
+> Material measurements belong to the companion research repository. Production
+> material inputs are limited to hex color and scalar or RGB transmission distance.
 
 ---
 
@@ -152,15 +147,15 @@ tinting-voxel solves these by:
 
 **Color processing**
 - K-means clustering (vectorized, CIELAB distance) for color extraction
-- N-color mapping via unified (ln10/td + k·A_ch) Beer-Lambert model
+- N-color mapping via one transmission formula, `T_ch = 10^(-d / TD_ch)`
 - CIEDE2000 perceptual matching with hue-preservation for dark chromatic colors
-- Three built-in filament presets: Bambu CMYWK Phase 6 (default), Bambu CMYW, and Clear CMYW.
+- Four built-in filament presets: Bambu CMYWK (default), Bambu CMYW, Clear CMYG, and Clear CMYW.
   Custom configurations remain supported; removed preset IDs are rejected.
-- Palette browser for the three supported filament configurations
+- Palette browser for the four supported filament configurations
 - Filament preview matrix with pagination for large N
 
 **Output formats**
-- V1: STL ZIP (CMYW), CSV, SVG-STL ZIP
+- Color-block CSV
 - V2: N-color STL ZIP, N-color SVG-STL, **3MF** (named color objects, trimesh
   + lxml), **SVG-3MF**, print-settings JSON
 - Greedy meshing (70–80% box-count reduction), face culling
@@ -172,7 +167,9 @@ tinting-voxel solves these by:
 - Parameter panel (maxColors, colorThreshold, layerHeight, pixelSize, detail
   presets with nozzle-line-width defaults)
 - Batch processor UI (up to 20 images)
-- Filament config panel + preset manager
+- Filament config panel + preset manager; one TD field with optional RGB expansion
+- Regular color layers default to 0.08 mm; high-transmission color layers to 0.84 mm (three 0.28 mm slicer layers)
+- Three backing color layers by default; light/dark selects the closest available material
 - Palette library selector
 - Parameter-search modal with backend warmup UX
 - Color adjustment panel
@@ -197,12 +194,9 @@ tinting-voxel solves these by:
 - **Max-dimension preset chips** in the frontend (180 / 250 / 300mm).
 - **Production hardening** — thread locks on global matrices, bounded
   analytics, non-root Docker user (see TODO P0/P1).
-- **Clear CMYW hex upgrade** — frozen production hexes predate the PLATE-08
-  same-batch reference (36.21 vs shipped 40.85); revisit after the next
-  hardware spectrophotometer calibration round.
 
-Parameter fitting (per-color k optimization against printed plates) is
-performed offline, outside this repo; presets carry the fitted results.
+The backend material catalog is the single source for preset values and print
+defaults. Bambu and clear presets use RGB-channel TD; custom materials accept a single TD or three channels.
 
 ### 4.3 Out of Scope
 
@@ -210,8 +204,7 @@ performed offline, outside this repo; presets carry the fitted results.
   exported 3MF + print-settings JSON instead.
 - Cloud user accounts / saved profiles (deferred to a later phase).
 - GPU acceleration (cuML) — not critical at current scale.
-- Palette-specific empirical codebooks as the primary runtime path — kept as
-  diagnostics only; the generalized parametric model remains the runtime.
+- Palette-specific empirical codebooks as the primary runtime path.
 
 ---
 
@@ -232,7 +225,7 @@ performed offline, outside this repo; presets carry the fitted results.
 |--------|---------|
 | Converter | Main workspace: upload, parameter panel, preview, downloads |
 | Parameter Panel | maxColors, colorThreshold, layerHeight, pixelSize, detail presets |
-| Filament Config Panel | N-color preset + generic code / hex / transmission-distance editing |
+| Filament Config Panel | N-color preset + code / hex / one TD field with optional RGB expansion |
 | Language Selector | English / Simplified Chinese workspace preference |
 | Filament Preview | Achievable color gamut matrix |
 | Image Comparison | Original vs simulated print |
@@ -318,8 +311,7 @@ performed offline, outside this repo; presets carry the fitted results.
   swap).
 - User has transparent CMYK (and optionally additional) filaments.
 - User understands basic slicing workflow.
-- The unified (ln10/td + k·A_ch) Beer-Lambert model generalizes within a filament
-  family (validated for Bambu CMYK transparent PETG).
+- Material predictions use the configured hex color, TD, and physical color-layer thickness.
 
 ### 7.3 Dependencies
 
@@ -350,7 +342,7 @@ param search, Docker/cloud deploy. Calibration performed offline.
 
 | Phase | Features | Target |
 |-------|----------|--------|
-| 2.1 Accuracy | CMYWK black filament; promote research-fitted presets to default | Q3 2026 |
+| 2.1 Accuracy | Verify material TD values and their measurement provenance | Q3 2026 |
 | 2.2 Hardening | Thread locks, bounded analytics, non-root Docker, SVG complexity caps | Q3 2026 |
 | 3 Ecosystem | Slicer-preset partnerships, filament manufacturer profiles, community palette submissions | Q4 2026 |
 | 4 Scale | User accounts, cloud-saved profiles, monitoring (Prometheus), error tracking (Sentry) | 2027+ |
@@ -359,14 +351,12 @@ param search, Docker/cloud deploy. Calibration performed offline.
 
 ## 9. API Reference (summary)
 
-### V1 (legacy)
+### Image Processing and CSV
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/process-image` | Process image (pixel/SVG modes) |
 | POST | `/api/simulate-preview` | Simulated print preview (vector mode) |
 | POST | `/api/download-csv` | Color data CSV |
-| POST | `/api/download-stl` | STL ZIP (default Phase 6 CMYW) |
-| POST | `/api/download-svg-stl` | SVG-mode STL ZIP |
 
 ### V2 (N-color)
 | Method | Endpoint | Description |
@@ -385,8 +375,9 @@ param search, Docker/cloud deploy. Calibration performed offline.
 | POST | `/api/batch/process` | Batch (≤20 images) |
 | POST | `/api/batch/download-stl` | Batch STL download |
 | POST | `/api/bug-report` | Submit in-app bug report (optional screenshot) |
-| POST | `/api/param-search` | Auto parameter sweep |
-| GET  | `/api/param-search/progress/{job_id}` | Sweep progress |
+| POST | `/api/param-search` | Start one parameter sweep job |
+| GET  | `/api/param-search/progress/{job_id}` | Poll new previews and job status |
+| DELETE | `/api/param-search/progress/{job_id}` | Cancel a sweep job |
 | GET  | `/api/palettes/` | List palettes |
 | GET  | `/api/palettes/{id}` | Get palette |
 | GET  | `/api/analytics` | Usage analytics |
@@ -404,16 +395,14 @@ Full OpenAPI spec at `/docs` when the backend is running.
 
 | Term | Definition |
 |------|------------|
-| **Beer-Lambert Law** | Optical physics law describing light absorption/transmission through layers: `T = exp(−α·d/td)` |
-| **Hybrid per-channel-k** | Production blend model: per-channel transmission with per-color scattering coefficient `k_c` |
+| **Beer-Lambert Law** | Layer transmission expressed with transmission distance: `T_ch = 10^(-d / TD_ch)` |
+| **Transmission Distance (TD)** | Material distance in mm at which channel transmission is 10%; one value or three values in RGB order |
 | **CMYK / CMYWK** | Subtractive color models (Cyan, Magenta, Yellow, White/[Key]) |
 | **Greedy Meshing** | Algorithm merging adjacent identical pixels into larger rectangles |
 | **K-means** | Clustering algorithm for grouping similar colors |
 | **CIELAB / CIEDE2000** | Perceptually uniform color space / perceptual difference metric |
 | **3MF** | 3D Manufacturing Format — modern mesh format supporting color/material metadata |
 | **AMS / MMU** | Automatic Material System (Bambu) / Multi-Material Unit (Prusa) |
-| **TD1S** | Single-parameter transmission-distance power-law remapping used in calibration |
-| **Phase 6** | Calibration generation: per-color k (survives as the optional k field; Phase 7 per-channel variant retired) |
 
 ### B. References
 

@@ -32,4 +32,12 @@ describe('frontend message compatibility adapter', () => {
     expect(localizeMessage('Custom material Q-42: unsupported profile', i18n)).toBe('Custom material Q-42: unsupported profile');
     expect(localizeMessage(null, i18n)).toBe('');
   });
+
+  it('explains search admission and time limits in Chinese', () => {
+    setLocale('zh-CN');
+    expect(localizeMessage('A search is already running. Cancel it or wait for it to finish.', i18n))
+      .toBe('另一轮方案比较仍在运行，请稍后重试。');
+    expect(localizeMessage('Search stopped after 1800s; 3 of 21 previews completed.', i18n))
+      .toBe('本轮搜索在 1800 秒后停止，已生成 3／21 张方案图。');
+  });
 });

@@ -5,7 +5,7 @@ import { useTranslation } from '../i18n';
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import type { FilamentColorConfig, FilamentPreset } from '../api/types';
+import type { BackingMode, FilamentColorConfig, FilamentPreset } from '../api/types';
 import { getFilamentPreview } from '../api/client';
 
 interface ColorMatrixEntry {
@@ -26,6 +26,8 @@ interface FilamentPreviewProps {
   filamentPreset: FilamentPreset | null;
   layerCount: number;
   layerHeight: number;
+  whiteBackingLayers: number;
+  backingMode: BackingMode;
   isConfigValid: boolean;
   disabled?: boolean;
 }
@@ -35,6 +37,8 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
   filamentPreset,
   layerCount,
   layerHeight,
+  whiteBackingLayers,
+  backingMode,
   isConfigValid,
   disabled = false,
 }) => {
@@ -62,8 +66,8 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
     try {
       // Send only filamentPreset if it's set, otherwise send filamentColors
       const requestBody = filamentPreset
-        ? { filamentPreset, layerCount, layerHeight }
-        : { filamentColors, layerCount, layerHeight };
+        ? { filamentPreset, layerCount, layerHeight, whiteBackingLayers, backingMode }
+        : { filamentColors, layerCount, layerHeight, whiteBackingLayers, backingMode };
       const result = await getFilamentPreview(requestBody, controller.signal);
       if (!controller.signal.aborted) {
         setPreview(result);
@@ -78,7 +82,7 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
         setLoading(false);
       }
     }
-  }, [filamentColors, filamentPreset, layerCount, layerHeight, isConfigValid, disabled]);
+  }, [filamentColors, filamentPreset, layerCount, layerHeight, whiteBackingLayers, backingMode, isConfigValid, disabled]);
 
   // Auto-fetch on config change with debounce
   useEffect(() => {
@@ -110,10 +114,7 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div>
-          <h4 className="text-sm font-medium text-gray-700">{t('filaments:achievableFilamentGamut')}</h4>
-          <p className="text-xs text-gray-500">{t('filaments:gamutHelp')}</p>
-        </div>
+        <h4 className="text-sm font-medium text-gray-700">{t('filaments:achievableFilamentGamut')}</h4>
         <button
           onClick={fetchPreview}
           disabled={loading || disabled}

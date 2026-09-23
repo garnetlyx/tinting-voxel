@@ -1,22 +1,14 @@
-"""Printed backing block: white/black modes participate in the simulation.
-
-The paper's plates sat on infinite external backings (white paper B=1,
-black cardstock B≈0.05). The app prints a FINITE backing block — N layers of
-one filament — so its thickness affects the result: the evaluated stack
-carries the backing as trailing layers over the mode boundary, BEFORE
-mapping (the mapping searches against backing-aware reference matrices).
-"""
+"""Printed backing material and thickness participate in color prediction."""
 import numpy as np
 import pytest
 
-from core.blend_color import Colors
+from core.blend_color import Colors, colors_key
 from core.color_config import ColorConfig
 from core.color_config import get_preset
 from core.blend_models import codes_to_rgb_batch
 from services.image_processor import _map_source_colors_to_blends
 from services.print_stack import (
-    BLACK_BOUNDARY_RGB,
-    backing_boundary_rgb,
+    PRINT_BACKGROUND_RGB,
     backing_suffix,
     build_print_stack,
     normalize_backing_layers,
@@ -59,19 +51,25 @@ def test_backing_suffix_and_strip_roundtrip():
     assert strip_backing_suffix('CYMYYYYY', 'W', 0) == 'CYMYYYYY'
 
 
-def test_boundary_rgb_matches_paper_backing_reflectance():
-    assert backing_boundary_rgb('white') == (255.0, 255.0, 255.0)
-    assert all(abs(c - 0.05 * 255) <= 0.5 for c in backing_boundary_rgb('black'))
+def test_backing_modes_predict_actual_filament_layers_under_one_background():
+    for mode, suffix in [("white", "WWW"), ("black", "MMM")]:
+        codes, rgbs = _map_source_colors_to_blends(
+            [(29, 30, 30)], BAMBU, 4, 0.08, backing_layers=3, backing_mode=mode,
+        )
+        assert codes[0].endswith(suffix)
+        expected = codes_to_rgb_batch(codes, 0.08, colors_key(BAMBU), background_rgb=PRINT_BACKGROUND_RGB)
+        np.testing.assert_array_equal(rgbs, np.round(expected).astype(int))
+        np.testing.assert_allclose(expected, codes_to_rgb_batch(codes, 0.08, colors_key(BAMBU)), atol=0, rtol=0)
 
 
 def test_print_stack_metadata_carries_mode():
-    stack = build_print_stack(8, 0.32, 3, 'black')
+    stack = build_print_stack(8, 0.08, 3, 'black')
     assert stack == {
         "opticalLayerCount": 8,
         "whiteBackingLayers": 3,
         "backingMode": "black",
         "totalLayerCount": 11,
-        "totalHeightMm": 3.52,
+        "totalHeightMm": 0.88,
     }
 
 
@@ -79,47 +77,50 @@ def test_print_stack_metadata_carries_mode():
 
 def test_backing_layers_shift_simulated_color():
     """Thickness dependence: the same code changes as the backing grows."""
-    from core.blend_color import colors_key
     key = colors_key(BAMBU)
-    no_backing = codes_to_rgb_batch(['CYMYYYYY'], 0.32, key)[0]
-    one_w = codes_to_rgb_batch(['CYMYYYYYW'], 0.32, key)[0]
-    three_w = codes_to_rgb_batch(['CYMYYYYYWWW'], 0.32, key)[0]
-    three_w_inked = codes_to_rgb_batch(
-        ['CYMYYYYYWWW'], 0.32, key, background_rgb=BLACK_BOUNDARY_RGB
+    no_backing = codes_to_rgb_batch(['CYMYYYYY'], 0.08, key)[0]
+    one_w = codes_to_rgb_batch(['CYMYYYYYW'], 0.08, key)[0]
+    three_w = codes_to_rgb_batch(['CYMYYYYYWWW'], 0.08, key)[0]
+    three_m = codes_to_rgb_batch(
+        ['CYMYYYYYMMM'], 0.08, key, background_rgb=PRINT_BACKGROUND_RGB
     )[0]
     assert one_w != no_backing
     assert three_w != one_w
-    assert three_w_inked != three_w  # black boundary vs white boundary
+    assert three_m != three_w
 
 
 def test_mapping_returns_full_stack_code_with_backing_suffix():
     codes, rgbs = _map_source_colors_to_blends(
-        [(0x1D, 0x1E, 0x1E)], BAMBU, 8, 0.32, backing_layers=3, backing_mode='white',
+        [(0x1D, 0x1E, 0x1E)], BAMBU, 8, 0.08, backing_layers=3, backing_mode='white',
     )
     assert codes[0].endswith('WWW')
     assert len(codes[0]) == 8 + 3
     # No backing: optical code only.
     codes0, _ = _map_source_colors_to_blends(
-        [(0x1D, 0x1E, 0x1E)], BAMBU, 8, 0.32, backing_layers=0,
+        [(0x1D, 0x1E, 0x1E)], BAMBU, 8, 0.08, backing_layers=0,
     )
     assert len(codes0[0]) == 8
 
 
 def test_mapping_result_depends_on_backing_mode():
-    """White vs black backing over the same set resolve different stacks."""
+    """Backing changes the result when the front layers transmit enough light."""
+    translucent = Colors.from_configs([
+        ColorConfig(name=c.name, hex=c.hex, transmission_distance=2.0)
+        for c in get_preset("bambu_cmyw_phase6")
+    ])
     dark = (0x1D, 0x1E, 0x1E)
-    codes_w, _ = _map_source_colors_to_blends([dark], BAMBU, 8, 0.32, 3, 'white')
-    codes_b, _ = _map_source_colors_to_blends([dark], BAMBU, 8, 0.32, 3, 'black')
+    codes_w, rgb_w = _map_source_colors_to_blends([dark], translucent, 8, 0.08, 3, 'white')
+    codes_b, rgb_b = _map_source_colors_to_blends([dark], translucent, 8, 0.08, 3, 'black')
     assert codes_w[0].endswith('WWW')
     assert codes_b[0].endswith('MMM')  # M is closest-to-black in CMYW
-    assert codes_w[0][:8] != codes_b[0][:8] or True  # sim differs (boundary)
+    assert not np.allclose(rgb_w, rgb_b)
 
 
 def test_reference_matrices_backing_cache_isolation():
     """Different backing configs must not alias in the matrix cache."""
-    m0 = compute_reference_matrices(4, 0.32, BAMBU, n_targets=3, backing_layers=0)
-    m3 = compute_reference_matrices(4, 0.32, BAMBU, n_targets=3, backing_layers=3, backing_mode='white')
-    mb = compute_reference_matrices(4, 0.32, BAMBU, n_targets=3, backing_layers=3, backing_mode='black')
+    m0 = compute_reference_matrices(4, 0.08, BAMBU, n_targets=3, backing_layers=0)
+    m3 = compute_reference_matrices(4, 0.08, BAMBU, n_targets=3, backing_layers=3, backing_mode='white')
+    mb = compute_reference_matrices(4, 0.08, BAMBU, n_targets=3, backing_layers=3, backing_mode='black')
     r0 = np.asarray(m0[1].iloc[0, 0], dtype=float)
     r3 = np.asarray(m3[1].iloc[0, 0], dtype=float)
     rb = np.asarray(mb[1].iloc[0, 0], dtype=float)
@@ -127,20 +128,21 @@ def test_reference_matrices_backing_cache_isolation():
     assert not np.allclose(r3, rb)
 
 
-def test_zero_backing_reproduces_paper_white_boundary():
-    """n=0 = the calibration condition (codes over white paper): every matrix
-    cell equals the plain blend of that code (independent oracle). Note the
-    parameter default (None) resolves to 1 layer, matching the API default
-    whiteBackingLayers=1."""
-    from core.blend_color import colors_key
-    m_white0 = compute_reference_matrices(4, 0.32, BAMBU, n_targets=3, backing_layers=0, backing_mode='white')
-    code = m_white0[0].iloc[0, 0]
-    expected = codes_to_rgb_batch([code], 0.32, colors_key(BAMBU))[0]
-    cell = np.asarray(m_white0[1].iloc[0, 0], dtype=float)
-    assert np.allclose(cell, np.round(np.clip(expected, 0, 255)))
+def test_zero_backing_has_no_hidden_mode_dependent_background():
+    matrices = [
+        compute_reference_matrices(4, 0.08, BAMBU, n_targets=3, backing_layers=0, backing_mode=mode)
+        for mode in ("white", "black")
+    ]
+    assert matrices[0][0].equals(matrices[1][0])
+    assert matrices[0][1].equals(matrices[1][1])
+    for code_matrix, rgb_matrix in matrices:
+        code = code_matrix.iloc[0, 0]
+        expected = codes_to_rgb_batch([code], 0.08, colors_key(BAMBU))[0]
+        cell = np.asarray(rgb_matrix.iloc[0, 0], dtype=float)
+        np.testing.assert_array_equal(cell, np.round(expected))
 
 
 def test_normalize_backing_layers():
-    assert normalize_backing_layers(None) == 1
+    assert normalize_backing_layers(None) == 3
     assert normalize_backing_layers(0) == 0
     assert normalize_backing_layers(-3) == 0

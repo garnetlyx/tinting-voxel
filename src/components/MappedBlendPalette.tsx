@@ -14,7 +14,6 @@ export const MappedBlendPalette: React.FC<MappedBlendPaletteProps> = ({ entries 
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-gray-800">{t('preview:mappedBlendPalette')}</h3>
-        <p className="text-xs text-gray-500">{t('preview:mappingHelp')}</p>
       </div>
 
       <div className="space-y-2">

@@ -1,5 +1,20 @@
 import * as THREE from 'three';
-import type { ColorBlock, ImageDimensions, MappedBlockColor } from '../api/types';
+import type { ColorBlock, FilamentColorConfig, ImageDimensions, MappedBlockColor } from '../api/types';
+
+/** Read the actual backing material chosen by the backend from its blend codes. */
+export function resolvePreviewBackingHex(
+  mappedBlockColors: MappedBlockColor[],
+  filamentColors: FilamentColorConfig[],
+  backingLayers: number,
+): string | null {
+  if (backingLayers === 0) return null;
+  const code = mappedBlockColors[0]?.code;
+  if (!code || code.length < backingLayers) return null;
+  const backingLabel = code[code.length - 1];
+  const suffix = backingLabel.repeat(backingLayers);
+  if (!mappedBlockColors.every(item => item.code.endsWith(suffix))) return null;
+  return filamentColors.find(color => color.name[0].toUpperCase() === backingLabel)?.hex ?? null;
+}
 
 interface PreviewRectangle {
   x: number;
@@ -66,6 +81,7 @@ export function buildInstancedMeshes(
   layerHeight: number,
   layerCount: number,
   whiteBackingLayers: number,
+  backingHex: string | null,
   visibilityMap: Map<string, boolean>,
   showExploded: boolean,
 ): THREE.Group {
@@ -78,7 +94,7 @@ export function buildInstancedMeshes(
     showExploded ? layerHeight : blockHeight,
     pixelSize
   );
-  // Preview coordinates put the colored face above its white backing.
+  // Preview coordinates put the colored face above its printed backing.
   const backingThickness = whiteBackingLayers * layerHeight;
   const baseY = backingThickness + blockHeight / 2;
   const materials = new Map<string, THREE.MeshPhongMaterial>();
@@ -138,17 +154,18 @@ export function buildInstancedMeshes(
   }
 
   if (whiteBackingLayers > 0) {
+    if (!backingHex) throw new Error('Backing filament color is unavailable');
     const plateWidth = imageDimensions.width * pixelSize;
     const plateDepth = imageDimensions.height * pixelSize;
-    const whiteMaterial = new THREE.MeshPhongMaterial({
-      color: 0xf8f8f8,
+    const backingMaterial = new THREE.MeshPhongMaterial({
+      color: new THREE.Color(backingHex),
       flatShading: true,
     });
 
     if (showExploded) {
       const backingGeo = new THREE.BoxGeometry(plateWidth, layerHeight, plateDepth);
       for (let layer = 0; layer < whiteBackingLayers; layer++) {
-        const backing = new THREE.Mesh(backingGeo, whiteMaterial);
+        const backing = new THREE.Mesh(backingGeo, backingMaterial);
         const y = layer * (layerHeight + explodedGap) + layerHeight / 2;
         backing.position.set(0, y, 0);
         group.add(backing);
@@ -156,7 +173,7 @@ export function buildInstancedMeshes(
     } else {
       const backingThickness = whiteBackingLayers * layerHeight;
       const backingGeo = new THREE.BoxGeometry(plateWidth, backingThickness, plateDepth);
-      const backing = new THREE.Mesh(backingGeo, whiteMaterial);
+      const backing = new THREE.Mesh(backingGeo, backingMaterial);
       backing.position.set(0, backingThickness / 2, 0);
       group.add(backing);
     }

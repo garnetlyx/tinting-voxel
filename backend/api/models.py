@@ -1,10 +1,12 @@
 """
 Pydantic models for API request and response validation
 """
+from config.print_defaults import DEFAULT_BACKING_LAYERS
+from core.color_config import normalize_transmission_distance
 from enum import Enum
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 
 class ProcessingMode(str, Enum):
@@ -14,70 +16,21 @@ class ProcessingMode(str, Enum):
 
 
 class FilamentColorConfig(BaseModel):
-    """Configuration for a single filament color: name, hex, td, optional
-    td_rgb, optional k, optional scalar-form capture compensation
-    (alpha_s/td_scale/td_gamma, paper Eqs. (1)-(2)).
-
-    td_rgb is the staircase-measured per-channel transmission distance
-    triplet. Scalar td (absent td_rgb) is remapped by
-    td_scale * td**td_gamma and scattered at alpha_s; neutral defaults
-    (alpha_s = ln 10, td_scale = td_gamma = 1) degrade to plain
-    ln(10)/td + k*A_ch.
-    """
+    """A material color and one scalar or RGB transmission-distance value."""
 
     model_config = ConfigDict(extra="forbid")
-    name: str = Field(..., min_length=1, max_length=200, description="Display name for the color")
-    hex: str = Field(..., description="Hex color code (e.g., '#00FFFF')")
-    transmission_distance: float = Field(
-        ...,
-        gt=0,
-        le=1000,
-        description="Beer-Lambert transmission distance (opacity control)"
-    )
-    td_rgb: Optional[List[float]] = Field(
-        None,
-        description="Staircase-measured per-channel transmission distances [R, G, B]; "
-                    "present selects the per-channel form"
-    )
-    k: float = Field(
-        0.0,
-        ge=0,
-        le=1000,
-        description="Optional pigment absorption gain; 0 blends as plain Beer-Lambert (t = 10^(-d/td))"
-    )
-    alpha_s: float = Field(
-        2.302585092994046,
-        gt=0,
-        le=1000,
-        description="Scalar-form scatter coefficient (paper Eq. (1)); neutral ln(10)"
-    )
-    td_scale: float = Field(
-        1.0,
-        gt=0,
-        le=1000,
-        description="Scalar-form s_td remap (paper Eq. (2)); neutral 1"
-    )
-    td_gamma: float = Field(
-        1.0,
-        gt=0,
-        le=1000,
-        description="Scalar-form gamma_td remap exponent (paper Eq. (2)); neutral 1"
-    )
+    name: str = Field(..., min_length=1, max_length=200)
+    hex: str
+    transmission_distance: float | tuple[float, float, float]
 
-    @field_validator('td_rgb')
+    @field_validator('transmission_distance', mode='before')
     @classmethod
-    def validate_td_rgb(cls, v):
-        """Per-channel TDs: exactly 3 positive finite values (R, G, B)."""
-        if v is None:
-            return v
-        if len(v) != 3:
-            raise ValueError("td_rgb must be exactly 3 per-channel distances [R, G, B]")
-        for ch, td_ch in enumerate(v):
-            if not (0 < td_ch <= 1000):
-                raise ValueError(
-                    f"td_rgb channel {'RGB'[ch]} must be in (0, 1000], got {td_ch}"
-                )
-        return v
+    def validate_transmission_distance(cls, value):
+        value = normalize_transmission_distance(value)
+        values = value if isinstance(value, tuple) else (value,)
+        if any(not (0 < td <= 1000) for td in values):
+            raise ValueError("TD values must be finite and in (0, 1000] mm")
+        return value
 
     @field_validator('name')
     @classmethod
@@ -187,9 +140,9 @@ class VectorRegion(BaseModel):
 
 class VectorColorResult(BaseModel):
     """Vector processing result for a single color."""
+    model_config = ConfigDict(extra="forbid")
     color: tuple[int, int, int]
-    polygons: List[List[tuple[float, float]]] = Field(default_factory=list)
-    regions: List[VectorRegion] = Field(default_factory=list)
+    regions: List[VectorRegion] = Field(..., min_length=1)
     pixel_count: int = Field(..., ge=0)
     polygon_points: int = Field(..., ge=0)
 
@@ -204,25 +157,6 @@ class SVGProcessImageResponse(BaseModel):
     pixelSize: Optional[float] = None
     detailSize: Optional[float] = None
     printStack: "PrintStackInfo"
-
-
-class DownloadSTLRequest(BaseModel):
-    """Request model for /api/download-stl endpoint (pixel mode)."""
-    colorBlocks: List[ColorBlock] = Field(..., min_length=1)
-    layerHeight: float = Field(..., gt=0, le=10)
-    pixelSize: float = Field(..., gt=0, le=10)
-    layerCount: int = Field(..., ge=1, le=10)
-    imageDimensions: ImageDimensions
-    mode: ProcessingMode = ProcessingMode.PIXEL
-
-
-class DownloadSVGSTLRequest(BaseModel):
-    """Request model for /api/download-stl endpoint (SVG mode)."""
-    vectorResults: List[VectorColorResult] = Field(..., min_length=1)
-    layerHeight: float = Field(..., gt=0, le=10)
-    pixelSize: float = Field(..., gt=0, le=10)
-    layerCount: int = Field(..., ge=1, le=10)
-    imageDimensions: ImageDimensions
 
 
 # Shared mixin for filament configuration validation
@@ -260,10 +194,28 @@ class FilamentConfigMixin(BaseModel):
         return self
 
 
+class PrintConfigMixin(FilamentConfigMixin):
+    """Resolve omitted color-layer height from the selected material data."""
+    layerHeight: Optional[float] = Field(None, gt=0, le=10)
+    _resolved_colors: object = PrivateAttr()
+
+    @model_validator(mode='after')
+    def resolve_print_configuration(self):
+        from api.filament_payload import get_colors_from_request, resolve_layer_height
+
+        self._resolved_colors = get_colors_from_request(self.filamentPreset, self.filamentColors)
+        self.layerHeight = resolve_layer_height(self.layerHeight, self._resolved_colors)
+        return self
+
+    @property
+    def resolved_colors(self):
+        return self._resolved_colors
+
+
 class WhiteBackingMixin(BaseModel):
     """Mixin for explicit printed backing configuration (white or black block)."""
     whiteBackingLayers: int = Field(
-        1,
+        DEFAULT_BACKING_LAYERS,
         ge=0,
         le=5,
         description="Number of full-area backing layers printed behind the optical stack"
@@ -275,10 +227,9 @@ class WhiteBackingMixin(BaseModel):
 
 
 # V2 API Models with configurable colors
-class DownloadSTLRequestV2(FilamentConfigMixin, WhiteBackingMixin):
+class DownloadSTLRequestV2(PrintConfigMixin, WhiteBackingMixin):
     """Request model for /api/v2/download-stl endpoint with configurable colors."""
     colorBlocks: List[ColorBlock] = Field(..., min_length=1)
-    layerHeight: float = Field(..., gt=0, le=10)
     pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
@@ -292,20 +243,16 @@ class DownloadSTLRequestV2(FilamentConfigMixin, WhiteBackingMixin):
     # Small pixels will be merged at the backend level
 
 
-class DownloadSVGSTLRequestV2(FilamentConfigMixin, WhiteBackingMixin):
+class DownloadSVGSTLRequestV2(PrintConfigMixin, WhiteBackingMixin):
     """Request model for /api/v2/download-svg-stl endpoint with configurable colors."""
     vectorResults: List[VectorColorResult] = Field(..., min_length=1)
-    layerHeight: float = Field(..., gt=0, le=10)
     pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
     detailSize: Optional[float] = Field(
-        None, ge=0.2, le=0.8,
-        description="Minimum physical pixel size in mm (default: 0.4)"
+        None, ge=0.2, le=0.9,
+        description="Minimum printable feature width in mm"
     )
-
-    # No longer validate pixelSize >= detailSize
-    # Small pixels will be merged at the backend level
 
 
 class FilamentPresetInfo(BaseModel):
@@ -318,12 +265,13 @@ class FilamentPresetInfo(BaseModel):
 class FilamentPresetsResponse(BaseModel):
     """Response model for /api/filament-presets endpoint."""
     presets: List[FilamentPresetInfo]
+    defaults: dict
+    transparency: dict
 
 
-class FilamentPreviewRequest(FilamentConfigMixin):
+class FilamentPreviewRequest(PrintConfigMixin, WhiteBackingMixin):
     """Request model for /api/filament-preview endpoint."""
     layerCount: int = Field(4, ge=1, le=10)
-    layerHeight: float = Field(0.08, gt=0, le=10)
     page: Optional[int] = Field(None, ge=1, description="Page number (1-based) for paginated results")
     pageSize: Optional[int] = Field(None, ge=1, le=10000, description="Number of entries per page")
 
@@ -350,9 +298,8 @@ class PrintStackInfo(BaseModel):
     totalHeightMm: float = Field(..., ge=0)
 
 
-class PrintSettingsRequest(FilamentConfigMixin, WhiteBackingMixin):
+class PrintSettingsRequest(PrintConfigMixin, WhiteBackingMixin):
     """Request model for /api/v2/print-settings endpoint."""
-    layerHeight: float = Field(..., gt=0, le=10)
     pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=10)
     imageDimensions: ImageDimensions
@@ -389,44 +336,24 @@ class MappedBlockColor(BaseModel):
     hex: str
 
 
-class ParamSearchRequest(BaseModel):
-    """Multipart form fields for POST /api/param-search."""
-    preset: str
-    mode: str = "pixel"
-    strategy: str = "grid"
-    n_trials: int = Field(50, ge=1, le=500)
-    seed: Optional[int] = None
-    layer_count: int = Field(4, ge=1, le=10)
-    layer_height: float = Field(0.08, gt=0, le=10)
-    pixel_size: float = Field(0.42, gt=0, le=10)
-    top_n: int = Field(10, ge=1, le=50)
-
-
 class SearchResultItem(BaseModel):
     """Single evaluated parameter combination."""
-    rank: int
+    candidate_id: int
+    is_baseline: bool
     mode: str
     params: dict
-    mae: float
     preview_image: str  # data URL (base64 PNG)
 
 
 class ParamSearchResponse(BaseModel):
-    """Response for POST /api/param-search."""
-    job_id: str
-    results: List[SearchResultItem]
-    total_evaluated: int
-    elapsed_seconds: float
-
-
-class ProgressEvent(BaseModel):
-    """SSE payload for /api/param-search/progress/{job_id}."""
+    """Snapshot of an asynchronous parameter search job."""
     job_id: str
     completed: int
     total: int
-    best_mae: float
-    status: str  # "running", "complete", "error"
+    status: Literal['running', 'complete', 'cancelled', 'error']
+    settled: bool
     error: Optional[str] = None
+    results: List[SearchResultItem]
 
 
 class PaginationInfo(BaseModel):
@@ -447,13 +374,12 @@ class FilamentPreviewResponse(BaseModel):
     pagination: Optional[PaginationInfo] = None
 
 
-class SimulatePreviewRequest(FilamentConfigMixin):
+class SimulatePreviewRequest(PrintConfigMixin):
     """Request model for print-simulation preview generation."""
     colorBlocks: List[ColorBlock] = Field(..., min_length=1)
     imageDimensions: ImageDimensions
     layerCount: int = Field(4, ge=1, le=10)
-    layerHeight: float = Field(0.08, gt=0, le=10)
-    whiteBackingLayers: int = Field(1, ge=0, le=5)
+    whiteBackingLayers: int = Field(DEFAULT_BACKING_LAYERS, ge=0, le=5)
     backingMode: Literal['white', 'black'] = 'white'
 
 

@@ -7,6 +7,43 @@ from core.blend_color import Colors
 from services.threemf_generator import generate_3mf
 
 
+def test_svg_3mf_uses_selected_backing_and_detail_size(monkeypatch, default_colors):
+    from services import threemf_generator
+
+    observed = {}
+    compute = threemf_generator.compute_reference_matrices
+    finalize = threemf_generator.finalize_vector_partition
+
+    def capture_matrix(*args, **kwargs):
+        observed['matrix'] = kwargs
+        return compute(*args, **kwargs)
+
+    def capture_partition(*args):
+        observed['partition'] = args
+        return finalize(*args)
+
+    monkeypatch.setattr(threemf_generator, 'compute_reference_matrices', capture_matrix)
+    monkeypatch.setattr(threemf_generator, 'finalize_vector_partition', capture_partition)
+    result = threemf_generator.generate_svg_3mf(
+        vector_results=[{
+            'color': (255, 0, 0),
+            'regions': [{'outer': [(0, 0), (4, 0), (4, 4), (0, 4)], 'holes': []}],
+        }],
+        layer_height=0.08,
+        pixel_size=0.2,
+        layer_count=4,
+        image_dimensions={'width': 5, 'height': 5},
+        colors=default_colors,
+        white_backing_layers=2,
+        backing_mode='black',
+        detail_size=0.82,
+    )
+    assert zipfile.is_zipfile(BytesIO(result))
+    assert observed['matrix']['backing_layers'] == 2
+    assert observed['matrix']['backing_mode'] == 'black'
+    assert observed['partition'][2:] == (0.2, 0.82)
+
+
 @pytest.fixture
 def default_colors():
     return Colors()

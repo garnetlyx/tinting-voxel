@@ -169,14 +169,12 @@ class TestProcessImageLargeHandling:
         vector_results = [
             {
                 "color": (255, 0, 0),
-                "polygons": [[(0, 0), (1, 0), (1, 1), (0, 1)]],
                 "regions": [{"outer": [(0, 0), (1, 0), (1, 1), (0, 1)], "holes": []}],
                 "pixel_count": 2,
                 "polygon_points": 4,
             },
             {
                 "color": (0, 0, 255),
-                "polygons": [[(0, 1), (1, 1), (1, 2), (0, 2)]],
                 "regions": [{"outer": [(0, 1), (1, 1), (1, 2), (0, 2)], "holes": []}],
                 "pixel_count": 2,
                 "polygon_points": 4,
@@ -186,6 +184,8 @@ class TestProcessImageLargeHandling:
         result = build_vector_simulated_preview(
             quantized_image=quantized,
             vector_results=vector_results,
+            pixel_size=0.42,
+            detail_size=None,
             white_backing_layers=0,
         )
 
@@ -195,26 +195,18 @@ class TestProcessImageLargeHandling:
         assert result['printStack']['whiteBackingLayers'] == 0
 
     def test_vector_simulated_preview_uses_final_geometry_not_quantized_pixels(self):
-        """Holed geometry keeps the mapped-background color in the hole.
-
-        build_vector_simulated_preview uses the quantized image as the
-        background (each pixel mapped through the Beer-Lambert blend model,
-        not raw RGB) to avoid white edges from filtered/hole regions. A hole
-        cut out of a vector region therefore shows the blend-mapped
-        background color rather than the raw quantized input or pure white.
-        """
+        """The preview fills vector gaps using the final printable partition."""
         quantized = np.array(
             [
-                [[255, 0, 0], [255, 0, 0], [255, 0, 0]],
-                [[255, 0, 0], [255, 0, 0], [255, 0, 0]],
-                [[255, 0, 0], [255, 0, 0], [255, 0, 0]],
+                [[0, 255, 0], [0, 255, 0], [0, 255, 0]],
+                [[0, 255, 0], [0, 255, 0], [0, 255, 0]],
+                [[0, 255, 0], [0, 255, 0], [0, 255, 0]],
             ],
             dtype=np.uint8,
         )
         vector_results = [
             {
                 "color": (255, 0, 0),
-                "polygons": [[(0, 0), (2, 0), (2, 2), (0, 2)]],
                 "regions": [{
                     "outer": [(0, 0), (2, 0), (2, 2), (0, 2)],
                     "holes": [[(1, 1), (2, 1), (2, 2), (1, 2)]],
@@ -227,18 +219,43 @@ class TestProcessImageLargeHandling:
         result = build_vector_simulated_preview(
             quantized_image=quantized,
             vector_results=vector_results,
+            pixel_size=0.42,
+            detail_size=None,
             white_backing_layers=0,
         )
 
         preview = _decode_data_url_image(result['processedImage'])
         hole_pixel = tuple(int(v) for v in preview[1, 1])
-        # The hole is NOT pure white (the bug would leave it as background
-        # fill of (255,255,255)). Instead it shows the Beer-Lambert-mapped
-        # background color for the quantized red input.
-        assert hole_pixel != (255, 255, 255), (
-            f"Hole pixel should show the mapped background, not white. "
-            f"Got {hole_pixel}"
+        # Quantized green deliberately disagrees with the red printable
+        # region. A gap must use the exported region's blend, not the
+        # quantized-image background blend.
+        assert hole_pixel == tuple(int(v) for v in preview[0, 0])
+
+    def test_vector_preview_omits_regions_removed_by_print_cleanup(self):
+        """The response palette contains only material regions still printed."""
+        quantized = np.zeros((20, 20, 3), dtype=np.uint8)
+        vector_results = [
+            {
+                'color': (0, 0, 255),
+                'regions': [{'outer': [(0, 0), (19, 0), (19, 19), (0, 19)], 'holes': []}],
+            },
+            {
+                'color': (255, 0, 0),
+                'regions': [{'outer': [(9, 9), (10, 9), (10, 10), (9, 10)], 'holes': []}],
+            },
+        ]
+        result = build_vector_simulated_preview(
+            quantized_image=quantized,
+            vector_results=vector_results,
+            pixel_size=0.1,
+            detail_size=0.9,
+            white_backing_layers=0,
         )
+
+        palette = result['mappedBlendPalette']
+        assert len(palette) == 1
+        assert palette[0]['pixelCount'] == 400
+        assert _decode_data_url_image(result['processedImage']).shape == (20, 20, 3)
 
     def test_small_components_merge_without_global_scaling(self):
         """detail_size merges local components instead of enlarging the full image."""
@@ -246,38 +263,59 @@ class TestProcessImageLargeHandling:
             {'r': 255, 'g': 0, 'b': 0, 'hex': '#ff0000', 'count': 1, 'pixels': [{'x': 0, 'y': 0}]},
             {'r': 250, 'g': 10, 'b': 10, 'hex': '#fa0a0a', 'count': 1, 'pixels': [{'x': 1, 'y': 0}]},
             {
-                'r': 0, 'g': 0, 'b': 255, 'hex': '#0000ff', 'count': 4,
-                'pixels': [{'x': 2, 'y': 0}, {'x': 3, 'y': 0}, {'x': 4, 'y': 0}, {'x': 5, 'y': 0}],
+                'r': 0, 'g': 0, 'b': 255, 'hex': '#0000ff', 'count': 10,
+                'pixels': ([{'x': x, 'y': 0} for x in range(2, 6)]
+                           + [{'x': x, 'y': 1} for x in range(6)]),
             },
         ]
 
         merged = merge_small_pixels_to_neighbors(
             color_blocks=color_blocks,
             width=6,
-            height=1,
+            height=2,
             pixel_size=0.2,
             detail_size=0.4,
         )
 
         assert len(merged) == 1
-        assert merged[0]['count'] == 6
+        assert merged[0]['count'] == 12
 
     def test_single_component_image_is_preserved(self):
         """A single-region image has no valid merge target and remains unchanged."""
         color_blocks = [
-            {'r': 255, 'g': 0, 'b': 0, 'hex': '#ff0000', 'count': 1, 'pixels': [{'x': 0, 'y': 0}]},
+            {
+                'r': 255, 'g': 0, 'b': 0, 'hex': '#ff0000', 'count': 4,
+                'pixels': [{'x': x, 'y': y} for y in range(2) for x in range(2)],
+            },
         ]
 
         merged = merge_small_pixels_to_neighbors(
             color_blocks=color_blocks,
-            width=1,
-            height=1,
+            width=2,
+            height=2,
             pixel_size=0.2,
             detail_size=0.4,
         )
 
         assert len(merged) == 1
-        assert merged[0]['count'] == 1
+        assert merged[0]['count'] == 4
+
+    def test_process_image_widens_a_connector_between_large_regions(self):
+        pixels = np.full((40, 50, 3), 255, dtype=np.uint8)
+        pixels[10:30, 2:17] = 0
+        pixels[10:30, 22:37] = 0
+        pixels[20, 17:22] = 0
+        image_bytes = BytesIO()
+        Image.fromarray(pixels).save(image_bytes, format='PNG')
+
+        result = process_image(
+            image_bytes.getvalue(), max_colors=2, color_threshold=0,
+            pixel_size=0.1, detail_size=0.42,
+        )
+        black = next(block for block in result['colorBlocks'] if block['r'] == 0)
+        printed = {(point['y'], point['x']) for point in black['pixels']}
+        assert all((y, x) in printed for y in range(18, 23) for x in range(17, 22))
+        assert result['imageDimensions'] == {'width': 50, 'height': 40}
 
     def test_tiny_hole_disappears(self):
         """A sub-threshold hole is absorbed into the surrounding region."""

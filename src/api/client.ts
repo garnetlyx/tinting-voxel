@@ -65,10 +65,10 @@ export async function processImage(
   formData.append('image', file);
   formData.append('mode', params.mode);
   formData.append('pixelSize', params.pixelSize.toString());
-  formData.append('layerHeight', (params.layerHeight ?? 0.08).toString());
-  formData.append('layerCount', (params.layerCount ?? 4).toString());
-  formData.append('whiteBackingLayers', (params.whiteBackingLayers ?? 1).toString());
-  formData.append('backingMode', params.backingMode ?? 'white');
+  if (params.layerHeight !== undefined) formData.append('layerHeight', params.layerHeight.toString());
+  if (params.layerCount !== undefined) formData.append('layerCount', params.layerCount.toString());
+  if (params.whiteBackingLayers !== undefined) formData.append('whiteBackingLayers', params.whiteBackingLayers.toString());
+  if (params.backingMode !== undefined) formData.append('backingMode', params.backingMode);
 
   if (params.filamentPreset) {
     formData.append('filamentPreset', params.filamentPreset);
@@ -361,7 +361,7 @@ export async function batchDownloadSTL(
   formData.append('layerHeight', params.layerHeight.toString());
   formData.append('layerCount', params.layerCount.toString());
   formData.append('whiteBackingLayers', params.whiteBackingLayers.toString());
-  formData.append('backingMode', params.backingMode ?? 'white');
+  if (params.backingMode !== undefined) formData.append('backingMode', params.backingMode);
   if (params.filamentPreset) {
     formData.append('filamentPreset', params.filamentPreset);
   }

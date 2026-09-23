@@ -1,35 +1,34 @@
 """
 V2 Download endpoints with configurable filament colors.
 
-Maintains backward compatibility while adding N-color support.
+Uses the shared material configuration for all exports.
 """
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from api.error_handlers import handle_api_errors
-from api.filament_payload import get_colors_from_request
 from api.rate_limiter import limiter
 from api.models import (
     DownloadSTLRequestV2,
     DownloadSVGSTLRequestV2,
     FilamentColorConfig,
-    FilamentPreset,
     FilamentPresetInfo,
     FilamentPresetsResponse,
     PrintSettingsRequest,
 )
-from core.blend_color import Colors
 from core.color_config import (
-    BAMBU_CMYWK_PHASE6_PRESET,
-    ColorConfig,
-    get_preset,
     PRESETS,
     PRESET_DISPLAY_NAMES,
 )
 from services.print_settings_generator import generate_print_settings
+from config.print_defaults import (
+    DEFAULT_FILAMENT_PRESET, DEFAULT_BACKING_LAYERS,
+    REGULAR_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM,
+)
+from core.stack_prune import TRANSPARENT_TD_THRESHOLD_MM
+
 from services.stl_generator import generate_stl_zip
 from services.svg_stl_generator import generate_svg_stl_zip
 from services.threemf_generator import generate_3mf, generate_svg_3mf
@@ -54,16 +53,20 @@ async def api_get_filament_presets(request: Request):
             colors=[FilamentColorConfig(
                 name=c.name, hex=c.hex,
                 transmission_distance=c.transmission_distance,
-                td_rgb=c.td_rgb,
-                k=c.k,
-                alpha_s=c.alpha_s,
-                td_scale=c.td_scale,
-                td_gamma=c.td_gamma,
             ) for c in configs],
         )
         for name, configs in PRESETS.items()
     ]
-    return FilamentPresetsResponse(presets=presets)
+    return FilamentPresetsResponse(
+        presets=presets,
+        defaults={
+            "filament_preset": DEFAULT_FILAMENT_PRESET,
+            "backing_layers": DEFAULT_BACKING_LAYERS,
+            "regular_layer_height_mm": REGULAR_LAYER_HEIGHT_MM,
+            "transparent_layer_height_mm": TRANSPARENT_LAYER_HEIGHT_MM,
+        },
+        transparency={"td_threshold_mm": TRANSPARENT_TD_THRESHOLD_MM, "aggregation": "mean"},
+    )
 
 
 @router.post("/download-stl")
@@ -71,7 +74,7 @@ async def api_get_filament_presets(request: Request):
 @handle_api_errors("generating STL v2")
 async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
     """Generate and download ZIP file containing color-separated STL files (V2, configurable colors)."""
-    colors = get_colors_from_request(body.filamentPreset, body.filamentColors)
+    colors = body.resolved_colors
     color_blocks = [block.model_dump() for block in body.colorBlocks]
     image_dimensions = body.imageDimensions.model_dump()
 
@@ -104,7 +107,7 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
 @handle_api_errors("generating SVG STL v2")
 async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV2):
     """Generate and download ZIP file containing color-separated STL files (V2, SVG mode)."""
-    colors = get_colors_from_request(body.filamentPreset, body.filamentColors)
+    colors = body.resolved_colors
     vector_results = [result.model_dump() for result in body.vectorResults]
     image_dimensions = body.imageDimensions.model_dump()
 
@@ -117,6 +120,7 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
         colors=colors,
         white_backing_layers=body.whiteBackingLayers,
         backing_mode=body.backingMode,
+        detail_size=body.detailSize,
     )
 
     logger.info(
@@ -137,7 +141,7 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
 @handle_api_errors("generating 3MF")
 async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
     """Generate and download a 3MF file with color-separated objects."""
-    colors = get_colors_from_request(body.filamentPreset, body.filamentColors)
+    colors = body.resolved_colors
     color_blocks = [block.model_dump() for block in body.colorBlocks]
     image_dimensions = body.imageDimensions.model_dump()
 
@@ -159,6 +163,7 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
         colors=colors,
         color_hex_map=color_hex_map,
         white_backing_layers=body.whiteBackingLayers,
+        backing_mode=body.backingMode,
     )
 
     logger.info(
@@ -178,7 +183,7 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
 @handle_api_errors("generating SVG 3MF")
 async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
     """Generate and download a 3MF file from SVG vector contours with color-separated objects."""
-    colors = get_colors_from_request(body.filamentPreset, body.filamentColors)
+    colors = body.resolved_colors
     vector_results = [result.model_dump() for result in body.vectorResults]
     image_dimensions = body.imageDimensions.model_dump()
 
@@ -199,6 +204,8 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
         colors=colors,
         color_hex_map=color_hex_map,
         white_backing_layers=body.whiteBackingLayers,
+        backing_mode=body.backingMode,
+        detail_size=body.detailSize,
     )
 
     logger.info(
@@ -218,47 +225,18 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
 @handle_api_errors("generating print settings")
 async def api_print_settings(request: Request, body: PrintSettingsRequest):
     """Generate and download a JSON print settings file."""
-    # Resolve filament colors from preset or custom config
-    filament_colors_dicts = []
-    preset_name = None
-
-    if body.filamentColors:
-        filament_colors_dicts = [
-            {
-                'name': fc.name,
-                'hex': fc.hex,
-                'transmission_distance': fc.transmission_distance,
-                'k': fc.k,
-            }
-            for fc in body.filamentColors
-        ]
-    elif body.filamentPreset:
-        preset_name = body.filamentPreset.value
-        preset_configs = get_preset(preset_name)
-        if preset_configs:
-            filament_colors_dicts = [
-                {
-                    'name': c.name,
-                    'hex': c.hex,
-                    'transmission_distance': c.transmission_distance,
-                    'td_rgb': c.td_rgb,
-                    'k': c.k,
-                    'alpha_s': c.alpha_s,
-                    'td_scale': c.td_scale,
-                    'td_gamma': c.td_gamma,
-                }
-                for c in preset_configs
-            ]
-    else:
-        for c in BAMBU_CMYWK_PHASE6_PRESET:
-            filament_colors_dicts.append({
-                'name': c.name,
-                'hex': c.hex,
-                'transmission_distance': c.transmission_distance,
-                'td_rgb': c.td_rgb,
-                'k': c.k,
-            })
-        preset_name = 'bambu_cmywk_phase6'
+    filament_colors_dicts = [
+        {
+            "name": color.name,
+            "hex": color.hex,
+            "transmission_distance": color.td,
+        }
+        for color in body.resolved_colors.colors.values()
+    ]
+    preset_name = (
+        body.filamentPreset.value if body.filamentPreset else
+        None if body.filamentColors else DEFAULT_FILAMENT_PRESET
+    )
 
     image_dimensions = body.imageDimensions.model_dump()
 

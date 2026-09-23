@@ -1,5 +1,8 @@
 from typing import TYPE_CHECKING
 
+from config.print_defaults import DEFAULT_FILAMENT_PRESET
+from core.color_config import get_preset, normalize_transmission_distance
+
 import numpy as np
 from PIL import ImageColor
 from skimage.color import rgb2lab
@@ -9,115 +12,22 @@ if TYPE_CHECKING:
 
 
 class Color:
-    # Baseline "no absorption correction". Calibrated families set k
-    # explicitly (e.g. bambu A-standard k_C = 3.4996); 0 blends as plain
-    # Beer-Lambert.
-    DEFAULT_K = 0.0
-    # Neutral scalar-form compensation: Eqs. (1)-(2) with
-    # alpha_s = ln 10, s_td = gamma_td = 1 degrade to ln(10)/td + k*A_ch.
-    LN10 = float(np.log(10.0))
-    DEFAULT_HEX = {
-        "C": "#00FFFF",
-        "M": "#FF00FF",
-        "Y": "#FFFF00",
-        "W": "#FFFFFF",
-    }
-
     def __init__(
         self,
         name,
         transmission_distance,
-        hex=None,
-        absorption=None,
-        rgb=None,
-        k=DEFAULT_K,
-        td_rgb=None,
-        alpha_s=LN10,
-        td_scale=1.0,
-        td_gamma=1.0,
+        hex,
         display_name=None,
     ):
-        """A filament color: hex + td + k (+ optional per-channel td_rgb,
-        + optional scalar-form capture compensation alpha_s/td_scale/td_gamma).
-
-        Two characterizations of td, same forward family — there is no
-        clear/regular material distinction:
-        - td_rgb present (staircase-measured, paper form (i)):
-          mu_ch = ln(10)/td_rgb[ch] + k*A_ch.
-        - scalar td (paper Eqs. (1)-(2)):
-          mu_ch = alpha_s/(td_scale * td**td_gamma) + k*A_ch.
-          td is the raw scalar TD reading; td_scale/td_gamma are the fitted
-          s_td/gamma_td remap and alpha_s the fitted scatter coefficient of
-          the calibrated set. Neutral defaults (alpha_s = ln 10,
-          td_scale = td_gamma = 1) degrade to plain ln(10)/td + k*A_ch.
-        W is a semi-opaque neutral scatterer through the same formula
-        (A_ch = 0, mu = alpha_s/td_eff, finite) — never treated as a
-        transparent or special layer.
-        """
+        """A filament color with scalar or RGB-channel transmission distance."""
         if not name or not name[0].isalpha() or not name[0].isascii():
             raise ValueError(
                 f"Color name must start with an ASCII letter (A-Z, a-z): {name}. "
                 f"The first character is used as the blend code identifier."
             )
-        if not np.isfinite(float(transmission_distance)):
-            raise ValueError(
-                f"transmission_distance must be finite and not NaN, got {transmission_distance}"
-            )
-        if transmission_distance < 0:
-            raise ValueError(
-                f"transmission_distance must be >= 0, got {transmission_distance}"
-            )
-        if td_rgb is not None:
-            td_rgb = tuple(float(ch) for ch in td_rgb)
-            if len(td_rgb) != 3:
-                raise ValueError(
-                    f"td_rgb must be exactly 3 per-channel distances [R, G, B], got {td_rgb}"
-                )
-            for ch_idx, td_ch in enumerate(td_rgb):
-                if not np.isfinite(td_ch) or td_ch <= 0:
-                    raise ValueError(
-                        f"td_rgb channel {'RGB'[ch_idx]} must be positive and finite, got {td_ch}"
-                    )
-        if not np.isfinite(float(k)):
-            raise ValueError(
-                f"k must be finite and not NaN, got {k}"
-            )
-        if k < 0:
-            raise ValueError(
-                f"k must be non-negative, got {k}"
-            )
-        for field_name, value in (
-            ("alpha_s", alpha_s), ("td_scale", td_scale), ("td_gamma", td_gamma),
-        ):
-            if not np.isfinite(float(value)) or float(value) <= 0:
-                raise ValueError(
-                    f"{field_name} must be positive and finite, got {value}"
-                )
-
         self.name = name
-        self.td = transmission_distance
-        self.td_rgb = td_rgb
-        self.rgb = rgb
-        self.absorption = absorption
-        self.k = k
-        self.alpha_s = float(alpha_s)
-        self.td_scale = float(td_scale)
-        self.td_gamma = float(td_gamma)
+        self.td = normalize_transmission_distance(transmission_distance)
         self.display_name = display_name
-
-        if hex is None and rgb is not None:
-            if len(rgb) != 3:
-                raise ValueError(f"rgb must be a 3-tuple, got: {rgb}")
-            rgb = tuple(int(channel) for channel in rgb)
-            hex = "#{:02X}{:02X}{:02X}".format(*rgb)
-        elif hex is None:
-            hex = self.DEFAULT_HEX.get(self.get_label())
-
-        if hex is None:
-            raise ValueError(
-                f"hex is required for non-default color name '{name}'. "
-                f"Only CMYW colors have default hex values."
-            )
 
         self.update_hex(hex)
 
@@ -127,44 +37,23 @@ class Color:
     def update_hex(self, hex):
         self.hex = hex
         self.rgb = ImageColor.getcolor(self.hex, "RGB")
-        self.cmyk = self.get_cmyk()
-        self.absorption = self.get_absorption()
 
     def get_label(self):
         return self.name[0].upper()
-
-    def get_cmyk(self, rgb_scale=255, cmyk_scale=1):
-        r, g, b = self.rgb
-        if (r, g, b) == (0, 0, 0):
-            return 0, 0, 0, cmyk_scale
-
-        c = 1 - r / rgb_scale
-        m = 1 - g / rgb_scale
-        y = 1 - b / rgb_scale
-
-        min_cmy = min(c, m, y)
-        denominator = 1 - min_cmy
-        if denominator <= 1e-12:
-            return 0.0, 0.0, 0.0, min_cmy * cmyk_scale
-
-        c = (c - min_cmy) / denominator
-        m = (m - min_cmy) / denominator
-        y = (y - min_cmy) / denominator
-        k = min_cmy
-
-        return c * cmyk_scale, m * cmyk_scale, y * cmyk_scale, k * cmyk_scale
 
     def get_absorption(self):
         rate = (255 - np.array(self.rgb)) / 255
         return rate
 
-    @staticmethod
-    def get_transmission_rate(d, td):
-        """Single-layer transmission under the unified base-10 convention:
-        t = 10^(-d/td). Non-positive td means fully opaque."""
-        if td <= 0:
-            return 0.0
-        return float(10.0 ** (-d / td))
+    @property
+    def td_channels(self) -> tuple[float, float, float]:
+        """A scalar explicitly describes equal transmission in all channels."""
+        if isinstance(self.td, tuple):
+            return self.td
+        return (self.td, self.td, self.td)
+
+    def transmission(self, layer_height: float) -> np.ndarray:
+        return np.power(10.0, -layer_height / np.asarray(self.td_channels))
 
     @staticmethod
     def get_lab(rgb):
@@ -242,23 +131,8 @@ class Color:
         input_colors: "list[tuple[int, int, int]] | np.ndarray",
         reference_code,
         reference_rgb,
-        weights=None,
-        white_labels: "set[str] | None" = None,
-        lightness_threshold: float = 85.0,
-        white_max_chroma: float = 6.0,
     ) -> "tuple[list[str], list[tuple[int, int, int]]]":
-        """Nearest printable blend per input color (CIEDE2000, dark adjustments).
-
-        Forced-W rule: when white_labels is given (labels of the set's white
-        filament) and a target is near-WHITE — high lightness AND near-neutral
-        (Lab L >= lightness_threshold, chroma <= white_max_chroma) — the
-        candidate set is restricted to W-dominant codes (at least half the
-        stack's layers are the white filament). Genuinely white regions then
-        print as real white stacks instead of relying on the backing shining
-        through; chromatic lights (pale yellow/cyan, L >= 85 but chromatic)
-        keep the unrestricted search. Falls back to unrestricted when no
-        W-dominant code exists in the matrix.
-        """
+        """Nearest printable blend per input color under the production metric."""
         # Vectorized extraction: iterating 800k+ pandas cells with .iat costs
         # seconds on full-enumeration matrices; flattened arrays are equivalent.
         ref_blend_codes = list(reference_code.values.flatten())
@@ -268,39 +142,11 @@ class Color:
         inp = np.array(input_colors) / 255.0
         inp_lab = rgb2lab(inp.reshape(-1, 1, 3)).reshape(-1, 3)
 
-        if white_labels:
-            white_labels = set(white_labels)
-
-            def _w_dominant_mask():
-                mask = np.zeros(len(ref_blend_codes), dtype=bool)
-                for i, code in enumerate(ref_blend_codes):
-                    if not code:
-                        continue
-                    n_white = sum(1 for ch in code if ch in white_labels)
-                    if n_white * 2 >= len(code):
-                        mask[i] = True
-                return mask
-
-            w_mask = _w_dominant_mask()
-            any_w_dominant = bool(w_mask.any())
-        else:
-            w_mask = None
-            any_w_dominant = False
-
         results_code = []
         results_color = []
         for lab_color in inp_lab:
             dists = Color.perceptual_distance(lab_color, ref_lab)
-            if w_mask is not None and any_w_dominant:
-                L, a, b = lab_color
-                near_white = L >= lightness_threshold and np.hypot(a, b) <= white_max_chroma
-                if near_white:
-                    masked = np.where(w_mask, dists, np.inf)
-                    nearest_idx = int(np.argmin(masked))
-                else:
-                    nearest_idx = int(np.argmin(dists))
-            else:
-                nearest_idx = int(np.argmin(dists))
+            nearest_idx = int(np.argmin(dists))
             results_code.append(ref_blend_codes[nearest_idx])
             results_color.append(np.round(ref_colors[nearest_idx] * 255).astype(int))
 
@@ -308,21 +154,17 @@ class Color:
 
 
 class Colors:
-    from core.color_config import BAMBU_CMYW_PHASE6_PRESET
-
-    _DEFAULT_PRESET = {c.label: c for c in BAMBU_CMYW_PHASE6_PRESET}
-
 
     def __init__(self, colors=None, names=None):
         """A filament set. No clear/regular distinction: a set is just its
-        colors (each described by hex + td (+ td_rgb) + k). The default set
-        when none is given is the bambu CMYW preset."""
+        colors (each described by hex and transmission distance). The default set
+        when none is given is the configured default preset."""
         self.colors = colors if colors is not None else {}
 
         if colors is not None:
             return
 
-        preset = self._DEFAULT_PRESET
+        preset = {c.label: c for c in get_preset(DEFAULT_FILAMENT_PRESET)}
         labels = names if names is not None else list(preset)
 
         for c in labels:
@@ -336,11 +178,6 @@ class Colors:
                 cfg.name,
                 cfg.transmission_distance,
                 cfg.hex,
-                k=cfg.k,
-                td_rgb=cfg.td_rgb,
-                alpha_s=cfg.alpha_s,
-                td_scale=cfg.td_scale,
-                td_gamma=cfg.td_gamma,
                 display_name=cfg.label,
             )
 
@@ -364,19 +201,6 @@ class Colors:
 
     def get_labels(self):
         return [x for x in self.colors]
-
-    def white_labels(self) -> set[str]:
-        """Labels of the set's PURE-white filament(s): hex exactly #FFFFFF.
-        Drives the forced-W rule for near-white targets in
-        Color.map_to_nearest_color — light regions print as real white
-        stacks instead of backing shine-through. Tinted "white" filaments
-        (beige, warm-white translucent) render off-white themselves, so the
-        rule does not apply to them."""
-        out = set()
-        for label, color in self.colors.items():
-            if color.hex.upper() == "#FFFFFF":
-                out.add(label)
-        return out
 
     @classmethod
     def from_configs(cls, configs) -> "Colors":
@@ -412,11 +236,6 @@ class Colors:
                 name=config.name,
                 transmission_distance=config.transmission_distance,
                 hex=config.hex,
-                k=config.k,
-                td_rgb=config.td_rgb,
-                alpha_s=config.alpha_s,
-                td_scale=config.td_scale,
-                td_gamma=config.td_gamma,
             )
             instance.colors[label] = color
 

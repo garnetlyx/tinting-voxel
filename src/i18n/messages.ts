@@ -19,6 +19,7 @@ const exactMessages = new Map<string, keyof typeof errors>([
   ["Failed to load palettes", "failedToLoadPalettes"],
   ["Failed to load preview", "failedToLoadPreview"],
   ["Failed to start parameter search", "failedToStartParameterSearch"],
+  ["A search is already running. Cancel it or wait for it to finish.", "searchAlreadyRunning"],
   ["Optimization failed. Please try again.", "optimizationFailedPleaseTryAgain"],
   ["Too many reports. Please try again in an hour.", "tooManyReportsPleaseTryAgainInAnHour"],
   ["Could not send your report. Please try again.", "couldNotSendYourReportPleaseTryAgain"],
@@ -43,6 +44,7 @@ const exactMessages = new Map<string, keyof typeof errors>([
   ["Screenshot is too large", "screenshotIsTooLarge"],
 ]);
 const patterns: readonly [RegExp, keyof typeof errors, readonly string[]][] = [
+  [/^Search stopped after (\d+)s; (\d+) of (\d+) previews completed\.$/, 'searchStoppedAtLimit', ['seconds', 'completed', 'total']],
   [/^Image too large \((\d+)x(\d+)\)\. Maximum dimension is (\d+)px\.$/, 'imageTooLarge', ['width', 'height', 'max']],
   [/^Unsupported file type: (.*?)\. Please upload a PNG, JPEG, GIF, WebP, or BMP image\.$/, 'unsupportedType', ['type']],
   [/^(\d+) file\(s\) skipped \(unsupported format\)$/, 'skippedFiles', ['count']],

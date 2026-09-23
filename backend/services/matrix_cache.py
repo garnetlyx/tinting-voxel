@@ -3,7 +3,7 @@ Reference matrix cache for color blend computations.
 
 Caches the (code, rgb) reference matrices produced by
 compute_reference_matrices, keyed by everything that influences the result:
-the filament parameters (colors_key: label/td/hex/k), layer count/height,
+the filament parameters (colors_key: label/TD channels/hex), layer count/height,
 the prune flag, and the target count (it feeds the time-budget
 full-vs-pruned decision). Content addressing means custom configurations
 cache exactly like named presets — no preset-name special casing.
@@ -12,6 +12,7 @@ The cache is a small LRU: entries are pandas DataFrames whose size grows
 with the candidate count, so only the most recent configurations are
 retained.
 """
+from config.print_defaults import DEFAULT_BACKING_LAYERS
 import logging
 from collections import OrderedDict
 from typing import Optional
@@ -30,14 +31,14 @@ _MAX_ENTRIES = 8
 
 
 def _default_backing_key_parts(colors: Colors) -> tuple[str, Optional[tuple]]:
-    """Key parts for the DEFAULT backing configuration (1 white layer) —
+    """Key parts for the DEFAULT backing configuration (three white layers) —
     what compute_reference_matrices resolves for backing_layers=None and
     what warmup stores. Explicit callers pass their own parts."""
-    from services.print_stack import backing_boundary_rgb, backing_suffix, resolve_backing_label
+    from services.print_stack import PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label
 
-    label = resolve_backing_label(colors, 1, 'white')
-    suffix = backing_suffix(label, 1)
-    boundary = backing_boundary_rgb('white') if suffix else None
+    label = resolve_backing_label(colors, DEFAULT_BACKING_LAYERS, 'white')
+    suffix = backing_suffix(label, DEFAULT_BACKING_LAYERS)
+    boundary = PRINT_BACKGROUND_RGB if suffix else None
     return suffix, boundary
 
 
@@ -104,7 +105,7 @@ def compute_and_cache_matrices(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Compute (or fetch cached) matrices for a named preset configuration.
 
-    Warms the DEFAULT app backing configuration (1 white backing layer), the
+    Warms the DEFAULT app backing configuration (three white backing layers), the
     same one compute_reference_matrices resolves for backing_layers=None."""
     from services.stl_generator import compute_reference_matrices
 

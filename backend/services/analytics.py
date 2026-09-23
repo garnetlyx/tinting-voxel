@@ -42,8 +42,6 @@ class AnalyticsCollector:
         '/api/health/detailed',
         '/api/process-image',
         '/api/download-csv',
-        '/api/download-stl',
-        '/api/download-svg-stl',
         '/api/filament-preview',
         '/api/filament-presets',
         '/api/analytics',

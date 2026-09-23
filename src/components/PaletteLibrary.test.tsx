@@ -1,12 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { PaletteLibrary } from './PaletteLibrary';
-import { DEFAULT_PRESETS } from '../api/types';
+import { filamentCatalog } from '../test/filamentCatalog';
 import * as api from '../api/client';
 
 describe('PaletteLibrary', () => {
   it('preserves all calibrated material parameters when applying a palette', async () => {
-    const colors = DEFAULT_PRESETS.bambu_cmyw_phase6;
+    const colors = filamentCatalog.presets[1].colors;
     const mock = vi.spyOn(api, 'getPaletteLibrary').mockResolvedValue({ palettes: [{
       id: 'bambu_cmyw_phase6', name: 'Bambu CMYW', description: '', colors,
     }] });

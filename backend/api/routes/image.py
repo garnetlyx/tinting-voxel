@@ -1,7 +1,7 @@
 """
 Image processing endpoints
 """
-import json
+from config.print_defaults import DEFAULT_BACKING_LAYERS
 import logging
 from typing import Optional
 from io import BytesIO
@@ -15,11 +15,9 @@ from api.error_handlers import handle_api_errors
 from api.filament_payload import (
     get_colors_from_request,
     parse_filament_form_payload,
+    resolve_layer_height,
 )
 from api.models import (
-    FilamentColorConfig,
-    FilamentConfigMixin,
-    FilamentPreset,
     ProcessImageResponse,
     ProcessingMode,
     SimulatePreviewRequest,
@@ -27,7 +25,6 @@ from api.models import (
     SVGProcessImageResponse,
 )
 from api.rate_limiter import limiter
-from api.routes.download_v2 import get_colors_from_request
 from api.validators import validate_image_upload
 from services.image_processor import (
     MAX_PROCESSING_DIMENSION,
@@ -63,9 +60,9 @@ async def api_process_image(
     numColors: int = Form(8, ge=1, le=256),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
     targetWidth: Optional[float] = Form(None, ge=1, le=500),
-    layerHeight: float = Form(0.08, gt=0, le=10),
+    layerHeight: Optional[float] = Form(None, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
-    whiteBackingLayers: int = Form(1, ge=0, le=5),
+    whiteBackingLayers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
     backingMode: str = Form("white", pattern=r'^(white|black)$'),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
@@ -89,6 +86,7 @@ async def api_process_image(
         filament_colors=filamentColors,
     )
     colors = get_colors_from_request(parsed_preset, parsed_colors)
+    layerHeight = resolve_layer_height(layerHeight, colors)
 
     if processing_mode == ProcessingMode.PIXEL:
         result = process_image(
@@ -206,6 +204,8 @@ async def api_process_image(
     simulated_preview = build_vector_simulated_preview(
         quantized_image=quantized,
         vector_results=vector_results,
+        pixel_size=pixelSize,
+        detail_size=detailSize,
         colors=colors,
         layer_count=layerCount,
         layer_height=layerHeight,
@@ -231,7 +231,7 @@ async def api_process_image(
 @handle_api_errors("simulating print preview")
 async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
     """Generate an image-specific simulated print preview from current color blocks."""
-    colors = get_colors_from_request(body.filamentPreset, body.filamentColors)
+    colors = body.resolved_colors
     result = build_simulated_print_preview(
         color_blocks=[block.model_dump() for block in body.colorBlocks],
         image_dimensions=body.imageDimensions.model_dump(),

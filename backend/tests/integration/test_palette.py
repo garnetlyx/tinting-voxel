@@ -32,9 +32,7 @@ class TestListPalettes:
         data = response.json()
         for p in data["palettes"]:
             for c in p["colors"]:
-                assert "name" in c
-                assert "hex" in c
-                assert "transmission_distance" in c
+                assert set(c) == {"name", "hex", "transmission_distance"}
 
 
 class TestGetPalette:

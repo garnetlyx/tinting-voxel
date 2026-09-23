@@ -3,9 +3,7 @@
   "browseCuratedPalettes": "Browse curated palettes",
   "noPalettesFound": "No palettes found",
   "bambu_cmywk_phase6_name": "Bambu CMYWK",
-  "bambu_cmywk_phase6_description": "Calibrated Bambu Lab CMYWK filament set for full-color printing with true black",
   "bambu_cmyw_phase6_name": "Bambu CMYW",
-  "bambu_cmyw_phase6_description": "Calibrated Bambu Lab CMYW filament set for full-color printing",
   "clear_cmyw_name": "Clear CMYW",
-  "clear_cmyw_description": "Translucent CMYW filament set for light-diffusing prints"
+  "clear_cmyg_name": "Clear CMYG"
 }

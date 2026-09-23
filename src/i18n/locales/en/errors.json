@@ -13,6 +13,8 @@
   "failedToLoadPalettes": "Failed to load palettes",
   "failedToLoadPreview": "Failed to load preview",
   "failedToStartParameterSearch": "Failed to start parameter search",
+  "searchAlreadyRunning": "Another search is running. Please try again shortly.",
+  "searchStoppedAtLimit": "Search stopped after {{seconds}} seconds. {{completed}} of {{total}} previews were generated.",
   "optimizationFailedPleaseTryAgain": "Optimization failed. Please try again.",
   "tooManyReportsPleaseTryAgainInAnHour": "Too many reports. Please try again in an hour.",
   "couldNotSendYourReportPleaseTryAgain": "Could not send your report. Please try again.",

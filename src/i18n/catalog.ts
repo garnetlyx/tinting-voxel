@@ -1,19 +1,12 @@
 import { english } from './resources';
 import { useTranslation } from './index';
 
-// Only system preset IDs have translated labels. Arbitrary colors retain their own codes.
-const presetKeys = {
-  bambu_cmywk_phase6: 'filaments:bambu_cmywk_phase6',
-  bambu_cmyw_phase6: 'filaments:bambu_cmyw_phase6',
-  clear_cmyw: 'filaments:clear_cmyw',
-} as const;
-
 export function usePresetLabel() {
-  const { t } = useTranslation();
-  return (id: string | null, fallback: string): string => {
+  const { t, i18n } = useTranslation();
+  return (id: string | null, displayName: string): string => {
     if (id === null) return t('filaments:custom');
-    if (!Object.prototype.hasOwnProperty.call(presetKeys, id)) return fallback;
-    return t(presetKeys[id as keyof typeof presetKeys]);
+    if (!Object.prototype.hasOwnProperty.call(english.filaments, id)) return displayName;
+    return i18n.getFixedT(null, 'filaments')(id as keyof typeof english.filaments);
   };
 }
 

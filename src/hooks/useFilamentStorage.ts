@@ -3,6 +3,7 @@
  */
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { FilamentColorConfig } from '../api/types';
+import { isFilamentColorConfig } from '../utils/filaments';
 
 const STORAGE_KEY = 'tinting-voxel_filament_presets';
 const LAST_PRESET_KEY = 'tinting-voxel_last_preset';
@@ -51,39 +52,12 @@ function savePresetsToStorage(presets: SavedPreset[]): void {
   }
 }
 
-const ALLOWED_COLOR_KEYS = new Set([
-  'name', 'hex', 'transmission_distance', 'td_rgb', 'k', 'alpha_s', 'td_scale', 'td_gamma',
-]);
-
 function isValidPreset(p: unknown): p is SavedPreset {
   if (typeof p !== 'object' || p === null) return false;
   const obj = p as Record<string, unknown>;
-  if (typeof obj.id !== 'string') return false;
-  if (typeof obj.name !== 'string') return false;
-  if (!Array.isArray(obj.colors)) return false;
-  if (obj.colors.length < 1) return false;
-  for (const c of obj.colors) {
-    if (typeof c !== 'object' || c === null) return false;
-    const color = c as Record<string, unknown>;
-    // Strict schema: unknown keys (e.g. retired alpha/td_neutral/k_rgb)
-    // make the preset invalid — it would fail the backend's
-    // extra="forbid" validation anyway; no silent compatibility path.
-    if (Object.keys(color).some(k => !ALLOWED_COLOR_KEYS.has(k))) return false;
-    if (typeof color.name !== 'string') return false;
-    if (typeof color.hex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color.hex)) return false;
-    if (typeof color.transmission_distance !== 'number') return false;
-    if (color.td_rgb !== undefined
-      && (!Array.isArray(color.td_rgb)
-        || color.td_rgb.length !== 3
-        || !color.td_rgb.every((ch) => typeof ch === 'number' && ch > 0 && ch <= 1000))) return false;
-    if (color.k !== undefined && (typeof color.k !== 'number' || color.k < 0 || color.k > 1000)) return false;
-    for (const field of ['alpha_s', 'td_scale', 'td_gamma'] as const) {
-      const v = color[field];
-      if (v !== undefined
-        && (typeof v !== 'number' || !Number.isFinite(v) || v <= 0 || v > 1000)) return false;
-    }
-  }
-  return true;
+  return typeof obj.id === 'string' && typeof obj.name === 'string'
+    && Array.isArray(obj.colors) && obj.colors.length > 0
+    && obj.colors.every(isFilamentColorConfig);
 }
 
 export const useFilamentStorage = (): FilamentStorage => {
@@ -119,7 +93,7 @@ export const useFilamentStorage = (): FilamentStorage => {
     const preset: SavedPreset = {
       id: generateId(),
       name: name.trim(),
-      colors: [...colors],
+      colors: structuredClone(colors),
       createdAt: now,
       updatedAt: now,
     };
@@ -130,7 +104,7 @@ export const useFilamentStorage = (): FilamentStorage => {
   const updatePreset = useCallback((id: string, name: string, colors: FilamentColorConfig[]) => {
     setPresets(prev => prev.map(p =>
       p.id === id
-        ? { ...p, name: name.trim(), colors: [...colors], updatedAt: Date.now() }
+        ? { ...p, name: name.trim(), colors: structuredClone(colors), updatedAt: Date.now() }
         : p
     ));
   }, []);

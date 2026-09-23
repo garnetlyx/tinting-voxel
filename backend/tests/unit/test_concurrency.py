@@ -1,22 +1,15 @@
 """
 Concurrency tests for thread safety of global state and shared resources.
 
-Tests the P0 fixes from code review:
-- Thread safety of global color mapping state
-- Analytics memory bounding with LRU eviction
-- SVG polygon vertex limit
+Tests thread safety of global color mapping state and analytics memory bounding.
 """
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
-import pytest
 
 from core.blend_color import Colors
 from core.color_config import ColorConfig
 from services import stl_generator
 from services.analytics import AnalyticsCollector
-from services.svg_stl_generator import triangulate_polygon
 
 
 class TestGlobalStateThreadSafety:
@@ -230,51 +223,6 @@ class TestAnalyticsMemoryBounding:
         assert len(summary['endpoints']) <= collector.MAX_ENDPOINTS
 
 
-class TestSVGPolygonVertexLimit:
-    """Test SVG polygon vertex limit for DoS protection."""
-
-    def test_polygon_under_limit_succeeds(self):
-        """Test that polygons under 1000 vertices are processed."""
-        # Create a polygon with 100 vertices
-        polygon = [(i, i * 0.5) for i in range(100)]
-        triangles = triangulate_polygon(polygon)
-        # Should produce triangles (100 vertices = 98 triangles)
-        assert len(triangles) > 0
-
-    def test_polygon_at_limit_succeeds(self):
-        """Test that polygon with exactly 1000 vertices succeeds."""
-        # Create a polygon with exactly 1000 vertices
-        polygon = [(i, i * 0.1) for i in range(1000)]
-        triangles = triangulate_polygon(polygon)
-        # Should produce triangles
-        assert len(triangles) > 0
-
-    def test_polygon_over_limit_raises_error(self):
-        """Test that polygons over 1000 vertices are rejected."""
-        # Create a polygon with 1001 vertices
-        polygon = [(i, i * 0.1) for i in range(1001)]
-
-        with pytest.raises(ValueError) as excinfo:
-            triangulate_polygon(polygon)
-
-        assert "1001 vertices" in str(excinfo.value)
-        assert "exceeding maximum of 1000" in str(excinfo.value)
-
-    def test_complex_polygon_performance(self):
-        """Test that large polygons don't cause excessive delays."""
-        # Create a polygon with 999 vertices
-        polygon = [(i, i * 0.1) for i in range(999)]
-
-        start_time = time.time()
-        triangles = triangulate_polygon(polygon)
-        elapsed = time.time() - start_time
-
-        # Should complete in reasonable time (< 5 seconds)
-        assert elapsed < 5.0, f"Triangulation took {elapsed:.2f}s, too slow"
-        # Should produce valid triangulation
-        assert len(triangles) > 0
-
-
 class TestIntegrationConcurrency:
     """Integration tests for concurrent operations."""
 
@@ -287,7 +235,7 @@ class TestIntegrationConcurrency:
         analytics = AnalyticsCollector()
 
         errors = []
-        results = {'stl': [], 'analytics': [], 'polygon': []}
+        results = {'stl': [], 'analytics': []}
 
         def stl_task():
             try:
@@ -320,20 +268,11 @@ class TestIntegrationConcurrency:
             except Exception as e:
                 errors.append(('analytics', e))
 
-        def polygon_task(vertex_count):
-            try:
-                polygon = [(i, i * 0.5) for i in range(vertex_count)]
-                triangles = triangulate_polygon(polygon)
-                results['polygon'].append(len(triangles))
-            except Exception as e:
-                errors.append(('polygon', e))
-
-        # Run 30 concurrent tasks (10 of each type)
+        # Run STL generation and analytics updates concurrently.
         threads = []
         for i in range(10):
             threads.append(threading.Thread(target=stl_task))
             threads.append(threading.Thread(target=analytics_task, args=(i,)))
-            threads.append(threading.Thread(target=polygon_task, args=(50 + i * 10,)))
 
         for thread in threads:
             thread.start()
@@ -343,7 +282,6 @@ class TestIntegrationConcurrency:
 
         # Should complete without errors
         assert len(errors) == 0, f"Concurrent operations errors: {errors}"
-        # All task types should have completed
+        # Both task types should have completed.
         assert len(results['stl']) == 10
         assert len(results['analytics']) == 10
-        assert len(results['polygon']) == 10

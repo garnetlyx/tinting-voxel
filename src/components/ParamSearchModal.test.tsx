@@ -17,21 +17,22 @@ const baseProps = {
   progress: null,
   results: [],
   error: null,
+  imageDimensions: { width: 953, height: 1270 },
 };
 
 const mockResults: SearchResultItem[] = [
   {
-    rank: 1,
+    candidateId: 1,
+    isBaseline: true,
     mode: 'pixel',
     params: { max_colors: 10, color_threshold: 40 },
-    mae: 12.5,
     previewImage: 'data:image/png;base64,abc',
   },
   {
-    rank: 2,
+    candidateId: 2,
+    isBaseline: false,
     mode: 'pixel',
     params: { max_colors: 8, color_threshold: 60 },
-    mae: 15.0,
     previewImage: 'data:image/png;base64,def',
   },
 ];
@@ -44,7 +45,7 @@ describe('ParamSearchModal', () => {
     // The modal no longer carries its own preset selector: the search runs
     // against whatever the user has selected (or customized) in the main UI.
     expect(screen.queryByLabelText(/filament preset/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /start optimization/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /generate options/i })).toBeInTheDocument();
   });
 
   it('config step calls onStart with the chosen size when confirmed', async () => {
@@ -53,7 +54,7 @@ describe('ParamSearchModal', () => {
 
     render(<ParamSearchModal {...baseProps} phase="config" onStart={onStart} />);
 
-    await user.click(screen.getByRole('button', { name: /start optimization/i }));
+    await user.click(screen.getByRole('button', { name: /generate options/i }));
 
     expect(onStart).toHaveBeenCalledOnce();
     const [size] = onStart.mock.calls[0];
@@ -65,17 +66,26 @@ describe('ParamSearchModal', () => {
       jobId: 'job-1',
       completed: 5,
       total: 20,
-      bestMae: 18.3,
       status: 'running',
+      settled: false,
+      results: [],
     };
 
     render(<ParamSearchModal {...baseProps} phase="running" progress={progress} />);
 
     expect(screen.getByText('5 / 20')).toBeInTheDocument();
-    expect(screen.getByText(/18\.3/)).toBeInTheDocument();
+    expect(screen.queryByText(/MAE|best/i)).not.toBeInTheDocument();
   });
 
-  it('results step renders top-5 cards and calls onApplyParams on click', async () => {
+  it('shows completed previews while the remaining options are still running', () => {
+    render(<ParamSearchModal {...baseProps} phase="running" results={[mockResults[0]]}
+      progress={{ jobId: 'job-1', completed: 1, total: 21, status: 'running', settled: false, results: [mockResults[0]] }} />);
+
+    expect(screen.getByText('1 / 21')).toBeInTheDocument();
+    expect(screen.getByAltText('Current settings')).toBeInTheDocument();
+  });
+
+  it('results step renders unranked cards and calls onApplyParams on click', async () => {
     const user = userEvent.setup();
     const onApplyParams = vi.fn();
     const onClose = vi.fn();
@@ -91,11 +101,11 @@ describe('ParamSearchModal', () => {
     );
 
     // Both result cards should be visible
-    expect(screen.getByText('#1')).toBeInTheDocument();
-    expect(screen.getByText('#2')).toBeInTheDocument();
+    expect(screen.getByText('Current settings')).toBeInTheDocument();
+    expect(screen.getByText('Option 2')).toBeInTheDocument();
 
-    // Click the first result card (contains the rank-1 preview image)
-    const firstCard = screen.getByAltText('rank 1 preview').closest('button');
+    // Apply the current settings card without a quality ranking.
+    const firstCard = screen.getByAltText('Current settings').closest('button');
     await user.click(firstCard!);
 
     expect(onApplyParams).toHaveBeenCalledWith(mockResults[0].params, mockResults[0].mode, 100);
@@ -115,6 +125,12 @@ describe('ParamSearchModal', () => {
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
     // Two "Close" buttons exist: the header ✕ (aria-label) and the body close button
     expect(screen.getAllByRole('button', { name: /close/i })).toHaveLength(2);
+  });
+
+  it('keeps completed previews available if a later candidate fails', () => {
+    render(<ParamSearchModal {...baseProps} phase="error" error="Candidate failed" results={[mockResults[0]]} />);
+    expect(screen.getByText('Candidate failed')).toBeInTheDocument();
+    expect(screen.getByAltText('Current settings')).toBeInTheDocument();
   });
 
   it('does not render when isOpen is false', () => {

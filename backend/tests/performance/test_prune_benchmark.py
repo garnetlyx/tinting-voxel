@@ -5,7 +5,7 @@ The shipped clear preset (4-color CMYW) at 8 layers / 0.84 mm enumerates
 fully in seconds — well inside the 60 s budget — so production takes the
 exact full path. This benchmark pins that headline timing, then exercises
 the composition-pruned path on a uniform scalar-td translucent set (the
-paper per-channel clear presets are order-sensitive and no longer prunable)
+channel-specific presets are covered by the unit oracle suite)
 by forcing the budget to ~zero, and records both timings plus palette drift
 between the paths. Metrics are written to the OS temp dir, never the tree.
 """
@@ -69,7 +69,7 @@ def _translucent_colors() -> Colors:
     """Uniform scalar-td translucent set (the pruning fallback regime)."""
     from core.color_materials import Color
     return Colors(colors={
-        l: Color(name=l, hex=h, transmission_distance=td, k=0.0)
+        l: Color(name=l, hex=h, transmission_distance=td)
         for l, h, td in zip(
             "CMYW",
             ["#5489B4", "#DE5740", "#DDC465", "#D9D6C5"],

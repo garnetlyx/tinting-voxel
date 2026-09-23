@@ -44,12 +44,9 @@ METRIC_EXCESS_BUDGET = 4.0
 
 
 def _translucent_colors() -> Colors:
-    """Uniform scalar-td translucent set (every channel td >= 4.5): the
-    regime the composition-pruning oracle budgets were measured on. The
-    shipped clear presets carry paper per-channel staircases with strongly
-    absorbing channels and are no longer prunable."""
+    """A scalar-TD palette for composition and runtime regressions."""
     return Colors(colors={
-        l: Color(name=l, hex=h, transmission_distance=td, k=0.0)
+        l: Color(name=l, hex=h, transmission_distance=td)
         for l, h, td in zip(
             "CMYW",
             ["#5489B4", "#DE5740", "#DDC465", "#D9D6C5"],
@@ -62,11 +59,11 @@ def _five_transparent_colors() -> Colors:
     """Synthetic 5-color transparent set for the frozen 5x8 counts (the
     shipped clear preset is 4-color CMYW)."""
     return Colors(colors={
-        l: Color(name=l, hex=h, transmission_distance=td, k=0.0)
+        l: Color(name=l, hex=h, transmission_distance=td)
         for l, h, td in zip(
             "CMYWG",
             ["#5489B4", "#DE5740", "#DDC465", "#D9D6C5", "#9A9D9C"],
-            [4.7, 6.3, 10.1, 18.0, 5.0],
+            [4.5, 4.5, 4.5, 4.5, 4.5],
         )
     })
 
@@ -123,12 +120,10 @@ class TestCandidateGeneration:
 
 
 class TestRegimeGate:
-    def test_shipped_clear_presets_are_not_translucent(self):
-        """Paper per-channel staircases have strongly absorbing channels
-        (e.g. cyan R ~1.0 mm), so real clear stacks are order-sensitive and
-        composition pruning is not validated for them."""
+    def test_shipped_clear_presets_are_translucent(self):
+        """The regime uses the palette mean, preserving channel measurements."""
         for name in ("clear_cmyw", "clear_cmyg"):
-            assert not is_translucent_set(Colors.from_configs(get_preset(name)))
+            assert is_translucent_set(Colors.from_configs(get_preset(name)))
 
     def test_uniform_high_td_set_is_translucent(self):
         assert is_translucent_set(_translucent_colors())
@@ -137,7 +132,7 @@ class TestRegimeGate:
         colors = Colors.from_configs(get_preset("bambu_cmywk_phase6"))
         assert not is_translucent_set(colors)
 
-    def test_unmeasured_color_falls_back_to_configured_td(self):
+    def test_custom_scalar_values_define_the_regime(self):
         colors = Colors(colors={
             "A": Color(name="A", hex="#112233", transmission_distance=10.0),
             "B": Color(name="B", hex="#332211", transmission_distance=20.0),
@@ -147,7 +142,7 @@ class TestRegimeGate:
         assert is_translucent_set(colors)
         # Fixed criterion: colors below the 4.5 constant are not translucent.
         below = Colors(colors=dict(colors.colors))
-        below.colors['A'] = type(list(colors.colors.values())[0])('Z', 3.0, '#112233')
+        below = Colors(colors={label: Color(label, 3.0, '#112233') for label in 'ABCD'})
         assert not is_translucent_set(below)
 
     def test_prune_true_never_forces_pruning(self):
@@ -164,7 +159,7 @@ class TestRegimeGate:
         assert len(set(_codes_from_matrix(code_df))) == 5**4
 
     def test_custom_set_within_budget_keeps_full_enumeration(self):
-        """Single standard: a custom set with high tds classifies
+        """A custom set with a high TD mean classifies
         transparent, but a small enumeration fits the time budget and stays
         exact — pruning only engages over budget."""
         custom = [
@@ -183,7 +178,7 @@ class TestRegimeGate:
         """Opaque/mixed sets remain exact: one opaque filament disqualifies
         the whole set from pruning (within budget they enumerate fully;
         over budget they are rejected, never approximated)."""
-        clear = [c for c in get_preset("clear_cmyw")]
+        clear = [type(c)(c.name, c.hex, 4.5) for c in get_preset("clear_cmyw")]
         mixed = clear[:4] + [
             type(clear[0])(name="Key", hex="#0B0F0C", transmission_distance=0.1)
         ]
@@ -283,7 +278,8 @@ class TestPaddingTailRegression:
 
 class TestPrunedVsFullOracle:
     @pytest.mark.parametrize("layer_count", [6, 8])
-    def test_pruned_refined_mapping_within_delta_e_budget(self, layer_count, force_prune):
+    @pytest.mark.parametrize("preset", ["clear_cmyw", "clear_cmyg"])
+    def test_pruned_refined_mapping_within_delta_e_budget(self, layer_count, preset, force_prune):
         """Ship gate: pruned+refined must match the full-enumeration oracle.
 
         - Reachable targets (sampled from the blend gamut itself): the pruned
@@ -294,7 +290,7 @@ class TestPrunedVsFullOracle:
           outside the printable gamut, where both paths are equally
           approximate.
         """
-        colors = _translucent_colors()
+        colors = Colors.from_configs(get_preset(preset))
         layer_height = 0.84
 
         full_code_df, full_rgb_df = compute_reference_matrices(
@@ -364,24 +360,23 @@ class TestPrunedVsFullOracle:
 
 
 class TestCalibrationForwarding:
-    """Edited Clear palettes must keep their hex+td+k on every request path."""
+    """Edited palettes retain their TD on each request path."""
 
     EDITED_CLEAR = [
-        {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "k": 0.0},
-        {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3, "k": 0.0},
-        {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1, "k": 0.0},
-        {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0, "k": 0.0},
+        {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7},
+        {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3},
+        {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1},
+        {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0},
     ]
 
-    def test_download_and_process_paths_keep_td_and_k(self):
+    def test_download_and_process_paths_keep_td(self):
         from api.models import FilamentColorConfig
-        from api.routes.download_v2 import get_colors_from_request
+        from api.filament_payload import get_colors_from_request
 
         configs = [FilamentColorConfig.model_validate(c) for c in self.EDITED_CLEAR]
         colors = get_colors_from_request(None, configs)
         cyan = colors.colors["C"]
         assert cyan.td == 4.7
-        assert cyan.k == 0.0
         assert is_translucent_set(colors), "edited Clear palette must keep the prune regime"
 
 
@@ -532,3 +527,41 @@ class TestEstimateAccuracy:
         df_p, _ = _crm(5, 0.08, translucent, n_targets=10)
         assert df_p.size < 5 ** 5  # composition representatives
         _mc.clear_cache()
+
+
+class TestMeanTdContract:
+    def test_one_low_channel_changes_the_mean_without_being_overwritten(self):
+        colors = Colors(colors={label: Color(label, 4.6, '#334455') for label in 'ABCD'})
+        assert is_translucent_set(colors)
+        colors.colors['A'] = Color('A', (.1, 4.6, 4.6), '#334455')
+        assert not is_translucent_set(colors)
+        assert colors['A'].td_channels == (.1, 4.6, 4.6)
+
+    def test_scalar_and_equal_channels_have_equal_weight(self):
+        scalar = Colors(colors={label: Color(label, 4.5, '#334455') for label in 'ABCD'})
+        vector = Colors(colors={label: Color(label, (4.5, 4.5, 4.5), '#334455') for label in 'ABCD'})
+        assert is_translucent_set(scalar) is True
+        assert is_translucent_set(vector) is True
+
+    def test_threshold_selective_channels_against_full_oracle(self, force_prune):
+        colors = Colors(colors={
+            'C': Color('C', (.1, 6.7, 6.7), '#00FFFF'),
+            'M': Color('M', (6.7, .1, 6.7), '#FF00FF'),
+            'Y': Color('Y', (6.7, 6.7, .1), '#FFFF00'),
+            'W': Color('W', 4.5, '#FFFFFF'),
+        })
+        assert is_translucent_set(colors)
+        full_codes, full_rgbs = compute_reference_matrices(8, .84, colors, prune=False)
+        codes, rgbs = compute_reference_matrices(8, .84, colors)
+        rng = np.random.default_rng(72)
+        targets = rng.integers(0, 256, size=(24, 3)).tolist()
+        _, full_matches = Color.map_to_nearest_color(targets, full_codes, full_rgbs)
+        _, pruned_matches = _map_and_refine(targets, codes, rgbs, colors, 8, .84)
+        target_lab = _lab(targets)
+        excess = np.array([
+            Color.perceptual_distance(lab, _lab([approx]))[0]
+            - Color.perceptual_distance(lab, _lab([exact]))[0]
+            for lab, approx, exact in zip(target_lab, pruned_matches, full_matches)
+        ])
+        assert excess.max() <= METRIC_EXCESS_BUDGET
+        assert excess.mean() <= 1.0

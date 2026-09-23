@@ -5,6 +5,7 @@ Uses trimesh for 3MF export. Each filament color layer becomes a separate
 object in the 3MF file, which slicers like Bambu Studio can assign to
 different extruders.
 """
+from config.print_defaults import DEFAULT_BACKING_LAYERS
 import itertools
 import logging
 import re
@@ -18,7 +19,7 @@ from core.blend_color import Color, Colors
 from config.settings import settings
 from services.mesh_optimizer import generate_optimized_boxes
 from services.print_stack import (
-    backing_boundary_rgb,
+    PRINT_BACKGROUND_RGB,
     backing_suffix,
     normalize_backing_layers,
     resolve_backing_label,
@@ -30,7 +31,7 @@ from services.stl_generator import (
     _log_input_color_brightness,
 )
 from services.mesh_optimizer import generate_optimized_boxes_from_grid
-from services.vector_processor import normalize_regions, render_region_mask
+from services.vector_processor import finalize_vector_partition
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ def generate_3mf(
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
     color_hex_map: Optional[dict] = None,
-    white_backing_layers: int = 1,
+    white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_mode: str = 'white',
 ) -> bytes:
     """
@@ -159,7 +160,7 @@ def generate_3mf(
     input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
     _b_label = resolve_backing_label(colors, white_backing_layers, backing_mode)
     _b_suffix = backing_suffix(_b_label, white_backing_layers)
-    _b_boundary = backing_boundary_rgb(backing_mode) if _b_suffix else None
+    _b_boundary = PRINT_BACKGROUND_RGB if _b_suffix else None
     result_codes, _ = _map_and_refine(
         input_colors, ref_code_matrix, ref_rgb_matrix, colors, layer_count, layer_height,
         backing_suffix=_b_suffix, background_rgb=_b_boundary,
@@ -289,20 +290,22 @@ def generate_svg_3mf(
     image_dimensions: dict,
     colors: Optional[Colors] = None,
     color_hex_map: Optional[dict] = None,
-    white_backing_layers: int = 1,
+    white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_mode: str = 'white',
+    detail_size: Optional[float] = None,
 ) -> bytes:
     """
     Generate a single 3MF file from SVG vector contours with color-separated objects.
 
     Args:
-        vector_results: List of dicts with 'color' (RGB tuple) and 'polygons' keys
+        vector_results: List of dicts with 'color' (RGB tuple) and 'regions' keys
         layer_height: Height of each layer in mm
         pixel_size: Physical size of each pixel in mm
         layer_count: Total number of layers
         image_dimensions: Dict with 'width' and 'height' keys
         colors: Colors instance (required)
         color_hex_map: Optional dict mapping label -> hex color for visual colors
+        detail_size: Minimum printable feature width in mm.
 
     Returns:
         3MF file binary content
@@ -321,7 +324,8 @@ def generate_svg_3mf(
                 )
 
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-        layer_count, layer_height, colors, n_targets=len(vector_results)
+        layer_count, layer_height, colors, n_targets=len(vector_results),
+        backing_layers=white_backing_layers, backing_mode=backing_mode,
     )
 
     labels = colors.get_labels()
@@ -333,7 +337,7 @@ def generate_svg_3mf(
     from services.image_processor import _map_and_refine
     _b_label = resolve_backing_label(colors, white_backing_layers, backing_mode)
     _b_suffix = backing_suffix(_b_label, white_backing_layers)
-    _b_boundary = backing_boundary_rgb(backing_mode) if _b_suffix else None
+    _b_boundary = PRINT_BACKGROUND_RGB if _b_suffix else None
     result_codes, _ = _map_and_refine(
         input_colors, ref_code_matrix, ref_rgb_matrix,
         colors, layer_count, layer_height,
@@ -353,13 +357,15 @@ def generate_svg_3mf(
         logger.info("SVG-3MF: printed backing mode='%s', label='%s', layers=%d", backing_mode, w_label, n_white)
 
     total_optimized_boxes = 0
+    partition = finalize_vector_partition(
+        vector_results, image_dimensions, pixel_size, detail_size,
+    )
 
     def _remaining_box_budget() -> int:
         return max(0, settings.stl_max_boxes - total_optimized_boxes)
 
     for idx, result in enumerate(vector_results):
-        regions = normalize_regions(result)
-        region_grid = render_region_mask(regions, width=width, height=height)
+        region_grid = partition == idx
         if not region_grid.any():
             continue
         blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)

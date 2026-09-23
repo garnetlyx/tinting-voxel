@@ -2,6 +2,7 @@
 Unit tests for the palette library.
 """
 import pytest
+import numpy as np
 
 from core.palette_library import (
     ALL_PALETTES,
@@ -47,7 +48,7 @@ class TestPaletteLibrary:
         """All transmission distances are positive."""
         for p in ALL_PALETTES:
             for c in p.colors:
-                assert c.transmission_distance > 0, (
+                assert np.all(np.isfinite(c.transmission_distance)) and np.all(np.asarray(c.transmission_distance) > 0), (
                     f"Palette '{p.id}', color '{c.name}' has td={c.transmission_distance}"
                 )
 

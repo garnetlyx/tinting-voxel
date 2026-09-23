@@ -37,7 +37,5 @@
   "intermediate": "Intermediate",
   "resetCamera": "Reset camera",
   "topDownView": "Top-down view",
-  "toggleExplodedView": "Toggle exploded view",
-  "mappingHelp": "Source colors mapped to the nearest printable blend used for this image.",
-  "colorEditingHelp": "Click a color to edit it. Use merge to combine two colors, or delete to remove one."
+  "toggleExplodedView": "Toggle exploded view"
 }

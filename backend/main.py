@@ -3,6 +3,7 @@ FastAPI application for ImageToSTLConverter backend
 Refactored for cloud deployment with modular routes
 """
 import logging
+import math
 import os
 import time
 from contextlib import asynccontextmanager
@@ -76,13 +77,24 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Accept"],
 )
 
 # Configure rate limiting
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    response = _rate_limit_exceeded_handler(request, exc)
+    current_limit = getattr(request.state, "view_rate_limit", None)
+    if current_limit is not None:
+        reset_at, _ = limiter.limiter.get_window_stats(current_limit[0], *current_limit[1])
+        response.headers["Retry-After"] = str(max(1, math.ceil(reset_at - time.time())))
+    return response
+
+
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 
 # Analytics middleware

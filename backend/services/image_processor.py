@@ -1,6 +1,7 @@
 """
 Image processing service for color extraction and clustering
 """
+from config.print_defaults import DEFAULT_BACKING_LAYERS
 import base64
 import logging
 from io import BytesIO
@@ -13,7 +14,7 @@ from PIL import Image
 from core.blend_color import Colors
 from core.color_materials import Color
 from services.print_stack import build_print_stack, resolve_backing_label
-from services.raster_cleanup import color_distance, merge_small_label_regions
+from services.raster_cleanup import color_distance, regularize_printable_regions
 from services.stl_generator import compute_reference_matrices
 from services.vector_processor import render_vector_results_image
 
@@ -73,7 +74,6 @@ def _map_and_refine(
 
     result_codes, result_rgbs = Color.map_to_nearest_color(
         source_colors, ref_code_matrix, ref_rgb_matrix,
-        white_labels=colors.white_labels(),
     )
     result_codes, result_rgbs = refine_matches(
         source_colors,
@@ -104,11 +104,11 @@ def _map_source_colors_to_blends(
     backing_mode: str = 'white',
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
     from services.print_stack import (
-        backing_boundary_rgb, backing_suffix, resolve_backing_label,
+        PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
     )
     b_label = resolve_backing_label(colors, backing_layers, backing_mode)
     b_suffix = backing_suffix(b_label, backing_layers)
-    b_boundary = backing_boundary_rgb(backing_mode) if b_suffix else None
+    b_boundary = PRINT_BACKGROUND_RGB if b_suffix else None
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
         layer_count,
         layer_height,
@@ -137,6 +137,8 @@ def _build_mapped_blend_palette(
             int(entry['b']),
         )
         pixel_count = int(entry['pixelCount'])
+        if pixel_count == 0:
+            continue
         mapped_blend_palette.append({
             "code": code,
             "rgb": list(rgb),
@@ -157,7 +159,7 @@ def build_simulated_print_preview(
     colors: Optional[Colors] = None,
     layer_count: int = 4,
     layer_height: float = 0.08,
-    white_backing_layers: int = 1,
+    white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_mode: str = 'white',
 ) -> dict:
     """
@@ -233,47 +235,42 @@ def build_simulated_print_preview(
 def build_vector_simulated_preview(
     quantized_image: np.ndarray,
     vector_results: list[dict],
+    pixel_size: float,
+    detail_size: Optional[float],
     colors: Optional[Colors] = None,
     layer_count: int = 4,
     layer_height: float = 0.08,
-    white_backing_layers: int = 1,
+    white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_mode: str = 'white',
     ref_matrices: Optional[tuple] = None,  # Pre-computed (ref_code_matrix, ref_rgb_matrix)
 ) -> dict:
     """Build an image-specific print preview for SVG mode from vectorized regions."""
     active_colors = colors or Colors()
     from services.print_stack import (
-        backing_boundary_rgb, backing_suffix, resolve_backing_label,
+        PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
     )
-    resolve_backing_label(active_colors, white_backing_layers, backing_mode)
     b_label = resolve_backing_label(active_colors, white_backing_layers, backing_mode)
     b_suffix = backing_suffix(b_label, white_backing_layers)
-    b_boundary = backing_boundary_rgb(backing_mode) if b_suffix else None
+    b_boundary = PRINT_BACKGROUND_RGB if b_suffix else None
     image_dimensions = {
         'width': int(quantized_image.shape[1]),
         'height': int(quantized_image.shape[0]),
     }
 
-    if not vector_results:
-        return {
-            "processedImage": _image_to_data_url(Image.fromarray(quantized_image)),
-            "mappedBlendPalette": [],
-            "printStack": build_print_stack(
-                layer_count=layer_count,
-                layer_height=layer_height,
-                backing_layers=white_backing_layers,
-                backing_mode=backing_mode,
-            ),
-        }
+    from services.vector_processor import finalize_vector_partition
+    partition = finalize_vector_partition(
+        vector_results, image_dimensions, pixel_size, detail_size,
+    )
+    counts = np.bincount(partition.ravel(), minlength=len(vector_results))
 
     source_entries = [
         {
             "r": int(result['color'][0]),
             "g": int(result['color'][1]),
             "b": int(result['color'][2]),
-            "pixelCount": int(result['pixel_count']),
+            "pixelCount": int(counts[index]),
         }
-        for result in vector_results
+        for index, result in enumerate(vector_results)
     ]
     source_colors = [
         (entry["r"], entry["g"], entry["b"])
@@ -283,14 +280,13 @@ def build_vector_simulated_preview(
     # Use pre-computed matrices if provided, otherwise compute them
     if ref_matrices is not None:
         ref_code_matrix, ref_rgb_matrix = ref_matrices
-        result_codes, normalized_rgbs = _map_and_refine(
+        result_codes, result_rgbs = _map_and_refine(
             source_colors, ref_code_matrix, ref_rgb_matrix,
-            colors, layer_count, layer_height,
+            active_colors, layer_count, layer_height,
             backing_suffix=b_suffix, background_rgb=b_boundary,
         )
-        result_rgbs = normalized_rgbs
     else:
-        result_codes, normalized_rgbs = _map_source_colors_to_blends(
+        result_codes, result_rgbs = _map_source_colors_to_blends(
             source_colors=source_colors,
             colors=active_colors,
             layer_count=layer_count,
@@ -299,57 +295,7 @@ def build_vector_simulated_preview(
             backing_mode=backing_mode,
         )
     
-    result_rgbs = normalized_rgbs
-    
-    # Use quantized image as background to avoid white edges from filtered regions
-    # Map all quantized colors (not just vector results) to their blend equivalents.
-    # Vectorized: pack RGB triples into int32 keys, find unique colors, then scatter.
-    h_q, w_q = quantized_image.shape[:2]
-    flat_q = quantized_image.reshape(-1, 3)
-    packed_q = (flat_q[:, 0].astype(np.int32) << 16
-                | flat_q[:, 1].astype(np.int32) << 8
-                | flat_q[:, 2].astype(np.int32))
-    unique_packed_q, inverse_q = np.unique(packed_q, return_inverse=True)
-    unique_colors_in_quantized = [
-        (int((p >> 16) & 0xFF), int((p >> 8) & 0xFF), int(p & 0xFF))
-        for p in unique_packed_q
-    ]
-
-    # Use pre-computed matrices if available
-    if ref_matrices is not None:
-        ref_code_matrix, ref_rgb_matrix = ref_matrices
-        all_codes, all_rgbs = _map_and_refine(
-            unique_colors_in_quantized, ref_code_matrix, ref_rgb_matrix,
-            colors, layer_count, layer_height,
-            backing_suffix=b_suffix, background_rgb=b_boundary,
-        )
-    else:
-        all_codes, all_rgbs = _map_source_colors_to_blends(
-            source_colors=unique_colors_in_quantized,
-            colors=active_colors,
-            layer_count=layer_count,
-            layer_height=layer_height,
-            backing_layers=white_backing_layers,
-            backing_mode=backing_mode,
-        )
-
-    # Build background via index scatter (no Python pixel loop)
-    mapped_palette = np.array(all_rgbs, dtype=np.uint8)  # shape (N, 3)
-    background_flat = mapped_palette[inverse_q]           # shape (H*W, 3)
-    background_image = background_flat.reshape(h_q, w_q, 3)
-
-    # Render vector results on top of the background
-    simulated = background_image.copy()
-    for idx, result in enumerate(vector_results):
-        from services.vector_processor import normalize_regions, render_region_mask
-        regions = normalize_regions(result)
-        region_mask = render_region_mask(
-            regions,
-            width=image_dimensions['width'],
-            height=image_dimensions['height'],
-        )
-        if region_mask.any():
-            simulated[region_mask] = result_rgbs[idx]
+    simulated = np.asarray(result_rgbs, dtype=np.uint8)[partition]
 
     return {
         "processedImage": _image_to_data_url(Image.fromarray(simulated)),
@@ -357,7 +303,7 @@ def build_vector_simulated_preview(
             entries=source_entries,
             result_codes=result_codes,
             result_rgbs=result_rgbs,
-            total_pixels=max(1, sum(entry["pixelCount"] for entry in source_entries)),
+            total_pixels=partition.size,
         ),
         "printStack": build_print_stack(
             layer_count=layer_count,
@@ -551,18 +497,8 @@ def merge_small_pixels_to_neighbors(
         for pixel in block['pixels']:
             label_grid[pixel['y'], pixel['x']] = idx
 
-    # First remove thin features
-    from services.raster_cleanup import remove_thin_features
-    filtered_labels = remove_thin_features(
+    cleaned_labels = regularize_printable_regions(
         labels=label_grid,
-        colors=palette,
-        pixel_size=pixel_size,
-        detail_size=detail_size,
-    )
-
-    # Then merge small regions
-    cleaned_labels = merge_small_label_regions(
-        labels=filtered_labels,
         colors=palette,
         pixel_size=pixel_size,
         detail_size=detail_size,
@@ -598,7 +534,7 @@ def process_image(
     filament_colors: Optional[Colors] = None,
     layer_count: int = 4,
     layer_height: float = 0.08,
-    white_backing_layers: int = 1,
+    white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_mode: str = 'white',
     target_width: Optional[float] = None,
     detail_size: Optional[float] = None,
@@ -668,44 +604,8 @@ def process_image(
     # Step 2: Sort by frequency
     color_blocks.sort(key=lambda c: c['count'], reverse=True)
 
-    # Step 3: Limit to max colors, keeping a near-white representative.
-    # Without this, low-frequency white areas (small highlights on an
-    # otherwise dark image) are cut by the frequency truncation and their
-    # pixels get absorbed into the nearest chromatic cluster — the printed
-    # region then deviates badly from the source (no real white stack). If
-    # a near-white block (Lab L >= 85, chroma <= 6 — same gate as the
-    # forced-W mapping rule) exists outside the top set, the highest-count
-    # one replaces the lowest-count non-near-white block of the top set.
     main_colors = color_blocks[:max_colors]
     rest_colors = color_blocks[max_colors:]
-
-    if main_colors and rest_colors:
-        from skimage.color import rgb2lab as _rgb2lab
-
-        def _is_near_white(blocks: list[dict]) -> np.ndarray:
-            if not blocks:
-                return np.zeros(0, dtype=bool)
-            labs = _rgb2lab(
-                np.array([[c['r'], c['g'], c['b']] for c in blocks], dtype=np.float64) / 255.0
-            )
-            return (labs[:, 0] >= 85.0) & (np.hypot(labs[:, 1], labs[:, 2]) <= 6.0)
-
-        top_white = _is_near_white(main_colors)
-        if not top_white.any():
-            rest_white = _is_near_white(rest_colors)
-            if rest_white.any():
-                candidate = max(
-                    (c for c, w in zip(rest_colors, rest_white) if w),
-                    key=lambda c: c['count'],
-                )
-                for i in range(len(main_colors) - 1, -1, -1):
-                    if not _is_near_white([main_colors[i]])[0]:
-                        replaced = main_colors.pop(i)
-                        main_colors.append(candidate)
-                        rest_colors.remove(candidate)
-                        rest_colors.append(replaced)
-                        main_colors.sort(key=lambda c: c['count'], reverse=True)
-                        break
 
     # Step 4: Reassign remaining colors to nearest main color (count-only, no pixels yet)
     if rest_colors:

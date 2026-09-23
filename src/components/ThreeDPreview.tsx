@@ -7,13 +7,14 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import * as THREE from 'three';
 import { BUG_REPORT_CAPTURE_EVENT } from '../utils/bugReport';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { ColorBlock, ImageDimensions, MappedBlockColor, PrintStackInfo } from '../api/types';
+import type { ColorBlock, FilamentColorConfig, ImageDimensions, MappedBlockColor, PrintStackInfo } from '../api/types';
 import { Eye, EyeOff, RotateCcw, Maximize2, Layers } from 'lucide-react';
-import { buildInstancedMeshes, disposePreviewModel, updatePreviewCameraClipping } from './threeDPreviewScene';
+import { buildInstancedMeshes, disposePreviewModel, resolvePreviewBackingHex, updatePreviewCameraClipping } from './threeDPreviewScene';
 
 interface ThreeDPreviewProps {
   colorBlocks: ColorBlock[];
   mappedBlockColors: MappedBlockColor[];
+  filamentColors: FilamentColorConfig[];
   imageDimensions: ImageDimensions;
   layerHeight: number;
   pixelSize: number;
@@ -36,6 +37,7 @@ const DIRECTIONAL_LIGHT_INTENSITY = 0.8;
 export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
   colorBlocks,
   mappedBlockColors,
+  filamentColors,
   imageDimensions,
   layerHeight,
   pixelSize,
@@ -86,6 +88,11 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
     setColorVisibility(Array.from(visibilityByHex.values()));
   }, [colorBlocks, mappedBlockColors]);
 
+  const backingHex = useMemo(
+    () => resolvePreviewBackingHex(mappedBlockColors, filamentColors, whiteBackingLayers),
+    [mappedBlockColors, filamentColors, whiteBackingLayers],
+  );
+
   const totalPixels = useMemo(
     () => colorBlocks.reduce((sum, b) => sum + b.pixels.length, 0),
     [colorBlocks]
@@ -103,7 +110,9 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
     if (modelGroupRef.current) {
       scene.remove(modelGroupRef.current);
       disposePreviewModel(modelGroupRef.current);
+      modelGroupRef.current = null;
     }
+    if (whiteBackingLayers > 0 && backingHex === null) return;
 
     const group = buildInstancedMeshes(
       colorBlocks,
@@ -113,6 +122,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
       layerHeight,
       layerCount,
       whiteBackingLayers,
+      backingHex,
       visibilityMap,
       showExploded,
     );
@@ -134,7 +144,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
       gridRef.current.position.y = bottom - Math.max(layerHeight, Math.max(modelWidth, modelDepth) * 0.005);
     }
     if (cameraRef.current) updatePreviewCameraClipping(cameraRef.current, boundsRef.current);
-  }, [colorBlocks, mappedBlockColors, imageDimensions, pixelSize, layerHeight, layerCount, whiteBackingLayers, visibilityMap, showExploded]);
+  }, [colorBlocks, mappedBlockColors, imageDimensions, pixelSize, layerHeight, layerCount, whiteBackingLayers, backingHex, visibilityMap, showExploded]);
 
   // Initialize three.js scene
   useEffect(() => {

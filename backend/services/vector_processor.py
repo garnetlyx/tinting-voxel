@@ -13,7 +13,7 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from services.raster_cleanup import merge_small_label_regions
+from services.raster_cleanup import regularize_printable_regions
 
 logger = logging.getLogger(__name__)
 
@@ -280,28 +280,19 @@ def extract_regions_from_mask(
 
 
 def normalize_regions(result: dict) -> list[dict]:
-    """Return vector regions from either the new or legacy result shape."""
-    if result.get('regions'):
-        normalized = []
-        for region in result['regions']:
-            normalized.append({
-                'outer': [
-                    (float(point[0]), float(point[1]))
-                    for point in region.get('outer', [])
-                ],
-                'holes': [
-                    [(float(point[0]), float(point[1])) for point in hole]
-                    for hole in region.get('holes', [])
-                ],
-            })
-        return normalized
-
+    """Return vector regions in the sole supported geometry representation."""
     return [
         {
-            'outer': [(float(point[0]), float(point[1])) for point in polygon],
-            'holes': [],
+            'outer': [
+                (float(point[0]), float(point[1]))
+                for point in region['outer']
+            ],
+            'holes': [
+                [(float(point[0]), float(point[1])) for point in hole]
+                for hole in region['holes']
+            ],
         }
-        for polygon in result.get('polygons', [])
+        for region in result['regions']
     ]
 
 
@@ -328,6 +319,49 @@ def render_region_mask(
             cv2.fillPoly(mask, [hole_pts], 0)
 
     return mask > 0
+
+
+def finalize_vector_partition(
+    vector_results: list[dict],
+    image_dimensions: dict,
+    pixel_size: float,
+    detail_size: Optional[float],
+) -> np.ndarray:
+    """Return the printable, gap-free material assignment for SVG output.
+
+    Simplified contours can overlap or leave pixels unassigned. Resolve overlaps
+    in result order, assign every gap to its nearest surviving region, then
+    apply the same physical feature cleanup as pixel mode. Preview and both
+    mesh formats must consume this exact assignment.
+    """
+    width = int(image_dimensions['width'])
+    height = int(image_dimensions['height'])
+    if width <= 0 or height <= 0:
+        raise ValueError('Image dimensions must be positive')
+    if not vector_results:
+        raise ValueError('No vector regions to print')
+
+    labels = np.full((height, width), -1, dtype=np.int32)
+    for idx, result in enumerate(vector_results):
+        mask = render_region_mask(normalize_regions(result), width, height)
+        labels[mask] = idx
+
+    assigned = labels >= 0
+    if not assigned.any():
+        raise ValueError('Vector regions have no printable area')
+    if not assigned.all():
+        from scipy.ndimage import distance_transform_edt
+
+        nearest = distance_transform_edt(
+            ~assigned, return_distances=False, return_indices=True,
+        )
+        labels[~assigned] = labels[nearest[0][~assigned], nearest[1][~assigned]]
+
+    if detail_size is not None and pixel_size < detail_size:
+        colors = [tuple(int(channel) for channel in item['color']) for item in vector_results]
+        labels = regularize_printable_regions(labels, colors, pixel_size, detail_size)
+
+    return labels
 
 
 def count_region_points(regions: list[dict]) -> int:
@@ -552,18 +586,10 @@ def process_image_vector_with_preview(
 
     _, label_grid, colors = quantize_colors_with_labels(image, config.num_colors)
     
-    # First, remove thin features that would be unprintable
-    from services.raster_cleanup import remove_thin_features
-    filtered_labels = remove_thin_features(
+    # Quantized colors must meet the selected physical feature width before
+    # contour extraction. Final contour masks are checked again after rasterization.
+    cleaned_labels = regularize_printable_regions(
         labels=label_grid,
-        colors=colors,
-        pixel_size=config.pixel_size,
-        detail_size=config.detail_size,
-    )
-    
-    # Then merge small isolated regions
-    cleaned_labels = merge_small_label_regions(
-        labels=filtered_labels,
         colors=colors,
         pixel_size=config.pixel_size,
         detail_size=config.detail_size,
@@ -602,7 +628,6 @@ def process_image_vector_with_preview(
             results.append({
                 'color': color,
                 'regions': regions,
-                'polygons': [region['outer'] for region in regions],
                 'pixel_count': final_pixel_count,
                 'polygon_points': point_count
             })

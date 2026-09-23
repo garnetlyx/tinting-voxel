@@ -15,7 +15,8 @@ from core.blend_color import (
     Color,
     Colors,
 )
-from core.color_config import BAMBU_CMYW_PHASE6_PRESET, ColorConfig
+from core.color_config import BAMBU_CMYW_PHASE6_PRESET, ColorConfig, get_preset
+from config.print_defaults import DEFAULT_FILAMENT_PRESET
 
 
 class TestColorGetLabel:
@@ -58,33 +59,20 @@ class TestColorGetAbsorption:
 
 
 class TestColorGetTransmissionRate:
-    """Tests for Color.get_transmission_rate() (Beer-Lambert law)."""
+    def test_zero_thickness(self):
+        assert Color("C", 3.0, hex="#00FFFF").transmission(0) == pytest.approx((1, 1, 1))
 
-    def test_zero_distance_full_transmission(self):
-        t = Color.get_transmission_rate(d=0, td=3.0)
-        assert t == pytest.approx(1.0)
+    def test_invalid_transmission_distance(self):
+        for td in (0, -1, float("nan"), float("inf")):
+            with pytest.raises(ValueError, match="positive and finite"):
+                Color("C", td, hex="#00FFFF")
 
-    def test_negative_td_returns_zero(self):
-        t = Color.get_transmission_rate(d=1.0, td=-1.0)
-        assert t == 0.0
+    def test_transmission_decreases_with_thickness(self):
+        color = Color("C", 3.0, hex="#00FFFF")
+        assert np.all(color.transmission(.08) > color.transmission(.16))
 
-    def test_zero_td_returns_zero(self):
-        t = Color.get_transmission_rate(d=1.0, td=0)
-        assert t == 0.0
-
-    def test_large_distance_approaches_zero(self):
-        t = Color.get_transmission_rate(d=100, td=1.0)
-        assert t < 0.001
-
-    def test_transmission_decreases_with_distance(self):
-        t1 = Color.get_transmission_rate(d=0.08, td=3.0)
-        t2 = Color.get_transmission_rate(d=0.16, td=3.0)
-        assert t1 > t2
-
-    def test_higher_td_gives_more_transmission(self):
-        t_opaque = Color.get_transmission_rate(d=0.08, td=1.0)
-        t_clear = Color.get_transmission_rate(d=0.08, td=10.0)
-        assert t_clear > t_opaque
+    def test_higher_td_transmits_more(self):
+        assert np.all(Color("C", 10.0, hex="#00FFFF").transmission(.08) > Color("C", 1.0, hex="#00FFFF").transmission(.08))
 
 
 class TestColorGetLab:
@@ -549,28 +537,6 @@ class TestColorRepr:
         assert repr(color) == "Cyan"
 
 
-class TestColorGetCmyk:
-    """Tests for Color.get_cmyk()."""
-
-    def test_white_has_zero_cmyk(self):
-        color = Color("White", transmission_distance=7.2, hex="#FFFFFF")
-        c, m, y, k = color.get_cmyk()
-        assert (c, m, y, k) == (0, 0, 0, 0)
-
-    def test_black_returns_full_key(self):
-        color = Color("Black", transmission_distance=1.0, hex="#000000")
-        c, m, y, k = color.get_cmyk()
-        assert (c, m, y, k) == (0, 0, 0, 1)
-
-    def test_pure_red(self):
-        color = Color("Red", transmission_distance=2.0, hex="#FF0000")
-        c, m, y, k = color.get_cmyk()
-        assert c == pytest.approx(0)
-        assert k == pytest.approx(0)
-        assert m == pytest.approx(1)
-        assert y == pytest.approx(1)
-
-
 class TestColorUpdateHex:
     """Tests for Color.update_hex()."""
 
@@ -585,16 +551,7 @@ class TestColorUpdateHex:
 class TestColorConstructor:
     """Tests for Color constructor edge cases."""
 
-    def test_default_cmyw_colors_dont_need_hex(self):
-        for name in ['Cyan', 'Magenta', 'Yellow', 'White']:
-            color = Color(name, transmission_distance=3.0)
-            assert color.hex is not None
-
-    def test_unknown_color_without_hex_raises(self):
-        with pytest.raises(ValueError, match="hex is required"):
-            Color("Purple", transmission_distance=2.0)
-
-    def test_custom_hex_overrides_default(self):
+    def test_supplied_hex_is_preserved(self):
         color = Color("Cyan", transmission_distance=3.0, hex="#123456")
         assert color.hex == "#123456"
 
@@ -602,10 +559,9 @@ class TestColorConstructor:
 class TestColorsInit:
     """Tests for Colors initialization variants."""
 
-    def test_default_set_is_bambu_cmyw(self):
+    def test_default_set_uses_configured_preset(self):
         colors = Colors()
-        assert len(colors) == 4
-        assert colors.get_labels() == ['C', 'M', 'Y', 'W']
+        assert colors.get_labels() == [c.label for c in get_preset(DEFAULT_FILAMENT_PRESET)]
 
     def test_names_subset(self):
         colors = Colors(names=['C', 'M'])
@@ -614,7 +570,7 @@ class TestColorsInit:
 
     def test_len(self):
         colors = Colors()
-        assert len(colors) == 4
+        assert len(colors) == len(get_preset(DEFAULT_FILAMENT_PRESET))
 
     def test_getitem_strips_and_uppercases(self):
         colors = Colors()

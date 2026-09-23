@@ -5,9 +5,7 @@ Two entry shapes exist in the API:
 - JSON-body routes pass typed `filamentPreset` / `filamentColors` fields.
 - Multipart Form routes receive both as raw strings (colors as JSON text).
 
-Both funnel through here so validation and preset-vs-colors priority are
-defined exactly once. Priority: filamentColors > filamentPreset > built-in
-default (Phase 6 CMYW).
+Both funnel through here to validate the selected source and resolve defaults.
 """
 import json
 import logging
@@ -17,7 +15,9 @@ from fastapi import HTTPException
 
 from api.models import FilamentColorConfig, FilamentConfigMixin, FilamentPreset
 from core.blend_color import Colors
-from core.color_config import BAMBU_CMYWK_PHASE6_PRESET, ColorConfig, get_preset
+from core.color_config import ColorConfig, get_preset
+from core.stack_prune import is_translucent_set
+from config.print_defaults import REGULAR_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM
 
 logger = logging.getLogger(__name__)
 
@@ -73,21 +73,13 @@ def get_colors_from_request(
     filament_preset: Optional[FilamentPreset],
     filament_colors: Optional[list[FilamentColorConfig]],
 ) -> Colors:
-    """Build a Colors instance from typed request fields.
-
-    Priority: filament_colors > filament_preset > default Phase 6 CMYW.
-    """
+    """Build the selected custom set, preset, or configured default set."""
     if filament_colors:
         configs = [
             ColorConfig(
                 name=fc.name,
                 hex=fc.hex,
                 transmission_distance=fc.transmission_distance,
-                td_rgb=fc.td_rgb,
-                k=fc.k,
-                alpha_s=fc.alpha_s,
-                td_scale=fc.td_scale,
-                td_gamma=fc.td_gamma,
             )
             for fc in filament_colors
         ]
@@ -102,5 +94,11 @@ def get_colors_from_request(
             detail=f"Unknown filament preset: {filament_preset.value}",
         )
 
-    # Fall back to the default Phase 6 CMYWK preset
-    return Colors.from_configs(BAMBU_CMYWK_PHASE6_PRESET)
+    return Colors()
+
+
+def resolve_layer_height(layer_height: Optional[float], colors: Colors) -> float:
+    """Only an omitted height uses the material set's TD-based default."""
+    if layer_height is not None:
+        return layer_height
+    return TRANSPARENT_LAYER_HEIGHT_MM if is_translucent_set(colors) else REGULAR_LAYER_HEIGHT_MM

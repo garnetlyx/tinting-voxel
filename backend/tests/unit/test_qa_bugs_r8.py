@@ -90,7 +90,7 @@ class TestQA51ThreeMFPresetNoColorMap:
         not from the resolved preset colors. When only filamentPreset is sent,
         color_hex_map is empty and 3MF objects lack visual color assignment.
         """
-        from api.routes.download_v2 import get_colors_from_request
+        from api.filament_payload import get_colors_from_request
         from api.models import FilamentPreset
 
         # Simulate the preset-only case (no filamentColors)
@@ -145,7 +145,7 @@ class TestQA52ShortCodeBackgroundIndex:
         clear_rgb_cache()
 
         # Create a white-only color config
-        color_key = (('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),)
+        color_key = (('W', 7.2, '#FFFFFF'),)
         result = _code_to_rgb_cached('W', 0.08, color_key)
 
         # Single layer of white filament should produce near-white
@@ -164,8 +164,8 @@ class TestQA52ShortCodeBackgroundIndex:
         clear_rgb_cache()
 
         color_key = (
-            ('C', 3.0, '#00FFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),
-            ('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),
+            ('C', 3.0, '#00FFFF'),
+            ('W', 7.2, '#FFFFFF'),
         )
 
         # 4-char code should work correctly
@@ -260,8 +260,9 @@ class TestQA57ThreeMFUnknownBlendChar:
         """
         colors = Colors()
         labels = colors.get_labels()
-        # Verify all labels are in the expected set
-        assert set(labels) == {'C', 'M', 'Y', 'W'}
+        from config.print_defaults import DEFAULT_FILAMENT_PRESET
+        from core.color_config import get_preset
+        assert labels == [c.label for c in get_preset(DEFAULT_FILAMENT_PRESET)]
 
         # This is a defensive check - the code_mesh_map should always
         # cover all possible blend code characters
@@ -314,7 +315,7 @@ class TestQA59ShortCodeBackgroundIndex:
         """
         clear_rgb_cache()
 
-        color_key = (('C', 3.0, '#0086D6', 0.0, None, 2.302585092994046, 1.0, 1.0), ('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0))
+        color_key = (('C', 3.0, '#0086D6'), ('W', 7.2, '#FFFFFF'))
 
         # Single-char code 'C' should have proper background contribution
         r, g, b = _code_to_rgb_cached('C', 0.08, color_key)

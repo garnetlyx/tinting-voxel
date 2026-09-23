@@ -1,7 +1,8 @@
 /**
- * E2E tests for the param search (Auto-Optimize Parameters) modal.
+ * E2E tests for the param search (Compare settings) modal.
  * Covers: button visibility, modal open/close, config phase UI.
- * Does NOT run a full search (too slow for E2E); mocks the API response.
+ * The modal state test mocks the API; full-size search is verified separately
+ * with the Local-photo image against the running service.
  */
 import { test, expect } from '@playwright/test';
 import { uploadAndProcess } from './helpers';
@@ -11,34 +12,34 @@ test.describe('Param Search Modal', () => {
     await page.goto('/');
   });
 
-  test('Auto-Optimize Parameters button is hidden before image upload', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /Auto-Optimize Parameters/ })).not.toBeVisible();
+  test('Compare settings button is hidden before image upload', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /Compare settings/ })).not.toBeVisible();
   });
 
-  test('Auto-Optimize Parameters button appears after processing an image', async ({ page }) => {
+  test('Compare settings button appears after processing an image', async ({ page }) => {
     await uploadAndProcess(page);
-    await expect(page.getByRole('button', { name: /Auto-Optimize Parameters/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Compare settings/ })).toBeVisible();
   });
 
-  test('clicking Auto-Optimize Parameters opens the modal with config phase', async ({ page }) => {
+  test('clicking Compare settings opens the modal with config phase', async ({ page }) => {
     await uploadAndProcess(page);
 
-    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
+    await page.getByRole('button', { name: /Compare settings/ }).click();
 
     // Modal should be visible
-    await expect(page.getByRole('dialog', { name: /Auto-Optimize Parameters/ })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /Compare settings/ })).toBeVisible();
 
     // Config phase elements
     await expect(page.getByLabel(/Target longest edge/)).toBeVisible();
     // No filament selector inside the search dialog (it reuses the
     // converter's current configuration).
     expect(await page.getByLabel(/Filament preset/).count()).toBe(0);
-    await expect(page.getByRole('button', { name: /Start Optimization/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Generate options/ })).toBeVisible();
   });
 
   test('modal closes when clicking the ✕ button', async ({ page }) => {
     await uploadAndProcess(page);
-    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
+    await page.getByRole('button', { name: /Compare settings/ }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -50,7 +51,7 @@ test.describe('Param Search Modal', () => {
 
   test('modal closes on Escape key', async ({ page }) => {
     await uploadAndProcess(page);
-    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
+    await page.getByRole('button', { name: /Compare settings/ }).click();
 
     await expect(page.getByRole('dialog')).toBeVisible();
 
@@ -67,7 +68,7 @@ test.describe('Param Search Modal', () => {
     await page.locator('select').nth(1).selectOption('clear_cmyw');
     await page.waitForTimeout(600);
 
-    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
+    await page.getByRole('button', { name: /Compare settings/ }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     expect(await page.getByLabel(/Filament preset/).count()).toBe(0);
     await page.keyboard.press('Escape');
@@ -80,53 +81,52 @@ test.describe('Param Search Modal', () => {
 
   test('target size input accepts numeric input', async ({ page }) => {
     await uploadAndProcess(page);
-    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
+    await page.getByRole('button', { name: /Compare settings/ }).click();
 
     const sizeInput = page.getByLabel(/Target longest edge/);
     await sizeInput.fill('150');
     await expect(sizeInput).toHaveValue('150');
   });
 
-  test('clicking Start Optimization transitions to running phase', async ({ page }) => {
-    // Intercept the param-search API to return a mock response immediately
+  test('clicking Generate options transitions to running phase', async ({ page }) => {
+    // Starting a search returns a job immediately; previews arrive in polls.
     await page.route('**/api/param-search', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           job_id: 'test-job-123',
+          completed: 0,
+          total: 21,
+          status: 'running',
           results: [
-            {
-              rank: 1,
-              mode: 'pixel',
-              params: { max_colors: 10, color_threshold: 40 },
-              mae: 12.5,
-              preview_image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-            },
           ],
-          total_evaluated: 1,
-          elapsed_seconds: 0.1,
         }),
       });
     });
 
-    // Also intercept SSE progress endpoint
+    // The first completed full-resolution preview becomes visible while the
+    // remaining evaluations are still running.
     await page.route('**/api/param-search/progress/**', async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'text/event-stream',
-        body: 'data: {"job_id":"test-job-123","completed":1,"total":1,"best_mae":12.5,"status":"complete"}\n\n',
+        contentType: 'application/json',
+        body: JSON.stringify({
+          job_id: 'test-job-123', completed: 1, total: 21, status: 'running', error: null,
+          results: [{
+            candidate_id: 1, is_baseline: true, mode: 'pixel',
+            params: { max_colors: 10, color_threshold: 40 },
+            preview_image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          }],
+        }),
       });
     });
 
     await uploadAndProcess(page);
-    await page.getByRole('button', { name: /Auto-Optimize Parameters/ }).click();
-    await page.getByRole('button', { name: /Start Optimization/ }).click();
+    await page.getByRole('button', { name: /Compare settings/ }).click();
+    await page.getByRole('button', { name: /Generate options/ }).click();
 
-    // Should show running or results phase (mock completes instantly)
-    // Either the progress bar or results cards should appear
-    await expect(
-      page.getByText(/Searching for optimal parameters/).or(page.getByText(/Found \d+ results/))
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByAltText('Current settings')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('1 / 21')).toBeVisible();
   });
 });

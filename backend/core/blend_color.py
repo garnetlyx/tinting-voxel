@@ -32,22 +32,9 @@ logger = logging.getLogger(__name__)
 
 
 def colors_key(colors) -> tuple:
-    """Content key covering every filament field that influences blending:
-    (label, td, hex, k, td_rgb, alpha_s, td_scale, td_gamma). Used by the
-    per-code LRU cache and the reference-matrix cache, so any edited value
-    yields a distinct key.
-    """
+    """Optical cache identity; scalar and equal-channel TDs are equivalent."""
     return tuple(
-        (
-            label,
-            colors.colors[label].td,
-            colors.colors[label].hex,
-            colors.colors[label].k,
-            colors.colors[label].td_rgb,
-            colors.colors[label].alpha_s,
-            colors.colors[label].td_scale,
-            colors.colors[label].td_gamma,
-        )
+        (label, colors.colors[label].td_channels, colors.colors[label].hex)
         for label in colors.get_labels()
     )
 
@@ -80,7 +67,7 @@ class BlendTestGenerator:
         if layer_height <= 0:
             raise ValueError(f"layer_height must be positive, got {layer_height}")
         # Backing context (printed backing block as trailing layers over the
-        # mode boundary); empty suffix + None background = paper default.
+        # light boundary); an empty suffix adds no printed backing.
         self._backing_suffix = backing_suffix or ''
         self._background_rgb = background_rgb
         self.length_total = plate_length
@@ -215,8 +202,7 @@ class BlendTestGenerator:
         code = code.strip().upper()
         if self._backing_suffix:
             # Backing-aware evaluation: the printed backing block rides as
-            # trailing layers over the mode boundary (paper's backing
-            # reflectance). Keep the cached path for the default no-backing
+            # trailing layers. Keep the cached path for the default no-backing
             # configuration.
             return codes_to_rgb_batch(
                 [code + self._backing_suffix],

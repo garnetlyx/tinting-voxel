@@ -287,6 +287,8 @@ describe('getFilamentPreview', () => {
       filamentColors: [{ name: 'Cyan', hex: '#0086D6', transmission_distance: 3.0 }],
       layerCount: 4,
       layerHeight: 0.08,
+      whiteBackingLayers: 3,
+      backingMode: 'black',
     };
     const result = await getFilamentPreview(params);
     expect(result).toEqual(mockPreview);

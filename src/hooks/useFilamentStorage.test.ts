@@ -37,6 +37,30 @@ describe('useFilamentStorage', () => {
     expect(saved!.id).toBeTruthy();
   });
 
+  it('round-trips RGB arrays without converting them and does not retain caller references', () => {
+    const colors: FilamentColorConfig[] = [{ name: 'C', hex: '#123456', transmission_distance: [1, 2, 3] }];
+    const { result, unmount } = renderHook(() => useFilamentStorage());
+    act(() => { result.current.savePreset('RGB', colors); });
+    (colors[0].transmission_distance as number[])[0] = 99;
+    expect(result.current.presets[0].colors[0].transmission_distance).toEqual([1, 2, 3]);
+    unmount();
+    const loaded = renderHook(() => useFilamentStorage());
+    expect(loaded.result.current.presets[0].colors[0].transmission_distance).toEqual([1, 2, 3]);
+  });
+
+  it('rejects old material fields without a compatibility migration', () => {
+    const { result } = renderHook(() => useFilamentStorage());
+    let imported = -1;
+    act(() => {
+      imported = result.current.importPresets(JSON.stringify([
+        { id: 'old', name: 'Old', colors: [{ ...sampleColors[0], td_rgb: [1, 2, 3] }] },
+        { id: 'old-k', name: 'Old k', colors: [{ ...sampleColors[0], k: 0.1 }] },
+      ])).imported;
+    });
+    expect(imported).toBe(0);
+    expect(result.current.presets).toEqual([]);
+  });
+
   it('trims whitespace from preset names on save', () => {
     const { result } = renderHook(() => useFilamentStorage());
 

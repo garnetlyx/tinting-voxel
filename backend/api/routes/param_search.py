@@ -1,25 +1,17 @@
-"""
-Parameter search API endpoints.
-
-POST /api/param-search       — run parameter search, return top-N results
-GET  /api/param-search/progress/{job_id} — SSE stream of ProgressEvent objects
-"""
-import asyncio
-import json
+"""Full-resolution parameter search jobs and incremental result retrieval."""
 import logging
+import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from api.error_handlers import handle_api_errors
-from api.filament_payload import get_colors_from_request, parse_filament_form_payload
+from api.filament_payload import get_colors_from_request, parse_filament_form_payload, resolve_layer_height
 from api.models import (
-    ParamSearchRequest,
     ParamSearchResponse,
-    ProgressEvent,
     SearchResultItem,
 )
 from api.rate_limiter import limiter
@@ -30,6 +22,7 @@ from services.param_search_service import (
     FixedParams,
     ParamSearchConfig,
     ParamSearchService,
+    SearchResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,36 +30,149 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Param Search"])
 
 # ---------------------------------------------------------------------------
-# In-memory progress store
+# Jobs are kept in this process. Production runs one Uvicorn worker. Admit only
+# one unfinished job, so the single-worker executor never accumulates a queue.
 # ---------------------------------------------------------------------------
 
-class ProgressStore:
-    """Thread-safe store mapping job_id → asyncio.Queue of ProgressEvent."""
+class SearchJob:
+    def __init__(self, job_id: str, total: int) -> None:
+        self.job_id = job_id
+        self.total = total
+        self.cancel_event = threading.Event()
+        self._lock = threading.Lock()
+        self._results: list[SearchResultItem] = []
+        self._candidate_errors: list[tuple[int, str]] = []
+        self._status = "running"
+        self._error: Optional[str] = None
+        self.finished_at: Optional[float] = None
+
+    def add_result(self, result: SearchResult) -> None:
+        item = SearchResultItem(
+            candidate_id=result.candidate_id,
+            is_baseline=result.is_baseline,
+            mode=result.mode,
+            params=result.params,
+            preview_image=result.preview_data_url,
+        )
+        with self._lock:
+            if self._status == "running":
+                self._results.append(item)
+
+    def finish(self, error: Optional[str] = None) -> None:
+        with self._lock:
+            if self._status == "running":
+                self._status = "error" if error else "complete"
+                self._error = error
+            self.finished_at = time.monotonic()
+
+    def add_candidate_error(self, candidate_id: int, reason: str) -> None:
+        with self._lock:
+            if self._status == "running":
+                self._candidate_errors.append((candidate_id, reason))
+
+    def candidate_errors(self) -> list[tuple[int, str]]:
+        with self._lock:
+            return list(self._candidate_errors)
+
+    def cancel(self) -> None:
+        self.cancel_event.set()
+        with self._lock:
+            if self._status == "running":
+                self._status = "cancelled"
+
+    def snapshot(self, after: int = 0) -> ParamSearchResponse:
+        with self._lock:
+            return ParamSearchResponse(
+                job_id=self.job_id,
+                completed=len(self._results),
+                total=self.total,
+                status=self._status,
+                settled=self.finished_at is not None,
+                error=self._error,
+                results=[result for result in self._results if result.candidate_id > after],
+            )
+
+
+class SearchJobStore:
+    """Thread-safe job registry; terminal snapshots remain available for 10 minutes."""
 
     _TTL = 600  # 10 minutes
 
     def __init__(self) -> None:
-        self._queues: dict[str, asyncio.Queue] = {}
-        self._created: dict[str, float] = {}
+        self._lock = threading.Lock()
+        self._jobs: dict[str, SearchJob] = {}
 
-    def create(self, job_id: str) -> asyncio.Queue:
-        self._queues[job_id] = asyncio.Queue()
-        self._created[job_id] = time.monotonic()
-        self._evict()
-        return self._queues[job_id]
+    def create(self, total: int) -> SearchJob:
+        with self._lock:
+            self._evict_locked()
+            if any(job.finished_at is None for job in self._jobs.values()):
+                raise HTTPException(
+                    status_code=503,
+                    detail="A search is already running. Cancel it or wait for it to finish.",
+                )
+            job = SearchJob(str(uuid.uuid4()), total)
+            self._jobs[job.job_id] = job
+            return job
 
-    def get(self, job_id: str) -> Optional[asyncio.Queue]:
-        return self._queues.get(job_id)
+    def get(self, job_id: str) -> Optional[SearchJob]:
+        with self._lock:
+            self._evict_locked()
+            return self._jobs.get(job_id)
 
-    def _evict(self) -> None:
+    def available(self) -> bool:
+        with self._lock:
+            self._evict_locked()
+            return all(job.finished_at is not None for job in self._jobs.values())
+
+    def _evict_locked(self) -> None:
         now = time.monotonic()
-        expired = [k for k, t in self._created.items() if now - t > self._TTL]
-        for k in expired:
-            self._queues.pop(k, None)
-            self._created.pop(k, None)
+        expired = [
+            job_id for job_id, job in self._jobs.items()
+            if job.finished_at is not None and now - job.finished_at > self._TTL
+        ]
+        for job_id in expired:
+            del self._jobs[job_id]
 
 
-_progress_store = ProgressStore()
+_job_store = SearchJobStore()
+_search_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="param-search")
+
+
+def _execute_search(job: SearchJob, service: ParamSearchService, image_bytes: bytes) -> None:
+    started = time.monotonic()
+    try:
+        results = service.run(
+            image_bytes,
+            on_result=job.add_result,
+            on_candidate_error=job.add_candidate_error,
+            cancel=job.cancel_event,
+            budget_seconds=settings.param_search_job_budget_seconds,
+        )
+        failures = job.candidate_errors()
+        if job.cancel_event.is_set():
+            job.finish()
+        elif len(results) + len(failures) < job.total or failures:
+            if len(results) + len(failures) < job.total:
+                message = f"Search stopped after {settings.param_search_job_budget_seconds:g}s; "
+            else:
+                message = "Search finished with candidate errors; "
+            message += f"{len(results)} of {job.total} previews completed."
+            if failures:
+                examples = "; ".join(
+                    f"option {candidate_id}: {reason}" for candidate_id, reason in failures[:3]
+                )
+                message += f" {len(failures)} candidate(s) failed: {examples}"
+            job.finish(error=message)
+        else:
+            job.finish()
+        logger.info(
+            "Param search finished: job_id=%s status=%s completed=%d total=%d elapsed=%.1fs",
+            job.job_id, job.snapshot().status, job.snapshot().completed,
+            job.total, time.monotonic() - started,
+        )
+    except Exception as exc:
+        logger.exception("Param search failed: job_id=%s", job.job_id)
+        job.finish(error=f"Search stopped; {job.snapshot().completed} of {job.total} previews completed. {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -81,14 +187,14 @@ async def api_param_search(
     image: UploadFile = File(...),
     preset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
-    mode: str = Form("pixel"),
-    strategy: str = Form("grid"),
-    n_trials: int = Form(50),
+    mode: str = Form("pixel", pattern=r"^(pixel|svg|both)$"),
+    strategy: str = Form("grid", pattern=r"^(grid|random)$"),
+    n_trials: int = Form(50, ge=1, le=500),
     seed: Optional[int] = Form(None),
     layer_count: int = Form(4, ge=1, le=10),
-    layer_height: float = Form(0.08, gt=0, le=10),
+    layer_height: Optional[float] = Form(None, gt=0, le=10),
     pixel_size: float = Form(0.42, gt=0, le=10),
-    white_backing_layers: int = Form(1, ge=0, le=5),
+    white_backing_layers: int = Form(3, ge=0, le=5),
     backing_mode: str = Form("white", pattern=r'^(white|black)$'),
     max_colors: int = Form(10, ge=1, le=1024),
     color_threshold: float = Form(50, ge=0, le=1000),
@@ -96,9 +202,8 @@ async def api_param_search(
     num_colors: int = Form(8, ge=1, le=256),
     epsilon: float = Form(2.0, gt=0, le=100),
     min_area: float = Form(4.0, gt=0, le=100),
-    top_n: int = Form(10, ge=1, le=50),
 ):
-    """Run parameter search and return top-N results sorted by MAE."""
+    """Render alternatives using the current image and print configuration."""
     image_bytes = await image.read()
     validate_image_upload(image.filename, image_bytes)
 
@@ -107,9 +212,7 @@ async def api_param_search(
     # UI, including fully custom filament configurations.
     parsed_preset, parsed_colors = parse_filament_form_payload(preset, filamentColors)
     colors = get_colors_from_request(parsed_preset, parsed_colors)
-    job_id = str(uuid.uuid4())
-    queue = _progress_store.create(job_id)
-
+    layer_height = resolve_layer_height(layer_height, colors)
     config = ParamSearchConfig(
         mode=mode,
         strategy=strategy,
@@ -124,7 +227,6 @@ async def api_param_search(
         ),
         colors=colors,
         param_ranges=None,
-        top_n=top_n,
         baseline_params={
             "pixel": {
                 "max_colors": max_colors,
@@ -140,98 +242,39 @@ async def api_param_search(
         },
     )
 
-    loop = asyncio.get_event_loop()
-
-    def _on_progress(event: ProgressEvent) -> None:
-        event_with_id = ProgressEvent(
-            job_id=job_id,
-            completed=event.completed,
-            total=event.total,
-            best_mae=event.best_mae,
-            status=event.status,
-            error=event.error,
-        )
-        loop.call_soon_threadsafe(queue.put_nowait, event_with_id)
-
-    start = time.monotonic()
     service = ParamSearchService(config)
-
-    # Run in thread pool to avoid blocking the event loop
-    results = await asyncio.get_event_loop().run_in_executor(
-        None,
-        lambda: service.run_with_timeout(
-            image_bytes,
-            timeout_seconds=settings.param_search_budget_seconds,
-            on_progress=_on_progress,
-        ),
-    )
-
-    elapsed = time.monotonic() - start
-
-    # Signal completion
-    final_event = ProgressEvent(
-        job_id=job_id,
-        completed=sum(1 for _ in []),  # placeholder
-        total=0,
-        best_mae=results[0].mae if results else 0.0,
-        status="complete",
-    )
-    queue.put_nowait(final_event)
-
-    if not results:
-        raise HTTPException(status_code=422, detail="Search produced zero valid results.")
-
-    result_items = [
-        SearchResultItem(
-            rank=r.rank,
-            mode=r.mode,
-            params=r.params,
-            mae=r.mae,
-            preview_image=r.preview_data_url,
-        )
-        for r in results[:top_n]
-    ]
-
-    logger.info(
-        "Param search complete: job_id=%s mode=%s strategy=%s results=%d elapsed=%.1fs",
-        job_id, mode, strategy, len(result_items), elapsed,
-    )
-
-    return ParamSearchResponse(
-        job_id=job_id,
-        results=result_items,
-        total_evaluated=len(results),
-        elapsed_seconds=round(elapsed, 2),
-    )
+    job = _job_store.create(service.total_candidates())
+    try:
+        _search_executor.submit(_execute_search, job, service, image_bytes)
+    except RuntimeError as exc:
+        job.finish(error="Search worker unavailable.")
+        raise HTTPException(status_code=503, detail="Search worker unavailable.") from exc
+    return job.snapshot()
 
 
 # ---------------------------------------------------------------------------
-# GET /api/param-search/progress/{job_id}
+# GET/DELETE /api/param-search/progress/{job_id}
 # ---------------------------------------------------------------------------
 
-@router.get("/param-search/progress/{job_id}")
-async def api_param_search_progress(job_id: str):
-    """SSE stream of ProgressEvent objects for a running search job."""
-    queue = _progress_store.get(job_id)
-    if queue is None:
+@router.get("/param-search/availability")
+def api_param_search_availability():
+    """Report whether the one search worker can accept a new job."""
+    return {"available": _job_store.available()}
+
+@router.get("/param-search/progress/{job_id}", response_model=ParamSearchResponse)
+def api_param_search_progress(job_id: str, after: int = Query(0, ge=0)):
+    """Return newly completed candidates and current job status."""
+    job = _job_store.get(job_id)
+    if job is None:
         raise HTTPException(status_code=404, detail=f"Unknown job_id: {job_id}")
+    return job.snapshot(after=after)
 
-    async def event_generator():
-        while True:
-            try:
-                event: ProgressEvent = await asyncio.wait_for(queue.get(), timeout=30.0)
-                yield f"data: {event.model_dump_json()}\n\n"
-                if event.status in ("complete", "error"):
-                    break
-            except asyncio.TimeoutError:
-                # Send keep-alive comment
-                yield ": keep-alive\n\n"
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
-    )
+@router.delete("/param-search/progress/{job_id}", response_model=ParamSearchResponse)
+def api_cancel_param_search(job_id: str):
+    """Stop after the current candidate; ignore an in-flight result."""
+    job = _job_store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Unknown job_id: {job_id}")
+    job.cancel()
+    return job.snapshot()

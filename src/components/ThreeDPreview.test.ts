@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { buildInstancedMeshes, disposePreviewModel, mergePreviewPixels, updatePreviewCameraClipping } from './threeDPreviewScene';
+import { buildInstancedMeshes, disposePreviewModel, mergePreviewPixels, resolvePreviewBackingHex, updatePreviewCameraClipping } from './threeDPreviewScene';
 import type { ColorBlock } from '../api/types';
 
 const blocks: ColorBlock[] = [{
@@ -9,10 +9,10 @@ const blocks: ColorBlock[] = [{
 const mapped = [{ code: 'MMMM', rgb: [220, 20, 100], hex: '#dc1464' }];
 const visibility = new Map([['#dc1464', true]]);
 
-function build(backing = 1, exploded = false, visible = true) {
+function build(backing = 1, exploded = false, visible = true, backingHex = '#ffffff') {
   return buildInstancedMeshes(
     blocks, mapped, { width: 2, height: 2 }, 1, 0.08, 4,
-    backing, visible ? visibility : new Map(), exploded,
+    backing, backingHex, visible ? visibility : new Map(), exploded,
   );
 }
 
@@ -161,7 +161,7 @@ describe('3D preview surface merging', () => {
     for (let y = 0; y < 1250; y++) for (let x = 0; x < 1000; x++) pixels.push({ x, y });
     const group = buildInstancedMeshes(
       [{ ...blocks[0], count: pixels.length, pixels }], mapped,
-      { width: 1000, height: 1250 }, 0.16, 0.08, 4, 1, visibility, false,
+      { width: 1000, height: 1250 }, 0.16, 0.08, 4, 1, '#ffffff', visibility, false,
     );
     const mesh = group.children[0] as THREE.InstancedMesh;
     expect(mesh.count).toBe(1);
@@ -170,5 +170,34 @@ describe('3D preview surface merging', () => {
     expect(size.z).toBeCloseTo(200, 4);
     expect(size.y).toBeCloseTo(0.32, 6);
     disposePreviewModel(group);
+  });
+});
+
+describe('3D preview backing material', () => {
+  const filaments = [
+    { name: 'Paper', hex: '#EEE8DD', transmission_distance: 0.2 },
+    { name: 'Ink', hex: '#152236', transmission_distance: 0.2 },
+  ];
+
+  it.each([
+    ['CMYPPP', '#EEE8DD'],
+    ['CMYIII', '#152236'],
+  ])('uses the printed material named by backend blend code %s', (code, expectedHex) => {
+    const actualHex = resolvePreviewBackingHex([{ code, hex: '#123456', rgb: [18, 52, 86] }], filaments, 3);
+    expect(actualHex).toBe(expectedHex);
+    for (const exploded of [false, true]) {
+      const group = build(3, exploded, false, actualHex!);
+      const material = (firstHit(group).object as THREE.Mesh).material as THREE.MeshPhongMaterial;
+      expect(material.color.getHexString()).toBe(expectedHex.slice(1).toLowerCase());
+      disposePreviewModel(group);
+    }
+  });
+
+  it('does not invent a backing when blend codes or material are unavailable', () => {
+    const code = { code: 'CMYPPP', hex: '#123456', rgb: [18, 52, 86] };
+    expect(resolvePreviewBackingHex([code], filaments, 0)).toBeNull();
+    expect(resolvePreviewBackingHex([{ ...code, code: 'CMYIPI' }], filaments, 3)).toBeNull();
+    expect(resolvePreviewBackingHex([{ ...code, code: 'CMYXXX' }], filaments, 3)).toBeNull();
+    expect(resolvePreviewBackingHex([code, { ...code, code: 'CMYIII' }], filaments, 3)).toBeNull();
   });
 });

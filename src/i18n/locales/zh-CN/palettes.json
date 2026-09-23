@@ -3,9 +3,7 @@
   "browseCuratedPalettes": "浏览精选配色",
   "noPalettesFound": "未找到配色",
   "bambu_cmywk_phase6_name": "Bambu CMYWK",
-  "bambu_cmywk_phase6_description": "用于全彩打印的校准 Bambu Lab CMYWK 耗材组合（含纯黑）",
   "bambu_cmyw_phase6_name": "Bambu CMYW",
-  "bambu_cmyw_phase6_description": "用于全彩打印的校准的 Bambu Lab CMYW 耗材组合",
   "clear_cmyw_name": "透明 CMYW",
-  "clear_cmyw_description": "用于透光打印的半透明 CMYW 耗材组合"
+  "clear_cmyg_name": "透明 CMYG"
 }

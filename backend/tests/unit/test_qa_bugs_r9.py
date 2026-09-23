@@ -98,7 +98,7 @@ class TestQA69LastLayerDoubleCountedInBackground:
         """
         clear_rgb_cache()
 
-        color_key = (('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),)
+        color_key = (('W', 7.2, '#FFFFFF'),)
         result = _code_to_rgb_cached('W', 0.08, color_key)
 
         r, g, b = result
@@ -118,7 +118,7 @@ class TestQA69LastLayerDoubleCountedInBackground:
         """
         clear_rgb_cache()
 
-        color_key = (('C', 3.0, '#0086D6', 0.0, None, 2.302585092994046, 1.0, 1.0),)
+        color_key = (('C', 3.0, '#0086D6'),)
         result_c = _code_to_rgb_cached('C', 0.08, color_key)
 
         # With bug: background is remain * (1-t) where t = cyan's transmission
@@ -177,7 +177,7 @@ class TestQA70LabelCollisionFromDifferentNames:
 # Inside the cached function, on every call (even cache hits bypass this,
 # but on MISS), it rebuilds color_map by constructing new Color objects
 # from the hashable key. This involves calling ImageColor.getcolor,
-# get_cmyk, get_absorption for EVERY color on EVERY cache miss.
+# get_absorption for every color on every cache miss.
 # The color_key IS part of the cache key, so the cache works, but for
 # 4096+ unique codes, it creates unnecessary Color objects.
 # This is a performance concern, not a correctness bug.
@@ -344,21 +344,6 @@ class TestQA82ColorsSetItemNoneValue:
 # While functionally correct in Pydantic V2 (backward compat), these will
 # break in Pydantic V3.
 
-# -- QA-89: Color.get_cmyk() loses precision for nearly-white colors ------------
-# File: backend/core/blend_color.py:60-78
-# For RGB (254, 254, 254), get_cmyk computes:
-#   c = 1 - 254/255 = 0.00392...
-#   min_cmy = 0.00392...
-#   c = (0.00392 - 0.00392) / (1 - 0.00392) = 0.0  <-- division OK
-#   k = 0.00392  <-- correct
-# But for RGB (255, 255, 254):
-#   c = 0, m = 0, y = 1/255 = 0.00392
-#   min_cmy = 0
-#   c = 0/1 = 0, m = 0/1 = 0, y = 0.00392/1 = 0.00392
-#   k = 0  <-- correct
-# This is actually fine. No bug here.
-
-
 # -- QA-90: Colors.from_configs doesn't validate transmission_distance > 0 ------
 # File: backend/core/blend_color.py:339-343
 # Colors.from_configs creates Color objects from configs. The ColorConfig
@@ -370,25 +355,10 @@ class TestQA82ColorsSetItemNoneValue:
 # But Colors.from_configs doesn't re-validate td, relying on ColorConfig.
 
 class TestQA90ColorDirectTdZero:
-    """Creating Color directly with td=0 is handled by get_transmission_rate
-    guard, but could cause confusion in other code paths.
-    """
-
-    def test_color_with_td_zero_doesnt_crash_code_to_rgb(self):
-        """code_to_rgb should handle td=0 without crashing."""
+    def test_color_with_td_zero_is_rejected(self):
         clear_rgb_cache()
-
-        # td=0 means fully opaque
-        color_key = (('X', 0, '#FF0000', 0.0, None, 2.302585092994046, 1.0, 1.0),)
-
-        # Should not crash with ZeroDivisionError
-        result = _code_to_rgb_cached('X', 0.08, color_key)
-        assert len(result) == 3
-        # With td=0, transmission is 0.0, so the color should be
-        # determined entirely by this layer (fully opaque red)
-        r, g, b = result
-        # Since it's fully opaque, only this color contributes
-        assert isinstance(r, (int, float))
+        with pytest.raises(ValueError, match="positive and finite"):
+            _code_to_rgb_cached('X', .08, (('X', 0, '#FF0000'),))
 
 
 # -- QA-91: download_v2 uses deprecated .dict() instead of .model_dump() ---------

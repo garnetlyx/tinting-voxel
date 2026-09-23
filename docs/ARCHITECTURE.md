@@ -91,19 +91,19 @@ tinting-voxel/
 │   │   ├── validators.py # File upload validation
 │   │   └── routes/       # Route handlers
 │   │       ├── image.py      # Image processing (pixel/SVG modes)
-│   │       ├── download.py   # V1 download endpoints (CSV, STL)
+│   │       ├── download.py   # CSV download endpoint
 │   │       ├── download_v2.py # V2 N-color endpoints (STL, SVG-STL, 3MF, print settings)
 │   │       ├── filament.py   # Filament preview
 │   │       ├── batch.py      # Batch processing (up to 20 images)
 │   │       ├── palette.py    # Palette library
-│   │       ├── param_search.py # Param search SSE + top-N results
+│   │       ├── param_search.py # Background parameter search + candidate previews
 │   │       ├── bug_report.py  # In-app bug reports
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py        # Color blending (BlendTestGenerator, colors_key)
-│   │   ├── blend_models.py       # The unified blend formula (mu=ln10/td+k*A) + vectorized batch
-│   │   ├── color_config.py       # Filament presets single source of truth (Phase6 preset)
-│   │   ├── color_materials.py    # Material property definitions (Color: hex+td+k)
+│   │   ├── blend_models.py       # Unified light-loss stacking + vectorized batch
+│   │   ├── color_config.py       # Filament presets single source of truth
+│   │   ├── color_materials.py    # Material properties (hex + scalar or RGB TD)
 │   │   ├── code_grid.py          # Code grid generation utilities
 │   │   ├── grid_sampling.py      # Code-grid RGB assembly for blend fitting
 │   │   ├── plate_geometry.py     # Plate geometry calculations
@@ -125,9 +125,6 @@ tinting-voxel/
 │   │   ├── param_search_service.py # Auto parameter sweep engine
 │   │   ├── bug_report.py        # Bug report storage + optional email delivery
 │   │   └── analytics.py         # In-memory usage analytics
-│   ├── certification/    # Shipped-preset cross-validation against calibration plates
-│   │   ├── plate08_shipped_crossval.py  # PLATE-08 CMYW ΔE00 report (--check for CI-grade verification)
-│   │   └── plate08_shipped_crossval.json # Tracked report: input SHA-256, source commit, scores
 │   ├── config/           # Configuration
 │   └── tests/            # Test suite (~700 tests)
 │       └── fixtures/
@@ -167,8 +164,8 @@ tinting-voxel/
 | **3MFGenerator** | 3MF file generation with named color objects | trimesh, lxml |
 | **MeshOptimizer** | Greedy meshing to reduce box count, face culling | NumPy |
 | **BlendColor (core)** | BlendTestGenerator, colors_key, CIEDE2000 matching | scikit-image, NumPy |
-| **BlendModels** | The paper's forward model (staircase: mu = ln10/td_rgb + k*A; scalar: mu = alpha_s/(s_td*td^gamma_td) + k*A) and its vectorized batch | NumPy |
-| **ColorConfig** | Filament presets (paper fits: raw td + alpha_s/td_scale/td_gamma or staircase td_rgb, per-color k) | dataclasses |
+| **BlendModels** | Shared light-loss allocation using each material’s `T_ch = 10^(-d / TD_ch)` | NumPy |
+| **ColorConfig** | Material catalog: name, hex, scalar or RGB transmission distance | dataclasses |
 | **FilamentPreview** | Color matrix preview generation | PIL, NumPy |
 | **BatchProcessor** | Multi-image batch processing | concurrent.futures |
 | **PaletteLibrary** | Curated color palette management | dataclasses |
@@ -324,6 +321,7 @@ requests. `npm test` and `npm run build` validate this boundary.
    │ layerHeight: 0.08mm                        │
    │ pixelSize: 0.08mm                          │
    │ layerCount: 4                              │
+   │ whiteBackingLayers: 3                      │
    └──────────────────┬─────────────────────────┘
                       │
                       ▼
@@ -351,10 +349,10 @@ requests. `npm test` and `npm run build` validate this boundary.
                       ▼
 4. Output: ZIP with 4 STL files
    ┌────────────────────────────────────────────┐
-   │ CMYW_208x208x0.32_C.stl  (Cyan layer)      │
-   │ CMYW_208x208x0.32_M.stl  (Magenta layer)   │
-   │ CMYW_208x208x0.32_Y.stl  (Yellow layer)    │
-   │ CMYW_208x208x0.32_W.stl  (White layer)     │
+   │ CMYW_208x208x0.56_C.stl  (Cyan layer)      │
+   │ CMYW_208x208x0.56_M.stl  (Magenta layer)   │
+   │ CMYW_208x208x0.56_Y.stl  (Yellow layer)    │
+   │ CMYW_208x208x0.56_W.stl  (White layer)     │
    └────────────────────────────────────────────┘
 ```
 
@@ -366,7 +364,6 @@ requests. `npm test` and `npm run build` validate this boundary.
 |----------|--------|-------|--------|
 | `/api/process-image` | POST | `multipart/form-data` (image + params) | JSON (colorBlocks, processedImage) |
 | `/api/download-csv` | POST | JSON (colorBlocks) | `text/csv` file |
-| `/api/download-stl` | POST | JSON (colorBlocks, params) | `application/zip` file |
 | `/api/health` | GET | None | JSON (status, version) |
 
 ### Request/Response Models
@@ -407,7 +404,7 @@ requests. `npm test` and `npm run build` validate this boundary.
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
 | **Color Space for Matching** | RGB Euclidean, HSV, LAB Euclidean, CIEDE2000 | CIEDE2000 | Perceptually uniform + hue weighting for dark chromatic colors |
-| **Color Mixing Model** | Beer-Lambert scalar, Unified mu=ln10/td+k·A_ch, Full K-M | Unified Beer-Lambert (mu=ln10/td+k·A_ch) | One formula for all filaments; k=0 is plain Beer-Lambert, fitted k refines calibrated presets; no mode dispatch |
+| **Color Mixing Model** | Unified material transmission and light-loss allocation | `T_ch = 10^(-d / TD_ch)` | One formula and material schema for every filament |
 | **Mesh Optimization** | None, Greedy meshing, Marching cubes | Greedy meshing | 70-80% reduction with simple implementation |
 | **STL Format** | ASCII STL, Binary STL | Binary STL | 5x smaller files, faster parsing |
 | **Separate vs Single STL** | Multi-color single file, Separate per color | Separate files | Slicer compatibility, manual filament swap support |
@@ -417,40 +414,48 @@ requests. `npm test` and `npm run build` validate this boundary.
 
 ## Key Algorithms
 
-### 1. Hybrid Per-Color k Color Mixing
+### 1. Unified Color Mixing
 
-### 1. Unified blend model
-
-The production color mixing model is ONE formula for every filament
-(transparent or opaque, preset or custom):
+Each material has `name`, `hex`, and one `transmission_distance` field. TD is
+either a positive number or three positive numbers in RGB order. A scalar is
+the equal-channel case of the same formula:
 
 ```
-staircase (td_rgb):   mu_ch = ln(10)/td_rgb[ch] + k × A_ch
-scalar td:            mu_ch = alpha_s/(s_td × td^gamma_td) + k × A_ch
-T_ch                 = exp(-mu_ch × d)
+T_ch = 10^(-d / TD_ch)
+A_ch = 1 - hex_ch / 255
 ```
 
-- `td` — the filament's transmission-distance data. Present `td_rgb`
-  (staircase measurement, clear presets) selects the per-channel form and
-  `td` holds the channel mean for display. A scalar `td` (bambu presets:
-  the raw readings of the PLATE-06-H2C-A paper fit) selects the
-  compensated form with the preset's `alpha_s`/`td_scale`/`td_gamma`;
-  neutral defaults (alpha_s = ln 10, s_td = gamma_td = 1) degrade to plain
-  `ln(10)/td + k·A_ch`, which is how user-entered scalars apply.
-- `k` — pigment absorption gain (fitted values on presets, 0 = plain
-  Beer-Lambert).
-- `A_ch` — per-channel absorption from the filament hex. `d` — layer height.
+`d` is the thickness of one color layer in mm. `Color.transmission()` owns the
+transmission calculation; `blend_models.py` composes layer transmission and
+hex-derived absorption with one light-loss allocation rule. The batch path and
+single-code path use the same material values.
 
-Stacked colors compose through the light-loss allocation (paper Eqs. 4-8).
-Preset provenance and the composed-remap derivation live in
-`backend/core/color_config.py`.
+The TD mean across all materials and RGB channels determines transparency;
+each material has equal weight and a scalar contributes three equal channels.
+The threshold is `TRANSPARENT_TD_THRESHOLD_MM` in `core/stack_prune.py` (4.5 mm).
+It controls pruning and the layer-height default, independently of preset names.
+When a request omits `layerHeight`, the API resolves it from the requested
+materials using the same rule; an explicit height is preserved. `GET /api/v2/filament-presets` supplies the threshold, aggregation
+rule, material catalog, and print defaults to the browser.
 
-Transparency classification is one fixed criterion for pruning and the
-layer-height hint: every filament's EFFECTIVE td (per-channel, or scalar
-after the remap) ≥ 4.5 mm.
+`config/print_defaults.py` defines 0.08 mm for regular color layers and 0.84 mm
+for high-transmission color layers. The latter spans three 0.28 mm slicer
+layers. Exported `color_layer_height_mm` preserves color-layer thickness;
+`layer_height` is the slicer layer height. Four 0.84 mm color layers plus three
+backing layers form a 5.88 mm stack, corresponding to 21 slices at 0.28 mm.
+Print settings record color segments as `color_layer_count` and
+`backing_color_layer_count`; `object_dimensions.total_layer_count` counts actual
+slicer layers, while `optical_layer_count` counts the color stack's slicer layers.
+The example therefore reports 4 color segments, 3 backing segments, 21 total
+slicer layers, and 12 color-stack slicer layers.
 
-Implementation: `blend_models.py` (unified formula + vectorized batch),
-presets: `core/color_config.py`.
+Three backing color layers are printed by default. The light/dark choice selects the
+closest available material to white or black. Its actual layers are appended to the predicted stack under the same
+white illumination; the mode does not add an external backing color.
+
+Parameter search includes the current configuration and returns all successful
+candidate previews in evaluation order, with `candidate_id` and `is_baseline`.
+Users choose a preview; the service does not assign an image-quality rank.
 
 ### 2. Greedy Meshing
 
@@ -516,19 +521,18 @@ Groups similar colors using scikit-learn's MiniBatchKMeans:
 
 ### Built-in filament catalog
 
-The built-in presets are `bambu_cmywk_phase6` (five colors, default),
-`bambu_cmyw_phase6` (four colors), and `clear_cmyw` (four colors: CMYW).
-`core/color_config.py` owns the canonical registry used by preset lookup,
-enumeration, API responses, and cache warmup. Removed presets have no
-aliases, archives, or fallback mappings; unknown IDs are rejected. The
-palette library's standard entries reference these same definitions.
-Frontend initialization is checked against a shared catalog fixture, which
-is also checked against the backend definitions; preset values must not
-diverge between the browser and server. Custom colors remain supported.
+`core/color_config.py` owns the four built-in presets:
+`bambu_cmywk_phase6` (five colors, default), `bambu_cmyw_phase6` (four colors),
+`clear_cmyg`, and `clear_cmyw`. All four presets use RGB-channel TD values. Bambu CMYW is derived from
+CMYWK without the K material. Their effective TDs come from the existing Bambu
+staircase observations; photo-specific calibration terms are not product parameters.
 
-Palette API responses and application preserve each color's full schema
-(hex, td, k), matching direct preset selection. The frontend shares one
-preset option list between settings and automatic parameter search.
+Preset lookup, palette responses, and browser initialization consume this
+registry. The browser fetches catalog values from the API and exposes retry
+when the catalog cannot load. It has no duplicate built-in material table.
+Unknown preset IDs are rejected.
 
-The palette browser exposes only these same configurations. Category
-filtering and all other built-in palette definitions have been removed.
+Custom materials use the same schema. The editor shows one TD control and an
+optional expansion for RGB values. Equal RGB values have the same predictions
+and cache identity as a scalar. Palette selection and saved custom presets
+preserve the complete transmission-distance value.

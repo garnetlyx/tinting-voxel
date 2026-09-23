@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useImageProcessor } from './useImageProcessor';
+import { filamentCatalog } from '../test/filamentCatalog';
 import {
+  getFilamentPresets,
   download3MFV2,
   downloadPrintSettings,
   downloadSTLV2,
@@ -10,6 +12,7 @@ import {
 } from '../api/client';
 
 vi.mock('../api/client', () => ({
+  getFilamentPresets: vi.fn(),
   processImage: vi.fn(),
   simulatePrintPreview: vi.fn(),
   downloadCSV: vi.fn(),
@@ -25,6 +28,12 @@ const mockedDownloadSTLV2 = vi.mocked(downloadSTLV2);
 const mockedDownload3MFV2 = vi.mocked(download3MFV2);
 const mockedDownloadPrintSettings = vi.mocked(downloadPrintSettings);
 
+async function renderProcessor() {
+  const hook = renderHook(() => useImageProcessor());
+  await waitFor(() => expect(hook.result.current.filamentCatalogLoading).toBe(false));
+  return hook;
+}
+
 type MockImageInstance = {
   onload: ((this: GlobalEventHandlers, ev: Event) => unknown) | null;
   onerror: ((this: GlobalEventHandlers, ev: Event | string) => unknown) | null;
@@ -39,6 +48,8 @@ describe('useImageProcessor', () => {
   let createdImages: MockImageInstance[] = [];
 
   beforeEach(() => {
+    localStorage.clear();
+    vi.mocked(getFilamentPresets).mockResolvedValue(structuredClone(filamentCatalog));
     createdImages = [];
 
     mockedProcessImage.mockResolvedValue({
@@ -50,7 +61,7 @@ describe('useImageProcessor', () => {
       imageDimensions: { width: 8, height: 6 },
       printStack: {
         opticalLayerCount: 4,
-        whiteBackingLayers: 1,
+        whiteBackingLayers: 3,
         backingMode: 'white' as const,
         totalLayerCount: 5,
         totalHeightMm: 0.4,
@@ -62,7 +73,7 @@ describe('useImageProcessor', () => {
       mappedBlendPalette: [],
       printStack: {
         opticalLayerCount: 4,
-        whiteBackingLayers: 1,
+        whiteBackingLayers: 3,
         backingMode: 'white' as const,
         totalLayerCount: 5,
         totalHeightMm: 0.4,
@@ -114,26 +125,69 @@ describe('useImageProcessor', () => {
   });
 
   it('does not create any images on mount (no default bootstrap image)', async () => {
-    renderHook(() => useImageProcessor());
+    await renderProcessor();
 
     // No images should be created on mount since bootstrap logic was removed
     expect(createdImages).toHaveLength(0);
     expect(mockedProcessImage).not.toHaveBeenCalled();
   });
 
-  it('defaults to the Bambu CMYWK filament preset', () => {
-    const { result } = renderHook(() => useImageProcessor());
+  it('defaults to the Bambu CMYWK filament preset', async () => {
+    const { result } = await renderProcessor();
 
     expect(result.current.filamentPreset).toBe('bambu_cmywk_phase6');
     expect(result.current.filamentColors).toHaveLength(5);
     expect(result.current.layerCount).toBe(4);
     expect(result.current.maxLayerCount).toBe(10);
     expect(result.current.filamentColors.some(color => color.name === 'Key')).toBe(true);
-    expect(result.current.filamentColors[0].k).toBe(3.4996);
+    expect(result.current.filamentColors).toEqual(filamentCatalog.presets[0].colors);
+    expect(result.current.layerHeight).toBe(0.08);
+    expect(result.current.whiteBackingLayers).toBe(3);
   });
 
-  it('clamps the layer count to the fixed UI maximum', () => {
+  it('uses catalog metadata and TD for an arbitrary preset identity', async () => {
+    const supplied = structuredClone(filamentCatalog);
+    supplied.presets = [{ ...supplied.presets[2], name: 'new-material-set' }];
+    supplied.defaults = { filament_preset: 'new-material-set', backing_layers: 2, regular_layer_height_mm: 0.1, transparent_layer_height_mm: 0.7 };
+    vi.mocked(getFilamentPresets).mockResolvedValueOnce(supplied);
+    const { result } = await renderProcessor();
+    expect(result.current.filamentPreset).toBe('new-material-set');
+    expect(result.current.layerHeight).toBe(0.7);
+    expect(result.current.whiteBackingLayers).toBe(2);
+  });
+
+  it('has no built-in fallback when catalog loading fails and retries the API', async () => {
+    vi.mocked(getFilamentPresets).mockRejectedValueOnce(new Error('Catalog unavailable'));
+    const { result } = await renderProcessor();
+    expect(result.current.filamentCatalogError).toBe('Catalog unavailable');
+    expect(result.current.filamentColors).toEqual([]);
+    expect(result.current.isFilamentConfigValid).toBe(false);
+    act(() => result.current.reloadFilamentCatalog());
+    await waitFor(() => expect(result.current.filamentCatalogLoading).toBe(false));
+    expect(result.current.filamentColors).toEqual(filamentCatalog.presets[0].colors);
+    expect(result.current.isFilamentConfigValid).toBe(true);
+  });
+
+  it('initializes a stored custom RGB preset after a delayed catalog response', async () => {
+    const customColors = filamentCatalog.presets[2].colors;
+    localStorage.setItem('tinting-voxel_filament_presets', JSON.stringify([
+      { id: 'saved', name: 'Saved RGB', colors: customColors, createdAt: 1, updatedAt: 1 },
+    ]));
+    localStorage.setItem('tinting-voxel_last_preset', 'saved');
+    let resolveCatalog!: (value: typeof filamentCatalog) => void;
+    vi.mocked(getFilamentPresets).mockReturnValueOnce(new Promise(resolve => { resolveCatalog = resolve; }));
     const { result } = renderHook(() => useImageProcessor());
+    expect(result.current.filamentColors).toEqual([]);
+    expect(result.current.isFilamentConfigValid).toBe(false);
+    await act(async () => resolveCatalog(structuredClone(filamentCatalog)));
+    expect(result.current.filamentPreset).toBeNull();
+    expect(result.current.filamentColors).toEqual(customColors);
+    expect(result.current.layerHeight).toBe(filamentCatalog.defaults.transparent_layer_height_mm);
+    expect(result.current.whiteBackingLayers).toBe(filamentCatalog.defaults.backing_layers);
+  });
+
+  it('clamps the layer count to the fixed UI maximum', async () => {
+    const { result } = await renderProcessor();
 
     act(() => {
       result.current.loadPreset('clear_cmyw');
@@ -145,23 +199,22 @@ describe('useImageProcessor', () => {
     expect(result.current.layerCount).toBe(10);
   });
 
-  it('raises the default layer height only when every filament classifies as transparent', () => {
-    const { result } = renderHook(() => useImageProcessor());
+  it('raises the default layer height when the material set mean exceeds the API threshold', async () => {
+    const { result } = await renderProcessor();
 
-    // Clear preset: staircase td_rgb -> transparent default 0.84.
+    // The API measurements exceed the shared threshold.
     act(() => { result.current.loadPreset('clear_cmyw'); });
     expect(result.current.allTransparent).toBe(true);
     expect(result.current.layerHeight).toBe(0.84);
 
-    // Back to Bambu CMYWK (Key 0.1 blocks) -> non-transparent, calibrated
-    // at the paper fit's 0.32 mm layer height.
+    // The lower measured TDs restore the ordinary default.
     act(() => { result.current.loadPreset('bambu_cmywk_phase6'); });
     expect(result.current.allTransparent).toBe(false);
-    expect(result.current.layerHeight).toBe(0.32);
+    expect(result.current.layerHeight).toBe(0.08);
   });
 
-  it('preserves a manually chosen layer height across classification flips', () => {
-    const { result } = renderHook(() => useImageProcessor());
+  it('preserves a manually chosen layer height across classification flips', async () => {
+    const { result } = await renderProcessor();
 
     act(() => {
       result.current.setLayerHeight(0.3);
@@ -173,8 +226,45 @@ describe('useImageProcessor', () => {
     expect(result.current.layerHeight).toBe(0.3);
   });
 
-  it('classifies by the fixed threshold: clear transparent, bambu opaque', () => {
-    const { result } = renderHook(() => useImageProcessor());
+  it.each([0.08, 0.84])('preserves explicitly chosen default-valued layer height %s across material changes', async (height) => {
+    const { result } = await renderProcessor();
+    act(() => result.current.setLayerHeight(0.3));
+    act(() => result.current.setLayerHeight(height));
+    act(() => result.current.loadPreset('clear_cmyw'));
+    expect(result.current.layerHeight).toBe(height);
+    act(() => result.current.loadPreset('bambu_cmywk_phase6'));
+    expect(result.current.layerHeight).toBe(height);
+  });
+
+  it('keeps the selected backing in automatic preview refreshes, TD edits, and print settings', async () => {
+    mockedProcessImage.mockResolvedValueOnce({
+      colorBlocks: [{ r: 255, g: 0, b: 0, hex: '#FF0000', count: 1, pixels: [{ x: 0, y: 0 }] }],
+      processedImage: 'data:image/png;base64,mock', segmentationImage: 'data:image/png;base64,seg',
+      mappedBlockColors: [], mappedBlendPalette: [], imageDimensions: { width: 8, height: 6 },
+      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingMode: 'white', totalLayerCount: 7, totalHeightMm: 0.56 },
+    });
+    const { result } = await renderProcessor();
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+    await act(async () => { result.current.handleApplyEdit(img); });
+    mockedSimulatePrintPreview.mockClear();
+    act(() => result.current.setBackingMode('black'));
+    await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ backingMode: 'black', whiteBackingLayers: 3 }), expect.any(AbortSignal),
+    ));
+    act(() => result.current.updateFilamentColor(0, { ...result.current.filamentColors[0], transmission_distance: 3.25 }));
+    await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ backingMode: 'black', filamentColors: expect.arrayContaining([expect.objectContaining({ transmission_distance: 3.25 })]) }), expect.any(AbortSignal),
+    ));
+    await act(async () => result.current.handleDownloadPrintSettings());
+    expect(mockedDownloadPrintSettings).toHaveBeenLastCalledWith(expect.objectContaining({ backingMode: 'black', whiteBackingLayers: 3 }));
+    act(() => result.current.setBackingMode('white'));
+    await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ backingMode: 'white', whiteBackingLayers: 3 }), expect.any(AbortSignal),
+    ));
+  });
+
+  it('classifies from API material measurements and threshold', async () => {
+    const { result } = await renderProcessor();
 
     act(() => { result.current.loadPreset('clear_cmyw'); });
     expect(result.current.allTransparent).toBe(true);
@@ -185,7 +275,7 @@ describe('useImageProcessor', () => {
   });
 
   it('sends filament config and layer settings when processing an image', async () => {
-    const { result } = renderHook(() => useImageProcessor());
+    const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;
 
     await act(async () => {
@@ -196,9 +286,9 @@ describe('useImageProcessor', () => {
       expect.any(File),
       expect.objectContaining({
         mode: 'pixel',
-        layerHeight: 0.32,
+        layerHeight: 0.08,
         layerCount: 4,
-        whiteBackingLayers: 1,
+        whiteBackingLayers: 3,
         filamentPreset: 'bambu_cmywk_phase6',
       }),
       expect.any(AbortSignal)
@@ -208,7 +298,7 @@ describe('useImageProcessor', () => {
   it('ignores a MouseEvent leaked into handleReprocess as the pixel-size override', async () => {
     // onClick={handleReprocess} forwards the click event as the first
     // argument; it must never serialize into pixelSize ("[object Object]").
-    const { result } = renderHook(() => useImageProcessor());
+    const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;
 
     await act(async () => {
@@ -227,7 +317,7 @@ describe('useImageProcessor', () => {
 
   it('stores simulated preview data returned by svg mode', async () => {
     mockedProcessImage.mockResolvedValueOnce({
-      vectorResults: [{ color: [255, 0, 0], polygons: [], pixel_count: 48, polygon_points: 0 }],
+      vectorResults: [{ color: [255, 0, 0], regions: [], pixel_count: 48, polygon_points: 0 }],
       processedImage: 'data:image/png;base64,svg-sim',
       segmentationImage: 'data:image/png;base64,svg-seg',
       mappedBlendPalette: [
@@ -244,14 +334,14 @@ describe('useImageProcessor', () => {
       imageDimensions: { width: 8, height: 6 },
       printStack: {
         opticalLayerCount: 4,
-        whiteBackingLayers: 1,
+        whiteBackingLayers: 3,
         backingMode: 'white' as const,
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },
     });
 
-    const { result } = renderHook(() => useImageProcessor());
+    const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;
 
     act(() => {
@@ -269,8 +359,56 @@ describe('useImageProcessor', () => {
     expect(result.current.vectorResults).toHaveLength(1);
   });
 
+  it('reprocesses pixel geometry before permitting a changed detail width to export', async () => {
+    mockedProcessImage.mockResolvedValue({
+      colorBlocks: [{ r: 0, g: 0, b: 0, hex: '#000000', count: 48, pixels: [{ x: 0, y: 0 }] }],
+      processedImage: 'data:image/png;base64,pixel',
+      segmentationImage: 'data:image/png;base64,seg',
+      mappedBlockColors: [],
+      mappedBlendPalette: [],
+      imageDimensions: { width: 8, height: 6 },
+      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingMode: 'white', totalLayerCount: 7, totalHeightMm: 0.56 },
+    });
+    const { result } = await renderProcessor();
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+    await act(async () => result.current.handleApplyEdit(img));
+    expect(result.current.renderReady).toBe(true);
+    mockedProcessImage.mockClear();
+
+    act(() => result.current.setDetailSize(0.62));
+    expect(result.current.renderReady).toBe(false);
+    await waitFor(() => expect(mockedProcessImage).toHaveBeenCalledWith(
+      expect.any(File), expect.objectContaining({ mode: 'pixel', detailSize: 0.62 }), expect.any(AbortSignal),
+    ));
+    await waitFor(() => expect(result.current.renderReady).toBe(true));
+  });
+
+  it('refreshes SVG preview and export geometry after backing changes', async () => {
+    mockedProcessImage.mockResolvedValue({
+      vectorResults: [{ color: [255, 0, 0], regions: [{ outer: [[0, 0], [7, 0], [7, 5]], holes: [] }], pixel_count: 48, polygon_points: 3 }],
+      processedImage: 'data:image/png;base64,svg',
+      segmentationImage: 'data:image/png;base64,seg',
+      mappedBlendPalette: [],
+      imageDimensions: { width: 8, height: 6 },
+      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingMode: 'white', totalLayerCount: 7, totalHeightMm: 0.56 },
+    });
+    const { result } = await renderProcessor();
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+    act(() => result.current.setMode('svg'));
+    await act(async () => result.current.handleApplyEdit(img));
+    expect(result.current.renderReady).toBe(true);
+    mockedProcessImage.mockClear();
+
+    act(() => result.current.setBackingMode('black'));
+    expect(result.current.renderReady).toBe(false);
+    await waitFor(() => expect(mockedProcessImage).toHaveBeenCalledWith(
+      expect.any(File), expect.objectContaining({ mode: 'svg', backingMode: 'black' }), expect.any(AbortSignal),
+    ));
+    await waitFor(() => expect(result.current.renderReady).toBe(true));
+  });
+
   it('preserves filamentPreset for STL downloads when a preset is selected', async () => {
-    const { result } = renderHook(() => useImageProcessor());
+    const { result } = await renderProcessor();
 
     await act(async () => {
       await result.current.handleDownloadSTL();
@@ -289,7 +427,7 @@ describe('useImageProcessor', () => {
   });
 
   it('preserves filamentPreset for 3MF and print-settings downloads when a preset is selected', async () => {
-    const { result } = renderHook(() => useImageProcessor());
+    const { result } = await renderProcessor();
 
     await act(async () => {
       await result.current.handleDownload3MF();
@@ -309,7 +447,7 @@ describe('useImageProcessor', () => {
   });
 
   it('updates pixel size from the editable max dimension while preserving aspect ratio', async () => {
-    const { result } = renderHook(() => useImageProcessor());
+    const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;
 
     await act(async () => {
@@ -327,7 +465,7 @@ describe('useImageProcessor', () => {
   });
 
   it('defaults max dimension to the processed image size when it is smaller than 200mm', async () => {
-    const { result } = renderHook(() => useImageProcessor());
+    const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;
 
     await act(async () => {
@@ -350,14 +488,14 @@ describe('useImageProcessor', () => {
       imageDimensions: { width: 800, height: 600 },
       printStack: {
         opticalLayerCount: 4,
-        whiteBackingLayers: 1,
+        whiteBackingLayers: 3,
         backingMode: 'white' as const,
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },
     });
 
-    const { result } = renderHook(() => useImageProcessor());
+    const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;
     // Simulate a large image (800×600) so the 200mm cap kicks in
     Object.defineProperty(img, 'width', { value: 800, configurable: true });
@@ -374,7 +512,7 @@ describe('useImageProcessor', () => {
   });
 
   it('falls back to filamentColors after the preset is edited into a custom config', async () => {
-    const { result } = renderHook(() => useImageProcessor());
+    const { result } = await renderProcessor();
 
     act(() => {
       result.current.updateFilamentColor(0, {
@@ -404,8 +542,8 @@ describe('useImageProcessor', () => {
     );
   });
 
-  it('inherits family blend params when adding a custom color to a calibrated preset', () => {
-    const { result } = renderHook(() => useImageProcessor());
+  it('assigns a free code and requires a TD for a new custom color', async () => {
+    const { result } = await renderProcessor();
 
     act(() => {
       result.current.loadPreset('bambu_cmyw_phase6');
@@ -413,13 +551,14 @@ describe('useImageProcessor', () => {
     });
 
     expect(result.current.filamentColors).toHaveLength(5);
-    // New colors default to plain Beer-Lambert — no silent k inheritance.
     const added = result.current.filamentColors[4];
-    expect(added.k).toBeUndefined();
+    expect(added.name).toBe('A');
+    expect(added.transmission_distance).toBe(0);
+    expect(result.current.isFilamentConfigValid).toBe(false);
   });
 
-  it('preserves calibrated material parameters when editing a calibrated preset', async () => {
-    const { result } = renderHook(() => useImageProcessor());
+  it('uses the explicitly edited scalar TD when editing a measured preset', async () => {
+    const { result } = await renderProcessor();
 
     act(() => {
       result.current.loadPreset('bambu_cmyw_phase6');
@@ -440,35 +579,9 @@ describe('useImageProcessor', () => {
           expect.objectContaining({
             name: 'Cyan',
             transmission_distance: 2.1,
-            k: 3.4996,
           }),
         ]),
       })
     );
-  });
-});
-
-describe('useImageProcessor scalar-form compensation validation', () => {
-  const base = [
-    { name: 'Cyan', hex: '#00FFFF', transmission_distance: 4 },
-    { name: 'Magenta', hex: '#FF00FF', transmission_distance: 5 },
-    { name: 'Yellow', hex: '#FFFF00', transmission_distance: 8 },
-    { name: 'White', hex: '#FFFFFF', transmission_distance: 12 },
-  ];
-
-  it('accepts finite positive compensation values and rejects out-of-bounds ones', () => {
-    const { result } = renderHook(() => useImageProcessor());
-    act(() => { result.current.updateFilamentColor(0, { ...base[0], alpha_s: 2.2292, td_scale: 2.02, td_gamma: 0.03 }); });
-    act(() => { result.current.updateFilamentColor(1, { ...base[1] }); });
-    act(() => { result.current.updateFilamentColor(2, { ...base[2] }); });
-    act(() => { result.current.updateFilamentColor(3, { ...base[3] }); });
-    expect(result.current.isFilamentConfigValid).toBe(true);
-
-    act(() => { result.current.updateFilamentColor(0, { ...base[0], alpha_s: 0 }); });
-    expect(result.current.isFilamentConfigValid).toBe(false);
-    act(() => { result.current.updateFilamentColor(0, { ...base[0], alpha_s: 2.3, td_scale: Number.NaN }); });
-    expect(result.current.isFilamentConfigValid).toBe(false);
-    act(() => { result.current.updateFilamentColor(0, { ...base[0], alpha_s: 2.3, td_gamma: 1001 }); });
-    expect(result.current.isFilamentConfigValid).toBe(false);
   });
 });

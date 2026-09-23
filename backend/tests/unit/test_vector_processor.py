@@ -9,6 +9,7 @@ import numpy as np
 from services.vector_processor import (
     VectorProcessorConfig,
     extract_regions_from_mask,
+    finalize_vector_partition,
     contour_to_polygon,
     extract_color_mask,
     filter_small_contours,
@@ -16,6 +17,63 @@ from services.vector_processor import (
     render_region_mask,
     simplify_contour,
 )
+
+
+def test_final_vector_partition_assigns_every_pixel_once():
+    results = [
+        {'color': (255, 0, 0), 'regions': [
+            {'outer': [(0, 0), (3, 0), (3, 7), (0, 7)], 'holes': []},
+        ]},
+        {'color': (0, 0, 255), 'regions': [
+            {'outer': [(7, 0), (11, 0), (11, 7), (7, 7)], 'holes': []},
+        ]},
+    ]
+    labels = finalize_vector_partition(results, {'width': 12, 'height': 8}, 0.2, None)
+    assert labels.shape == (8, 12)
+    assert set(np.unique(labels)) == {0, 1}
+    assert np.all(labels[:, :4] == 0)
+    assert np.all(labels[:, 7:] == 1)
+
+
+def test_final_vector_partition_fills_sub_nozzle_hole():
+    result = {'color': (0, 0, 0), 'regions': [
+        {
+            'outer': [(0, 0), (11, 0), (11, 11), (0, 11)],
+            'holes': [[(5, 5), (6, 5), (6, 6), (5, 6)]],
+        },
+    ]}
+    labels = finalize_vector_partition([result], {'width': 12, 'height': 12}, 0.1575, 0.42)
+    assert np.all(labels == 0)
+
+
+def test_final_vector_partition_does_not_leave_one_pixel_stroke():
+    results = [
+        {'color': (255, 255, 255), 'regions': [
+            {'outer': [(0, 0), (23, 0), (23, 19), (0, 19)], 'holes': []},
+        ]},
+        {'color': (0, 0, 0), 'regions': [
+            {'outer': [(5, 2), (5.3, 2), (5.3, 17), (5, 17)], 'holes': []},
+        ]},
+    ]
+    labels = finalize_vector_partition(results, {'width': 24, 'height': 20}, 0.1575, 0.42)
+    stroke_width = int(np.count_nonzero(labels[10] == 1))
+    assert stroke_width == 0 or stroke_width >= 3
+
+
+def test_final_vector_partition_widens_bridge_between_large_regions():
+    results = [
+        {'color': (255, 255, 255), 'regions': [
+            {'outer': [(0, 0), (29, 0), (29, 24), (0, 24)], 'holes': []},
+        ]},
+        {'color': (0, 0, 0), 'regions': [
+            {'outer': [(2, 2), (8, 2), (8, 22), (2, 22)], 'holes': []},
+            {'outer': [(21, 2), (27, 2), (27, 22), (21, 22)], 'holes': []},
+            {'outer': [(8, 12), (21, 12), (21, 12.3), (8, 12.3)], 'holes': []},
+        ]},
+    ]
+    labels = finalize_vector_partition(results, {'width': 30, 'height': 25}, 0.1, 0.42)
+    bridge_width = int(np.count_nonzero(labels[:, 15] == 1))
+    assert bridge_width == 0 or bridge_width >= 5
 
 
 class TestVectorProcessorConfig:
@@ -210,7 +268,7 @@ class TestVectorProcessorIntegration:
         # Each result should have color and contours
         for color_data in result:
             assert 'color' in color_data
-            assert 'polygons' in color_data
+            assert 'regions' in color_data
 
     def test_vector_mode_produces_fewer_points_than_pixels(self):
         """Vector mode should produce significantly fewer points than pixel count"""
@@ -227,7 +285,8 @@ class TestVectorProcessorIntegration:
         total_points = sum(
             len(polygon)
             for color_data in result
-            for polygon in color_data['polygons']
+            for region in color_data['regions']
+            for polygon in [region['outer'], *region['holes']]
         )
 
         # Should be much less than 3600 pixels

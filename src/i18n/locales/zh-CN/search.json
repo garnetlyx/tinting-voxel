@@ -1,14 +1,12 @@
 {
-  "autoOptimizeParameters": "自动优化参数",
+  "autoOptimizeParameters": "比较方案",
   "targetLongestEdgeMm": "目标最长边（mm）",
-  "startOptimization": "开始优化",
-  "searchingForOptimalParametersPleaseWait": "正在寻找最佳参数，请稍候…",
+  "invalidTargetEdge": "请输入大于 0 且不超过 {{max}} mm 的尺寸。",
+  "waitingToStart": "正在等待上一次搜索结束或搜索资源空出…",
+  "startOptimization": "生成方案",
+  "searchingForOptimalParametersPleaseWait": "正在生成预览…",
   "progress": "进度",
-  "currentBestMae": "当前最小平均绝对误差：",
-  "best": "最佳",
-  "mae": "平均绝对误差：",
-  "results": "找到 {{count}} 个结果。点击卡片应用参数。",
-  "rankPreview": "第 {{rank}} 名预览",
+  "results": "已生成 {{count}} 个方案。选择预览即可应用。",
   "modePixel": "像素",
   "modeSvg": "SVG",
   "max_colors": "最多颜色数",
@@ -19,6 +17,6 @@
   "detail_size": "细节尺寸",
   "white_backing_layers": "背衬层数",
   "pixel_size": "像素尺寸",
-  "optimizerHelp": "优化器会尝试多种参数组合，并按处理结果的相似度排序。",
-  "targetSizeHelp": "像素尺寸会自动计算：用此长度除以原图最长边的像素数。"
+  "currentSettings": "当前设置",
+  "candidate": "方案 {{number}}"
 }

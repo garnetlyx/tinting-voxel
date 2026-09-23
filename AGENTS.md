@@ -24,12 +24,12 @@ tinting-voxel/
 │   │   ├── rate_limiter.py # slowapi limiter instance
 │   │   └── routes/       # Route handlers
 │   │       ├── image.py      # Image processing (pixel/SVG modes)
-│   │       ├── download.py   # V1 download endpoints (CSV, STL)
+│   │       ├── download.py   # CSV download endpoint
 │   │       ├── download_v2.py # V2 N-color endpoints (STL, SVG-STL, 3MF, SVG-3MF, print settings)
 │   │       ├── filament.py   # Filament preview
 │   │       ├── batch.py      # Batch processing (up to 20 images)
 │   │       ├── palette.py    # Palette library
-│   │       ├── param_search.py # Param search SSE + top-N results
+│   │       ├── param_search.py # Background parameter search + candidate previews
 │   │       ├── bug_report.py  # In-app bug reports (storage + optional email)
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
@@ -37,7 +37,7 @@ tinting-voxel/
 │   │   ├── blend_models.py   # Unified blend formula + vectorized batch
 │   │   ├── code_grid.py      # Code grid generation utilities
 │   │   ├── color_config.py   # Filament presets (single source of truth)
-│   │   ├── color_materials.py # Material property definitions (Color: hex+td+k)
+│   │   ├── color_materials.py # Material properties (hex + scalar or RGB TD)
 │   │   ├── grid_sampling.py  # Code-grid RGB assembly for blend fitting
 │   │   └── palette_library.py # Supported filament palettes
 │   ├── services/         # Business logic
@@ -127,14 +127,12 @@ docker compose up --build  # Build and run
 
 ## API Endpoints
 
-### V1 (Legacy)
+### Image Processing and CSV
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/process-image` | Process image (pixel/SVG modes) |
 | POST | `/api/simulate-preview` | Simulated print preview (vector mode) |
 | POST | `/api/download-csv` | Download color data as CSV |
-| POST | `/api/download-stl` | Generate STL ZIP (default Phase 6 CMYW) |
-| POST | `/api/download-svg-stl` | Generate SVG-mode STL ZIP |
 
 ### V2 (N-Color Support)
 | Method | Endpoint | Description |
@@ -153,8 +151,9 @@ docker compose up --build  # Build and run
 | POST | `/api/batch/process` | Batch process up to 20 images |
 | POST | `/api/batch/download-stl` | Batch STL download |
 | POST | `/api/bug-report` | Submit in-app bug report (optional screenshot) |
-| POST | `/api/param-search` | Run parameter search, return top-N results |
-| GET | `/api/param-search/progress/{job_id}` | SSE stream of search progress events |
+| POST | `/api/param-search` | Start one search job and return its ID immediately |
+| GET | `/api/param-search/progress/{job_id}` | Poll incremental candidate previews and job status |
+| DELETE | `/api/param-search/progress/{job_id}` | Cancel the search job |
 | GET | `/api/palettes/` | List color palettes |
 | GET | `/api/palettes/{id}` | Get specific palette |
 | GET | `/api/analytics` | Usage analytics |
@@ -193,7 +192,7 @@ npx playwright test
 ### Color Processing Pipeline
 1. Image upload → color extraction (K-means clustering)
 2. Map colors to N configurable filament primaries
-3. Calculate color mixing using Beer-Lambert optical model
+3. Calculate color mixing using `T_ch = 10^(-d / TD_ch)` and light-loss allocation
 4. Generate layered output (STL/3MF) with greedy meshing optimization
 
 ### Key Patterns
@@ -203,11 +202,27 @@ npx playwright test
 - File validation (extension, size, magic bytes) in `validators.py`
 - `Colors.from_configs()` creates N-color configurations from `ColorConfig` list
 
-## Calibration & Research
+## Material Contract
 
-Beer-Lambert parameter calibration (td/k fitting against printed test plates) is performed offline, outside this repo. This repo consumes calibration results only, as presets in `core/color_config.py`.
+`core/color_config.py` is the source of material presets. A material contains only
+`name`, `hex`, and `transmission_distance` (a positive scalar or three positive
+RGB values). A scalar is equivalent to three equal channel values. The browser
+loads the catalog, print defaults, and TD transparency rule from
+`/api/v2/filament-presets`; it has no separate built-in material table.
 
-Calibrated parameters (td/k presets) are **process-conditioned**: they are valid for the filament × printer × profile combination they were fitted on, so calibration prints and application prints must share the same slicer profile.
+`config/print_defaults.py` defines regular color layers at 0.08 mm and
+high-transmission color layers at 0.84 mm (three 0.28 mm slicer layers), with
+three backing color layers. Pruning and the height default use the material
+set's mean RGB TD against the threshold in `core/stack_prune.py`. The backing
+mode selects actual light/dark material layers under common white illumination.
+
+Parameter search returns every successful candidate in evaluation order,
+including the current settings. Candidate IDs identify evaluations; users
+choose previews without an automatic image-quality ranking.
+
+Material measurements and photograph calibration belong to the research
+repository. Production uses the material fields directly. Bambu and clear presets use
+RGB-channel TD values; a custom material may use one TD or expand to RGB TD.
 
 ## Common Tasks
 

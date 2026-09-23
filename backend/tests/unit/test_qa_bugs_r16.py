@@ -14,8 +14,9 @@ import numpy as np
 
 from api.models import FilamentColorConfig, FilamentConfigMixin
 from api.models import DownloadSTLRequestV2, FilamentPreset, ImageDimensions
+from config.print_defaults import DEFAULT_FILAMENT_PRESET
 from core.blend_color import Colors, Color, BlendTestGenerator
-from core.color_config import ColorConfig
+from core.color_config import ColorConfig, get_preset
 from services.stl_generator import compute_reference_matrices, generate_box
 
 
@@ -79,14 +80,10 @@ class TestBlendTestGeneratorEdgeCases:
             BlendTestGenerator(colors=colors, layer_count_max=-1)
 
     def test_blend_test_generator_with_none_colors(self):
-        """
-        QA-163: BlendTestGenerator accepts colors=None but defaults to Colors().
-        This is actually documented behavior but may be confusing.
-        """
+        """An omitted material set uses the configured default preset."""
         gen = BlendTestGenerator(colors=None, layer_count_max=4)
-        # Creates default Colors() instance
-        assert len(gen.colors) == 4
-        assert gen.colors is not None
+        assert gen.colors.get_labels() == [c.label for c in get_preset(DEFAULT_FILAMENT_PRESET)]
+
 
 
 class TestColorsCaseInsensitiveLookup:

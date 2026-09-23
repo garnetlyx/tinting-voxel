@@ -188,9 +188,6 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
         })}
       </div>
 
-      {colorBlocks.length > 0 && (
-        <p className="mt-3 text-xs text-gray-400">{t('preview:colorEditingHelp')}</p>
-      )}
     </div>
   );
 };

@@ -5,7 +5,7 @@
  * at the backend default layer height instead of the user's.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { startParamSearch } from './paramSearch';
+import { cancelParamSearch, getParamSearchProgress, startParamSearch } from './paramSearch';
 import type { FilamentColorConfig } from './types';
 
 const colors: FilamentColorConfig[] = [
@@ -26,9 +26,10 @@ describe('startParamSearch', () => {
       ok: true,
       json: async () => ({
         job_id: 'job-1',
+        completed: 0,
+        total: 21,
+        status: 'running',
         results: [],
-        total_evaluated: 0,
-        elapsed_seconds: 0.1,
       }),
     }));
 
@@ -93,5 +94,29 @@ describe('startParamSearch', () => {
         { width: 100, height: 100 },
       ),
     ).rejects.toThrow('boom');
+  });
+
+  it('polls only new completed previews and can cancel the job', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        job_id: 'job-1', completed: 2, total: 21, status: 'running', error: null,
+        results: [{ candidate_id: 2, is_baseline: false, mode: 'pixel',
+          params: { detail_size: 0.42 }, preview_image: 'data:image/png;base64,abc' }],
+      }),
+    }).mockResolvedValueOnce({ ok: true }));
+
+    const progress = await getParamSearchProgress('job-1', 1);
+    expect(progress.completed).toBe(2);
+    expect(progress.results[0].candidateId).toBe(2);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/param-search/progress/job-1?after=1');
+
+    await cancelParamSearch('job-1');
+    expect(vi.mocked(fetch).mock.calls[1][1]).toEqual({ method: 'DELETE' });
+  });
+
+  it('does not report a failed cancellation as success', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+    await expect(cancelParamSearch('job-1')).rejects.toThrow('Failed to cancel search');
   });
 });

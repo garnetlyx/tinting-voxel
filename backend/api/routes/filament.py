@@ -10,7 +10,6 @@ from fastapi import APIRouter, Request
 from api.error_handlers import handle_api_errors
 from api.models import FilamentPreviewRequest, FilamentPreviewResponse
 from api.rate_limiter import limiter
-from api.routes.download_v2 import get_colors_from_request
 from services.filament_preview import FilamentPreviewService
 
 logger = logging.getLogger(__name__)
@@ -23,11 +22,13 @@ router = APIRouter(prefix="/api", tags=["Filament"])
 @handle_api_errors("generating filament preview")
 async def api_filament_preview(request: Request, body: FilamentPreviewRequest):
     """Generate a color matrix preview for the given filament configuration."""
-    colors = get_colors_from_request(body.filamentPreset, body.filamentColors)
+    colors = body.resolved_colors
     service = FilamentPreviewService(
         colors,
         layer_count=body.layerCount,
         layer_height=body.layerHeight,
+        backing_layers=body.whiteBackingLayers,
+        backing_mode=body.backingMode,
     )
 
     result = service.generate_preview(page=body.page, page_size=body.pageSize)

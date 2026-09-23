@@ -7,7 +7,7 @@
   "showSettingsSidebar": "Show Settings Sidebar",
   "singleImage": "Single Image",
   "batchProcessing": "Batch Processing",
-  "optimize": "Optimize",
+  "optimize": "Compare",
   "skip": "Skip",
   "groupedColors": "Grouped Colors",
   "vectorizedRegions": "Vectorized Regions",
@@ -18,7 +18,7 @@
   "processingColors": "Processing colors...",
   "generatingStl": "Generating STL files...",
   "title": "Tinting Voxel · Image to STL Color Block Converter",
-  "optimizationPrompt": "Want to auto-optimize parameters for better results?",
+  "optimizationPrompt": "Compare other settings?",
   "serverStarting": "Server is warming up, please wait...",
   "simulatedPrint": "Simulated Print",
   "description": "Turn images into layered, full-color 3D prints. Preview filament blends and export print-ready STL or 3MF files with Tinting Voxel."

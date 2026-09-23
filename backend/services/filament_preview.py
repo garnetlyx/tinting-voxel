@@ -16,6 +16,8 @@ from PIL import Image, ImageDraw
 from skimage.color import rgb2lab
 
 from core.blend_color import BlendTestGenerator, Colors
+from config.print_defaults import DEFAULT_BACKING_LAYERS
+from services.print_stack import resolve_backing_label, backing_suffix, PRINT_BACKGROUND_RGB
 
 logger = logging.getLogger(__name__)
 
@@ -33,15 +35,20 @@ class FilamentPreviewService:
     color combinations and renders them as a grid image.
     """
 
-    def __init__(self, colors: Colors, layer_count: int = 4, layer_height: float = 0.08):
+    def __init__(self, colors: Colors, layer_count: int = 4, layer_height: float = 0.08,
+                 backing_layers: int = DEFAULT_BACKING_LAYERS, backing_mode: str = "white"):
         self.colors = colors
         self.layer_count = layer_count
         self.layer_height = layer_height
+        label = resolve_backing_label(colors, backing_layers, backing_mode)
+        suffix = backing_suffix(label, backing_layers)
         self.generator = BlendTestGenerator(
             colors=colors,
             layer_height=layer_height,
             layer_count_max=layer_count,
             verbose=False,
+            backing_suffix=suffix,
+            background_rgb=PRINT_BACKGROUND_RGB if suffix else None,
         )
 
     def generate_preview(self, page: int = None, page_size: int = None) -> dict:

@@ -1,23 +1,9 @@
-"""Composition-pruned stack search for translucent filament sets.
+"""Composition search with full order refinement within a ranked candidate pool.
 
-Implements the hierarchical search from the tinting-voxel research note
-``TD_ADAPTIVE_STACK_SEARCH.md`` (companion tinting-voxel-research
-repository): in the translucent regime — every filament's neutral TD clears
-the transparency threshold — a stack's color is dominated by its composition
-(multiset of layers) and layer order is a secondary perturbation. The stage-1
-reference set therefore shrinks from ``N**L`` ordered codes to exactly
-``C(N+L-1, L)`` composition representatives (one canonical ordering each:
-495 for 5 filaments x 8 layers vs 390,625 fully enumerated). Stage 2 then
-refines the distinct orderings of every composition that ranks within a
-margin of the best representative, under the production
-``Color.perceptual_distance`` metric.
-
-Pruning is never forced: it applies only when the automatic transparency
-classification marks the whole set translucent; opaque and mixed sets keep
-the exact full enumeration.
-
-The ΔE00 budgets that gate this design against full enumeration as the
-oracle are asserted in tests/unit/test_stack_prune.py at both 6 and 8 layers.
+The material-set TD mean determines the transparency regime. Over-budget
+searches use one representative per composition, then refine the best
+compositions by the same color-distance metric as exhaustive search.
+The accepted error against exhaustive search is tested at six and eight layers.
 """
 import itertools
 import logging
@@ -29,13 +15,9 @@ from core.color_materials import Color, Colors
 
 logger = logging.getLogger(__name__)
 
-# Transparency classification threshold (mm) on the stored td scale — the
-# same number blending uses, one standard for every set. 4.5 sits in the gap
-# between the calibrated families (bambu folded 0.27-0.61 vs clear staircase
-# means 4.7-18.0), so clear CMYW classifies transparent and bambu sets
-# opaque. Deliberately a literal constant, not a setting: it is a property of
-# the calibrated data, not an environment knob, and the frontend hint uses
-# the same value (TRANSPARENT_TD_THRESHOLD_MM in src/api/types.ts).
+# Palette-wide arithmetic TD mean, in millimetres. The threshold separates
+# the characterized production palettes and is checked against the full
+# enumeration oracle on both scalar and channel-specific measurements.
 TRANSPARENT_TD_THRESHOLD_MM = 4.5
 
 # Distinct orderings considered per composition during refinement.
@@ -48,15 +30,6 @@ MAX_PERMS_PER_COMPOSITION = 8192
 # raw CIEDE2000. The raw-CIEDE2000 channel guards against the production
 # metric's dark-chromatic hue penalty hiding such compositions.
 #
-# Retuned for the corrected per-channel blend (the reference-matrix cache key
-# previously dropped td_rgb, so production blended with scalar-td fallback
-# and these budgets were calibrated against that behavior). Under the real
-# staircase TDs the intra-composition order spread is wider: a 5c x 8L sweep
-# against the full-enumeration oracle gives, at margin=48/cap=128,
-# reachable ΔE00 mean 0.27 / max 1.15 and plausible-target metric excess
-# max 2.20 / mean 0.10 (budgets 1.5 / 7.5 / 4.0 / 1.0). The previous
-# margin=16/cap=32 values measured excess 8.52 at 8 layers under the same
-# corrected blend.
 CANDIDATE_MARGIN_DELTA_E = 48.0
 
 # Upper bound on compositions refined per input color.
@@ -64,33 +37,10 @@ MAX_CANDIDATE_COMPOSITIONS = 128
 
 
 def is_translucent_set(colors: Colors) -> bool:
-    """True when every effective td value blending uses meets the threshold.
-
-    Single standard: the td numbers blending actually reads — per-channel
-    td_rgb when the filament carries staircase measurements, else the
-    scalar-form effective td (td_scale * td**td_gamma, paper Eq. (2)). A set
-    whose every channel transmits weakly (all td_ch >= 4.5 mm) has
-    order-insensitive stacking, which is what the composition-pruning ΔE
-    oracle validates. Raw scalar readings are compensated: bambu A-standard
-    raw TDs span 0.1-6.1 mm but its effective tds sit at ~1.8-2.1 mm, so it
-    stays on the full-enumeration track; only uniformly high-effective-td
-    sets (e.g. customs at 10-30 mm) classify translucent.
-    """
-    items = colors.colors.values() if isinstance(colors.colors, dict) else []
-    if not items:
-        return False
-    for color in items:
-        td_rgb = color.td_rgb
-        if td_rgb is not None:
-            tds = tuple(td_rgb)
-        else:
-            td = color.td
-            if td is None or td <= 0:
-                return False
-            tds = (color.td_scale * (td ** color.td_gamma),)
-        if any(td is None or td < TRANSPARENT_TD_THRESHOLD_MM for td in tds):
-            return False
-    return True
+    """Classify the material set using its mean RGB transmission distance."""
+    return bool(colors.colors) and bool(np.mean([
+        td for color in colors.colors.values() for td in color.td_channels
+    ]) >= TRANSPARENT_TD_THRESHOLD_MM)
 
 
 def composition_codes(labels: list, layer_count: int) -> list:

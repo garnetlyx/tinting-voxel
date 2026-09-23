@@ -4,6 +4,9 @@ Print settings export service.
 Generates slicer-compatible JSON configuration files containing
 layer height, filament colors, object dimensions, and extruder assignments.
 """
+from config.print_defaults import DEFAULT_BACKING_LAYERS
+import math
+from config.print_defaults import TRANSPARENT_SLICER_LAYER_HEIGHT_MM
 import json
 import logging
 from typing import Optional
@@ -19,7 +22,7 @@ def generate_print_settings(
     layer_count: int,
     image_dimensions: dict,
     filament_colors: list[dict],
-    white_backing_layers: int = 1,
+    white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_mode: str = 'white',
     filament_preset: Optional[str] = None,
 ) -> str:
@@ -68,27 +71,30 @@ def generate_print_settings(
                 "name": color['name'],
                 "color": color['hex'],
                 "transmission_distance": color['transmission_distance'],
-                "td_rgb": color.get('td_rgb'),
-                "k": color.get('k', 0.0),
             })
         except KeyError as e:
             raise ValueError(f"Missing required filament color key: {e}")
 
+    slices_per_color = max(1, math.ceil(layer_height / TRANSPARENT_SLICER_LAYER_HEIGHT_MM - 1e-9))
+    slicer_layer_height = layer_height / slices_per_color
     settings = {
         "version": "1.0",
         "generator": "tinting-voxel",
         "print_settings": {
-            "layer_height": layer_height,
-            "layer_count": layer_count,
-            "white_backing_layers": print_stack["whiteBackingLayers"],
+            "layer_height": slicer_layer_height,
+            "color_layer_height_mm": layer_height,
+            "slicer_layers_per_color_layer": slices_per_color,
+            "color_layer_count": layer_count,
+            "backing_color_layer_count": print_stack["whiteBackingLayers"],
             "backing_mode": print_stack["backingMode"],
         },
         "object_dimensions": {
             "width_mm": width_mm,
             "height_mm": height_mm,
-            "total_height_mm": print_stack["totalHeightMm"],
-            "total_layer_count": print_stack["totalLayerCount"],
-            "optical_layer_count": print_stack["opticalLayerCount"],
+            "total_height_mm": layer_height * print_stack["totalLayerCount"],
+            "total_layer_count": slices_per_color * print_stack["totalLayerCount"],
+            "optical_layer_count": slices_per_color * print_stack["opticalLayerCount"],
+            "backing_layer_count": slices_per_color * print_stack["whiteBackingLayers"],
             "width_pixels": image_dimensions['width'],
             "height_pixels": image_dimensions['height'],
             "pixel_size_mm": pixel_size,

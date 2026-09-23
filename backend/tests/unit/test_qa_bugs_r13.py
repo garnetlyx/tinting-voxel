@@ -402,89 +402,6 @@ class TestQA135PixelsNoMaxLength:
         )
 
 
-# -- QA-136: Ear clipping fails for clockwise polygons -------------------------
-# File: backend/services/svg_stl_generator.py:30-130
-# The is_convex() check assumes counter-clockwise winding. For clockwise
-# polygons, no ears are found and most geometry is silently discarded.
-
-class TestQA136EarClippingClockwisePolygons:
-    """Ear clipping produces incorrect results for clockwise polygons."""
-
-    def test_clockwise_polygon_triangulated_correctly(self):
-        """A clockwise polygon should produce correct triangulation."""
-        from services.svg_stl_generator import triangulate_polygon
-
-        # Counter-clockwise square (standard)
-        ccw_square = [(0, 0), (1, 0), (1, 1), (0, 1)]
-        ccw_triangles = triangulate_polygon(ccw_square)
-
-        # Clockwise square (reversed winding)
-        cw_square = [(0, 0), (0, 1), (1, 1), (1, 0)]
-        cw_triangles = triangulate_polygon(cw_square)
-
-        # Both should produce exactly 2 triangles for a 4-vertex polygon
-        assert len(ccw_triangles) == 2, (
-            f"CCW square: expected 2 triangles, got {len(ccw_triangles)}"
-        )
-        assert len(cw_triangles) == 2, (
-            f"BUG QA-136: Clockwise polygon produced {len(cw_triangles)} "
-            f"triangles instead of 2. Ear clipping assumes CCW winding and "
-            f"fails silently for CW polygons. OpenCV findContours can produce "
-            f"CW polygons. Should detect winding order and reverse if needed."
-        )
-
-    def test_clockwise_complex_polygon_full_triangulation(self):
-        """A clockwise pentagon should produce 3 triangles."""
-        from services.svg_stl_generator import triangulate_polygon
-
-        # Clockwise pentagon
-        cw_pentagon = [
-            (0, 0), (0, 2), (1, 3), (2, 2), (2, 0)
-        ]
-        triangles = triangulate_polygon(cw_pentagon)
-
-        # A 5-vertex polygon should produce exactly 3 triangles
-        assert len(triangles) == 3, (
-            f"BUG QA-136: Clockwise pentagon produced {len(triangles)} "
-            f"triangles instead of 3. Ear clipping silently discards "
-            f"vertices when winding order is clockwise."
-        )
-
-
-# -- QA-137: Ear clipping fallback silently discards remaining vertices --------
-# File: backend/services/svg_stl_generator.py:122-124
-# When ear clipping fails (max_iterations exceeded or no ear found),
-# the code just does `break` instead of implementing fan triangulation.
-# Remaining vertices are silently discarded, producing meshes with holes.
-
-class TestQA137EarClippingIncompleteFallback:
-    """Ear clipping fallback discards remaining vertices."""
-
-    def test_fallback_covers_all_vertices(self):
-        """When ear clipping fails, fallback should still triangulate."""
-        from services.svg_stl_generator import triangulate_polygon
-
-        # Create a polygon where ear clipping is difficult
-        # (collinear or near-collinear vertices)
-        # Star-shaped polygon with re-entrant angles
-        star = [
-            (2, 0), (1, 1.5), (0, 0.5),
-            (1.5, 2.5), (0.5, 4), (2, 3),
-            (3.5, 4), (2.5, 2.5), (4, 0.5),
-            (3, 1.5),
-        ]
-        triangles = triangulate_polygon(star)
-
-        # A 10-vertex polygon needs exactly 8 triangles
-        # If fallback discards vertices, we get fewer
-        assert len(triangles) == 8, (
-            f"BUG QA-137: 10-vertex polygon produced {len(triangles)} "
-            f"triangles instead of 8. Ear clipping fallback does 'break' "
-            f"instead of fan triangulation, silently discarding vertices "
-            f"and producing meshes with holes."
-        )
-
-
 # -- QA-138: get_preset(None) raises AttributeError ----------------------------
 # File: backend/core/color_config.py:76-90
 # get_preset(name) calls name.lower() without checking if name is None.
@@ -744,7 +661,7 @@ class TestQA147VectorColorResultUnvalidated:
         # A valid color should be a 3-tuple of ints
         valid = VectorColorResult(
             color=(128, 64, 32),
-            polygons=[[(0, 0), (1, 0), (1, 1)]],
+            regions=[{"outer": [(0, 0), (1, 0), (1, 1)], "holes": []}],
             pixel_count=100,
             polygon_points=3,
         )
@@ -754,7 +671,7 @@ class TestQA147VectorColorResultUnvalidated:
         try:
             invalid = VectorColorResult(
                 color=(),
-                polygons=[[(0, 0), (1, 0), (1, 1)]],
+                regions=[{"outer": [(0, 0), (1, 0), (1, 1)], "holes": []}],
                 pixel_count=100,
                 polygon_points=3,
             )
@@ -773,4 +690,3 @@ class TestQA147VectorColorResultUnvalidated:
 # File: backend/api/routes/batch.py:40-56
 # _read_batch_files reads ALL files into memory, then checks total_size.
 # 20 x 10MB = 200MB already in memory before 413 error.
-

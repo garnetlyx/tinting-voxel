@@ -45,7 +45,6 @@ describe('ParameterPanel', () => {
     onReprocess: vi.fn(),
     processing: false,
     hasImage: true,
-    allTransparent: false,
     onTransparentTdThresholdChange: vi.fn(),
   };
 
@@ -79,5 +78,16 @@ describe('ParameterPanel', () => {
 
     expect(screen.getByText(/Color Layers: 4/i)).toBeInTheDocument();
     expect(screen.getByText(/\(max 8 for current filament set\)/i)).toBeInTheDocument();
+  });
+
+  it('keeps the Local-photo 200 mm pixel pitch selectable without rounding it', () => {
+    const pixelSize = 200 / 1270;
+    const { container } = render(<ParameterPanel {...defaultProps} pixelSize={pixelSize} />);
+    const slider = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="range"]'))
+      .find(input => Number(input.value) === pixelSize);
+
+    expect(slider).toBeDefined();
+    expect(Number(slider?.min)).toBeLessThan(pixelSize);
+    expect(slider?.step).toBe('any');
   });
 });

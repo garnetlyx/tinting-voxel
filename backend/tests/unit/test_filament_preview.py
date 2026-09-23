@@ -5,11 +5,13 @@ import base64
 
 import pytest
 
+from config.print_defaults import DEFAULT_FILAMENT_PRESET
 from core.blend_color import Colors
 from core.color_config import (
     BAMBU_CMYW_PHASE6_PRESET,
     CLEAR_CMYW_PRESET,
     ColorConfig,
+    get_preset,
 )
 from services.filament_preview import FilamentPreviewService
 
@@ -51,7 +53,9 @@ class TestFilamentPreviewService:
         stats = result["stats"]
         assert "colorCount" in stats
         assert "combinationCount" in stats
-        assert stats["colorCount"] == 4
+        color_count = len(get_preset(DEFAULT_FILAMENT_PRESET))
+        assert stats["colorCount"] == color_count
+        assert stats["combinationCount"] == color_count ** 4
 
     def test_generate_preview_with_custom_colors(self):
         """Preview works with custom color configurations."""
@@ -83,8 +87,7 @@ class TestFilamentPreviewService:
         assert result["stats"]["colorCount"] == 4
 
     def test_generate_preview_distinct_presets_blend_differently(self):
-        """The single formula still separates calibrated material sets:
-        folded bambu vs staircase clear produce different colors."""
+        """Distinct material parameters produce distinct predicted colors."""
         colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
         service = FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
 
@@ -186,31 +189,38 @@ class TestFilamentPreviewPagination:
         colors = Colors()
         return FilamentPreviewService(colors, layer_count=4, layer_height=0.08)
 
-    def test_paginated_returns_page_info(self, service):
+    @pytest.fixture
+    def total_combinations(self, service):
+        return len(get_preset(DEFAULT_FILAMENT_PRESET)) ** service.layer_count
+
+    def test_paginated_returns_page_info(self, service, total_combinations):
         """Paginated preview includes pagination metadata."""
         result = service.generate_preview(page=1, page_size=50)
         assert "pagination" in result
         p = result["pagination"]
         assert p["page"] == 1
         assert p["pageSize"] == 50
-        assert p["totalCombinations"] == 256
-        assert p["totalPages"] == 6  # ceil(256 / 50)
+        assert p["totalCombinations"] == total_combinations
+        assert p["totalPages"] == (total_combinations + 49) // 50
 
     def test_paginated_limits_color_matrix(self, service):
         """Color matrix length matches page_size for non-last pages."""
         result = service.generate_preview(page=1, page_size=50)
         assert len(result["colorMatrix"]) == 50
 
-    def test_paginated_last_page_remainder(self, service):
-        """Last page returns remaining items."""
-        result = service.generate_preview(page=6, page_size=50)
-        # 256 total, pages 1-5 have 50 each = 250, page 6 has 6
-        assert len(result["colorMatrix"]) == 6
+    def test_paginated_last_page_remainder(self, service, total_combinations):
+        """Last page returns exactly the items left after the full pages."""
+        page_size = 50
+        last_page = (total_combinations + page_size - 1) // page_size
+        result = service.generate_preview(page=last_page, page_size=page_size)
+        assert len(result["colorMatrix"]) == total_combinations - (last_page - 1) * page_size
+        assert result["pagination"]["page"] == last_page
+        assert result["pagination"]["totalPages"] == last_page
 
     def test_paginated_image_matches_page(self, service):
         """Paginated preview image covers only the current page's entries."""
         result = service.generate_preview(page=1, page_size=50)
-        # Image should be rendered for 50 items, not 256
+        # The image dimensions follow the current page size
         dims = result["imageDimensions"]
         assert dims["width"] > 0
         assert dims["height"] > 0
@@ -221,19 +231,19 @@ class TestFilamentPreviewPagination:
         assert dims["width"] == expected_cols * cell_size
         assert dims["height"] == expected_rows * cell_size
 
-    def test_unpaginated_returns_all(self, service):
+    def test_unpaginated_returns_all(self, service, total_combinations):
         """Without pagination params, returns all combinations."""
         result = service.generate_preview()
-        assert len(result["colorMatrix"]) == 256
+        assert len(result["colorMatrix"]) == total_combinations
         assert "pagination" not in result
 
-    def test_paginated_page_out_of_range(self, service):
-        """Page beyond totalPages raises ValueError."""
-        import pytest
+    def test_paginated_page_out_of_range(self, service, total_combinations):
+        """The first page beyond the end raises ValueError."""
+        total_pages = (total_combinations + 49) // 50
         with pytest.raises(ValueError, match="out of range"):
-            service.generate_preview(page=100, page_size=50)
+            service.generate_preview(page=total_pages + 1, page_size=50)
 
-    def test_paginated_stats_always_total(self, service):
+    def test_paginated_stats_always_total(self, service, total_combinations):
         """Stats always reflect total combination count regardless of page."""
         result = service.generate_preview(page=2, page_size=50)
-        assert result["stats"]["combinationCount"] == 256
+        assert result["stats"]["combinationCount"] == total_combinations

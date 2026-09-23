@@ -1,26 +1,4 @@
-"""
-The paper's forward model for stacked translucent filaments.
-
-Two td characterizations select the per-layer extinction — no material
-type flags, no mode dispatch:
-
-- staircase (td_rgb present, paper form (i)):
-      mu_ch = ln(10)/td_rgb[ch] + k * A_ch
-- scalar td (paper Eqs. (1)-(2)):
-      td_eff = td_scale * td**td_gamma
-      mu_ch  = alpha_s/td_eff + k * A_ch
-  Neutral defaults (alpha_s = ln 10, td_scale = td_gamma = 1) degrade
-  the scalar form to plain ln(10)/td + k * A_ch.
-
-t_ch = exp(-mu_ch * layer_height); stack color via light-loss allocation
-(paper Eqs. 4-8). Every filament is hex + td data (+ optional k and
-scalar-form compensation). Channel selectivity comes from k * A_ch with
-A_ch the per-channel darkness derived from hex; scalar td is
-channel-neutral, td_rgb carries measured per-channel structure.
-
-Preset provenance: see core/color_config.py (bambu A-standard composed
-remap, clear staircase td_rgb).
-"""
+"""Base-10 per-channel transmission with one shared stacking rule."""
 import functools
 import logging
 import unicodedata
@@ -32,9 +10,6 @@ from core.color_materials import Color
 
 logger = logging.getLogger(__name__)
 
-LN10 = float(np.log(10.0))
-
-
 def _normalize_code(code: str) -> str:
     if code is None:
         return ""
@@ -45,15 +20,8 @@ def _normalize_code(code: str) -> str:
 
 
 def _build_color_map_from_key(color_key: tuple) -> dict:
-    """Rebuild Color objects from the cache key
-    (label, td, hex, k, td_rgb, alpha_s, td_scale, td_gamma)."""
-    color_map = {}
-    for label, td, hex_val, k, td_rgb, alpha_s, td_scale, td_gamma in color_key:
-        color_map[label] = Color(
-            label, td, hex_val, k=k, td_rgb=td_rgb,
-            alpha_s=alpha_s, td_scale=td_scale, td_gamma=td_gamma,
-        )
-    return color_map
+    """Rebuild materials from their immutable optical cache key."""
+    return {label: Color(label, td, hex_value) for label, td, hex_value in color_key}
 
 
 def _validate_code(code: str, color_map: dict) -> None:
@@ -87,41 +55,13 @@ def _normalize_background_rgb(background_rgb: Optional[tuple]) -> np.ndarray:
     return np.clip(bg, 0.0, 255.0) / 255.0
 
 
-def _resolve_extinction(color: Color) -> np.ndarray:
-    """Per-channel extinction coefficient (1/mm), paper forward model.
-
-    Staircase characterization (td_rgb present, paper form (i)):
-        mu_ch = ln(10)/td_rgb[ch] + k*A_ch
-    Scalar characterization (paper Eqs. (1)-(2)):
-        td_eff = td_scale * td**td_gamma
-        mu_ch = alpha_s/td_eff + k*A_ch
-    Neutral defaults (alpha_s = ln 10, td_scale = td_gamma = 1) degrade the
-    scalar form to ln(10)/td + k*A_ch. A non-positive td means fully
-    opaque: mu = inf, t = 0. No filament-type flags — td shape alone
-    selects the branch.
-    """
-    absorption = color.get_absorption()
-    k = float(color.k)
-    td_rgb = color.td_rgb
-    if td_rgb is not None:
-        td_ch = np.asarray(td_rgb, dtype=np.float64)
-        mu = np.where(td_ch > 0, LN10 / np.where(td_ch > 0, td_ch, 1.0), np.inf)
-    else:
-        td = float(color.td)
-        if td <= 0:
-            return np.full(3, np.inf)
-        td_eff = float(color.td_scale) * (td ** float(color.td_gamma))
-        mu = np.full(3, float(color.alpha_s) / td_eff)
-    return mu + k * absorption
-
-
 def _compose_light_loss_allocation(
     code: str,
     transmissions: list,
     color_map: dict,
     background_rgb: Optional[tuple] = None,
 ) -> tuple:
-    """Compose per-layer transmissions with the paper's Eqs. 4--8."""
+    """Allocate light loss across layers and the backing."""
     n = len(code)
     if n == 0:
         return (255.0, 255.0, 255.0)
@@ -166,7 +106,7 @@ def _blend_unified(
     if not code:
         return (255.0, 255.0, 255.0)
     transmissions = [
-        np.exp(-_resolve_extinction(color_map[c]) * layer_height)
+        color_map[c].transmission(layer_height)
         for c in code
     ]
     return _compose_light_loss_allocation(
@@ -199,7 +139,7 @@ def codes_to_rgb_batch(
     t_table = np.empty((len(labels), 3), dtype=np.float64)
     absorb_table = np.empty((len(labels), 3), dtype=np.float64)
     for i, label in enumerate(labels):
-        t_table[i] = np.exp(-_resolve_extinction(color_map[label]) * layer_height)
+        t_table[i] = color_map[label].transmission(layer_height)
         absorb_table[i] = color_map[label].get_absorption()
 
     background = _normalize_background_rgb(background_rgb)

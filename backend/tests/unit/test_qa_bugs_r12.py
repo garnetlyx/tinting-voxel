@@ -8,6 +8,7 @@ import os
 
 import numpy as np
 import pytest
+import numpy as np
 
 from core.blend_color import Color, Colors, BlendTestGenerator, _code_to_rgb_cached
 from core.color_config import ColorConfig
@@ -156,7 +157,7 @@ class TestQA124PaletteTransmissionDistances:
 
         for palette in ALL_PALETTES:
             for color in palette.colors:
-                assert color.transmission_distance > 0, (
+                assert np.all(np.isfinite(color.transmission_distance)) and np.all(np.asarray(color.transmission_distance) > 0), (
                     f"Palette '{palette.name}' color '{color.name}' has "
                     f"invalid transmission_distance={color.transmission_distance}"
                 )

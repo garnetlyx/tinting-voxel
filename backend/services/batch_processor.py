@@ -3,6 +3,7 @@ Batch image processing service.
 
 Processes multiple images sequentially and returns per-image results.
 """
+from config.print_defaults import DEFAULT_BACKING_LAYERS
 import logging
 from io import BytesIO
 from typing import Optional
@@ -91,7 +92,7 @@ def generate_batch_stl_zip(
     pixel_size: float,
     layer_count: int,
     colors: Optional[Colors] = None,
-    white_backing_layers: int = 1,
+    white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_mode: str = 'white',
 ) -> bytes:
     """

@@ -31,6 +31,24 @@ def test_pixel_mode_success(client, tiny_png_bytes):
     assert len(data["colorBlocks"]) > 0
 
 
+def test_pixel_mode_rejects_model_narrower_than_selected_print_width(client):
+    image = Image.new('RGB', (70, 10), (255, 255, 255))
+    image.putpixel((35, 5), (0, 0, 0))
+    image_bytes = io.BytesIO()
+    image.save(image_bytes, format='PNG')
+
+    response = client.post(
+        '/api/process-image',
+        files={'image': ('test.png', image_bytes.getvalue(), 'image/png')},
+        data={
+            'mode': 'pixel', 'maxColors': '2', 'colorThreshold': '0',
+            'pixelSize': '0.01', 'detailSize': '0.42',
+        },
+    )
+    assert response.status_code == 422
+    assert 'shorter side' in response.json()['detail']
+
+
 def test_svg_mode_success(client, tiny_png_bytes):
     """POST /api/process-image in svg mode returns vectorResults."""
     response = client.post(
@@ -60,7 +78,7 @@ def test_svg_mode_ignores_detail_size_for_global_resizing(client, tiny_png_bytes
             "epsilon": "1.0",
             "minArea": "0.01",
             "numColors": "4",
-            "pixelSize": "0.08",
+            "pixelSize": "0.1",
             "detailSize": "0.4",
             "targetWidth": "100",
         },

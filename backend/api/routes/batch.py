@@ -1,6 +1,7 @@
 """
 Batch processing endpoints for multiple images.
 """
+from config.print_defaults import DEFAULT_BACKING_LAYERS
 import logging
 from typing import List, Optional
 
@@ -8,7 +9,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from api.error_handlers import handle_api_errors
-from api.filament_payload import get_colors_from_request, parse_filament_form_payload
+from api.filament_payload import get_colors_from_request, parse_filament_form_payload, resolve_layer_height
 from api.models import BatchProcessResponse
 from api.rate_limiter import limiter
 from services.batch_processor import (
@@ -96,9 +97,9 @@ async def api_batch_download_stl(
     maxColors: int = Form(10, ge=1, le=1024),
     colorThreshold: float = Form(50, ge=0, le=1000),
     pixelSize: float = Form(0.2, gt=0, le=10),
-    layerHeight: float = Form(0.08, gt=0, le=10),
+    layerHeight: Optional[float] = Form(None, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=10),
-    whiteBackingLayers: int = Form(1, ge=0, le=5),
+    whiteBackingLayers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
     backingMode: str = Form("white", pattern=r'^(white|black)$'),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
@@ -119,9 +120,10 @@ async def api_batch_download_stl(
     if batch_result['successCount'] == 0:
         raise HTTPException(status_code=422, detail="All images failed to process")
 
-    # Resolve colors: filamentColors > filamentPreset > default (Phase 6 CMYW)
+    # Resolve colors: filamentColors > filamentPreset > default (Phase 6 CMYWK)
     parsed_preset, parsed_colors = parse_filament_form_payload(filamentPreset, filamentColors)
     colors = get_colors_from_request(parsed_preset, parsed_colors)
+    layerHeight = resolve_layer_height(layerHeight, colors)
 
     zip_content = generate_batch_stl_zip(
         batch_results=batch_result['results'],

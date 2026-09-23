@@ -28,11 +28,6 @@ def _palette_to_info(entry) -> PaletteInfo:
                 name=c.name,
                 hex=c.hex,
                 transmission_distance=c.transmission_distance,
-                td_rgb=c.td_rgb,
-                k=c.k,
-                alpha_s=getattr(c, "alpha_s", None),
-                td_scale=getattr(c, "td_scale", None),
-                td_gamma=getattr(c, "td_gamma", None),
             )
             for c in entry.colors
         ],

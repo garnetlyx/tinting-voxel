@@ -12,12 +12,13 @@ import { BugReportModal } from './BugReportModal';
 import { FilamentPreview } from './FilamentPreview';
 import * as api from '../api/client';
 import type { FilamentColorConfig } from '../api/types';
+import { filamentCatalog } from '../test/filamentCatalog';
 
 const colors: FilamentColorConfig[] = 'QRSTUV'.split('').map((code, index) => ({
   name: `${code}-custom material`, hex: `#${(0x345678 + index * 0x101010).toString(16)}`, transmission_distance: 1.1 + index,
 }));
 
-beforeEach(() => { localStorage.clear(); setLocale('en'); initializeLocale(); });
+beforeEach(() => { localStorage.clear(); setLocale('en'); initializeLocale(); vi.spyOn(api, 'getFilamentPresets').mockResolvedValue(structuredClone(filamentCatalog)); });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); setLocale('en'); localStorage.clear(); });
 
 describe('live localization boundaries', () => {
@@ -26,30 +27,31 @@ describe('live localization boundaries', () => {
     const user = userEvent.setup();
     function Workspace() {
       const [entries, setEntries] = useState(colors);
-      return <><LanguageSelector /><FilamentConfigPanel filamentPreset={null} filamentColors={entries} isValid
+      return <><LanguageSelector /><FilamentConfigPanel presets={filamentCatalog.presets} filamentPreset={null} filamentColors={entries} isValid
         onLoadPreset={vi.fn()} onAddColor={vi.fn()} onRemoveColor={vi.fn()}
         onUpdateColor={(index, entry) => { onUpdate(index, entry); setEntries(previous => previous.map((color, i) => i === index ? entry : color)); }}
       /><output data-testid="data">{JSON.stringify(entries)}</output></>;
     }
     render(<Workspace />);
-    const input = screen.getByRole('textbox', { name: /Color 1 · Q/ });
-    expect(input).toHaveValue('Q');
+    const input = screen.getByRole('spinbutton', { name: 'Color 1 transmission distance' });
+    expect(input).toHaveValue(1.1);
     await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'zh-CN');
-    expect(screen.getByRole('textbox', { name: /颜色 1 · Q/ })).toBe(input);
+    expect(screen.getByRole('spinbutton', { name: '颜色 1 透射距离' })).toBe(input);
     expect(screen.getByText('6 / 16 种颜色')).toBeInTheDocument();
     expect(screen.getByTestId('data').textContent).toBe(JSON.stringify(colors));
     expect(onUpdate).not.toHaveBeenCalled();
     await user.clear(input);
-    await user.type(input, 'z');
-    expect(input).toHaveValue('Z');
-    expect(onUpdate).toHaveBeenLastCalledWith(0, { ...colors[0], name: 'Z' });
+    await user.type(input, '2');
+    expect(input).toHaveValue(2);
+    expect(onUpdate).toHaveBeenLastCalledWith(0, { ...colors[0], transmission_distance: 2 });
     expect(JSON.parse(screen.getByTestId('data').textContent!)[1]).toEqual(colors[1]);
     await user.selectOptions(screen.getByRole('combobox', { name: '语言' }), 'en');
-    expect(input).toHaveValue('Z');
+    expect(input).toHaveValue(2);
   });
 
   it('retains actual converter parameters, custom colors and existing errors across a language change', async () => {
     const { result } = renderHook(() => ({ processor: useImageProcessor(), locale: useTranslation().i18n.resolvedLanguage }));
+    await act(async () => {});
     act(() => {
       result.current.processor.loadSavedPresetColors(colors);
       result.current.processor.setMaxColors(17);
@@ -102,10 +104,10 @@ describe('live localization boundaries', () => {
       image: '', colorMatrix: [], stats: { colorCount: colors.length, combinationCount: 1296 },
       imageDimensions: { width: 1, height: 1 }, warnings: [],
     });
-    render(<FilamentPreview filamentColors={colors} filamentPreset={null} layerCount={4} layerHeight={0.08} isConfigValid />);
+    render(<FilamentPreview filamentColors={colors} filamentPreset={null} layerCount={4} layerHeight={0.08} whiteBackingLayers={3} backingMode="white" isConfigValid />);
     await act(() => vi.advanceTimersByTimeAsync(550));
     expect(preview).toHaveBeenCalledOnce();
-    expect(preview.mock.calls[0][0]).toEqual({ filamentColors: colors, layerCount: 4, layerHeight: 0.08 });
+    expect(preview.mock.calls[0][0]).toEqual({ filamentColors: colors, layerCount: 4, layerHeight: 0.08, whiteBackingLayers: 3, backingMode: 'white' });
     act(() => setLocale('zh-CN'));
     await act(() => vi.advanceTimersByTimeAsync(1000));
     expect(preview).toHaveBeenCalledOnce();

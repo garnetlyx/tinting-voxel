@@ -40,10 +40,9 @@ class Settings(BaseSettings):
     default_max_colors: int = 10
     default_color_threshold: float = 50.0
 
-    # Param search: wall-clock budget per run. Must stay below the Railway edge
-    # request timeout (~60s observed); the endpoint returns the best partial
-    # results collected within this budget.
-    param_search_budget_seconds: float = 50.0
+    # Parameter search runs after the request returns. Stop between candidates
+    # at this budget and keep all completed full-resolution previews.
+    param_search_job_budget_seconds: float = 1800.0
 
     # File Upload
     max_upload_size: int = 10 * 1024 * 1024  # 10MB

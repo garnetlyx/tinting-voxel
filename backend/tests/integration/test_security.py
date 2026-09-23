@@ -90,9 +90,9 @@ def test_cors_disallowed_methods(client):
         "/api/process-image",
         headers={
             "Origin": "http://localhost:5173",
-            "Access-Control-Request-Method": "DELETE",
+            "Access-Control-Request-Method": "PUT",
         },
     )
-    # DELETE should not be in allow-methods
+    # PUT should not be in allow-methods
     allow_methods = response.headers.get("access-control-allow-methods", "")
-    assert "DELETE" not in allow_methods
+    assert "PUT" not in allow_methods

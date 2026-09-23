@@ -14,8 +14,8 @@ export const VectorColorList: React.FC<VectorColorListProps> = ({ vectorResults 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
       {vectorResults.map((result, index) => {
-        const regionCount = result.regions?.length ?? result.polygons.length;
-        const holeCount = result.regions?.reduce((sum, region) => sum + region.holes.length, 0) ?? 0;
+        const regionCount = result.regions.length;
+        const holeCount = result.regions.reduce((sum, region) => sum + region.holes.length, 0);
 
         return (
         <div

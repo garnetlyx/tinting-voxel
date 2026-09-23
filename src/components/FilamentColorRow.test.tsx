@@ -1,101 +1,61 @@
-/**
- * Tests for FilamentColorRow under the single-td model: every field is
- * editable (no measured-parameter locking), and edits propagate through
- * onChange with the updated config.
- */
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-
 import { FilamentColorRow } from './FilamentColorRow';
 import type { FilamentColorConfig } from '../api/types';
 
-const baseConfig: FilamentColorConfig = {
-  name: 'Cyan',
-  hex: '#5489B4',
-  transmission_distance: 4.7,
-  k: 0,
-};
+const measured: FilamentColorConfig = { name: 'Cyan', hex: '#5489B4', transmission_distance: [1, 4, 10] };
 
-const renderRow = (onChange = vi.fn()) => {
-  render(
-    <div data-testid="row-container">
-      <FilamentColorRow
-        config={baseConfig}
-        index={0}
-        onChange={onChange}
-        onRemove={vi.fn()}
-        canRemove
-        existingLabels={['C']}
-      />
-    </div>,
-  );
-  return { onChange };
-};
+function renderRow(config = measured) {
+  const onChange = vi.fn();
+  render(<FilamentColorRow config={config} index={0} onChange={onChange} onRemove={vi.fn()} canRemove />);
+  return onChange;
+}
 
-describe('FilamentColorRow (single-td model)', () => {
-  it('edits the transmission distance directly — no measured-parameter lock', () => {
-    const { onChange } = renderRow();
-    const tdInput = screen.getByRole('spinbutton', { name: /transmission distance/i });
-    expect(tdInput).not.toBeDisabled();
-    fireEvent.change(tdInput, { target: { value: '5.5' } });
-    const last = onChange.mock.calls[onChange.mock.calls.length - 1]?.[1];
-    expect(last.transmission_distance).toBe(5.5);
+describe('material TD editor', () => {
+  it('starts with one input and expands measured RGB values without changing data', () => {
+    const onChange = renderRow();
+    expect(screen.getAllByRole('spinbutton')).toHaveLength(1);
+    expect(screen.getByRole('spinbutton')).toHaveValue(5);
+    expect(screen.queryByRole('textbox')).toBeNull();
+    const button = screen.getByRole('button', { name: 'RGB' });
+    fireEvent.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('R')).toBeVisible();
+    expect(screen.getByRole('spinbutton', { name: 'Color 1 B transmission distance' })).toHaveValue(10);
+    expect(screen.getAllByRole('spinbutton')).toHaveLength(4);
+    fireEvent.click(button);
+    expect(screen.queryByText('R')).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(measured.transmission_distance).toEqual([1, 4, 10]);
   });
-
-  it('keeps k when editing td (preset params survive unrelated edits)', () => {
-    const { onChange } = renderRow();
-    const tdInput = screen.getByRole('spinbutton', { name: /transmission distance/i });
-    fireEvent.change(tdInput, { target: { value: '6' } });
-    const last = onChange.mock.calls[onChange.mock.calls.length - 1]?.[1];
-    expect(last.k).toBe(0);
-    expect(last.hex).toBe('#5489B4');
+  it('replaces the measurement only when the single TD is edited', () => {
+    const onChange = renderRow();
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '6.5' } });
+    expect(onChange).toHaveBeenCalledWith(0, { ...measured, transmission_distance: 6.5 });
   });
-
-  it('renders an always-enabled color picker and td input (no locking)', () => {
-    const { container } = render(
-      <div data-testid="row-container">
-        <FilamentColorRow config={baseConfig} index={0} onChange={vi.fn()} onRemove={vi.fn()} canRemove existingLabels={['C']} />
-      </div>,
-    );
-    const picker = container.querySelector('input[type="color"]') as HTMLInputElement;
-    expect(picker).not.toBeNull();
-    expect(picker).not.toBeDisabled();
-    // Hex editing is covered end-to-end by useImageProcessor's
-    // updateFilamentColor tests; jsdom's color-input event shim makes the
-    // direct change event unreliable here.
+  it('preserves the measured TD when changing hex', () => {
+    const onChange = renderRow();
+    fireEvent.change(screen.getByTitle('Pick color'), { target: { value: '#123456' } });
+    expect(onChange).toHaveBeenCalledWith(0, { ...measured, hex: '#123456' });
   });
-
-  it('renders no lock button (measured-field locking removed)', () => {
-    renderRow();
-    expect(screen.queryByRole('button', { name: /convert to custom/i })).toBeNull();
+  it('expands a custom scalar without mutation and converts it only on a channel edit', () => {
+    const onChange = renderRow({ ...measured, transmission_distance: 5 });
+    fireEvent.click(screen.getByRole('button', { name: 'RGB' }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('spinbutton', { name: 'Color 1 R transmission distance' })).toHaveValue(5);
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Color 1 G transmission distance' }), { target: { value: '7' } });
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(0, { ...measured, transmission_distance: [5, 7, 5] });
   });
-});
-
-describe('FilamentColorRow k editor', () => {
-  const kConfig: FilamentColorConfig = {
-    name: 'Cyan', hex: '#3D79C6', transmission_distance: 0.48447574859816506, k: 8.13,
-  };
-  const renderK = (onChange = vi.fn()) => {
-    render(
-      <div><FilamentColorRow config={kConfig} index={0} onChange={onChange} onRemove={vi.fn()} canRemove existingLabels={['C']} /></div>,
-    );
-    return { onChange };
-  };
-
-  it('shows the calibrated k and lets the user edit it', () => {
-    const { onChange } = renderK();
-    const kInput = screen.getByRole('spinbutton', { name: /absorption gain k/i });
-    expect(kInput).toHaveValue(8.13);
-    fireEvent.change(kInput, { target: { value: '0' } });
-    expect(onChange).toHaveBeenCalledWith(0, expect.objectContaining({ k: 0 }));
+  it('edits a measured channel without overwriting the other channels', () => {
+    const onChange = renderRow();
+    fireEvent.click(screen.getByRole('button', { name: 'RGB' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Color 1 R transmission distance' }), { target: { value: '2' } });
+    expect(onChange).toHaveBeenCalledWith(0, { ...measured, transmission_distance: [2, 4, 10] });
+    expect(measured.transmission_distance).toEqual([1, 4, 10]);
   });
-
-  it('defaults k to 0 for colors without one', () => {
-    const onChange = vi.fn();
-    render(
-      <div><FilamentColorRow config={{ name: 'X', hex: '#808080', transmission_distance: 5 }} index={0} onChange={onChange} onRemove={vi.fn()} canRemove existingLabels={['X']} /></div>,
-    );
-    const kInput = screen.getByRole('spinbutton', { name: /absorption gain k/i }) as HTMLInputElement;
-    expect(parseFloat(kInput.value)).toBe(0);
+  it('permits clearing TD for a new value', () => {
+    const onChange = renderRow({ ...measured, transmission_distance: 5 });
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '' } });
+    expect(onChange).toHaveBeenCalledWith(0, { ...measured, transmission_distance: 0 });
   });
 });

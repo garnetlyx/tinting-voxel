@@ -156,41 +156,6 @@ class TestGlobalColorStateRace:
         assert len(result_clear) > 0
 
 
-# -- BUG QA-03: get_cmyk() returns inconsistent tuple length ---------------
-# File: backend/core/blend_color.py:50-68
-# For black (0,0,0): returns (0, 0, 0) - 3 elements
-# For all other colors: returns (c, m, y, k) - 4 elements
-
-
-class TestGetCmykInconsistentReturn:
-    """
-    BUG QA-03: Color.get_cmyk() returns 3-tuple for black, 4-tuple for others.
-
-    Line 52-54: if (r, g, b) == (0, 0, 0): return 0, 0, 0
-    Line 68: return c * cmyk_scale, m * cmyk_scale, y * cmyk_scale, k * cmyk_scale
-
-    Any code that unpacks the result as (c, m, y, k) will crash on black.
-    """
-
-    def test_black_returns_same_tuple_length_as_other_colors(self):
-        """get_cmyk() should always return a consistent tuple length."""
-        from core.blend_color import Color
-
-        # Non-black color -> 4-tuple
-        red_color = Color(name='Red', transmission_distance=3.0, hex='#FF0000')
-        red_cmyk = red_color.get_cmyk()
-
-        # Black color -> currently returns 3-tuple (BUG)
-        black_color = Color(name='Black', transmission_distance=3.0, hex='#000000')
-        black_cmyk = black_color.get_cmyk()
-
-        assert len(black_cmyk) == len(red_cmyk), (
-            f"BUG QA-03: get_cmyk() returns {len(black_cmyk)}-tuple for black "
-            f"but {len(red_cmyk)}-tuple for red. This breaks code that unpacks "
-            f"as (c, m, y, k). Black: {black_cmyk}, Red: {red_cmyk}"
-        )
-
-
 # -- BUG QA-04: No bounds validation on Form parameters in /process-image --
 # File: backend/api/routes/image.py:29-34
 # Form parameters maxColors, colorThreshold, numColors have no validation.
@@ -594,34 +559,11 @@ class TestCodeToRgbIndexError:
             )
 
 
-# -- BUG QA-20: Color.get_transmission_rate ZeroDivisionError ---------------
-# File: backend/core/blend_color.py:77
-# x = alpha * d / td  -- no guard for td=0
-
-
 class TestTransmissionRateZeroDivision:
-    """
-    BUG QA-20: Color.get_transmission_rate() crashes with ZeroDivisionError
-    when transmission_distance (td) is 0.
-
-    Line 77: x = alpha * d / td
-
-    While the Pydantic model has gt=0, the Color class itself has no
-    validation. Direct Color construction (e.g., from Colors.from_configs
-    with malformed data) can pass td=0, crashing Beer-Lambert computation.
-    """
-
-    def test_zero_transmission_distance_does_not_crash(self):
-        """get_transmission_rate should handle td=0 gracefully."""
+    def test_zero_transmission_distance_is_rejected(self):
         from core.blend_color import Color
-
-        # Should not raise ZeroDivisionError
-        rate = Color.get_transmission_rate(d=0.08, td=0)
-        # td=0 means fully opaque, transmission rate should be 0.0
-        assert rate == 0.0, (
-            f"BUG QA-20: Expected transmission rate 0.0 for td=0 "
-            f"(fully opaque), got {rate}"
-        )
+        with pytest.raises(ValueError, match="positive and finite"):
+            Color("Cyan", 0, "#00FFFF")
 
 
 # -- BUG QA-10: Whitespace-only filament name accepted -----------------------
@@ -946,48 +888,6 @@ class TestPermutationGuardReturns500:
             "BUG QA-27: api_filament_preview() should use @handle_api_errors "
             "decorator which catches ValueError and returns 422."
         )
-
-
-# -- BUG QA-28: Color() crashes when name has no default hex -----------------
-# File: backend/core/blend_color.py:32-35
-# When hex=None and name is not in DEFAULT_HEX (not C/M/Y/W),
-# DEFAULT_HEX.get() returns None, then update_hex(None) crashes.
-
-
-class TestColorNoDefaultHexCrash:
-    """
-    BUG QA-28: Color(name='Red') crashes with TypeError because 'Red'
-    maps to label 'R' which is not in DEFAULT_HEX.
-
-    Flow:
-    1. hex=None (default)
-    2. DEFAULT_HEX.get('R') returns None
-    3. update_hex(None)
-    4. ImageColor.getcolor(None, 'RGB') -> TypeError
-
-    This affects any direct Color construction with a non-CMYW name
-    without providing hex. While Colors.from_configs() always provides
-    hex, other code paths may not.
-    """
-
-    def test_color_without_hex_for_non_default_name(self):
-        """Color with non-CMYW name and no hex should raise clear error, not TypeError."""
-        from core.blend_color import Color
-
-        try:
-            c = Color(name='Red', transmission_distance=3.0)
-            # If it doesn't crash, it should at least have a valid hex
-            assert c.hex is not None, "hex should not be None"
-        except TypeError:
-            pytest.fail(
-                "BUG QA-28: Color(name='Red') without hex raises TypeError "
-                "(object of type 'NoneType' has no len()). DEFAULT_HEX has "
-                "no entry for label 'R', so hex stays None, causing crash "
-                "in update_hex(None). Fix: Raise ValueError with clear "
-                "message when hex is required but not provided."
-            )
-        except ValueError:
-            pass  # Correctly raises ValueError with clear message
 
 
 # -- BUG QA-29: Colors(names=['X']) creates Color with td=None ---------------
@@ -1661,44 +1561,9 @@ class TestPreviewOutOfRangePage:
             pass  # Correctly rejected
 
 
-# -- BUG QA-42: Empty vectorResults accepted in SVG STL download models ----------
-# File: backend/api/models.py:105-117, 179-192
-# DownloadSVGSTLRequest and DownloadSVGSTLRequestV2 have no min_length
-# constraint on vectorResults. Empty list produces empty ZIP silently.
-
-
 class TestEmptyVectorResultsAccepted:
-    """
-    BUG QA-42: SVG STL download models accept empty vectorResults.
+    """SVG STL requests reject empty geometry."""
 
-    DownloadSVGSTLRequest.vectorResults and DownloadSVGSTLRequestV2.vectorResults
-    have no min_length=1 constraint, allowing empty lists.
-
-    This produces an empty ZIP file (0 STL files inside), which the user
-    downloads but can't use. No error message explains why.
-
-    Similar to QA-34 (empty colorBlocks) but for SVG mode.
-    """
-
-    def test_v1_svg_empty_vector_results_rejected(self):
-        """V1 SVG STL request should reject empty vectorResults."""
-        from api.models import DownloadSVGSTLRequest
-
-        try:
-            req = DownloadSVGSTLRequest(
-                vectorResults=[],
-                layerHeight=0.08,
-                pixelSize=0.08,
-                layerCount=4,
-                imageDimensions={'width': 4, 'height': 4},
-            )
-            pytest.fail(
-                "BUG QA-42: DownloadSVGSTLRequest accepts empty vectorResults. "
-                "This produces an empty ZIP with 0 STL files. "
-                "Fix: Add min_length=1 to vectorResults field."
-            )
-        except (ValueError, Exception):
-            pass
 
     def test_v2_svg_empty_vector_results_rejected(self):
         """V2 SVG STL request should reject empty vectorResults."""
@@ -1714,33 +1579,14 @@ class TestEmptyVectorResultsAccepted:
             )
             pytest.fail(
                 "BUG QA-42: DownloadSVGSTLRequestV2 accepts empty vectorResults. "
-                "Same issue as V1 - produces empty ZIP."
+                "Empty geometry must not produce an empty ZIP."
             )
         except (ValueError, Exception):
             pass
 
 
-# -- BUG QA-43: Empty colorBlocks accepted in CSV and V1 STL download models ----
-# File: backend/api/models.py:100-103, 120-128
-# DownloadCSVRequest and DownloadSTLRequest have no min_length on colorBlocks.
-# CSV generates header-only file, STL generates empty ZIP (caught by QA-34
-# in generate_stl_zip, but the model should reject earlier).
-
-
 class TestEmptyColorBlocksInOtherModels:
-    """
-    BUG QA-43: DownloadCSVRequest and DownloadSTLRequest accept empty colorBlocks.
-
-    DownloadCSVRequest with colorBlocks=[] produces a CSV with only the header
-    row and no data - a useless file for the user.
-
-    DownloadSTLRequest with colorBlocks=[] hits the QA-34 guard in
-    generate_stl_zip() (ValueError), but validation should happen earlier
-    at the model level for a clearer error message.
-
-    Unlike DownloadSTLRequestV2 which has the guard in generate_stl_zip,
-    DownloadCSVRequest has NO guard - it happily generates a header-only CSV.
-    """
+    """CSV requests reject empty color blocks."""
 
     def test_csv_request_empty_color_blocks_rejected(self):
         """DownloadCSVRequest should reject empty colorBlocks."""
@@ -1756,25 +1602,6 @@ class TestEmptyColorBlocksInOtherModels:
         except (ValueError, Exception):
             pass
 
-    def test_v1_stl_request_empty_color_blocks_rejected(self):
-        """V1 DownloadSTLRequest should reject empty colorBlocks at model level."""
-        from api.models import DownloadSTLRequest
-
-        try:
-            req = DownloadSTLRequest(
-                colorBlocks=[],
-                layerHeight=0.08,
-                pixelSize=0.08,
-                layerCount=4,
-                imageDimensions={'width': 4, 'height': 4},
-            )
-            pytest.fail(
-                "BUG QA-43: DownloadSTLRequest accepts empty colorBlocks. "
-                "generate_stl_zip raises ValueError later, but model should "
-                "catch this earlier. Fix: Add min_length=1 to colorBlocks."
-            )
-        except (ValueError, Exception):
-            pass
 
 
 # -- BUG QA-44: Pixels outside image bounds silently dropped --------------------
@@ -1950,55 +1777,17 @@ class TestReadMatrixCsvUndefinedVariable:
             pass  # Expected: file doesn't exist
 
 
-# -- BUG QA-47: V1 download routes missing ValueError handler ------------------
-# File: backend/api/routes/download.py:75-109, 112-158
-# V1 /api/download-stl and /api/download-svg-stl do not catch ValueError
-# from compute_reference_matrices (permutation guard).
-# V2 correctly catches ValueError -> 422, but V1 falls through to
-# the generic Exception handler and returns 500.
+class TestCSVDownloadValueErrorHandler:
+    """CSV validation errors use the shared API error handler."""
 
 
-class TestV1DownloadMissingValueErrorHandler:
-    """
-    BUG QA-47: V1 download routes don't handle ValueError separately.
 
-    V2 download_v2.py:164-165:
-        except ValueError as e:
-            raise HTTPException(status_code=422, detail=str(e))
-
-    V1 download.py:105-109:
-        except Exception as e:
-            logger.error(...)
-            raise HTTPException(status_code=500, detail="An internal error occurred")
-
-    V1 has no ValueError handler, so ValueError from the permutation guard
-    or other validation returns 500 with a generic message instead of 422.
-    """
-
-    def test_v1_download_stl_catches_value_error(self):
-        """V1 download-stl route should handle ValueError via decorator."""
-        from api.routes import download
-
-        assert hasattr(download.api_download_stl, '__wrapped__'), (
-            "BUG QA-47: V1 /api/download-stl should use @handle_api_errors "
-            "decorator which catches ValueError and returns 422."
-        )
-
-    def test_v1_download_svg_stl_catches_value_error(self):
-        """V1 SVG download route should handle ValueError via decorator."""
-        from api.routes import download
-
-        assert hasattr(download.api_download_svg_stl, '__wrapped__'), (
-            "BUG QA-47: V1 /api/download-svg-stl should use @handle_api_errors "
-            "decorator which catches ValueError and returns 422."
-        )
-
-    def test_v1_download_csv_catches_value_error(self):
-        """V1 download-csv route should handle ValueError via decorator."""
+    def test_download_csv_catches_value_error(self):
+        """CSV download route should handle ValueError via decorator."""
         from api.routes import download
 
         assert hasattr(download.api_download_csv, '__wrapped__'), (
-            "BUG QA-47: V1 /api/download-csv should use @handle_api_errors "
+            "CSV download should use @handle_api_errors "
             "decorator which catches ValueError and returns 422."
         )
 
@@ -2055,7 +1844,6 @@ class TestTargetDimensionConditionLogic:
 
 # -- BUG QA-49: DownloadSTLRequestV2.colorBlocks missing min_items=1 ----------
 # File: backend/api/models.py:143
-# V1 DownloadSTLRequest.colorBlocks has min_items=1, but V2 does not.
 # Empty colorBlocks pass model validation and reach generate_stl_zip which
 # raises ValueError. Validation should happen earlier at the model level
 # for consistency with V1 and clearer error messages.
@@ -2105,54 +1893,9 @@ class TestV2EmptyColorBlocksValidation:
 # users to identify which object corresponds to which filament.
 
 
-# -- BUG QA-51: layerHeight and pixelSize have no upper bounds ----------------
-# Files: backend/api/models.py:124,125,144,145
-# Both V1 and V2 download models accept layerHeight and pixelSize with only
-# gt=0 constraint and no upper limit. Extreme values cause:
-# - Huge STL/3MF files (pixelSize=1000 means each pixel = 1 meter)
-# - Numerical issues in Beer-Lambert calculations (large exponents)
-# - Memory exhaustion from enormous mesh generation
-
-
 class TestLayerHeightPixelSizeNoBounds:
-    """
-    BUG QA-51: layerHeight and pixelSize accept arbitrarily large values.
+    """Download requests reject unreasonable physical dimensions."""
 
-    Both V1 and V2 models:
-        layerHeight: float = Field(..., gt=0)  # No upper bound
-        pixelSize: float = Field(..., gt=0)    # No upper bound
-
-    Extreme values like layerHeight=999999 or pixelSize=999999:
-    1. Generate STL meshes with enormous physical dimensions
-    2. May cause floating-point overflow in Beer-Lambert calculations
-    3. Produce multi-GB output files
-    4. Waste server resources on meaningless geometry
-
-    Realistic bounds: layerHeight <= 10mm (thick printing), pixelSize <= 10mm.
-    """
-
-    def test_v1_layer_height_has_upper_bound(self):
-        """V1 DownloadSTLRequest should reject unreasonable layerHeight."""
-        from api.models import DownloadSTLRequest, ColorBlock, PixelCoordinate
-
-        try:
-            req = DownloadSTLRequest(
-                colorBlocks=[ColorBlock(
-                    r=0, g=255, b=255, hex='#00FFFF', count=1,
-                    pixels=[PixelCoordinate(x=0, y=0)]
-                )],
-                layerHeight=999999.0,
-                pixelSize=0.08,
-                layerCount=4,
-                imageDimensions={'width': 4, 'height': 4},
-            )
-            pytest.fail(
-                f"BUG QA-51: DownloadSTLRequest accepts layerHeight={req.layerHeight}. "
-                f"No upper bound on layerHeight. "
-                f"Fix: Add le=10 constraint to layerHeight field."
-            )
-        except (ValueError, Exception):
-            pass  # Correctly rejected
 
     def test_v2_layer_height_has_upper_bound(self):
         """V2 DownloadSTLRequestV2 should reject unreasonable layerHeight."""
@@ -2176,27 +1919,6 @@ class TestLayerHeightPixelSizeNoBounds:
         except (ValueError, Exception):
             pass
 
-    def test_v1_pixel_size_has_upper_bound(self):
-        """V1 DownloadSTLRequest should reject unreasonable pixelSize."""
-        from api.models import DownloadSTLRequest, ColorBlock, PixelCoordinate
-
-        try:
-            req = DownloadSTLRequest(
-                colorBlocks=[ColorBlock(
-                    r=0, g=255, b=255, hex='#00FFFF', count=1,
-                    pixels=[PixelCoordinate(x=0, y=0)]
-                )],
-                layerHeight=0.08,
-                pixelSize=999999.0,
-                layerCount=4,
-                imageDimensions={'width': 4, 'height': 4},
-            )
-            pytest.fail(
-                f"BUG QA-51: DownloadSTLRequest accepts pixelSize={req.pixelSize}. "
-                f"No upper bound on pixelSize. Fix: Add le=10."
-            )
-        except (ValueError, Exception):
-            pass
 
     def test_v2_pixel_size_has_upper_bound(self):
         """V2 DownloadSTLRequestV2 should reject unreasonable pixelSize."""
@@ -2325,7 +2047,7 @@ class TestCodeToRgbShortCodeBackground:
         from core.blend_color import _code_to_rgb_cached, clear_rgb_cache
 
         clear_rgb_cache()
-        color_key = (('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0),)
+        color_key = (('W', 7.2, '#FFFFFF'),)
         r, g, b = _code_to_rgb_cached('W', 0.08, color_key)
 
         # Single layer of white should be very bright (>230)
@@ -2342,8 +2064,8 @@ class TestCodeToRgbShortCodeBackground:
         from core.blend_color import _code_to_rgb_cached, clear_rgb_cache
 
         clear_rgb_cache()
-        color_key = (('C', 3.0, '#0086D6', 0.0, None, 2.302585092994046, 1.0, 1.0), ('M', 1.9, '#EC008C', 0.0, None, 2.302585092994046, 1.0, 1.0),
-                     ('Y', 2.5, '#F4EE2A', 0.0, None, 2.302585092994046, 1.0, 1.0), ('W', 7.2, '#FFFFFF', 0.0, None, 2.302585092994046, 1.0, 1.0))
+        color_key = (('C', 3.0, '#0086D6'), ('M', 1.9, '#EC008C'),
+                     ('Y', 2.5, '#F4EE2A'), ('W', 7.2, '#FFFFFF'))
 
         r1, g1, b1 = _code_to_rgb_cached('W', 0.08, color_key)
         r4, g4, b4 = _code_to_rgb_cached('WWWW', 0.08, color_key)

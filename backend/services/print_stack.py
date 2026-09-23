@@ -1,23 +1,12 @@
-"""
-Shared print stack helpers: optical layers, printed backing block, total height.
-
-The backing is a PRINTED block of N layers of one filament (white or black
-mode) behind the optical stack. It participates in the color simulation as
-real stack layers: the evaluated code carries the backing as a suffix and the
-boundary behind the block uses the paper's backing reflectance (white paper
-B=1; black cardstock B≈0.05). The paper's plates sat on infinite external
-backings; here the backing is finite — its thickness (layer count) affects the
-result.
-"""
+"""Printed backing layers share the same illumination as the color stack."""
+from config.print_defaults import DEFAULT_BACKING_LAYERS
 from typing import Optional
 
 from core.blend_color import Colors
 
 BACKING_MODES = ('white', 'black')
 
-# Paper's black cardstock backing reflectance ≈ 0.05 per channel.
-BLACK_BOUNDARY_RGB = (13.0, 13.0, 13.0)
-WHITE_BOUNDARY_RGB = (255.0, 255.0, 255.0)
+PRINT_BACKGROUND_RGB = (255.0, 255.0, 255.0)
 
 _BACKING_TARGET_RGB = {
     'white': (255, 255, 255),
@@ -28,7 +17,7 @@ _BACKING_TARGET_RGB = {
 def normalize_backing_layers(backing_layers: Optional[int]) -> int:
     """Normalize optional backing configuration to a concrete non-negative count."""
     if backing_layers is None:
-        return 1
+        return DEFAULT_BACKING_LAYERS
     return max(0, int(backing_layers))
 
 
@@ -66,13 +55,6 @@ def resolve_backing_label(
     )
 
 
-def backing_boundary_rgb(backing_mode: str) -> tuple[float, float, float]:
-    """Boundary reflectance RGB behind the printed backing block (paper Eqs.)."""
-    if backing_mode == 'black':
-        return BLACK_BOUNDARY_RGB
-    return WHITE_BOUNDARY_RGB
-
-
 def backing_suffix(backing_label: Optional[str], backing_layers: Optional[int]) -> str:
     """Backing block as trailing code layers (deepest in the light path)."""
     n = normalize_backing_layers(backing_layers)
@@ -103,5 +85,5 @@ def build_print_stack(
         "whiteBackingLayers": backing,
         "backingMode": backing_mode,
         "totalLayerCount": total_layer_count,
-        "totalHeightMm": round(total_layer_count * layer_height, 2),
+        "totalHeightMm": total_layer_count * layer_height,
     }

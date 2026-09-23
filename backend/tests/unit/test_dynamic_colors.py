@@ -2,7 +2,7 @@
 Unit tests for dynamic N-color architecture.
 
 Tests ColorConfig, Colors.from_configs(), mesh map generation,
-and filename backward compatibility.
+and material names in generated filenames.
 """
 import pytest
 
@@ -15,6 +15,7 @@ from core.color_config import (
     get_available_presets,
     get_preset,
 )
+from config.print_defaults import DEFAULT_FILAMENT_PRESET
 from services.stl_generator import get_filename_prefix, initialize_color_mapping
 
 
@@ -71,13 +72,13 @@ class TestPresets:
         """BAMBU_CMYW_PHASE6_PRESET has 4 colors."""
         assert len(BAMBU_CMYW_PHASE6_PRESET) == 4
         labels = [c.label for c in BAMBU_CMYW_PHASE6_PRESET]
-        assert set(labels) == {'C', 'M', 'Y', 'W'}
+        assert labels == ['C', 'M', 'Y', 'W']
 
     def test_clear_cmyw_preset_exists(self):
         """CLEAR_CMYW_PRESET has 4 colors (stained-glass CMYW; grey dropped)."""
         assert len(CLEAR_CMYW_PRESET) == 4
         labels = [c.label for c in CLEAR_CMYW_PRESET]
-        assert set(labels) == {'C', 'M', 'Y', 'W'}
+        assert labels == ['C', 'M', 'Y', 'W']
 
     def test_get_preset_bambu(self):
         """get_preset returns BAMBU_CMYW_PHASE6_PRESET for 'bambu_cmyw_phase6'."""
@@ -152,28 +153,19 @@ class TestColorsFromConfigs:
 
         assert colors['C'].td == 5.5
 
-    def test_from_configs_preserves_raw_td_k_and_compensation(self):
-        """from_configs carries the raw scalar td, fitted k and the scalar-form
-        compensation triple verbatim."""
+    def test_from_configs_preserves_single_td_field(self):
         colors = Colors.from_configs(BAMBU_CMYWK_PHASE6_PRESET)
-
-        assert colors["C"].td == pytest.approx(2.0)
-        assert colors["C"].k == pytest.approx(3.4996)
-        assert colors["W"].k == pytest.approx(6.3168)
-        assert colors["K"].k == pytest.approx(23.1863)
-        assert colors["C"].td_rgb is None
-        assert colors["C"].alpha_s == pytest.approx(2.2292)
-        assert colors["C"].td_scale == pytest.approx(2.023552983514602)
-        assert colors["C"].td_gamma == pytest.approx(0.03272)
+        for config in BAMBU_CMYWK_PHASE6_PRESET:
+            assert colors[config.label].td == config.transmission_distance
 
     def test_from_configs_preserves_per_channel_td(self):
-        """from_configs carries the staircase per-channel td_rgb verbatim."""
+        """from_configs carries the staircase per-channel TD verbatim."""
         colors = Colors.from_configs(CLEAR_CMYW_PRESET)
 
-        assert colors["C"].td_rgb == (
+        assert colors["C"].td == (
             1.3490352079515975, 2.5371501740106988, 4.088658622221301,
         )
-        assert colors["W"].td_rgb == (
+        assert colors["W"].td == (
             17.949461574719358, 18.902845340687115, 17.207703003749966,
         )
 
@@ -221,12 +213,12 @@ class TestFilenamePrefix:
 
     def test_cmyw_produces_cmyw_prefix(self):
         """Standard CMYW colors produce 'CMYW' prefix."""
-        colors = Colors()  # Default CMYK
+        colors = Colors.from_configs(BAMBU_CMYW_PHASE6_PRESET)
         prefix = get_filename_prefix(colors)
         assert prefix == "CMYW"
 
-    def test_cmyw_order_independent(self):
-        """CMYW prefix works regardless of label order."""
+    def test_prefix_preserves_material_order(self):
+        """Filename prefix follows the actual material ordering."""
         configs = [
             ColorConfig(name="White", hex="#FFFFFF", transmission_distance=7.2),
             ColorConfig(name="Yellow", hex="#FFFF00", transmission_distance=2.5),
@@ -235,7 +227,7 @@ class TestFilenamePrefix:
         ]
         colors = Colors.from_configs(configs)
         prefix = get_filename_prefix(colors)
-        assert prefix == "CMYW"
+        assert prefix == "WYMC"
 
     def test_custom_colors_produce_custom_prefix(self):
         """Non-CMYW colors produce joined label prefix."""
@@ -274,11 +266,11 @@ class TestColorsGetLabels:
         assert isinstance(labels, list)
         assert all(isinstance(label, str) for label in labels)
 
-    def test_get_labels_default_cmyw(self):
-        """Default Colors has CMYW labels."""
+    def test_get_labels_default_preset(self):
+        """Default Colors shares the configured API preset."""
         colors = Colors()
         labels = colors.get_labels()
-        assert set(labels) == {'C', 'M', 'Y', 'W'}
+        assert labels == [c.label for c in get_preset(DEFAULT_FILAMENT_PRESET)]
 
     def test_get_labels_custom_colors(self):
         """Custom colors return correct labels."""
@@ -293,17 +285,16 @@ class TestColorsGetLabels:
         assert labels == ['R', 'G', 'B', 'Y']
 
 
-class TestBackwardCompatibility:
-    """Tests ensuring backward compatibility with existing code."""
+class TestDefaultMaterialSet:
+    """All implicit material sets use the configured preset."""
 
-    def test_default_colors_unchanged(self):
-        """Default Colors() behavior is unchanged."""
+    def test_default_colors_use_configured_preset(self):
         colors = Colors()
-        assert len(colors) == 4
-        assert 'C' in colors.get_labels()
-        assert 'M' in colors.get_labels()
-        assert 'Y' in colors.get_labels()
-        assert 'W' in colors.get_labels()
+        expected = Colors.from_configs(get_preset(DEFAULT_FILAMENT_PRESET))
+        assert colors.get_labels() == expected.get_labels()
+        for label in colors.get_labels():
+            assert colors[label].td_channels == expected[label].td_channels
+            assert colors[label].hex == expected[label].hex
 
     def test_color_object_attributes(self):
         """Color objects have expected attributes."""
@@ -321,7 +312,7 @@ class TestBackwardCompatibility:
         from services import stl_generator
         assert stl_generator._reference_code_matrix is not None
         assert stl_generator._current_colors is not None
-        assert len(stl_generator._current_colors) == 4
+        assert stl_generator._current_colors.get_labels() == [c.label for c in get_preset(DEFAULT_FILAMENT_PRESET)]
 
     def test_calibrated_colors_init_matrix(self):
         """Calibrated presets initialize the reference matrix under the

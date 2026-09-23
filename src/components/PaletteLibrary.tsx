@@ -64,7 +64,7 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
   }, [isExpanded]);
 
   const handleApply = useCallback((palette: PaletteInfo) => {
-    const colors: FilamentColorConfig[] = palette.colors.map(c => ({ ...c }));
+    const colors = structuredClone(palette.colors);
     onApplyPalette(colors);
   }, [onApplyPalette]);
 
@@ -106,7 +106,6 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                   <div className="flex items-center justify-between mb-1.5">
                     <h4 className="text-sm font-medium text-gray-800">{paletteText(`${palette.id}_name`, palette.name)}</h4>
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">{paletteText(`${palette.id}_description`, palette.description)}</p>
 
                   {/* Color Swatches */}
                   <div className="flex gap-1 mb-2">

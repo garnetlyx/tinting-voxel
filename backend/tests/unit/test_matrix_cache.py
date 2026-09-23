@@ -43,3 +43,49 @@ def test_warmup_continues_after_an_invalid_preset():
     from core.blend_color import Colors
     assert matrix_cache.warmup_cache(['invalid', 'bambu_cmyw_phase6'], [2], [0.08]) == 1
     assert matrix_cache.get_cached_matrices(Colors.from_configs(get_preset('bambu_cmyw_phase6')), 2, 0.08) is not None
+
+
+
+def test_default_backing_cache_matches_explicit_three_layers_only():
+    from core.blend_color import Colors
+    from core.color_config import get_preset
+    from services.stl_generator import compute_reference_matrices
+    colors = Colors.from_configs(get_preset("bambu_cmyw_phase6"))
+    actual = compute_reference_matrices(2, 0.08, colors, n_targets=2)
+    default = matrix_cache.get_cached_matrices(colors, 2, 0.08, n_targets=2)
+    explicit = matrix_cache.get_cached_matrices(
+        colors, 2, 0.08, n_targets=2,
+        backing_suffix="WWW", background_rgb=(255.0, 255.0, 255.0),
+    )
+    assert default is explicit
+    assert default[0] is actual[0]
+    assert default[1] is actual[1]
+    assert matrix_cache.get_cached_matrices(
+        colors, 2, 0.08, n_targets=2,
+        backing_suffix="W", background_rgb=(255.0, 255.0, 255.0),
+    ) is None
+    assert matrix_cache.get_cached_matrices(
+        colors, 2, 0.08, n_targets=2, backing_suffix="", background_rgb=None,
+    ) is None
+
+
+
+def test_td_channels_invalidate_cached_predictions_and_equal_channels_share_cache():
+    from core.blend_color import Colors
+    from core.color_config import ColorConfig
+    from services.stl_generator import compute_reference_matrices
+
+    def materials(cyan_td):
+        return Colors.from_configs([
+            ColorConfig("Cyan", "#3D79C6", cyan_td),
+            ColorConfig("Magenta", "#B3356E", 0.5),
+            ColorConfig("Yellow", "#FFE665", 0.6),
+            ColorConfig("White", "#FFFFFF", 0.7),
+        ])
+
+    scalar = materials(0.4)
+    compute_reference_matrices(2, 0.08, scalar, n_targets=2)
+    cached = matrix_cache.get_cached_matrices(scalar, 2, 0.08, n_targets=2)
+    assert cached is not None
+    assert matrix_cache.get_cached_matrices(materials([0.4, 0.4, 0.4]), 2, 0.08, n_targets=2) is cached
+    assert matrix_cache.get_cached_matrices(materials([0.4, 0.6, 0.8]), 2, 0.08, n_targets=2) is None

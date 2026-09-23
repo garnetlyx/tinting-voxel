@@ -1,7 +1,5 @@
-"""
-Unit tests for ParamSearchService: downscaled evaluation, cooperative cancel,
-and partial-result collection on timeout.
-"""
+"""Parameter alternatives preserve the apply pipeline and generation order."""
+import base64
 import io
 import threading
 import time
@@ -11,188 +9,140 @@ from PIL import Image
 
 from core.color_config import get_preset
 from core.color_materials import Colors
-from services.param_search_service import (
-    Evaluator,
-    FixedParams,
-    ParamSearchConfig,
-    ParamSearchService,
-)
+from services.param_search_service import Evaluator, FixedParams, ParamSearchConfig, ParamSearchService, SearchResult
 
-FIXED = FixedParams(
-    layer_count=4,
-    layer_height=0.08,
-    pixel_size=0.42,
-    white_backing_layers=1,
-)
-
-# Wide enough that a full grid cannot finish inside the small timeouts used
-# below: 4 * 4 * 3 * 2 = 96 combinations.
-_WIDE_GRID = {
-    "max_colors": [6, 8, 10, 12],
-    "color_threshold": [20, 40, 60, 80],
-    "detail_size": [0.22, 0.42, 0.62],
-}
-
-_TINY_GRID = {
-    "max_colors": [6, 8],
-    "color_threshold": [20, 40],
-    "detail_size": [0.42],
-    "white_backing_layers": [1],
-}
-
-
-def _make_png(width: int = 600, height: int = 800) -> bytes:
-    """Gradient + noise image with enough color variety for the pipeline."""
-    import numpy as np
-
-    xs = np.linspace(0, 255, width, dtype=np.float32)
-    grad = np.tile(xs, (height, 1))
-    noise = np.random.default_rng(7).integers(0, 40, (height, width))
-    arr = np.stack([grad, 255 - grad, grad / 2 + noise], axis=2).astype(np.uint8)
-    buf = io.BytesIO()
-    Image.fromarray(arr, "RGB").save(buf, format="PNG")
-    return buf.getvalue()
+FIXED = FixedParams(layer_count=4, layer_height=0.08, pixel_size=0.42, white_backing_layers=3)
+RANGES = {"max_colors": [8, 4, 12], "color_threshold": [40], "detail_size": [0.6]}
 
 
 @pytest.fixture
-def colors() -> Colors:
+def colors():
     return Colors.from_configs(get_preset("bambu_cmyw_phase6"))
 
 
 @pytest.fixture
-def png_bytes() -> bytes:
-    return _make_png()
+def png_bytes():
+    image = Image.new("RGBA", (513, 73), (32, 70, 180, 255))
+    for x in range(60, 440):
+        for y in range(10, 55):
+            image.putpixel((x, y), (180, 30, 50, 0 if x % 7 == 0 else 255))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
-def _service(param_ranges, colors):
-    config = ParamSearchConfig(
-        mode="pixel",
-        strategy="grid",
-        n_trials=10,
-        seed=None,
-        fixed=FIXED,
-        colors=colors,
-        param_ranges=param_ranges,
-        top_n=5,
+def service(colors, baseline=None):
+    return ParamSearchService(ParamSearchConfig(
+        mode="pixel", strategy="grid", n_trials=3, seed=7,
+        fixed=FIXED, colors=colors, param_ranges=RANGES,
+        baseline_params={"pixel": baseline} if baseline else None,
+    ))
+
+
+def fake_evaluate(self, params, mode):
+    return SearchResult(0, False, mode, dict(params), "data:image/png;base64,")
+
+
+def test_pixel_pipeline_receives_original_bytes_and_physical_parameters(png_bytes, colors, monkeypatch):
+    captured = {}
+
+    def process(**kwargs):
+        captured.update(kwargs)
+        return {"processedImage": "preview"}
+
+    monkeypatch.setattr("services.image_processor.process_image", process)
+    evaluator = Evaluator(png_bytes, colors, FIXED)
+    result = evaluator.evaluate({"max_colors": 4, "color_threshold": 16.5, "detail_size": 0.54}, "pixel")
+    assert captured["image_bytes"] == png_bytes
+    assert captured["pixel_size"] == FIXED.pixel_size
+    assert captured["layer_height"] == FIXED.layer_height
+    assert captured["white_backing_layers"] == FIXED.white_backing_layers
+    assert captured["detail_size"] == 0.54
+    assert result.preview_data_url == "preview"
+
+
+def test_pixel_preview_equals_direct_application(png_bytes, colors):
+    from services.image_processor import process_image
+    params = {"max_colors": 4, "color_threshold": 16.5, "detail_size": 0.54}
+    result = Evaluator(png_bytes, colors, FIXED).evaluate(params, "pixel")
+    applied = process_image(
+        image_bytes=png_bytes, filament_colors=colors,
+        layer_count=FIXED.layer_count, layer_height=FIXED.layer_height,
+        pixel_size=FIXED.pixel_size, white_backing_layers=FIXED.white_backing_layers,
+        **params,
     )
-    return ParamSearchService(config)
+    assert result.preview_data_url == applied["processedImage"]
+    image = Image.open(io.BytesIO(base64.b64decode(result.preview_data_url.split(",", 1)[1])))
+    assert image.size == (513, 73)
 
 
-class TestEvaluatorDownscale:
-    def test_pixel_evaluation_uses_fixed_print_stack(self, png_bytes, colors, monkeypatch):
-        captured = {}
-
-        def fake_process_image(**kwargs):
-            captured.update(kwargs)
-            return {"processedImage": "data:image/png;base64,"}
-
-        monkeypatch.setattr("services.image_processor.process_image", fake_process_image)
-        fixed = FixedParams(
-            layer_count=8,
-            layer_height=0.84,
-            pixel_size=0.15,
-            white_backing_layers=0,
-        )
-        evaluator = Evaluator(png_bytes, colors, fixed)
-        evaluator._run_pixel({
-            "max_colors": 10,
-            "color_threshold": 35,
-            "detail_size": 0.42,
-        })
-
-        assert captured["layer_count"] == 8
-        assert captured["layer_height"] == pytest.approx(0.84)
-        assert captured["white_backing_layers"] == 0
-
-    def test_work_image_capped_to_max_edge(self, png_bytes, colors):
-        ev = Evaluator(png_bytes, colors, FIXED)
-        work = Image.open(io.BytesIO(ev._work_bytes))
-        assert max(work.size) <= Evaluator.WORK_MAX_EDGE
-
-    def test_small_image_not_upscaled(self, colors):
-        png = _make_png(width=64, height=80)
-        ev = Evaluator(png, colors, FIXED)
-        work = Image.open(io.BytesIO(ev._work_bytes))
-        assert work.size == (64, 80)
-        assert ev._pixel_size == pytest.approx(FIXED.pixel_size)
-
-    def test_effective_pixel_size_scales_with_downscale(self, png_bytes, colors):
-        ev = Evaluator(png_bytes, colors, FIXED)
-        # 800px longest edge -> 384px, so each work pixel covers ~2.08x more mm.
-        assert ev._pixel_size == pytest.approx(FIXED.pixel_size * 800 / 384)
-
-    def test_evaluation_returns_result_on_work_image(self, png_bytes, colors):
-        ev = Evaluator(png_bytes, colors, FIXED)
-        result = ev.evaluate(
-            {"max_colors": 8, "color_threshold": 40, "detail_size": 0.42,
-             "white_backing_layers": 1},
-            "pixel",
-        )
-        assert 0.0 <= result.mae <= 255.0
-        assert result.preview_data_url.startswith("data:image/png;base64,")
+def test_candidates_remain_in_generation_order(colors, monkeypatch):
+    monkeypatch.setattr(Evaluator, "evaluate", fake_evaluate)
+    results = service(colors).run(b"image")
+    assert [r.params["max_colors"] for r in results] == [8, 4, 12]
+    assert [r.candidate_id for r in results] == [1, 2, 3]
+    assert not any(r.is_baseline for r in results)
+    assert all(not hasattr(r, "mae") and not hasattr(r, "rank") for r in results)
 
 
-class TestCooperativeCancel:
-    def test_cancel_stops_loop_between_evaluations(self, png_bytes, colors):
-        svc = _service(_WIDE_GRID, colors)
-        cancel = threading.Event()
-        threading.Timer(1.0, cancel.set).start()
+def test_current_settings_are_first_and_not_duplicated(colors, monkeypatch):
+    monkeypatch.setattr(Evaluator, "evaluate", fake_evaluate)
+    baseline = {"max_colors": 4, "color_threshold": 40, "detail_size": 0.6}
+    results = service(colors, baseline).run(b"image")
+    assert [r.params["max_colors"] for r in results] == [4, 8, 12]
+    assert [r.is_baseline for r in results] == [True, False, False]
+    assert baseline == {"max_colors": 4, "color_threshold": 40, "detail_size": 0.6}
 
-        results = svc.run(png_bytes, cancel=cancel)
 
-        total = 4 * 4 * 3 * 2
-        assert 0 < len(results) < total, (
-            f"expected partial results, got {len(results)}/{total}"
-        )
-        maes = [r.mae for r in results]
-        assert maes == sorted(maes)
+def test_cancellation_stops_between_candidates(colors, monkeypatch):
+    monkeypatch.setattr(Evaluator, "evaluate", fake_evaluate)
+    cancel = threading.Event()
+    events = []
 
-    def test_run_with_timeout_returns_partial_results(self, png_bytes, colors):
-        svc = _service(_WIDE_GRID, colors)
+    def on_result(result):
+        events.append(result)
+        cancel.set()
 
-        start = time.monotonic()
-        results = svc.run_with_timeout(png_bytes, timeout_seconds=2.0)
-        elapsed = time.monotonic() - start
+    results = service(colors).run(b"image", on_result=on_result, cancel=cancel)
+    assert len(results) == 1
+    assert events[0].candidate_id == 1
 
-        # Cancel honored within the grace period after the budget expires.
-        assert elapsed < 2.0 + 30.0
-        # Partial (or full) results come back ranked instead of an empty list.
-        assert len(results) >= 1
-        maes = [r.mae for r in results]
-        assert maes == sorted(maes)
-        assert [r.rank for r in results] == list(range(1, len(results) + 1))
 
-    def test_run_with_timeout_completes_small_grid(self, png_bytes, colors):
-        svc = _service(_TINY_GRID, colors)
+def test_budget_stops_between_candidates_after_preserving_first_preview(colors, monkeypatch):
+    calls = []
 
-        results = svc.run_with_timeout(png_bytes, timeout_seconds=120.0)
+    def evaluate(self, params, mode):
+        calls.append(params["max_colors"])
+        time.sleep(0.02)
+        return fake_evaluate(self, params, mode)
 
-        assert len(results) == 4  # 2 * 2 * 1 * 1
-        assert [r.rank for r in results] == [1, 2, 3, 4]
+    monkeypatch.setattr(Evaluator, "evaluate", evaluate)
+    results = service(colors).run(b"image", budget_seconds=0.01)
+    assert [r.params["max_colors"] for r in results] == [8]
+    assert calls == [8]
 
-    def test_current_params_are_always_evaluated_as_baseline(self, png_bytes, colors):
-        svc = _service(_TINY_GRID, colors)
-        baseline = {
-            "max_colors": 50,
-            "color_threshold": 35.0,
-            "detail_size": 0.42,
-        }
-        svc._config.baseline_params = {"pixel": baseline}
 
-        results = svc.run(png_bytes)
+def test_invalid_candidate_is_recorded_and_later_candidates_render(colors, monkeypatch):
+    def evaluate(self, params, mode):
+        if params["max_colors"] == 4:
+            raise ValueError("Invalid candidate")
+        return fake_evaluate(self, params, mode)
 
-        assert len(results) == 5
-        baseline_result = next(r for r in results if r.params["max_colors"] == 50)
-        assert baseline_result.params == {**baseline, "white_backing_layers": 1}
+    monkeypatch.setattr(Evaluator, "evaluate", evaluate)
+    failures = []
+    results = service(colors).run(b"image", on_candidate_error=lambda candidate_id, reason: failures.append((candidate_id, reason)))
+    assert [result.candidate_id for result in results] == [1, 3]
+    assert failures == [(2, "Invalid candidate")]
 
-    def test_timeout_thread_exits_after_cancel(self, png_bytes, colors):
-        """The worker thread must stop shortly after the budget expires."""
-        svc = _service(_WIDE_GRID, colors)
 
-        start = time.monotonic()
-        svc.run_with_timeout(png_bytes, timeout_seconds=1.0)
-        # After returning, give the abandoned-grace path a moment and check the
-        # loop is no longer appending: re-run with the same budget and confirm
-        # it returns promptly (no zombie CPU burn from the previous grid).
-        elapsed = time.monotonic() - start
-        assert elapsed < 1.0 + 30.0 + 5.0
+def test_unexpected_renderer_failure_remains_fail_stop(colors, monkeypatch):
+    def evaluate(self, params, mode):
+        if params["max_colors"] == 4:
+            raise RuntimeError("Renderer unavailable")
+        return fake_evaluate(self, params, mode)
+
+    monkeypatch.setattr(Evaluator, "evaluate", evaluate)
+    completed = []
+    with pytest.raises(RuntimeError, match="Renderer unavailable"):
+        service(colors).run(b"image", on_result=completed.append)
+    assert [result.candidate_id for result in completed] == [1]

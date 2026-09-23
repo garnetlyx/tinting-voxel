@@ -4,17 +4,16 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 
 ## Features
 
-- **Scientific Color Mixing** - the paper's forward model for every filament, transparent or opaque: staircase-measured per-channel td (`mu = ln10/td_rgb + k·A_ch`) or scalar td with capture compensation (`mu = alpha_s/(s_td·td^gamma_td) + k·A_ch`), composed by light-loss allocation
-- **N-Color Support (4–16 colors)** - Arbitrary color codes with custom hex values and per-color transmission/scattering parameters
+- **Optical Color Mixing** - One transmission formula for every filament: `T_ch = 10^(-d / TD_ch)`, composed by light-loss allocation using the filament hex color
+- **N-Color Support (4–16 colors)** - Arbitrary color codes with custom hex values and a single transmission-distance field, accepting one number or three RGB values
 - **Multiple Output Formats** - STL ZIP, SVG-STL, **3MF** (with named color objects), SVG-3MF, CSV, and slicer print-settings JSON
 - **Batch Processing** - Process up to 20 images in one run
-- **Palette Library** - Two built-in filament configurations, sharing the preset parameters
+- **Palette Library** - Four built-in filament configurations supplied by the backend catalog
 - **Interface Languages** - English and Simplified Chinese with automatic detection, persistent switching, and feature-based translation resources
 - **Bug Reports** - In-app feedback with optional page screenshots, conversion settings, and diagnostic logs
 - **3D WebGL Preview** - three.js render with orbit controls before export
-- **Parameter Auto-Search** - Sweep maxColors / colorThreshold combinations and pick the best variant
+- **Parameter Auto-Search** - Compare every successful maxColors / colorThreshold candidate, including the current settings, in evaluation order
 - **Greedy Meshing Optimization** - 70-80% file size reduction vs naive pixel-to-box approach
-- **Research-Backed Parameters** - Beer-Lambert parameters fitted against photos of printed test plates; model and calibration published as a [preprint](https://doi.org/10.31224/7794)
 
 ## Tech Stack
 
@@ -100,26 +99,25 @@ npm run dev:backend   # Backend only (port 8000)
 ## Usage
 
 1. Upload an image (PNG, JPG)
-2. Choose Bambu CMYWK Phase 6 (default), Bambu CMYW, or Clear CMYW, or configure custom N-color filaments (hex / td / k values).
+2. Choose Bambu CMYWK (default), Bambu CMYW, Clear CMYG, or Clear CMYW. Custom filaments need a hex color and one TD value; expand TD to enter separate R, G, and B values.
 3. Adjust processing parameters:
    - **maxColors**: Number of colors to extract (1-20)
    - **colorThreshold**: Color merge sensitivity (0-100)
-   - **layerHeight**: Layer thickness in mm (0.01-1.0)
+   - **layerHeight**: Thickness of one color layer: 0.08 mm for regular materials; 0.84 mm for high-transmission materials (three 0.28 mm slicer layers)
+   - **Backing**: Three backing color layers by default; choose the lightest or darkest available material
    - **pixelSize**: Pixel physical size in mm (0.01-1.0)
 4. Preview the processed image and 3D WebGL render
 5. Download STL ZIP / 3MF / SVG-STL / CSV / print-settings JSON
 
 ## API Endpoints
 
-Full endpoint list (22 routes across V1, V2 N-color, batch, palette, param-search, health) is in [AGENTS.md](AGENTS.md). Highlights:
+The full endpoint list is in [AGENTS.md](AGENTS.md). Highlights:
 
-### V1 (legacy CMYK)
+### Image Processing and CSV
 
 - `POST /api/process-image` — extract color blocks (pixel/SVG modes)
 - `POST /api/simulate-preview` — simulated print preview (vector mode)
 - `POST /api/download-csv` — color data CSV
-- `POST /api/download-stl` — STL ZIP (default Phase 6 CMYW)
-- `POST /api/download-svg-stl` — SVG-mode STL ZIP
 
 ### V2 (N-color)
 
@@ -205,21 +203,29 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - [Architecture](docs/ARCHITECTURE.md)
 - [Project Instructions](AGENTS.md)
 
-## Calibration
+## Material Properties and Research
 
-Each filament preset carries `hex`, td data (a scalar raw TD reading remapped by `alpha_s/td_scale/td_gamma` for the bambu paper fit, or staircase-measured per-channel `td_rgb` for the clear presets), and a fitted `k` (pigment absorption gain). Calibration is fitted offline against photos of printed test plates in the research repo and promoted into `backend/core/color_config.py` here.
+`backend/core/color_config.py` owns the built-in material catalog. Each material
+contains `name`, `hex`, and `transmission_distance`: a positive number in mm or
+three positive numbers in RGB order. A single value applies equally to all three
+channels. All built-in presets contain channel-specific TD values. Bambu CMYW/CMYWK
+share the effective RGB TD estimates from the existing Bambu staircase photographs
+(`tinting-voxel-research/data/results/bambu-cmywk-td-recovery/`).
+Photo-specific calibration terms stay in the research analysis.
 
-The forward model, the staircase / dual-backing measurement procedure, and the validation behind these presets are published as a preprint:
+Production uses these material values directly. Photograph exposure, white-balance
+adjustments, and fitted capture corrections belong to the companion research
+repository and are not product material inputs.
+
+The related measurement and modeling research is published as:
 
 > Garnet Liu. *Predicting Stacked-Filament Color from Independently Measured Filament Properties.* EngXiv preprint, September 2026. [doi:10.31224/7794](https://doi.org/10.31224/7794) (CC BY 4.0)
-
-Summary: per-filament properties (nominal RGB `hex`, transmission-distance data — per-channel staircase or scalar with capture compensation — and attenuation gain `k`) compose into stack color through the paper's forward model and the loss-allocation stacking rule. The published validation: staircase-measured TDs predict unseen transparent stacks at 18.6–31.8 vs 38.7–61.8 ΔE00 for preset scalars; fitted coefficients carry five arbitrary filaments at 6.9 ΔE00; on ColorChecker prints the model reaches 16.69 vs 30.92 ΔE00 for the community TD-table formula. The full mathematical reference lives in the companion research repository (`tinting-voxel-research/docs/BLEND_FUNCTIONS.md`). Note that calibrated parameters are **process-conditioned**: valid only for the filament × printer × profile combination they were fitted on, so calibration and application prints must share the same slicer profile.
 
 ## How It Works
 
 1. **Color Extraction** - K-means clustering extracts dominant colors from image (CIELAB distance, vectorized)
 2. **N-Color Mapping** - Colors mapped to configured filament primaries using CIEDE2000 perceptual matching with hue preservation for dark chromatic colors
-3. **Beer-Lambert Model** - Hybrid per-channel-k optical model calculates light transmission through transparent layers
+3. **Beer-Lambert Model** - `T_ch = 10^(-d / TD_ch)` calculates each layer’s transmission; the same stacking rule applies to every material
 4. **Mesh Generation** - Creates layered 3D mesh with greedy meshing optimization (70-80% box-count reduction)
 
 ## License

@@ -42,8 +42,6 @@ interface ParameterPanelProps {
   onWhiteBackingLayersChange: (value: number) => void;
   backingMode: 'white' | 'black';
   onBackingModeChange: (mode: 'white' | 'black') => void;
-  // Transparency classification (drives the layer-height default)
-  allTransparent: boolean;
   // Base plate
   // Double-sided
   printStack: PrintStackInfo;
@@ -83,7 +81,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   onWhiteBackingLayersChange,
   backingMode,
   onBackingModeChange,
-  allTransparent,
   printStack,
   onReprocess,
   processing,
@@ -145,7 +142,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               onChange={(e) => onColorThresholdChange(parseInt(e.target.value))}
               className="w-full"
             />
-            <p className="text-xs text-gray-500 mt-1">{t('parameters:colorMergeThresholdHelp')}</p>
           </div>
         </>
       ) : (
@@ -175,7 +171,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               onChange={(e) => onEpsilonChange(parseFloat(e.target.value))}
               className="w-full"
             />
-            <p className="text-xs text-gray-500 mt-1">{t('parameters:simplificationHelp')}</p>
           </div>
 
           <div>
@@ -190,7 +185,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               onChange={(e) => onMinAreaChange(parseFloat(e.target.value))}
               className="w-full"
             />
-            <p className="text-xs text-gray-500 mt-1">{t('parameters:minimumAreaHelp')}</p>
           </div>
         </>
       )}
@@ -207,7 +201,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           onChange={(e) => onLayerCountChange(parseInt(e.target.value, 10))}
           className="w-full"
         />
-        <p className="text-xs text-gray-500 mt-1">{t('parameters:layerCountHelp')}</p>
       </div>
 
       <div>
@@ -222,9 +215,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
           onChange={(e) => onLayerHeightChange(parseFloat(e.target.value))}
           className="w-full"
         />
-        {allTransparent && (
-          <p className="text-xs text-emerald-700 mt-1">{t('parameters:allTransparentNote')}</p>
-        )}
       </div>
 
       <div>
@@ -248,7 +238,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-500 mt-1">{t('parameters:detailSizeHelp')}</p>
       </div>
 
       <div>
@@ -256,14 +245,13 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
         </label>
         <input
           type="range"
-          min="0.2"
-          max="2"
-          step="0.01"
+          min="0.01"
+          max="5"
+          step="any"
           value={pixelSize}
           onChange={(e) => onPixelSizeChange(parseFloat(e.target.value))}
           className="w-full"
         />
-        <p className="text-xs text-gray-500 mt-1">{t('parameters:pixelSizeHelp')}</p>
       </div>
 
       {targetWidth > 0 && (
@@ -331,7 +319,6 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-500 mt-1">{t('parameters:backingModeHelp')}</p>
       </div>
 
       <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">{t('parameters:actualExportHeight')}{' '}{printStack.totalHeightMm.toFixed(2)} mm

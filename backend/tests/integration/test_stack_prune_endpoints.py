@@ -1,38 +1,28 @@
-"""
-Endpoint regression: an edited Clear palette (custom filamentColors carrying
-hex + td + k, optional td_rgb staircase data, optional scalar-form capture
-compensation alpha_s/td_scale/td_gamma) must keep the translucent prune
-regime through the process-image request path, and removed schema fields
-(alpha, td_neutral, k_rgb) are rejected instead of silently discarded.
-"""
+"""Single TD payloads reach processing; obsolete optical fields are rejected."""
 import io
 import json
 
 from PIL import Image
 
 EDITED_CLEAR = [
-        {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "k": 0.0},
-        {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3, "k": 0.0},
-        {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1, "k": 0.0},
-        {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0, "k": 0.0},
+        {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7},
+        {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3},
+        {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1},
+        {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0},
     ]
 
 
-# Current schema fields that must be ACCEPTED (single-color sets are
-# invalid for other reasons — wrong color count — so each variant is paired
-# with valid siblings; acceptance = not a 422/400 field-validation error on
-# the field itself, i.e. the payload parses).
 ACCEPTED_FIELD_VARIANTS = [
-    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "td_rgb": [1.0, 2.0, 3.0]},
-    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "alpha_s": 2.2292},
-    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "td_scale": 1.48},
-    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "td_gamma": 0.2},
+    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7},
+    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": [1.0, 2.0, 3.0]},
 ]
 
 REMOVED_FIELDS = [
-    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "td_neutral": 48.9},
-    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "alpha": 12.0},
-    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, "k_rgb": [1.0, 2.0, 3.0]},
+    {"name": "Cyan", "hex": "#5489B4", "transmission_distance": 4.7, field: value}
+    for field, value in {
+        "td_rgb": [1., 2., 3.], "td_neutral": 48.9, "alpha": 12., "k": 0.,
+        "k_rgb": [1., 2., 3.], "alpha_s": 2.2292, "td_scale": 1.48, "td_gamma": .2,
+    }.items()
 ]
 
 
@@ -55,16 +45,14 @@ def test_process_image_endpoint_accepts_edited_clear_palette(client):
 
 
 def test_current_schema_fields_are_accepted(client):
-    """td_rgb / alpha_s / td_scale / td_gamma are live schema fields (paper
-    forms (i) and Eqs. (1)-(2)); a palette built around each variant must
-    process successfully."""
+    """Both TD input shapes use the current production model."""
     buf = io.BytesIO()
     Image.new("RGB", (32, 32), (200, 60, 60)).save(buf, format="PNG")
     for variant in ACCEPTED_FIELD_VARIANTS:
         siblings = [
-            {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3, "k": 0.0},
-            {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1, "k": 0.0},
-            {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0, "k": 0.0},
+            {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3},
+            {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1},
+            {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0},
         ]
         resp = client.post(
             "/api/process-image",
@@ -89,9 +77,9 @@ def test_removed_schema_fields_are_rejected(client):
     buf = io.BytesIO()
     Image.new("RGB", (32, 32), (200, 60, 60)).save(buf, format="PNG")
     siblings = [
-        {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3, "k": 0.0},
-        {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1, "k": 0.0},
-        {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0, "k": 0.0},
+        {"name": "Magenta", "hex": "#DE5740", "transmission_distance": 6.3},
+        {"name": "Yellow", "hex": "#DDC465", "transmission_distance": 10.1},
+        {"name": "White", "hex": "#D9D6C5", "transmission_distance": 18.0},
     ]
     for colors in REMOVED_FIELDS:
         removed_field = next(k for k in colors if k not in siblings[0])

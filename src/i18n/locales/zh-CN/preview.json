@@ -37,7 +37,5 @@
   "intermediate": "中间结果",
   "resetCamera": "重置视角",
   "topDownView": "俯视图",
-  "toggleExplodedView": "切换分层视图",
-  "mappingHelp": "将原图颜色映射到本图所用的最接近的可打印混色。",
-  "colorEditingHelp": "点击颜色进行编辑。使用“合并”组合两种颜色，或使用“删除”移除颜色。"
+  "toggleExplodedView": "切换分层视图"
 }

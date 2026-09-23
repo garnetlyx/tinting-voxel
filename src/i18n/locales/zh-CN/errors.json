@@ -13,6 +13,8 @@
   "failedToLoadPalettes": "配色加载失败",
   "failedToLoadPreview": "预览加载失败",
   "failedToStartParameterSearch": "无法开始参数优化",
+  "searchAlreadyRunning": "另一轮方案比较仍在运行，请稍后重试。",
+  "searchStoppedAtLimit": "本轮搜索在 {{seconds}} 秒后停止，已生成 {{completed}}／{{total}} 张方案图。",
   "optimizationFailedPleaseTryAgain": "参数优化失败，请重试。",
   "tooManyReportsPleaseTryAgainInAnHour": "反馈次数过多，请一小时后重试。",
   "couldNotSendYourReportPleaseTryAgain": "反馈发送失败，请重试。",

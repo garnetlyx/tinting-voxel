@@ -1,10 +1,7 @@
+import React, { useId, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useTranslation } from '../i18n';
-/**
- * Single row for editing one filament color configuration
- */
-import React from 'react';
-import { Trash2, ChevronsUpDown } from 'lucide-react';
-import type { FilamentColorConfig } from '../api/types';
+import type { FilamentColorConfig, TransmissionDistance } from '../api/types';
 
 interface FilamentColorRowProps {
   config: FilamentColorConfig;
@@ -12,7 +9,6 @@ interface FilamentColorRowProps {
   onChange: (index: number, updated: FilamentColorConfig) => void;
   onRemove: (index: number) => void;
   canRemove: boolean;
-  existingLabels: string[];
 }
 
 export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
@@ -21,151 +17,90 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
   onChange,
   onRemove,
   canRemove,
-  existingLabels,
 }) => {
   const { t } = useTranslation();
-  const label = config.name?.[0]?.toUpperCase() ?? '';
-  const isDuplicate = label && existingLabels.filter(l => l === label).length > 1;
-  const isEmptyName = !config.name.trim();
+  const [showChannels, setShowChannels] = useState(false);
+  const channelsId = useId();
+  const label = config.name[0]?.toUpperCase() ?? '';
+  const td = config.transmission_distance;
+  const channels: [number, number, number] = Array.isArray(td) ? td : [td, td, td];
+  const displayedTd = Array.isArray(td) ? Number((td.reduce((sum, value) => sum + value, 0) / td.length).toPrecision(4)) : td;
 
   return (
-    <div className="flex items-center gap-2">
-      {/* Color picker */}
-      <input
-        type="color"
-        value={config.hex}
-        onChange={(e) => onChange(index, { ...config, hex: e.target.value })}
-        className="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
-        title={t('filaments:pickColor')}
-      />
-
-      {/* Stable code editor; existing canonical names remain unchanged until edited. */}
-      <div className="flex-1 min-w-0">
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
         <input
-          type="text"
-          value={label}
-          maxLength={1}
-          onChange={(e) => {
-            const code = e.target.value.toUpperCase();
-            if (/^[A-Z]?$/.test(code)) onChange(index, { ...config, name: code });
-          }}
-          title={isDuplicate ? t('filaments:duplicateLabel') : t('filaments:label', { code: label })}
-          aria-invalid={Boolean(isDuplicate || isEmptyName)}
-          placeholder={t('filaments:codeName')}
-          aria-label={t('common:colorEntry', { index: index + 1, code: label || '?', hex: config.hex })}
-          className={`w-full px-2 py-1 text-sm border rounded ${
-            isDuplicate || isEmptyName ? 'border-red-400 bg-red-50' : 'border-gray-300'
-          }`}
+          type="color"
+          value={config.hex}
+          onChange={(e) => onChange(index, { ...config, hex: e.target.value })}
+          className="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+          title={t('filaments:pickColor')}
         />
-      </div>
-
-      {/* Transmission distance — the one composite TD this color carries;
-          it drives blending, classification, everything. Per-channel
-          staircase TDs (R/G/B) when the color carries them. */}
-      {config.td_rgb ? (
-        <div className="flex gap-1">
-          {([0, 1, 2] as const).map((ch) => {
-            const channels = config.td_rgb!;
-            return (
-            <input
-              key={ch}
-              type="number"
-              aria-label={t('filaments:tdRgbEntry', { index: index + 1, channel: 'RGB'[ch] })}
-              value={channels[ch]}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
-                if (!isNaN(val) && val > 0 && val <= 1000) {
-                  const next = [...channels];
-                  next[ch] = val;
-                  onChange(index, { ...config, td_rgb: next });
-                }
-              }}
-              min={0.1}
-              max={1000}
-              step={0.1}
-              className="w-14 px-1 py-1 text-sm border rounded text-right border-gray-300"
-              title={t('filaments:tdRgbHelp')}
-            />
-            );
-          })}
+        <span className="flex-1 min-w-0 px-2 text-sm" title={t('filaments:label', { code: label })}>
+          {label}
+        </span>
+        <div className="w-36 flex items-center gap-1">
+          <input
+            type="number"
+            aria-label={t('filaments:tdEntry', { index: index + 1 })}
+            value={displayedTd || ''}
+            onChange={(e) => {
+              const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+              if (!isNaN(value) && value >= 0 && value <= 1000) {
+                onChange(index, { ...config, transmission_distance: value });
+              }
+            }}
+            min={0}
+            max={1000}
+            step="any"
+            className="w-20 px-2 py-1 text-sm border rounded text-right border-gray-300"
+          />
+          <button
+            type="button"
+            onClick={() => setShowChannels((visible) => !visible)}
+            aria-expanded={showChannels}
+            aria-controls={channelsId}
+            className="px-1 py-1 text-xs text-purple-600 hover:text-purple-800 rounded"
+          >
+            {t('filaments:rgb')}
+          </button>
         </div>
-      ) : (
-        <input
-          type="number"
-          aria-label={t('filaments:tdEntry', { index: index + 1 })}
-          value={config.transmission_distance}
-          onChange={(e) => {
-            const val = parseFloat(e.target.value);
-            // Allow any valid number including 0 (for intermediate input like "0.5")
-            // The > 0 validation is done at form level (isFilamentConfigValid)
-            if (!isNaN(val) && val >= 0 && val <= 1000) {
-              onChange(index, { ...config, transmission_distance: val });
-            }
-          }}
-          min={0.1}
-          max={1000}
-          step={0.1}
-          className="w-20 px-2 py-1 text-sm border rounded text-right border-gray-300"
-          title={t('filaments:transmissionDistanceMustBe0')}
-        />
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          disabled={!canRemove}
+          className="p-1 rounded hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          title={canRemove ? t('filaments:removeColor') : t('filaments:minimum4ColorsRequired')}
+        >
+          <Trash2 className="w-4 h-4 text-red-500" />
+        </button>
+      </div>
+      {showChannels && (
+        <div id={channelsId} className="flex justify-end gap-2 pr-8 text-xs text-gray-500">
+          {channels.map((value, channel) => (
+            <label key={channel} className="flex items-center gap-1">
+              {'RGB'[channel]}
+              <input
+                type="number"
+                aria-label={t('filaments:tdChannel', { index: index + 1, channel: 'RGB'[channel] })}
+                value={value || ''}
+                min={0}
+                max={1000}
+                step="any"
+                onChange={(e) => {
+                  const updated = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                  if (!isNaN(updated) && updated >= 0 && updated <= 1000) {
+                    const next: TransmissionDistance = [...channels];
+                    next[channel] = updated;
+                    onChange(index, { ...config, transmission_distance: next });
+                  }
+                }}
+                className="w-16 rounded border border-gray-300 px-1 py-1 text-right"
+              />
+            </label>
+          ))}
+        </div>
       )}
-
-      {/* Toggle scalar / per-channel td. */}
-      <button
-        type="button"
-        onClick={() => {
-          if (config.td_rgb) {
-            // Collapse: keep the channel mean as the scalar td.
-            const mean = config.td_rgb.reduce((a, b) => a + b, 0) / config.td_rgb.length;
-            const { td_rgb: _drop, ...rest } = config;
-            onChange(index, { ...rest, transmission_distance: mean });
-          } else {
-            onChange(index, {
-              ...config,
-              td_rgb: [config.transmission_distance, config.transmission_distance, config.transmission_distance],
-            });
-          }
-        }}
-        className="p-1 text-gray-400 hover:text-gray-600"
-        title={config.td_rgb ? t('filaments:tdPerChannelOff') : t('filaments:tdPerChannelOn')}
-        aria-label={config.td_rgb ? t('filaments:tdPerChannelOff') : t('filaments:tdPerChannelOn')}
-      >
-        <ChevronsUpDown size={14} />
-      </button>
-
-      {/* Optional pigment absorption gain. Calibrated presets carry a
-          fitted value; 0 (or cleared) blends as plain Beer-Lambert. */}
-      <input
-        type="number"
-        aria-label={t('filaments:kEntry', { index: index + 1 })}
-        value={config.k ?? 0}
-        onChange={(e) => {
-          const raw = e.target.value;
-          if (raw === '') {
-            onChange(index, { ...config, k: 0 });
-            return;
-          }
-          const val = parseFloat(raw);
-          if (!isNaN(val) && val >= 0 && val <= 1000) {
-            onChange(index, { ...config, k: val });
-          }
-        }}
-        min={0}
-        max={1000}
-        step={0.01}
-        className="w-16 px-2 py-1 text-sm border rounded text-right border-gray-300"
-        title={t('filaments:kHelp')}
-      />
-
-      {/* Remove button */}
-      <button
-        onClick={() => onRemove(index)}
-        disabled={!canRemove}
-        className="p-1 rounded hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        title={canRemove ? t('filaments:removeColor') : t('filaments:minimum4ColorsRequired')}
-      >
-        <Trash2 className="w-4 h-4 text-red-500" />
-      </button>
     </div>
   );
 };
