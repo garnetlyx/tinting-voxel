@@ -8,8 +8,9 @@ from io import BytesIO
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
 from PIL import Image
+from starlette.concurrency import run_in_threadpool
 
 from api.error_handlers import handle_api_errors
 from api.filament_payload import (
@@ -25,6 +26,7 @@ from api.models import (
     SVGProcessImageResponse,
 )
 from api.rate_limiter import limiter
+from api.responses import json_response
 from api.validators import validate_image_upload
 from services.image_processor import (
     MAX_PROCESSING_DIMENSION,
@@ -88,37 +90,59 @@ async def api_process_image(
     layerHeight = resolve_layer_height(layerHeight, colors)
 
     if processing_mode == ProcessingMode.PIXEL:
-        result = process_image(
-            image_bytes=image_bytes,
-            max_colors=maxColors,
-            color_threshold=colorThreshold,
-            pixel_size=pixelSize,
-            filament_colors=colors,
-            layer_count=layerCount,
-            layer_height=layerHeight,
-            white_backing_layers=whiteBackingLayers,
-            backing_mode=backingMode,
-            detail_size=detailSize,
-        )
+        def build_pixel_response() -> Response:
+            result = process_image(
+                image_bytes=image_bytes,
+                max_colors=maxColors,
+                color_threshold=colorThreshold,
+                pixel_size=pixelSize,
+                filament_colors=colors,
+                layer_count=layerCount,
+                layer_height=layerHeight,
+                white_backing_layers=whiteBackingLayers,
+                backing_mode=backingMode,
+                detail_size=detailSize,
+            )
 
-        logger.info(
-            "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.2f, detailSize=%s",
-            maxColors, colorThreshold, pixelSize, str(detailSize)
-        )
-        logger.info(
-            "Processed image: %dx%d, extracted %d colors",
-            result['imageDimensions']['width'],
-            result['imageDimensions']['height'],
-            len(result['colorBlocks'])
-        )
+            logger.info(
+                "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.2f, detailSize=%s",
+                maxColors, colorThreshold, pixelSize, str(detailSize)
+            )
+            logger.info(
+                "Processed image: %dx%d, extracted %d colors",
+                result['imageDimensions']['width'],
+                result['imageDimensions']['height'],
+                len(result['colorBlocks'])
+            )
 
-        return ProcessImageResponse(
-            **result,
-            pixelSize=pixelSize,
-            detailSize=detailSize,
-        )
+            return json_response(ProcessImageResponse(
+                **result,
+                pixelSize=pixelSize,
+                detailSize=detailSize,
+            ))
 
-    # SVG mode
+        return await run_in_threadpool(build_pixel_response)
+
+    return await run_in_threadpool(
+        _svg_mode_response, image_bytes, epsilon, minArea, numColors, pixelSize, detailSize,
+        colors, layerCount, layerHeight, whiteBackingLayers, backingMode,
+    )
+
+
+def _svg_mode_response(
+    image_bytes: bytes,
+    epsilon: float,
+    minArea: float,
+    numColors: int,
+    pixelSize: float,
+    detailSize: Optional[float],
+    colors,
+    layerCount: int,
+    layerHeight: float,
+    whiteBackingLayers: int,
+    backingMode: str,
+) -> Response:
+    """Vectorize, map and preview an image in SVG mode (runs in a worker thread)."""
     img = Image.open(BytesIO(image_bytes))
     # Convert RGBA to RGB with white background if needed
     if img.mode == 'RGBA':
@@ -206,7 +230,7 @@ async def api_process_image(
         ref_matrices=(ref_code_matrix, ref_rgb_matrix),  # Pass pre-computed matrices
     )
 
-    return SVGProcessImageResponse(
+    return json_response(SVGProcessImageResponse(
         vectorResults=vector_results,
         processedImage=simulated_preview["processedImage"],
         segmentationImage=segmentation_image_data_url,
@@ -215,7 +239,7 @@ async def api_process_image(
         pixelSize=pixelSize,
         detailSize=detailSize,
         printStack=simulated_preview["printStack"],
-    )
+    ))
 
 
 @router.post("/simulate-preview", response_model=SimulatedPrintPreviewResponse)
@@ -224,13 +248,17 @@ async def api_process_image(
 async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
     """Generate an image-specific simulated print preview from current color blocks."""
     colors = body.resolved_colors
-    result = build_simulated_print_preview(
-        color_blocks=[block.model_dump() for block in body.colorBlocks],
-        image_dimensions=body.imageDimensions.model_dump(),
-        colors=colors,
-        layer_count=body.layerCount,
-        layer_height=body.layerHeight,
-        white_backing_layers=body.whiteBackingLayers,
-        backing_mode=body.backingMode,
-    )
-    return SimulatedPrintPreviewResponse(**result)
+
+    def build_preview_response() -> Response:
+        result = build_simulated_print_preview(
+            color_blocks=[block.model_dump() for block in body.colorBlocks],
+            image_dimensions=body.imageDimensions.model_dump(),
+            colors=colors,
+            layer_count=body.layerCount,
+            layer_height=body.layerHeight,
+            white_backing_layers=body.whiteBackingLayers,
+            backing_mode=body.backingMode,
+        )
+        return json_response(SimulatedPrintPreviewResponse(**result))
+
+    return await run_in_threadpool(build_preview_response)

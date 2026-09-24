@@ -3,6 +3,7 @@ import logging
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
 from api.error_handlers import handle_api_errors
 from api.rate_limiter import limiter
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/api", tags=["Downloads"])
 async def api_download_csv(request: Request, body: DownloadCSVRequest):
     """Generate and download CSV file with color data."""
     color_blocks = [block.model_dump() for block in body.colorBlocks]
-    csv_content = generate_csv(color_blocks)
+    csv_content = await run_in_threadpool(generate_csv, color_blocks)
 
     logger.info("Generated CSV for %d colors", len(color_blocks))
 

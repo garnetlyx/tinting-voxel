@@ -7,11 +7,13 @@ from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
 from api.error_handlers import handle_api_errors
 from api.filament_payload import get_colors_from_request, parse_filament_form_payload, resolve_layer_height
 from api.models import BatchProcessResponse
 from api.rate_limiter import limiter
+from api.responses import json_response
 from services.batch_processor import (
     MAX_BATCH_SIZE,
     generate_batch_stl_zip,
@@ -72,7 +74,8 @@ async def api_batch_process(
     files = await _read_batch_files(images)
 
     # Use pixel_size directly - detail_size is now handled by pixel merging
-    result = process_batch_images(
+    result = await run_in_threadpool(
+        process_batch_images,
         files=files,
         max_colors=maxColors,
         color_threshold=colorThreshold,
@@ -85,7 +88,7 @@ async def api_batch_process(
         result['totalImages'], result['successCount'], result['errorCount'],
     )
 
-    return BatchProcessResponse(**result)
+    return await run_in_threadpool(lambda: json_response(BatchProcessResponse(**result)))
 
 
 @router.post("/download-stl")
@@ -109,7 +112,8 @@ async def api_batch_download_stl(
     _validate_batch_input(images)
     files = await _read_batch_files(images)
 
-    batch_result = process_batch_images(
+    batch_result = await run_in_threadpool(
+        process_batch_images,
         files=files,
         max_colors=maxColors,
         color_threshold=colorThreshold,
@@ -125,7 +129,8 @@ async def api_batch_download_stl(
     colors = get_colors_from_request(parsed_preset, parsed_colors)
     layerHeight = resolve_layer_height(layerHeight, colors)
 
-    zip_content = generate_batch_stl_zip(
+    zip_content = await run_in_threadpool(
+        generate_batch_stl_zip,
         batch_results=batch_result['results'],
         layer_height=layerHeight,
         pixel_size=pixelSize,

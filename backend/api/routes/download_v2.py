@@ -7,6 +7,7 @@ import logging
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
 from api.error_handlers import handle_api_errors
 from api.rate_limiter import limiter
@@ -78,7 +79,8 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
     color_blocks = [block.model_dump() for block in body.colorBlocks]
     image_dimensions = body.imageDimensions.model_dump()
 
-    zip_content = generate_stl_zip(
+    zip_content = await run_in_threadpool(
+        generate_stl_zip,
         color_blocks=color_blocks,
         layer_height=body.layerHeight,
         pixel_size=body.pixelSize,
@@ -111,7 +113,8 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
     vector_results = [result.model_dump() for result in body.vectorResults]
     image_dimensions = body.imageDimensions.model_dump()
 
-    zip_content = generate_svg_stl_zip(
+    zip_content = await run_in_threadpool(
+        generate_svg_stl_zip,
         vector_results=vector_results,
         layer_height=body.layerHeight,
         pixel_size=body.pixelSize,
@@ -154,7 +157,8 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
         for label in colors.get_labels():
             color_hex_map[label] = colors[label].hex
 
-    threemf_content = generate_3mf(
+    threemf_content = await run_in_threadpool(
+        generate_3mf,
         color_blocks=color_blocks,
         layer_height=body.layerHeight,
         pixel_size=body.pixelSize,
@@ -195,7 +199,8 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
         for label in colors.get_labels():
             color_hex_map[label] = colors[label].hex
 
-    threemf_content = generate_svg_3mf(
+    threemf_content = await run_in_threadpool(
+        generate_svg_3mf,
         vector_results=vector_results,
         layer_height=body.layerHeight,
         pixel_size=body.pixelSize,

@@ -201,9 +201,18 @@ npx playwright test
 3. Calculate color mixing using `T_ch = 10^(-d / TD_ch)` and light-loss allocation
 4. Generate layered output (STL/3MF) with greedy meshing optimization
 
+Stack search (`compute_reference_matrices`) blends every ordered code on index
+arrays in parallel and keeps one code per distinct 8-bit color (the first in
+enumeration order), which matches exactly what matching every code returns.
+Enumeration plus matching must fit `full_enumeration_budget_seconds`; over
+budget, translucent sets use composition pruning and opaque sets are rejected.
+
 ### Key Patterns
 - `FilamentConfigMixin` in `models.py` provides shared filament validation
 - `@handle_api_errors` decorator in `error_handlers.py` standardizes error handling
+- Handlers are `async`; CPU-heavy work (processing, previews, exports, batch)
+  runs through `run_in_threadpool`, and large JSON responses are serialized in
+  that thread with `api/responses.py`, so the single worker keeps serving
 - Rate limiting via `slowapi` on all endpoints, keyed on the visitor address from
   `api/client_ip.py` (Railway's `X-Real-IP`; `CF-Connecting-IP` only from
   Cloudflare's published ranges)

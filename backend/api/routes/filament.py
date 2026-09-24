@@ -6,6 +6,7 @@ Generates a visual preview of achievable colors from a filament configuration.
 import logging
 
 from fastapi import APIRouter, Request
+from starlette.concurrency import run_in_threadpool
 
 from api.error_handlers import handle_api_errors
 from api.models import FilamentPreviewRequest, FilamentPreviewResponse
@@ -31,8 +32,8 @@ async def api_filament_preview(request: Request, body: FilamentPreviewRequest):
         backing_mode=body.backingMode,
     )
 
-    result = service.generate_preview(page=body.page, page_size=body.pageSize)
-    warnings = service.check_similar_colors()
+    result = await run_in_threadpool(service.generate_preview, page=body.page, page_size=body.pageSize)
+    warnings = await run_in_threadpool(service.check_similar_colors)
 
     logger.info(
         "Generated filament preview: %d colors, %d combinations",
