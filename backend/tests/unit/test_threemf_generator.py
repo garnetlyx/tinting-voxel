@@ -5,6 +5,7 @@ from io import BytesIO
 
 from core.blend_color import Colors
 from services.threemf_generator import generate_3mf
+from tests.label_maps import labels_from_blocks
 
 
 def test_svg_3mf_uses_selected_backing_and_detail_size(monkeypatch, default_colors):
@@ -77,7 +78,7 @@ class TestGenerate3MF:
             layer_height=0.08,
             pixel_size=0.08,
             layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
+            labels=labels_from_blocks(simple_color_blocks, 4, 4),
             colors=default_colors,
         )
         assert isinstance(result, bytes)
@@ -90,7 +91,7 @@ class TestGenerate3MF:
             layer_height=0.08,
             pixel_size=0.08,
             layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
+            labels=labels_from_blocks(simple_color_blocks, 4, 4),
             colors=default_colors,
         )
         buf = BytesIO(result)
@@ -103,7 +104,7 @@ class TestGenerate3MF:
             layer_height=0.08,
             pixel_size=0.08,
             layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
+            labels=labels_from_blocks(simple_color_blocks, 4, 4),
             colors=default_colors,
         )
         buf = BytesIO(result)
@@ -117,10 +118,10 @@ class TestGenerate3MF:
         with pytest.raises(ValueError, match="No color blocks"):
             generate_3mf(
                 color_blocks=[],
+                labels=labels_from_blocks([], 4, 4),
                 layer_height=0.08,
                 pixel_size=0.08,
                 layer_count=4,
-                image_dimensions={'width': 4, 'height': 4},
                 colors=default_colors,
             )
 
@@ -132,7 +133,7 @@ class TestGenerate3MF:
                 layer_height=0.08,
                 pixel_size=0.08,
                 layer_count=4,
-                image_dimensions={'width': 4, 'height': 4},
+                labels=labels_from_blocks(simple_color_blocks, 4, 4),
                 colors=None,
             )
 
@@ -143,7 +144,7 @@ class TestGenerate3MF:
             layer_height=0.08,
             pixel_size=0.08,
             layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
+            labels=labels_from_blocks(simple_color_blocks, 4, 4),
             colors=default_colors,
             color_hex_map={'C': '#0086D6', 'M': '#EC008C', 'Y': '#F4EE2A', 'W': '#FFFFFF'},
         )

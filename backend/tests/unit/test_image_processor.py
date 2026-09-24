@@ -17,6 +17,7 @@ from services.image_processor import (
     process_image,
     resample_to_model_grid,
 )
+from tests.label_maps import labels_from_blocks
 
 
 def _create_image_bytes(width, height, color=(255, 0, 0), fmt='PNG'):
@@ -160,7 +161,7 @@ class TestProcessImageLargeHandling:
 
         result = build_simulated_print_preview(
             color_blocks=color_blocks,
-            image_dimensions={'width': 2, 'height': 2},
+            labels=labels_from_blocks(color_blocks, 2, 2),
             white_backing_layers=0,
         )
 
@@ -283,16 +284,15 @@ class TestProcessImageLargeHandling:
             },
         ]
 
-        merged = merge_small_pixels_to_neighbors(
+        merged, labels = merge_small_pixels_to_neighbors(
             color_blocks=color_blocks,
-            width=6,
-            height=2,
+            labels=labels_from_blocks(color_blocks, 6, 2),
             pixel_size=0.2,
             detail_size=0.4,
         )
 
         assert len(merged) == 1
-        assert merged[0]['count'] == 12
+        assert int((labels == 0).sum()) == 12
 
     def test_single_component_image_is_preserved(self):
         """A single-region image has no valid merge target and remains unchanged."""
@@ -303,16 +303,15 @@ class TestProcessImageLargeHandling:
             },
         ]
 
-        merged = merge_small_pixels_to_neighbors(
+        merged, labels = merge_small_pixels_to_neighbors(
             color_blocks=color_blocks,
-            width=2,
-            height=2,
+            labels=labels_from_blocks(color_blocks, 2, 2),
             pixel_size=0.2,
             detail_size=0.4,
         )
 
         assert len(merged) == 1
-        assert merged[0]['count'] == 4
+        assert int((labels == 0).sum()) == 4
 
     def test_process_image_widens_a_connector_between_large_regions(self):
         pixels = np.full((40, 50, 3), 255, dtype=np.uint8)
@@ -348,16 +347,15 @@ class TestProcessImageLargeHandling:
             },
         ]
 
-        merged = merge_small_pixels_to_neighbors(
+        merged, labels = merge_small_pixels_to_neighbors(
             color_blocks=color_blocks,
-            width=3,
-            height=3,
+            labels=labels_from_blocks(color_blocks, 3, 3),
             pixel_size=0.2,
             detail_size=0.4,
         )
 
         assert len(merged) == 1
-        assert merged[0]['count'] == 9
+        assert int((labels == 0).sum()) == 9
 
 
 def _stained_glass_bytes(width=240, height=180):

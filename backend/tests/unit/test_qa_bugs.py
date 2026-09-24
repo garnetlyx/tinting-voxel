@@ -14,6 +14,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 from PIL import Image
+from tests.label_maps import labels_from_blocks
+from tests.label_maps import label_map_request
 
 # -- Fixtures ----------------------------------------------------------------
 
@@ -112,7 +114,7 @@ class TestGlobalColorStateRace:
             layer_height=0.08,
             pixel_size=1.0,
             layer_count=4,
-            image_dimensions={'width': 10, 'height': 10},
+            labels=labels_from_blocks(sample_blocks, 10, 10),
             colors=colors
         )
         assert len(result) > 0  # Valid ZIP content
@@ -138,7 +140,7 @@ class TestGlobalColorStateRace:
             layer_height=0.08,
             pixel_size=1.0,
             layer_count=4,
-            image_dimensions=dims,
+            labels=labels_from_blocks(sample_blocks, **dims),
             colors=Colors()
         )
 
@@ -147,7 +149,7 @@ class TestGlobalColorStateRace:
             layer_height=0.08,
             pixel_size=1.0,
             layer_count=4,
-            image_dimensions=dims,
+            labels=labels_from_blocks(sample_blocks, **dims),
             colors=Colors.from_configs(get_preset('clear_cmyw'))
         )
 
@@ -222,16 +224,15 @@ class TestDuplicateHexColorsAllowed:
         # BUG: This should raise a validation error but doesn't
         try:
             request = DownloadSTLRequestV2(
-                colorBlocks=[{
+                **label_map_request([{
                     'r': 255, 'g': 0, 'b': 0,
                     'count': 1,
                     'pixels': [{'x': 0, 'y': 0}],
                     'hex': '#FF0000'
-                }],
+                }], 4, 4),
                 layerHeight=0.08,
                 pixelSize=0.08,
                 layerCount=4,
-                imageDimensions={'width': 4, 'height': 4},
                 filamentColors=colors
             )
             pytest.fail(
@@ -1151,7 +1152,7 @@ class TestEmptyColorBlocksZip:
                 layer_height=0.08,
                 pixel_size=0.08,
                 layer_count=4,
-                image_dimensions={'width': 4, 'height': 4},
+                labels=labels_from_blocks([], 4, 4),
                 colors=colors
             )
             # Check if ZIP is empty
@@ -1604,63 +1605,6 @@ class TestEmptyColorBlocksInOtherModels:
 
 
 
-# -- BUG QA-44: Pixels outside image bounds silently dropped --------------------
-# File: backend/services/mesh_optimizer.py:43-46
-# pixels_to_grid clips out-of-bounds pixels with `if 0 <= x < width and 0 <= y < height`
-# but does not warn or raise an error. This means a color block with count=5
-# and 5 pixels where 3 are out-of-bounds only generates geometry for 2 pixels.
-# The user sees the correct count in CSV but the STL has fewer pixels.
-
-
-class TestOutOfBoundsPixelsSilentlyDropped:
-    """
-    BUG QA-44: pixels_to_grid silently drops out-of-bounds pixel coordinates.
-
-    Line 43-46:
-        for pixel in pixels:
-            x, y = pixel['x'], pixel['y']
-            if 0 <= x < width and 0 <= y < height:
-                grid[y, x] = True
-
-    If a pixel has x=100 but image width=10, it's silently ignored.
-    The color block says count=1 but the grid has 0 pixels.
-    STL file is missing geometry that the user expects.
-
-    This can happen when:
-    1. Frontend sends pixel coordinates from a resized image
-    2. Image dimensions changed between processing and download
-    3. Manual API calls with mismatched dimensions
-
-    Fix: Log a warning when pixels are dropped, or raise ValueError.
-    """
-
-    def test_out_of_bounds_pixel_not_silently_dropped(self):
-        """All pixels outside image bounds should raise ValueError."""
-        from services.mesh_optimizer import pixels_to_grid
-
-        pixels = [{'x': 100, 'y': 100}]
-        with pytest.raises(ValueError, match="outside image bounds"):
-            pixels_to_grid(pixels, width=10, height=10)
-
-    def test_mixed_valid_and_invalid_pixels(self, caplog):
-        """Mix of valid and out-of-bounds pixels should warn about dropped ones."""
-        import logging
-        from services.mesh_optimizer import pixels_to_grid
-
-        pixels = [
-            {'x': 0, 'y': 0},    # Valid
-            {'x': 5, 'y': 5},    # Valid
-            {'x': 100, 'y': 0},  # Out of bounds
-            {'x': 0, 'y': 100},  # Out of bounds
-        ]
-        with caplog.at_level(logging.WARNING):
-            grid = pixels_to_grid(pixels, width=10, height=10)
-
-        # 2 valid pixels included, 2 out-of-bounds dropped with warning
-        assert grid.sum() == 2
-        assert "Dropped 2 of 4 pixels" in caplog.text
-
-
 # -- BUG QA-45: FilamentColorConfig.name validator doesn't strip ---------------
 # File: backend/api/models.py:27-32
 # validate_name checks if strip() is empty but doesn't apply strip().
@@ -1870,11 +1814,10 @@ class TestV2EmptyColorBlocksValidation:
 
         try:
             req = DownloadSTLRequestV2(
-                colorBlocks=[],
+                **label_map_request([], 4, 4),
                 layerHeight=0.08,
                 pixelSize=0.08,
                 layerCount=4,
-                imageDimensions={'width': 4, 'height': 4},
             )
             pytest.fail(
                 "BUG QA-49: DownloadSTLRequestV2 accepts empty colorBlocks. "
@@ -1903,14 +1846,13 @@ class TestLayerHeightPixelSizeNoBounds:
 
         try:
             req = DownloadSTLRequestV2(
-                colorBlocks=[ColorBlock(
+                **label_map_request([ColorBlock(
                     r=0, g=255, b=255, hex='#00FFFF', count=1,
                     pixels=[PixelCoordinate(x=0, y=0)]
-                )],
+                )], 4, 4),
                 layerHeight=999999.0,
                 pixelSize=0.08,
                 layerCount=4,
-                imageDimensions={'width': 4, 'height': 4},
             )
             pytest.fail(
                 f"BUG QA-51: DownloadSTLRequestV2 accepts layerHeight={req.layerHeight}. "
@@ -1926,14 +1868,13 @@ class TestLayerHeightPixelSizeNoBounds:
 
         try:
             req = DownloadSTLRequestV2(
-                colorBlocks=[ColorBlock(
+                **label_map_request([ColorBlock(
                     r=0, g=255, b=255, hex='#00FFFF', count=1,
                     pixels=[PixelCoordinate(x=0, y=0)]
-                )],
+                )], 4, 4),
                 layerHeight=0.08,
                 pixelSize=999999.0,
                 layerCount=4,
-                imageDimensions={'width': 4, 'height': 4},
             )
             pytest.fail(
                 f"BUG QA-51: DownloadSTLRequestV2 accepts pixelSize={req.pixelSize}. "

@@ -6,41 +6,8 @@ into larger rectangular blocks to reduce STL file size.
 """
 import numpy as np
 
-from services.mesh_optimizer import (
-    greedy_mesh_2d,
-    pixels_to_grid,
-)
-
-
-class TestPixelsToGrid:
-    """Tests for converting pixel list to 2D grid"""
-
-    def test_empty_pixels(self):
-        """Empty pixel list should return empty grid"""
-        pixels = []
-        grid = pixels_to_grid(pixels, width=10, height=10)
-        assert grid.shape == (10, 10)
-        assert not grid.any()
-
-    def test_single_pixel(self):
-        """Single pixel should be placed correctly"""
-        pixels = [{'x': 5, 'y': 3}]
-        grid = pixels_to_grid(pixels, width=10, height=10)
-        assert grid[3, 5]
-        assert grid.sum() == 1
-
-    def test_multiple_pixels(self):
-        """Multiple pixels should all be placed correctly"""
-        pixels = [
-            {'x': 0, 'y': 0},
-            {'x': 1, 'y': 0},
-            {'x': 2, 'y': 0},
-        ]
-        grid = pixels_to_grid(pixels, width=10, height=10)
-        assert grid[0, 0]
-        assert grid[0, 1]
-        assert grid[0, 2]
-        assert grid.sum() == 3
+from services.mesh_optimizer import greedy_mesh_2d
+from services.stl_generator import block_box_runs
 
 
 class TestGreedyMesh2D:
@@ -138,71 +105,46 @@ class TestMeshOptimizationIntegration:
         assert total_area == pixel_count
 
 
-class TestGenerateOptimizedBoxes:
-    """Tests for the generate_optimized_boxes function"""
+class TestBlockBoxRuns:
+    """Footprint meshing and extrusion of color blocks from a label map"""
 
-    def test_empty_pixels(self):
-        """Empty pixel list should return empty boxes list"""
-        from services.mesh_optimizer import generate_optimized_boxes
-        boxes = generate_optimized_boxes(
-            pixels=[],
-            width=10, height=10,
-            pixel_size=1.0,
-            z_min=0.0, z_max=1.0
-        )
-        assert len(boxes) == 0
+    @staticmethod
+    def _labels(cells: list[tuple[int, int]], width: int = 10, height: int = 10) -> np.ndarray:
+        labels = np.full((height, width), 255, dtype=np.uint8)
+        for x, y in cells:
+            labels[y, x] = 0
+        return labels
+
+    def test_empty_block(self):
+        """A block with no cells yields no boxes"""
+        assert list(block_box_runs(self._labels([]), ['C'], 1.0, 1.0)) == []
 
     def test_single_pixel_box(self):
         """Single pixel should return single box with correct dimensions"""
-        from services.mesh_optimizer import generate_optimized_boxes
-        pixels = [{'x': 5, 'y': 3}]
-        boxes = generate_optimized_boxes(
-            pixels=pixels,
-            width=10, height=10,
-            pixel_size=0.5,
-            z_min=0.0, z_max=0.08
-        )
-        assert len(boxes) == 1
-        xrange, yrange, zrange = boxes[0]
-        assert xrange == (2.5, 3.0)  # 5 * 0.5, 6 * 0.5
-        assert yrange == (1.5, 2.0)  # 3 * 0.5, 4 * 0.5
-        assert zrange == (0.0, 0.08)
+        runs = list(block_box_runs(self._labels([(5, 3)]), ['C'], 0.5, 0.08))
+        assert [(code, cells) for code, _, cells in runs] == [('C', 1)]
+        assert runs[0][1] == [((2.5, 3.0), (1.5, 2.0), (0.0, 0.08))]
 
     def test_merged_pixels_box(self):
         """Adjacent pixels should merge into single larger box"""
-        from services.mesh_optimizer import generate_optimized_boxes
-        pixels = [
-            {'x': 0, 'y': 0},
-            {'x': 1, 'y': 0},
-            {'x': 0, 'y': 1},
-            {'x': 1, 'y': 1},
-        ]
-        boxes = generate_optimized_boxes(
-            pixels=pixels,
-            width=10, height=10,
-            pixel_size=1.0,
-            z_min=0.0, z_max=1.0
-        )
-        # 2x2 grid should merge into single box
-        assert len(boxes) == 1
-        xrange, yrange, zrange = boxes[0]
-        assert xrange == (0.0, 2.0)
-        assert yrange == (0.0, 2.0)
+        runs = list(block_box_runs(self._labels([(0, 0), (1, 0), (0, 1), (1, 1)]), ['C'], 1.0, 1.0))
+        assert runs[0][1] == [((0.0, 2.0), (0.0, 2.0), (0.0, 1.0))]
 
     def test_separate_pixels_multiple_boxes(self):
         """Non-adjacent pixels should produce multiple boxes"""
-        from services.mesh_optimizer import generate_optimized_boxes
-        pixels = [
-            {'x': 0, 'y': 0},
-            {'x': 5, 'y': 5},
-        ]
-        boxes = generate_optimized_boxes(
-            pixels=pixels,
-            width=10, height=10,
-            pixel_size=1.0,
-            z_min=0.0, z_max=1.0
-        )
-        assert len(boxes) == 2
+        runs = list(block_box_runs(self._labels([(0, 0), (5, 5)]), ['C'], 1.0, 1.0))
+        assert len(runs[0][1]) == 2
+
+    def test_runs_extrude_the_footprint_per_filament(self):
+        """Each vertical run of the blend code extrudes the same footprint"""
+        runs = list(block_box_runs(self._labels([(0, 0), (1, 0)]), ['CCM'], 1.0, 0.5))
+        assert [(code, boxes[0][2]) for code, boxes, _ in runs] == [('C', (0.0, 1.0)), ('M', (1.0, 1.5))]
+        assert {boxes[0][:2] for _, boxes, _ in runs} == {((0.0, 2.0), (0.0, 1.0))}
+
+    def test_ungreedy_meshing_boxes_every_cell(self):
+        """Without greedy meshing every cell is its own box"""
+        runs = list(block_box_runs(self._labels([(0, 0), (1, 0)]), ['C'], 1.0, 1.0, use_greedy_meshing=False))
+        assert sorted(runs[0][1]) == [((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)), ((1.0, 2.0), (0.0, 1.0), (0.0, 1.0))]
 
     def test_max_rectangles_cap_aborts_noise(self):
         """The memory-budget cap must abort pathological grids instead of

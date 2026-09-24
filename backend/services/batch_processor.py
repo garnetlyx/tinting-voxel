@@ -64,6 +64,7 @@ def process_batch_images(
                 'filename': filename,
                 'status': 'success',
                 'colorBlocks': result['colorBlocks'],
+                'labels': result['labels'],
                 'processedImage': result['processedImage'],
                 'imageDimensions': result['imageDimensions'],
                 'pixelSize': result['pixelSize'],
@@ -100,7 +101,7 @@ def generate_batch_stl_zip(
 
     Args:
         batch_results: List of successful batch result dicts (with colorBlocks,
-            imageDimensions and the model pixelSize)
+            their label map and the model pixelSize)
         layer_height: Layer height in mm
         layer_count: Number of layers
         colors: Colors instance for color mapping
@@ -131,10 +132,10 @@ def generate_batch_stl_zip(
             try:
                 inner_zip_bytes = generate_stl_zip(
                     color_blocks=result['colorBlocks'],
+                    labels=result['labels'],
                     layer_height=layer_height,
                     pixel_size=result['pixelSize'],
                     layer_count=layer_count,
-                    image_dimensions=result['imageDimensions'],
                     colors=colors,
                     white_backing_layers=white_backing_layers,
                     backing_mode=backing_mode,

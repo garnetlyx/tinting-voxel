@@ -17,6 +17,7 @@ from core.blend_color import Colors, colors_key
 from core.blend_models import codes_to_rgb_batch
 from core.color_config import ColorConfig, get_preset
 from core.stack_prune import is_translucent_set
+from tests.label_maps import label_map_request
 
 
 def test_get_filament_presets(client):
@@ -130,11 +131,10 @@ def test_v2_stl_with_default_colors(client, sample_color_blocks_with_hex):
     response = client.post(
         "/api/v2/download-stl",
         json={
-            "colorBlocks": sample_color_blocks_with_hex,
+            **label_map_request(sample_color_blocks_with_hex, 4, 4),
             "layerHeight": 0.08,
             "pixelSize": 0.08,
             "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
             "filamentPreset": "bambu_cmyw",
         },
     )
@@ -157,11 +157,10 @@ def test_v2_stl_with_bambu_preset(client, sample_color_blocks_with_hex):
     response = client.post(
         "/api/v2/download-stl",
         json={
-            "colorBlocks": sample_color_blocks_with_hex,
+            **label_map_request(sample_color_blocks_with_hex, 4, 4),
             "layerHeight": 0.08,
             "pixelSize": 0.08,
             "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
             "filamentPreset": "bambu_cmyw",
         },
     )
@@ -181,11 +180,10 @@ def test_v2_stl_with_custom_colors(client, sample_color_blocks_with_hex):
     response = client.post(
         "/api/v2/download-stl",
         json={
-            "colorBlocks": sample_color_blocks_with_hex,
+            **label_map_request(sample_color_blocks_with_hex, 4, 4),
             "layerHeight": 0.08,
             "pixelSize": 0.08,
             "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
             "filamentColors": custom_colors,
         },
     )
@@ -204,11 +202,10 @@ def test_v2_stl_too_few_colors_returns_422(client, sample_color_blocks_with_hex)
     response = client.post(
         "/api/v2/download-stl",
         json={
-            "colorBlocks": sample_color_blocks_with_hex,
+            **label_map_request(sample_color_blocks_with_hex, 4, 4),
             "layerHeight": 0.08,
             "pixelSize": 0.08,
             "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
             "filamentColors": too_few,
         },
     )
@@ -226,11 +223,10 @@ def test_v2_stl_duplicate_labels_returns_422(client, sample_color_blocks_with_he
     response = client.post(
         "/api/v2/download-stl",
         json={
-            "colorBlocks": sample_color_blocks_with_hex,
+            **label_map_request(sample_color_blocks_with_hex, 4, 4),
             "layerHeight": 0.08,
             "pixelSize": 0.08,
             "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
             "filamentColors": duplicates,
         },
     )
@@ -325,11 +321,10 @@ def test_v2_3mf_with_default_colors(client, sample_color_blocks_with_hex):
     response = client.post(
         "/api/v2/download-3mf",
         json={
-            "colorBlocks": sample_color_blocks_with_hex,
+            **label_map_request(sample_color_blocks_with_hex, 4, 4),
             "layerHeight": 0.08,
             "pixelSize": 0.08,
             "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
         },
     )
     assert response.status_code == 200
@@ -343,11 +338,10 @@ def test_v2_3mf_with_preset(client, sample_color_blocks_with_hex):
     response = client.post(
         "/api/v2/download-3mf",
         json={
-            "colorBlocks": sample_color_blocks_with_hex,
+            **label_map_request(sample_color_blocks_with_hex, 4, 4),
             "layerHeight": 0.08,
             "pixelSize": 0.08,
             "layerCount": 4,
-            "imageDimensions": {"width": 4, "height": 4},
             "filamentPreset": "bambu_cmyw",
         },
     )
@@ -444,7 +438,7 @@ def test_download_geometry_and_settings_agree_on_color_and_backing_height(
         "imageDimensions": {"width": 4, "height": 4}, "filamentPreset": preset,
     }
     response = client.post(f"/api/v2/download-{export_type}", json={
-        **body, "colorBlocks": sample_color_blocks_with_hex,
+        **body, **label_map_request(sample_color_blocks_with_hex, 4, 4),
     })
     assert response.status_code == 200
     if export_type == "3mf":

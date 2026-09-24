@@ -10,6 +10,7 @@ from core.blend_color import Colors
 from core.color_config import ColorConfig
 from services import stl_generator
 from services.analytics import AnalyticsCollector
+from tests.label_maps import labels_from_blocks
 
 
 class TestGlobalStateThreadSafety:
@@ -92,7 +93,7 @@ class TestGlobalStateThreadSafety:
                     layer_height=0.08,
                     pixel_size=0.08,
                     layer_count=4,
-                    image_dimensions={'width': 10, 'height': 10},
+                    labels=labels_from_blocks(color_blocks, 10, 10),
                     use_greedy_meshing=True,
                     colors=None  # Trigger global state read
                 )
@@ -174,7 +175,7 @@ class TestIntegrationConcurrency:
                     layer_height=0.08,
                     pixel_size=0.08,
                     layer_count=4,
-                    image_dimensions={'width': 10, 'height': 10},
+                    labels=labels_from_blocks(color_blocks, 10, 10),
                     colors=None
                 )
                 results['stl'].append(len(zip_bytes))

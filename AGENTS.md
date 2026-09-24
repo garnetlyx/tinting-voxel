@@ -49,6 +49,7 @@ tinting-voxel/
 │   │   ├── csv_generator.py      # CSV export
 │   │   ├── filament_preview.py   # Color matrix preview
 │   │   ├── image_processor.py    # Image processing + auto-downscale
+│   │   ├── label_map.py          # Model-grid label maps (export/preview payloads)
 │   │   ├── matrix_cache.py       # Reference-matrix cache (powers /api/cache-stats)
 │   │   ├── mesh_optimizer.py     # Greedy meshing optimization
 │   │   ├── param_search_service.py # Auto parameter sweep engine
@@ -134,7 +135,7 @@ docker compose up --build  # Build and run
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/process-image` | Process image (pixel/SVG modes) |
-| POST | `/api/simulate-preview` | Simulated print preview (vector mode) |
+| POST | `/api/simulate-preview` | Refresh the pixel-mode simulated print preview |
 | POST | `/api/download-csv` | Download color data as CSV |
 
 ### V2 (N-Color Support)
@@ -226,6 +227,15 @@ distinct colors, so CIEDE2000 scoring runs in `DISTANCE_CHUNK` slices
 (`core/color_materials.py`), the matrix cache is bounded by
 `matrix_cache_max_references`, and mapping results are cached per reference
 matrix so exports reuse the mapping processing computed.
+
+Pixel-mode export and preview requests carry the model grid as a label map
+(`services/label_map.py`, built by `src/utils/labelMap.ts`): block colors
+plus one base64 byte per cell holding its block index, instead of per-pixel
+coordinate lists (2M cells: ~2.7 MB instead of ~45 MB, and no per-pixel Python
+objects). Internally, processing, previews and the STL/3MF generators work on
+the label array; `block_box_runs` in `services/stl_generator.py` meshes and
+extrudes each block's footprint for both generators within `stl_max_boxes`.
+The process response still lists pixels per block for the browser.
 
 Images larger than the model grid budget (`max_model_cells`, 4096 px per side)
 are resampled at their physical size, snapping to whole detail-width cells when

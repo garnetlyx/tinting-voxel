@@ -2,15 +2,20 @@
 Pydantic models for API request and response validation
 """
 from config.print_defaults import DEFAULT_BACKING_LAYERS, MAX_COLOR_LAYERS
+from config.settings import settings
 from core.color_config import normalize_transmission_distance
+import math
 import re
 from enum import Enum
 from typing import Annotated, Dict, List, Literal, Optional, Union
 
+import numpy as np
 from pydantic import (
     BaseModel, ConfigDict, Field, PrivateAttr, StrictBool, StrictFloat, StrictInt,
     field_validator, model_validator,
 )
+
+from services.label_map import MAX_BLOCKS, decode_label_map
 
 
 class ProcessingMode(str, Enum):
@@ -81,41 +86,68 @@ class PixelCoordinate(BaseModel):
     y: int = Field(..., ge=0)
 
 
-class ColorBlock(BaseModel):
-    """Color block with RGB values and pixel positions"""
+class BlockColor(BaseModel):
+    """A color block's RGB color."""
     r: int = Field(..., ge=0, le=255)
     g: int = Field(..., ge=0, le=255)
     b: int = Field(..., ge=0, le=255)
-    pixels: List[PixelCoordinate] = Field(..., min_length=1, max_length=1048576)
-    count: int = Field(..., ge=1)
     hex: str
 
     @field_validator('hex')
     @classmethod
     def validate_hex(cls, v):
         """Validate hex color format."""
-        import re
         if not re.match(r'^#[0-9a-fA-F]{6}$', v):
             raise ValueError(f"Invalid hex color format: {v}. Must be '#' followed by 6 hex digits")
         return v
 
-    @field_validator('count')
-    @classmethod
-    def validate_count_matches_pixels(cls, v, info):
+
+class ColorBlockSummary(BlockColor):
+    """A color block's color and pixel count."""
+    count: int = Field(..., ge=1)
+
+
+class ColorBlock(ColorBlockSummary):
+    """Color block with RGB values and pixel positions"""
+    pixels: List[PixelCoordinate] = Field(..., min_length=1, max_length=1048576)
+
+    @model_validator(mode='after')
+    def validate_count_matches_pixels(self):
         """Ensure count matches the number of pixels."""
-        # Pydantic V2: use info.data instead of values
-        pixels = info.data.get('pixels')
-        if pixels is not None and v != len(pixels):
+        if self.count != len(self.pixels):
             raise ValueError(
-                f"count ({v}) does not match number of pixels ({len(pixels)})"
+                f"count ({self.count}) does not match number of pixels ({len(self.pixels)})"
             )
-        return v
+        return self
 
 
 class ImageDimensions(BaseModel):
     """Image dimensions in pixels"""
     width: int = Field(..., gt=0, le=10000)
     height: int = Field(..., gt=0, le=10000)
+
+
+class LabelMapMixin(BaseModel):
+    """Color blocks with the model grid as a base64 label map
+    (services/label_map.py): one byte per cell holding its block index."""
+    colorBlocks: List[BlockColor] = Field(..., min_length=1, max_length=MAX_BLOCKS)
+    imageDimensions: ImageDimensions
+    labelMap: str = Field(..., max_length=4 * math.ceil(settings.max_model_cells / 3))
+    _labels: object = PrivateAttr()
+
+    @model_validator(mode='after')
+    def decode_labels(self):
+        width, height = self.imageDimensions.width, self.imageDimensions.height
+        if width * height > settings.max_model_cells:
+            raise ValueError(
+                f"A {width}x{height} model exceeds the {settings.max_model_cells:,}-cell model grid"
+            )
+        self._labels = decode_label_map(self.labelMap, width, height, len(self.colorBlocks))
+        return self
+
+    @property
+    def labels(self) -> np.ndarray:
+        return self._labels
 
 
 class ProcessImageResponse(BaseModel):
@@ -133,7 +165,7 @@ class ProcessImageResponse(BaseModel):
 
 class DownloadCSVRequest(BaseModel):
     """Request model for /api/download-csv endpoint"""
-    colorBlocks: List[ColorBlock] = Field(..., min_length=1)
+    colorBlocks: List[ColorBlockSummary] = Field(..., min_length=1)
 
 
 class VectorRegion(BaseModel):
@@ -235,12 +267,10 @@ class WhiteBackingMixin(BaseModel):
 
 
 # V2 API Models with configurable colors
-class DownloadSTLRequestV2(PrintConfigMixin, WhiteBackingMixin):
-    """Request model for /api/v2/download-stl endpoint with configurable colors."""
-    colorBlocks: List[ColorBlock] = Field(..., min_length=1)
+class DownloadSTLRequestV2(LabelMapMixin, PrintConfigMixin, WhiteBackingMixin):
+    """Request model for /api/v2/download-stl and /api/v2/download-3mf."""
     pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=MAX_COLOR_LAYERS)
-    imageDimensions: ImageDimensions
     mode: ProcessingMode = ProcessingMode.PIXEL
     detailSize: Optional[float] = Field(
         None, ge=0.2, le=0.8,
@@ -382,10 +412,8 @@ class FilamentPreviewResponse(BaseModel):
     pagination: Optional[PaginationInfo] = None
 
 
-class SimulatePreviewRequest(PrintConfigMixin):
+class SimulatePreviewRequest(LabelMapMixin, PrintConfigMixin):
     """Request model for print-simulation preview generation."""
-    colorBlocks: List[ColorBlock] = Field(..., min_length=1)
-    imageDimensions: ImageDimensions
     layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
     whiteBackingLayers: int = Field(DEFAULT_BACKING_LAYERS, ge=0, le=5)
     backingMode: Literal['white', 'black'] = 'white'

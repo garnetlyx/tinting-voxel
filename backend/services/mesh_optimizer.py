@@ -23,43 +23,6 @@ class FaceDirection(Enum):
     BACK = auto()    # +Y face
 
 
-def pixels_to_grid(
-    pixels: list[dict[str, int]],
-    width: int,
-    height: int
-) -> np.ndarray:
-    """
-    Convert a list of pixel positions to a 2D boolean grid.
-
-    Args:
-        pixels: List of pixel dicts with 'x' and 'y' keys
-        width: Grid width
-        height: Grid height
-
-    Returns:
-        2D numpy boolean array where True indicates a pixel is present
-    """
-    grid = np.zeros((height, width), dtype=bool)
-    if not pixels:
-        return grid
-    xs = np.fromiter((pixel['x'] for pixel in pixels), dtype=np.int64, count=len(pixels))
-    ys = np.fromiter((pixel['y'] for pixel in pixels), dtype=np.int64, count=len(pixels))
-    inside = (xs >= 0) & (xs < width) & (ys >= 0) & (ys < height)
-    dropped = len(pixels) - int(inside.sum())
-    if dropped > 0:
-        if dropped == len(pixels):
-            raise ValueError(
-                f"All {dropped} pixel(s) are outside image bounds "
-                f"({width}x{height}). Check image dimensions."
-            )
-        logger.warning(
-            "Dropped %d of %d pixels outside image bounds (%dx%d)",
-            dropped, len(pixels), width, height
-        )
-    grid[ys[inside], xs[inside]] = True
-    return grid
-
-
 class MeshTooComplexError(ValueError):
     """Raised when greedy meshing would produce more rectangles than the
     memory budget (settings.stl_max_boxes) allows."""
@@ -135,52 +98,6 @@ def boxes_from_rectangles(
         ((x * pixel_size, (x + w) * pixel_size), (y * pixel_size, (y + h) * pixel_size), (z_min, z_max))
         for x, y, w, h in rectangles
     ]
-
-
-def generate_optimized_boxes(
-    pixels: list[dict[str, int]],
-    width: int,
-    height: int,
-    pixel_size: float,
-    z_min: float,
-    z_max: float,
-    max_rectangles: int | None = None,
-) -> list[BoxRange]:
-    """
-    Generate optimized box ranges using greedy meshing.
-
-    Instead of one box per pixel, merges adjacent pixels into larger boxes.
-
-    Args:
-        pixels: List of pixel dicts with 'x' and 'y' keys
-        width: Image width in pixels
-        height: Image height in pixels
-        pixel_size: Physical size of each pixel in mm
-        z_min: Z start coordinate in mm
-        z_max: Z end coordinate in mm
-
-    Returns:
-        List of (xrange, yrange, zrange) tuples for each optimized box
-    """
-    grid = pixels_to_grid(pixels, width, height)
-    return generate_optimized_boxes_from_grid(grid, pixel_size, z_min, z_max, max_rectangles)
-
-
-def generate_optimized_boxes_from_grid(
-    grid: np.ndarray,
-    pixel_size: float,
-    z_min: float,
-    z_max: float,
-    max_rectangles: int | None = None,
-) -> list[BoxRange]:
-    """
-    Generate optimized boxes directly from a boolean grid.
-
-    This avoids materializing large pixel lists when geometry is already
-    available as a rasterized occupancy mask.
-    """
-    rectangles = greedy_mesh_2d(grid, max_rectangles=max_rectangles)
-    return boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
 
 
 # =============================================================================

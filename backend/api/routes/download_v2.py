@@ -108,10 +108,10 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
     zip_content = await run_in_threadpool(
         generate_stl_zip,
         color_blocks=color_blocks,
+        labels=body.labels,
         layer_height=body.layerHeight,
         pixel_size=body.pixelSize,
         layer_count=body.layerCount,
-        image_dimensions=image_dimensions,
         colors=colors,
         white_backing_layers=body.whiteBackingLayers,
         backing_mode=body.backingMode,
@@ -190,10 +190,10 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
     threemf_content = await run_in_threadpool(
         generate_3mf,
         color_blocks=color_blocks,
+        labels=body.labels,
         layer_height=body.layerHeight,
         pixel_size=body.pixelSize,
         layer_count=body.layerCount,
-        image_dimensions=image_dimensions,
         colors=colors,
         color_hex_map=color_hex_map,
         white_backing_layers=body.whiteBackingLayers,

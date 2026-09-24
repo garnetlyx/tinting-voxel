@@ -3,6 +3,7 @@
  */
 import { recordBugReportLog } from '../utils/bugReport';
 import { track } from '../utils/telemetry';
+import { withLabelMap } from '../utils/labelMap';
 import type {
   BugReportRequest,
   BugReportResponse,
@@ -143,7 +144,7 @@ export async function simulatePrintPreview(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(params),
+    body: JSON.stringify(withLabelMap(params)),
     signal,
   });
 
@@ -163,7 +164,7 @@ export async function downloadCSV(colorBlocks: ColorBlock[], signal?: AbortSigna
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ colorBlocks }),
+    body: JSON.stringify({ colorBlocks: colorBlocks.map(({ r, g, b, hex, count }) => ({ r, g, b, hex, count })) }),
     signal,
   });
 
@@ -217,7 +218,7 @@ export async function downloadSTLV2(params: DownloadSTLParamsV2, signal?: AbortS
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(params),
+    body: JSON.stringify(withLabelMap(params)),
     signal,
   });
 
@@ -299,7 +300,7 @@ export async function download3MFV2(params: DownloadSTLParamsV2, signal?: AbortS
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(params),
+    body: JSON.stringify(withLabelMap(params)),
     signal,
   });
 

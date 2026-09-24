@@ -10,6 +10,8 @@ import pytest
 from core.blend_color import Color, Colors, _code_to_rgb_cached, clear_rgb_cache
 from core.color_config import ColorConfig
 from services.threemf_generator import generate_3mf
+from tests.label_maps import labels_from_blocks
+from tests.label_maps import label_map_request
 
 
 # -- QA-49: DownloadSTLRequestV2.colorBlocks missing min_items=1 validation --
@@ -24,11 +26,10 @@ class TestQA49EmptyColorBlocksV2:
 
         with pytest.raises(ValidationError):
             DownloadSTLRequestV2(
-                colorBlocks=[],
+                **label_map_request([], 4, 4),
                 layerHeight=0.08,
                 pixelSize=0.08,
                 layerCount=4,
-                imageDimensions={"width": 4, "height": 4},
             )
 
 
@@ -58,14 +59,13 @@ class TestQA50PresetAndColorsCoexist:
         # This is what the frontend sends when preset is selected
         with pytest.raises(ValidationError, match="Cannot provide both"):
             DownloadSTLRequestV2(
-                colorBlocks=[{
+                **label_map_request([{
                     "r": 255, "g": 0, "b": 0, "count": 1,
                     "pixels": [{"x": 0, "y": 0}], "hex": "#FF0000",
-                }],
+                }], 4, 4),
                 layerHeight=0.08,
                 pixelSize=0.08,
                 layerCount=4,
-                imageDimensions={"width": 4, "height": 4},
                 filamentPreset="bambu_cmyw",
                 filamentColors=[
                     {"name": "Cyan", "hex": "#0086D6", "transmission_distance": 3.0},
@@ -236,7 +236,7 @@ class TestQA56V2EmptyColorBlocksEndpoint:
                 layer_height=0.08,
                 pixel_size=0.08,
                 layer_count=4,
-                image_dimensions={'width': 4, 'height': 4},
+                labels=labels_from_blocks([], 4, 4),
                 colors=Colors(),
             )
 
@@ -281,7 +281,7 @@ class TestQA57ThreeMFUnknownBlendChar:
             layer_height=0.08,
             pixel_size=0.08,
             layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
+            labels=labels_from_blocks(color_blocks, 4, 4),
             colors=colors,
         )
         assert isinstance(result, bytes)
@@ -434,7 +434,7 @@ class TestQA65GreedyMeshDivByZero:
             layer_height=0.08,
             pixel_size=0.08,
             layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
+            labels=labels_from_blocks(color_blocks, 4, 4),
             colors=Colors(),
             use_greedy_meshing=False,
         )

@@ -10,7 +10,7 @@ import threading
 import weakref
 from collections import OrderedDict
 from io import BytesIO
-from typing import Callable, Optional
+from typing import Optional
 
 import numpy as np
 import cv2
@@ -19,9 +19,9 @@ from PIL import Image
 from core.blend_color import Colors, colors_key
 from core.color_materials import Color
 from services.print_stack import build_print_stack, resolve_backing_label
+from services.label_map import EMPTY, block_cell_counts, block_pixels
 from services.raster_cleanup import color_distance, regularize_printable_regions
 from services.stl_generator import compute_reference_matrices
-from services.vector_processor import render_vector_results_image
 
 logger = logging.getLogger(__name__)
 
@@ -53,18 +53,11 @@ def _image_to_data_url(img: Image.Image) -> str:
     return f"data:image/png;base64,{img_base64}"
 
 
-def _render_color_block_image(
-    color_blocks: list[dict],
-    width: int,
-    height: int,
-    rgb_getter: Callable[[dict, int], tuple[int, int, int]],
-) -> str:
-    img_array = np.zeros((height, width, 3), dtype=np.uint8)
-    for idx, color in enumerate(color_blocks):
-        rgb = np.array(rgb_getter(color, idx), dtype=np.uint8)
-        for pixel in color['pixels']:
-            img_array[pixel['y'], pixel['x']] = rgb
-    return _image_to_data_url(Image.fromarray(img_array))
+def _render_labels(labels: np.ndarray, block_rgbs: list[tuple[int, int, int]]) -> str:
+    """PNG data URL of a label map painted with one color per block (black where empty)."""
+    lut = np.zeros((EMPTY + 1, 3), dtype=np.uint8)
+    lut[:len(block_rgbs)] = block_rgbs
+    return _image_to_data_url(Image.fromarray(lut[labels]))
 
 
 def _map_and_refine(
@@ -198,7 +191,7 @@ def _build_mapped_blend_palette(
 
 def build_simulated_print_preview(
     color_blocks: list[dict],
-    image_dimensions: dict,
+    labels: np.ndarray,
     colors: Optional[Colors] = None,
     layer_count: int = 4,
     layer_height: float = 0.08,
@@ -206,7 +199,8 @@ def build_simulated_print_preview(
     backing_mode: str = 'white',
 ) -> dict:
     """
-    Build an image-specific print preview from current color blocks.
+    Build an image-specific print preview from current color blocks
+    (block i covers the cells where labels == i).
 
     The preview uses the same nearest printable blend mapping as STL export.
     """
@@ -215,18 +209,17 @@ def build_simulated_print_preview(
 
     active_colors = colors or Colors()
     resolve_backing_label(active_colors, white_backing_layers, backing_mode)
-    width = image_dimensions['width']
-    height = image_dimensions['height']
-    total_pixels = max(1, sum(block.get('count', len(block['pixels'])) for block in color_blocks))
+    counts = block_cell_counts(labels, len(color_blocks))
+    total_pixels = max(1, int(counts.sum()))
 
     source_entries = [
         {
             "r": int(block['r']),
             "g": int(block['g']),
             "b": int(block['b']),
-            "pixelCount": int(block.get('count', len(block['pixels']))),
+            "pixelCount": int(count),
         }
-        for block in color_blocks
+        for block, count in zip(color_blocks, counts.tolist())
     ]
     source_colors = [
         (entry["r"], entry["g"], entry["b"])
@@ -242,12 +235,7 @@ def build_simulated_print_preview(
         backing_mode=backing_mode,
     )
 
-    processed_image = _render_color_block_image(
-        color_blocks,
-        width,
-        height,
-        lambda _block, idx: result_rgbs[idx],
-    )
+    processed_image = _render_labels(labels, result_rgbs)
 
     mapped_block_colors = []
     for code, rgb in zip(result_codes, result_rgbs):
@@ -522,62 +510,45 @@ def resample_to_model_grid(
 
 def merge_small_pixels_to_neighbors(
     color_blocks: list[dict],
-    width: int,
-    height: int,
+    labels: np.ndarray,
     pixel_size: float,
     detail_size: float,
-) -> list[dict]:
+) -> tuple[list[dict], np.ndarray]:
     """
     Make every color region printable at detail_size without rescaling the model.
 
     Sub-detail strokes are widened and sub-detail noise joins a neighboring
     color (see ``regularize_printable_regions``).
-    
+
     Args:
-        color_blocks: List of color blocks with pixels
-        width: Image width in pixels
-        height: Image height in pixels
+        color_blocks: Color blocks; block i covers the cells where labels == i
+        labels: (height, width) label map of the model grid
         pixel_size: Physical size of each pixel in mm
         detail_size: Minimum physical pixel size in mm
-    
+
     Returns:
-        Updated color_blocks with small regions merged
+        The remaining blocks, largest first, and their label map
     """
     if pixel_size >= detail_size:
-        return color_blocks
+        return color_blocks, labels
 
-    label_grid = np.zeros((height, width), dtype=np.int32)
-    palette = [
-        (int(block['r']), int(block['g']), int(block['b']))
-        for block in color_blocks
-    ]
-    for idx, block in enumerate(color_blocks):
-        for pixel in block['pixels']:
-            label_grid[pixel['y'], pixel['x']] = idx
-
-    cleaned_labels = regularize_printable_regions(
-        labels=label_grid,
-        colors=palette,
+    cleaned = regularize_printable_regions(
+        labels=labels.astype(np.int32),
+        colors=[(int(block['r']), int(block['g']), int(block['b'])) for block in color_blocks],
         pixel_size=pixel_size,
         detail_size=detail_size,
     )
+    counts = block_cell_counts(cleaned, len(color_blocks))
+    return _keep_blocks(color_blocks, cleaned, [
+        i for i in np.argsort(-counts, kind='stable').tolist() if counts[i] > 0
+    ])
 
-    rebuilt_blocks = {}
-    for idx in np.unique(cleaned_labels):
-        ys, xs = np.nonzero(cleaned_labels == idx)
-        r, g, b = palette[idx]
-        rebuilt_blocks[int(idx)] = {
-            'r': r,
-            'g': g,
-            'b': b,
-            'hex': color_blocks[idx].get('hex', f"#{r:02x}{g:02x}{b:02x}"),
-            'count': int(len(xs)),
-            'pixels': [{'x': int(x), 'y': int(y)} for y, x in zip(ys.tolist(), xs.tolist())],
-        }
 
-    result = list(rebuilt_blocks.values())
-    result.sort(key=lambda c: c['count'], reverse=True)
-    return result
+def _keep_blocks(color_blocks: list[dict], labels: np.ndarray, order: list[int]) -> tuple[list[dict], np.ndarray]:
+    """The blocks at `order`, relabelled 0..len(order)-1 in that order."""
+    remap = np.full(len(color_blocks), EMPTY, dtype=np.uint8)
+    remap[order] = np.arange(len(order), dtype=np.uint8)
+    return [color_blocks[i] for i in order], remap[labels]
 
 
 def process_image(
@@ -685,49 +656,29 @@ def process_image(
         diffs = unique_rgb[start:start + NEAREST_FINAL_CHUNK, np.newaxis, :] - final_rgb[np.newaxis, :, :]
         unique_to_final[start:start + NEAREST_FINAL_CHUNK] = (diffs * diffs).sum(axis=2).argmin(axis=1)
 
-    # Map each pixel to its final color index via the inverse array
-    pixel_to_final = unique_to_final[inverse]  # (total_pixels,)
+    # Label map: each cell's final color index (services/label_map.py).
+    labels = unique_to_final[inverse].reshape(height, width).astype(np.uint8)
 
-    # Populate pixel lists and build a label map for fast rendering.
-    total_pixels = len(pixels)
-    xs = np.arange(total_pixels, dtype=np.int32) % width
-    ys = np.arange(total_pixels, dtype=np.int32) // width
-
-    # label_map[y, x] = final color index — used for fast image rendering
-    label_map = pixel_to_final.reshape(height, width)
-
-    # Build pixel lists grouped by color index (needed by downstream consumers)
-    sort_idx = np.argsort(pixel_to_final, kind='stable')
-    sorted_ci = pixel_to_final[sort_idx]
-    sorted_xs = xs[sort_idx]
-    sorted_ys = ys[sort_idx]
-    boundaries = np.searchsorted(sorted_ci, np.arange(len(color_blocks) + 1))
-    for ci in range(len(color_blocks)):
-        lo, hi = int(boundaries[ci]), int(boundaries[ci + 1])
-        gxs = sorted_xs[lo:hi].tolist()
-        gys = sorted_ys[lo:hi].tolist()
-        color_blocks[ci]['pixels'] = [{'x': x, 'y': y} for x, y in zip(gxs, gys)]
-        color_blocks[ci]['count'] = hi - lo
-    
     # Step 5: Merge small pixel clusters if detail_size is specified
     if detail_size is not None and detail_size > pixel_size:
-        color_blocks = merge_small_pixels_to_neighbors(
-            color_blocks, width, height, pixel_size, detail_size
-        )
+        color_blocks, labels = merge_small_pixels_to_neighbors(color_blocks, labels, pixel_size, detail_size)
+    else:
+        counts = block_cell_counts(labels, len(color_blocks))
+        color_blocks, labels = _keep_blocks(color_blocks, labels, [i for i in range(len(color_blocks)) if counts[i] > 0])
 
-    # Add hex values
-    for color in color_blocks:
+    # Counts, pixel lists (for the response) and hex values
+    counts = block_cell_counts(labels, len(color_blocks))
+    for color, count, block_cells in zip(color_blocks, counts.tolist(), block_pixels(labels, len(color_blocks))):
+        color['count'] = count
+        color['pixels'] = block_cells
         color['hex'] = f"#{color['r']:02x}{color['g']:02x}{color['b']:02x}"
 
-    segmentation_image = _render_color_block_image(
-        color_blocks,
-        width,
-        height,
-        lambda color, _idx: (int(color['r']), int(color['g']), int(color['b'])),
+    segmentation_image = _render_labels(
+        labels, [(int(color['r']), int(color['g']), int(color['b'])) for color in color_blocks],
     )
     simulated_preview = build_simulated_print_preview(
         color_blocks=color_blocks,
-        image_dimensions={"width": width, "height": height},
+        labels=labels,
         colors=filament_colors,
         layer_count=layer_count,
         layer_height=layer_height,
@@ -737,6 +688,7 @@ def process_image(
 
     return {
         'colorBlocks': color_blocks,
+        'labels': labels,
         'processedImage': simulated_preview['processedImage'],
         'segmentationImage': segmentation_image,
         'mappedBlockColors': simulated_preview['mappedBlockColors'],

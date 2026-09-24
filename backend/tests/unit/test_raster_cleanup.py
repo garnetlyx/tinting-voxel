@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from services.mesh_optimizer import generate_optimized_boxes
+from services.mesh_optimizer import boxes_from_rectangles, greedy_mesh_2d
 from services.raster_cleanup import regularize_printable_regions, unprintable_pixels
 
 LOCAL_PHOTO_PIXEL_SIZE = 200 / 1270
@@ -163,28 +163,20 @@ def test_real_local-photo_detail_survives_as_printable_export_geometry():
     labels = np.asarray(source).astype(np.int32)
     palette = source.getpalette()
     source_colors = [tuple(palette[index * 3:index * 3 + 3]) for index in (0, 5)]
-    color_blocks = []
-    for index, color in zip((0, 5), source_colors):
-        ys, xs = np.where(labels == index)
-        color_blocks.append({
-            'r': color[0], 'g': color[1], 'b': color[2],
-            'count': len(xs),
-            'pixels': [{'x': int(x), 'y': int(y)} for y, x in zip(ys, xs)],
-        })
+    color_blocks = [{'r': color[0], 'g': color[1], 'b': color[2]} for color in source_colors]
+    block_labels = np.where(labels == 5, 1, 0).astype(np.uint8)
 
     from services.image_processor import merge_small_pixels_to_neighbors
 
     pixel_size = 200 / 1270
-    processed = merge_small_pixels_to_neighbors(
-        color_blocks, source.width, source.height, pixel_size, 0.42,
+    processed, processed_labels = merge_small_pixels_to_neighbors(
+        color_blocks, block_labels, pixel_size, 0.42,
     )
     assert labels[7, 10] == 5 and labels[8, 10] == 0 and labels[9, 10] == 5
 
     exported_occupancy = np.zeros(labels.shape, dtype=np.uint8)
-    for block in processed:
-        boxes = generate_optimized_boxes(
-            block['pixels'], source.width, source.height, pixel_size, 0, 0.08,
-        )
+    for index, block in enumerate(processed):
+        boxes = boxes_from_rectangles(greedy_mesh_2d(processed_labels == index), pixel_size, 0, 0.08)
         block_value = 1 if (block['r'], block['g'], block['b']) == source_colors[0] else 2
         for (x0, x1), (y0, y1), (z0, z1) in boxes:
             assert (z0, z1) == (0, 0.08)

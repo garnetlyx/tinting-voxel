@@ -14,9 +14,10 @@ from typing import Optional
 import numpy as np
 import trimesh
 
-from core.blend_color import Color, Colors
+from core.blend_color import Colors
 from config.settings import settings
-from services.mesh_optimizer import BoxRange, boxes_from_rectangles, greedy_mesh_2d, pixels_to_grid
+from services.label_map import EMPTY
+from services.mesh_optimizer import BoxRange, boxes_from_rectangles, greedy_mesh_2d
 from services.print_stack import (
     PRINT_BACKGROUND_RGB,
     backing_suffix,
@@ -25,8 +26,10 @@ from services.print_stack import (
     strip_backing_suffix,
 )
 from services.stl_generator import (
+    block_box_runs,
     compute_reference_matrices,
     layer_runs,
+    map_color_blocks_to_blend_results,
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
@@ -100,10 +103,10 @@ def _boxes_to_trimesh(
 
 def generate_3mf(
     color_blocks: list[dict],
+    labels: np.ndarray,
     layer_height: float,
     pixel_size: float,
     layer_count: int,
-    image_dimensions: dict,
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
     color_hex_map: Optional[dict] = None,
@@ -117,11 +120,11 @@ def generate_3mf(
     which slicers can assign to different extruders.
 
     Args:
-        color_blocks: List of color blocks with RGB and pixels
+        color_blocks: Color blocks (RGB); block i prints where labels == i
+        labels: (height, width) label map of the model grid (services/label_map.py)
         layer_height: Height of each layer in mm
         pixel_size: Physical size of each pixel in mm
         layer_count: Total number of layers
-        image_dimensions: Dict with 'width' and 'height' keys
         use_greedy_meshing: If True, merge adjacent pixels
         colors: Optional Colors instance
         color_hex_map: Optional dict mapping label -> hex color for visual colors
@@ -143,32 +146,25 @@ def generate_3mf(
                     f"Invalid hex color '{hex_color}' for label '{label}'"
                 )
 
-    # Compute reference matrices locally (thread-safe, backing-aware)
-    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-        layer_count, layer_height, colors, n_targets=len(color_blocks),
-        backing_layers=white_backing_layers, backing_mode=backing_mode,
-    )
-
     # Keep compact box ranges until the final indexed trimesh conversion.
-    labels = colors.get_labels()
-    code_mesh_map: dict[str, list[list[BoxRange]]] = {label: [] for label in labels}
+    code_mesh_map: dict[str, list[list[BoxRange]]] = {label: [] for label in colors.get_labels()}
 
-    # Map input colors to blend codes (with order refinement for pruned sets);
+    # Map input colors to blend codes (shared with processing and STL export);
     # codes carry the printed backing as a trailing suffix.
-    from services.image_processor import _map_and_refine
     input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
-    _b_label = resolve_backing_label(colors, white_backing_layers, backing_mode)
-    _b_suffix = backing_suffix(_b_label, white_backing_layers)
-    _b_boundary = PRINT_BACKGROUND_RGB if _b_suffix else None
-    result_codes, _ = _map_and_refine(
-        input_colors, ref_code_matrix, ref_rgb_matrix, colors, layer_count, layer_height,
-        backing_suffix=_b_suffix, background_rgb=_b_boundary,
+    result_codes, _ = map_color_blocks_to_blend_results(
+        color_blocks=color_blocks,
+        layer_height=layer_height,
+        layer_count=layer_count,
+        colors=colors,
+        backing_layers=white_backing_layers,
+        backing_mode=backing_mode,
     )
 
     _log_input_color_brightness(input_colors, "3MF")
-    _log_blend_code_distribution(result_codes, labels, "3MF")
+    _log_blend_code_distribution(result_codes, colors.get_labels(), "3MF")
 
-    width, height = image_dimensions['width'], image_dimensions['height']
+    height, width = labels.shape
     z_offset = 0.0
 
     n_white = normalize_backing_layers(white_backing_layers)
@@ -176,57 +172,18 @@ def generate_3mf(
     if n_white > 0:
         logger.info("3MF: printed backing mode='%s', label='%s', layers=%d", backing_mode, w_label, n_white)
 
-    # Complexity guard: enforced on the REAL merged box count (see
-    # settings.stl_max_boxes); the raw estimate is logged for observability.
-    estimated_boxes = sum(len(b['pixels']) for b in color_blocks) * layer_count
-    total_optimized_boxes = 0
-
-    def _remaining_box_budget() -> int:
-        return max(0, settings.stl_max_boxes - total_optimized_boxes)
-
+    # The raw pixel x layer count is logged for observability; the complexity
+    # guard applies to the real merged box count (block_box_runs).
+    estimated_boxes = int((labels != EMPTY).sum()) * layer_count
     logger.info(
         "3MF generation: %d color blocks, %d layers, %dx%d image, ~%d estimated boxes",
         len(color_blocks), layer_count, width, height, estimated_boxes
     )
 
-    # Generate meshes per color block
-    for idx, color_block in enumerate(color_blocks):
-        pixels = color_block['pixels']
-        # Backing suffix -> single merged block below; strip before meshing.
-        blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)
-        runs = layer_runs(blend_code, z_offset, layer_height)
-
-        # The block's footprint is meshed once; each vertical run extrudes it.
-        rectangles = None
-        if use_greedy_meshing and len(pixels) > 1:
-            rectangles = greedy_mesh_2d(
-                pixels_to_grid(pixels, width, height),
-                max_rectangles=_remaining_box_budget() // max(len(runs), 1),
-            )
-
-        for code_char, z_min, z_max in runs:
-            if rectangles is not None:
-                optimized_boxes = boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
-                total_optimized_boxes += len(optimized_boxes)
-                code_mesh_map[code_char].append(optimized_boxes)
-            else:
-                box_ranges = [
-                    (
-                        (pixel['x'] * pixel_size, (pixel['x'] + 1) * pixel_size),
-                        (pixel['y'] * pixel_size, (pixel['y'] + 1) * pixel_size),
-                        (z_min, z_max)
-                    )
-                    for pixel in pixels
-                ]
-                if box_ranges:
-                    total_optimized_boxes += len(box_ranges)
-                    if total_optimized_boxes > settings.stl_max_boxes:
-                        raise ValueError(
-                            f"Request too complex: {total_optimized_boxes:,} boxes after "
-                            f"meshing (budget {settings.stl_max_boxes:,}). "
-                            f"Reduce image size or colors."
-                        )
-                    code_mesh_map[code_char].append(box_ranges)
+    # Backing suffix -> single merged block below; strip before meshing.
+    block_codes = [strip_backing_suffix(code, w_label, n_white) for code in result_codes]
+    for code_char, boxes, _cells in block_box_runs(labels, block_codes, pixel_size, layer_height, use_greedy_meshing):
+        code_mesh_map[code_char].append(boxes)
 
     # Add white backing above optical layers (reflector behind colors)
     if n_white > 0:

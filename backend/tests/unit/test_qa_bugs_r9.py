@@ -12,6 +12,8 @@ import pytest
 
 from core.blend_color import Color, Colors, BlendTestGenerator, _code_to_rgb_cached, clear_rgb_cache
 from core.color_config import ColorConfig
+from tests.label_maps import labels_from_blocks
+from tests.label_maps import label_map_request
 
 
 class TestQA68AllDownloadsSendBothPresetAndColors:
@@ -29,14 +31,13 @@ class TestQA68AllDownloadsSendBothPresetAndColors:
 
         with pytest.raises(ValidationError, match="Cannot provide both"):
             DownloadSTLRequestV2(
-                colorBlocks=[{
+                **label_map_request([{
                     "r": 0, "g": 0, "b": 0, "count": 1,
                     "pixels": [{"x": 0, "y": 0}], "hex": "#000000",
-                }],
+                }], 4, 4),
                 layerHeight=0.08,
                 pixelSize=0.08,
                 layerCount=4,
-                imageDimensions={"width": 4, "height": 4},
                 filamentPreset="bambu_cmyw",
                 filamentColors=[
                     {"name": "Cyan", "hex": "#0086D6", "transmission_distance": 3.0},
@@ -408,7 +409,7 @@ class TestQA92BaseFilenameCollision:
             layer_height=0.08,
             pixel_size=0.08,
             layer_count=4,
-            image_dimensions={'width': 4, 'height': 4},
+            labels=labels_from_blocks(color_blocks, 4, 4),
             colors=colors,
             white_backing_layers=0,  # No white filament in this config
         )

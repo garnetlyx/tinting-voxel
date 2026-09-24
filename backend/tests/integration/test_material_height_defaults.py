@@ -5,6 +5,7 @@ import struct
 import zipfile
 
 import pytest
+from tests.label_maps import label_map_request
 
 
 def _custom(td):
@@ -46,8 +47,8 @@ def test_real_preview_and_simulation_match_explicit_transparent_height(client, s
     explicit = client.post("/api/filament-preview", json={**common, "layerHeight": .84})
     assert default.status_code == explicit.status_code == 200
     assert default.json()["colorMatrix"] == explicit.json()["colorMatrix"]
-    body = {**common, "colorBlocks": sample_color_blocks_with_hex,
-            "imageDimensions": {"width": 4, "height": 4}}
+    body = {**common, **label_map_request(sample_color_blocks_with_hex, 4, 4),
+            }
     default = client.post("/api/simulate-preview", json=body)
     explicit = client.post("/api/simulate-preview", json={**body, "layerHeight": .84})
     assert default.status_code == explicit.status_code == 200
@@ -96,7 +97,7 @@ def test_every_export_forwards_resolved_height_once(client, monkeypatch, sample_
         body["vectorResults"] = [{"color": [255, 0, 0], "pixel_count": 4,
                                   "polygon_points": 4, "regions": [{"outer": [[0, 0], [2, 0], [2, 2], [0, 2]], "holes": []}]}]
     else:
-        body["colorBlocks"] = sample_color_blocks_with_hex
+        body.update(label_map_request(sample_color_blocks_with_hex, 4, 4))
     response = client.post(f"/api/v2/{route}", json=body)
     assert response.status_code == 200, response.text
     assert len(parsed) == len(captured) == 1

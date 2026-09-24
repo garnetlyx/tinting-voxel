@@ -6,6 +6,7 @@ import io
 
 import numpy as np
 from PIL import Image
+from tests.label_maps import label_map_request
 
 
 def _decode_data_url_image(data_url: str) -> np.ndarray:
@@ -267,8 +268,7 @@ def test_simulate_preview_success(client, tiny_png_bytes):
     response = client.post(
         "/api/simulate-preview",
         json={
-            "colorBlocks": processed["colorBlocks"],
-            "imageDimensions": processed["imageDimensions"],
+            **label_map_request(processed["colorBlocks"], **processed["imageDimensions"]),
             "layerHeight": 0.08,
             "layerCount": 4,
             "filamentPreset": "bambu_cmyw",

@@ -276,7 +276,7 @@ async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
     def build_preview_response() -> Response:
         result = build_simulated_print_preview(
             color_blocks=[block.model_dump() for block in body.colorBlocks],
-            image_dimensions=body.imageDimensions.model_dump(),
+            labels=body.labels,
             colors=colors,
             layer_count=body.layerCount,
             layer_height=body.layerHeight,

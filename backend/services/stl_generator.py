@@ -12,16 +12,17 @@ import zipfile
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
-from typing import Optional
+from typing import Iterator, Optional
 
 import numpy as np
 import pandas as pd
 
 from config.settings import settings
-from core.blend_color import BlendTestGenerator, Color, Colors, colors_key
+from core.blend_color import BlendTestGenerator, Colors, colors_key
 from core.blend_models import blend_tables, rgb_from_indices
 from core.parallel import available_cpus, set_worker_threads, worker_threads
-from services.mesh_optimizer import boxes_from_rectangles, greedy_mesh_2d, pixels_to_grid
+from services.label_map import EMPTY, block_cell_counts
+from services.mesh_optimizer import BoxRange, MeshTooComplexError, boxes_from_rectangles, greedy_mesh_2d
 from services.print_stack import (
     backing_suffix,
     build_print_stack,
@@ -726,6 +727,46 @@ def layer_runs(blend_code: str, z_offset: float, layer_height: float) -> list[tu
     return runs
 
 
+def block_box_runs(
+    labels: np.ndarray,
+    block_codes: list[str],
+    pixel_size: float,
+    layer_height: float,
+    use_greedy_meshing: bool = True,
+) -> Iterator[tuple[str, list[BoxRange], int]]:
+    """Boxes for each filament run of each color block.
+
+    A block's footprint (its cells in the label map) is meshed once, into
+    greedy rectangles unless disabled, and extruded per vertical run of its
+    blend code (backing suffix already stripped). Yields (filament label,
+    boxes, footprint cells). The total stays within settings.stl_max_boxes,
+    so noise-like inputs fail fast instead of exhausting memory.
+    """
+    counts = block_cell_counts(labels, len(block_codes))
+    total_boxes = 0
+    for idx, blend_code in enumerate(block_codes):
+        cells = int(counts[idx])
+        if cells == 0:
+            continue
+        runs = layer_runs(blend_code, 0.0, layer_height)
+        footprint = labels == idx
+        if use_greedy_meshing and cells > 1:
+            remaining = max(0, settings.stl_max_boxes - total_boxes)
+            rectangles = greedy_mesh_2d(footprint, max_rectangles=remaining // max(len(runs), 1))
+        else:
+            ys, xs = np.nonzero(footprint)
+            rectangles = [(x, y, 1, 1) for x, y in zip(xs.tolist(), ys.tolist())]
+        for code_char, z_min, z_max in runs:
+            boxes = boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
+            total_boxes += len(boxes)
+            if total_boxes > settings.stl_max_boxes:
+                raise MeshTooComplexError(
+                    f"Request too complex: {total_boxes:,} boxes after meshing "
+                    f"(budget {settings.stl_max_boxes:,}). Reduce image size or colors."
+                )
+            yield code_char, boxes, cells
+
+
 def get_filename_prefix(colors: Colors) -> str:
     """Use the material code order for exported filenames."""
     return ''.join(colors.get_labels())
@@ -733,10 +774,10 @@ def get_filename_prefix(colors: Colors) -> str:
 
 def generate_stl_zip(
     color_blocks: list[dict],
+    labels: np.ndarray,
     layer_height: float,
     pixel_size: float,
     layer_count: int,
-    image_dimensions: dict,
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
@@ -746,11 +787,11 @@ def generate_stl_zip(
     Generate ZIP file containing merged STL files by primary color
 
     Args:
-        color_blocks: List of color blocks with RGB and pixels
+        color_blocks: Color blocks (RGB); block i prints where labels == i
+        labels: (height, width) label map of the model grid (services/label_map.py)
         layer_height: Height of each layer in mm
         pixel_size: Physical size of each pixel in mm
         layer_count: Total number of layers
-        image_dimensions: Dict with 'width' and 'height' keys
         use_greedy_meshing: If True, merge adjacent pixels to reduce file size
         colors: Optional Colors instance. If None, uses current global colors.
 
@@ -791,18 +832,13 @@ def generate_stl_zip(
     _log_input_color_brightness(input_colors, "STL")
     _log_blend_code_distribution(result_codes, active_colors.get_labels(), "STL")
 
-    width, height = image_dimensions['width'], image_dimensions['height']
+    height, width = labels.shape
     total_original_boxes = 0
     total_optimized_boxes = 0
 
-    # Complexity guard: enforced on the REAL merged box count, cumulative
-    # across color blocks (see settings.stl_max_boxes). The raw pixel × layer
-    # count is logged for observability but does not gate the request —
-    # mergeable photos must pass.
-    estimated_boxes = sum(len(b['pixels']) for b in color_blocks) * layer_count
-
-    def _remaining_box_budget() -> int:
-        return max(0, settings.stl_max_boxes - total_optimized_boxes)
+    # The raw pixel x layer count is logged for observability; the complexity
+    # guard applies to the real merged box count (block_box_runs).
+    estimated_boxes = int((labels != EMPTY).sum()) * layer_count
 
     z_offset = 0.0
 
@@ -819,50 +855,14 @@ def generate_stl_zip(
         len(color_blocks), layer_count, width, height, estimated_boxes
     )
 
-    # Step 4: Generate meshes for each color block
-    for idx, color_block in enumerate(color_blocks):
-        pixels = color_block['pixels']
-        # The mapping result carries the printed backing as a trailing suffix;
-        # the backing block itself is a single merged box below — strip the
-        # suffix before per-pixel meshing to avoid double geometry.
-        blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)  # e.g., "CCCM"
-        runs = layer_runs(blend_code, z_offset, layer_height)
-
-        # The block's footprint is meshed once; each vertical run extrudes it.
-        rectangles = None
-        if use_greedy_meshing and len(pixels) > 1:
-            rectangles = greedy_mesh_2d(
-                pixels_to_grid(pixels, width, height),
-                max_rectangles=_remaining_box_budget() // max(len(runs), 1),
-            )
-
-        for code_char, z_min, z_max in runs:
-            if rectangles is not None:
-                optimized_boxes = boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
-                total_original_boxes += len(pixels)
-                total_optimized_boxes += len(optimized_boxes)
-                code_mesh_map[code_char].append(generate_boxes_batch(optimized_boxes))
-            else:
-                # Original per-pixel box generation
-                total_original_boxes += len(pixels)
-                total_optimized_boxes += len(pixels)
-                if total_optimized_boxes > settings.stl_max_boxes:
-                    raise ValueError(
-                        f"Request too complex: {total_optimized_boxes:,} boxes after "
-                        f"meshing (budget {settings.stl_max_boxes:,}). "
-                        f"Reduce image size or colors."
-                    )
-                box_ranges = [
-                    (
-                        (pixel['x'] * pixel_size, (pixel['x'] + 1) * pixel_size),
-                        (pixel['y'] * pixel_size, (pixel['y'] + 1) * pixel_size),
-                        (z_min, z_max)
-                    )
-                    for pixel in pixels
-                ]
-                if box_ranges:
-                    batch_mesh = generate_boxes_batch(box_ranges)
-                    code_mesh_map[code_char].append(batch_mesh)
+    # Step 4: Generate meshes for each color block. The mapping result carries
+    # the printed backing as a trailing suffix; the backing itself is a single
+    # merged box below, so the suffix is stripped before meshing.
+    block_codes = [strip_backing_suffix(code, w_label, n_white) for code in result_codes]
+    for code_char, boxes, cells in block_box_runs(labels, block_codes, pixel_size, layer_height, use_greedy_meshing):
+        total_original_boxes += cells
+        total_optimized_boxes += len(boxes)
+        code_mesh_map[code_char].append(generate_boxes_batch(boxes))
 
     # Step 4b: Add white backing above optical layers (reflector behind colors)
     if n_white > 0:

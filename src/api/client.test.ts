@@ -249,6 +249,8 @@ describe('downloadCSV', () => {
         headers: { 'Content-Type': 'application/json' },
       })
     );
+    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1]!.body as string);
+    expect(body.colorBlocks).toEqual([{ r: 255, g: 0, b: 0, hex: '#FF0000', count: 10 }]);
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(mockClick).toHaveBeenCalled();
   });
@@ -274,15 +276,15 @@ describe('getFilamentPresets', () => {
 });
 
 describe('downloadSTLV2', () => {
-  it('sends V2 params and triggers download', async () => {
+  it('sends V2 params with a label map instead of pixel lists and triggers download', async () => {
     mockFetchResponse(null);
 
     const params: DownloadSTLParamsV2 = {
-      colorBlocks: [],
+      colorBlocks: [{ r: 255, g: 0, b: 0, count: 2, pixels: [{ x: 0, y: 0 }, { x: 1, y: 0 }], hex: '#FF0000' }],
       layerHeight: 0.08,
       pixelSize: 0.08,
       layerCount: 4,
-      imageDimensions: { width: 100, height: 100 },
+      imageDimensions: { width: 2, height: 1 },
       filamentColors: [{ name: 'Cyan', hex: '#0086D6', transmission_distance: 3.0 }],
     };
     await downloadSTLV2(params);
@@ -291,6 +293,10 @@ describe('downloadSTLV2', () => {
       '/api/v2/download-stl',
       expect.objectContaining({ method: 'POST' })
     );
+    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1]!.body as string);
+    expect(body.colorBlocks).toEqual([{ r: 255, g: 0, b: 0, hex: '#FF0000' }]);
+    expect(body.labelMap).toBe(btoa(String.fromCharCode(0, 0)));
+    expect(body).toMatchObject({ layerCount: 4, imageDimensions: { width: 2, height: 1 } });
     expect(mockClick).toHaveBeenCalled();
   });
 });

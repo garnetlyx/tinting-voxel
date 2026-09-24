@@ -85,13 +85,13 @@ class TestQA111BatchSTLSilentFailure:
                 'filename': 'broken1.png',
                 'status': 'success',
                 'colorBlocks': [{'invalid': 'data'}],
-                'imageDimensions': {'width': 10, 'height': 10},
+                'labels': np.zeros((10, 10), dtype=np.uint8),
             },
             {
                 'filename': 'broken2.png',
                 'status': 'success',
                 'colorBlocks': [{'also': 'invalid'}],
-                'imageDimensions': {'width': 10, 'height': 10},
+                'labels': np.zeros((10, 10), dtype=np.uint8),
             },
         ]
 
