@@ -65,7 +65,7 @@ async def api_process_image(
     layerHeight: Optional[float] = Form(None, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=MAX_COLOR_LAYERS),
     whiteBackingLayers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
-    backingMode: str = Form("white", pattern=r'^(white|black)$'),
+    backingFilament: Optional[str] = Form(None, pattern=r'^[A-Z]$'),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
 ):
@@ -103,7 +103,7 @@ async def api_process_image(
                 layer_count=layerCount,
                 layer_height=layerHeight,
                 white_backing_layers=whiteBackingLayers,
-                backing_mode=backingMode,
+                backing_filament=backingFilament,
                 detail_size=detailSize,
             )
 
@@ -128,7 +128,7 @@ async def api_process_image(
 
     return await run_in_threadpool(
         _svg_mode_response, image_bytes, epsilon, minArea, numColors, pixelSize, detailSize,
-        colors, layerCount, layerHeight, whiteBackingLayers, backingMode, filament,
+        colors, layerCount, layerHeight, whiteBackingLayers, backingFilament, filament,
     )
 
 
@@ -157,7 +157,7 @@ def _svg_mode_response(
     layerCount: int,
     layerHeight: float,
     whiteBackingLayers: int,
-    backingMode: str,
+    backingFilament: Optional[str],
     filament: str,
 ) -> Response:
     """Vectorize, map and preview an image in SVG mode (runs in a worker thread)."""
@@ -185,7 +185,7 @@ def _svg_mode_response(
         colors,
         n_targets=len(vector_results),
         backing_layers=whiteBackingLayers,
-        backing_mode=backingMode,
+        backing_filament=backingFilament,
     )
 
     # Render segmentation image: show quantized colors (BEFORE mapping) with vector outlines
@@ -234,7 +234,7 @@ def _svg_mode_response(
         layer_count=layerCount,
         layer_height=layerHeight,
         white_backing_layers=whiteBackingLayers,
-        backing_mode=backingMode,
+        backing_filament=backingFilament,
         ref_matrices=(ref_code_matrix, ref_rgb_matrix),  # Pass pre-computed matrices
     )
 
@@ -269,7 +269,7 @@ async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
             layer_count=body.layerCount,
             layer_height=body.layerHeight,
             white_backing_layers=body.whiteBackingLayers,
-            backing_mode=body.backingMode,
+            backing_filament=body.backingFilament,
         )
         return json_response(SimulatedPrintPreviewResponse(**result))
 

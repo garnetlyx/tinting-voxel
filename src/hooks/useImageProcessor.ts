@@ -14,8 +14,9 @@ import type {
   FilamentPreset,
   FilamentColorConfig,
   FilamentPresetsResponse,
+  FilamentSetInfo,
 } from '../api/types';
-import { isAllTransparentFilaments, isFilamentColorConfig } from '../utils/filaments';
+import { filamentLabel, isAllTransparentFilaments, isFilamentColorConfig } from '../utils/filaments';
 import type { ProcessingStage } from '../components/LoadingSpinner';
 import {
   processImage,
@@ -27,7 +28,7 @@ import {
   download3MFV2,
   downloadSVG3MFV2,
   downloadPrintSettings,
-  getLayerLimit,
+  getFilamentSet,
 } from '../api/client';
 import { useFilamentStorage } from './useFilamentStorage';
 import { buildPrintStack } from '../utils/printStack';
@@ -102,7 +103,8 @@ export const useImageProcessor = () => {
   const [pixelSize, setPixelSize] = useState(0.42);
   const [layerCount, setLayerCount] = useState(MIN_COLOR_LAYERS);
   const [whiteBackingLayers, setWhiteBackingLayers] = useState(0);
-  const [backingMode, setBackingMode] = useState<'white' | 'black'>('white');
+  // The user's backing filament; the set's default applies until they choose one.
+  const [chosenBackingFilament, setBackingFilament] = useState<string | null>(null);
 
   const filamentStorage = useFilamentStorage();
   const savedFilamentsRef = useRef(filamentStorage);
@@ -219,7 +221,7 @@ export const useImageProcessor = () => {
   const addFilamentColor = useCallback(() => {
     setFilamentColors(prev => {
       if (prev.length >= MAX_FILAMENT_COLORS) return prev;
-      const labels = new Set(prev.map(color => color.name[0].toUpperCase()));
+      const labels = new Set(prev.map(filamentLabel));
       let code = 'A'.charCodeAt(0);
       while (labels.has(String.fromCharCode(code))) code++;
       return [...prev, {
@@ -246,7 +248,7 @@ export const useImageProcessor = () => {
     if (filamentColors.length > MAX_FILAMENT_COLORS) return false;
 
     if (!filamentCatalog || !filamentColors.every(isFilamentColorConfig)) return false;
-    const labels = filamentColors.map(c => c.name[0].toUpperCase());
+    const labels = filamentColors.map(filamentLabel);
     if (new Set(labels).size !== labels.length) return false;
     const hexValues = filamentColors.map(c => c.hex.toLowerCase());
     if (new Set(hexValues).size !== hexValues.length) return false;
@@ -259,21 +261,29 @@ export const useImageProcessor = () => {
     [filamentColors, filamentPreset]
   );
 
-  // The backend knows what each filament set can search within its time limit;
-  // until it answers, the catalog's overall maximum applies.
-  const [filamentSetLayerLimit, setFilamentSetLayerLimit] = useState<number | null>(null);
+  // The backend knows what each filament set can search within its time limit
+  // and which filament backs it by default; until it answers, the catalog's
+  // overall layer maximum applies.
+  const [filamentSet, setFilamentSet] = useState<FilamentSetInfo | null>(null);
   const maxLayerCount = Math.max(
     MIN_COLOR_LAYERS,
-    filamentSetLayerLimit ?? filamentCatalog?.defaults.max_color_layers ?? MIN_COLOR_LAYERS,
+    filamentSet?.maxLayerCount ?? filamentCatalog?.defaults.max_color_layers ?? MIN_COLOR_LAYERS,
   );
+  // The backing filament printed: the user's choice while it belongs to the
+  // current set, otherwise the set's default.
+  const backingFilament = useMemo(() => {
+    const labels = filamentColors.map(filamentLabel);
+    return [chosenBackingFilament, filamentSet?.defaultBackingFilament]
+      .find((label): label is string => !!label && labels.includes(label));
+  }, [chosenBackingFilament, filamentSet, filamentColors]);
   useEffect(() => {
     if (!filamentCatalog || !isFilamentConfigValid) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      getLayerLimit(filamentRequestPayload, controller.signal)
-        .then(setFilamentSetLayerLimit)
+      getFilamentSet(filamentRequestPayload, controller.signal)
+        .then(setFilamentSet)
         .catch(err => {
-          if (!controller.signal.aborted) console.error('Error getting the layer limit:', err);
+          if (!controller.signal.aborted) console.error('Error describing the filament set:', err);
         });
     }, 300);
     return () => {
@@ -301,7 +311,7 @@ export const useImageProcessor = () => {
       layerHeight,
       layerCount,
       whiteBackingLayers: overrides?.whiteBackingLayers ?? whiteBackingLayers,
-      backingMode,
+      backingFilament,
       ...filamentRequestPayload,
       detailSize: overrides?.detailSize ?? detailSize,
       pixelParams: processingMode === 'pixel'
@@ -312,7 +322,7 @@ export const useImageProcessor = () => {
         : undefined,
     };
   }, [mode, pixelSize, detailSize, maxColors, colorThreshold, epsilon, minArea, numColors,
-    layerHeight, layerCount, whiteBackingLayers, backingMode, filamentRequestPayload]);
+    layerHeight, layerCount, whiteBackingLayers, backingFilament, filamentRequestPayload]);
 
   // Process image by calling backend API
   const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode, overrideLongestMm?: number, overrides?: Partial<{
@@ -581,7 +591,7 @@ export const useImageProcessor = () => {
         pixelSize,
         layerCount,
         whiteBackingLayers,
-        backingMode,
+        backingFilament,
         imageDimensions,
         detailSize,
         ...filamentRequestPayload,
@@ -618,7 +628,7 @@ export const useImageProcessor = () => {
         pixelSize,
         layerCount,
         whiteBackingLayers,
-        backingMode,
+        backingFilament,
         imageDimensions,
         detailSize,
         ...filamentRequestPayload,
@@ -654,7 +664,7 @@ export const useImageProcessor = () => {
         pixelSize,
         layerCount,
         whiteBackingLayers,
-        backingMode,
+        backingFilament,
         imageDimensions,
         detailSize,
         ...filamentRequestPayload,
@@ -687,7 +697,7 @@ export const useImageProcessor = () => {
         layerHeight,
         layerCount,
         whiteBackingLayers,
-        backingMode,
+        backingFilament,
         ...filamentRequestPayload,
       }, controller.signal);
       if (controller.signal.aborted) return;
@@ -708,7 +718,7 @@ export const useImageProcessor = () => {
     layerCount,
     filamentRequestPayload,
     whiteBackingLayers,
-    backingMode,
+    backingFilament,
   ]);
 
   // Keep the simulated print preview in sync with manual edits and filament changes.
@@ -723,16 +733,16 @@ export const useImageProcessor = () => {
       void refreshSimulatedPreview(colorBlocks);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [mode, colorBlocks, imageDimensions, layerHeight, layerCount, whiteBackingLayers, backingMode, filamentRequestPayload, refreshSimulatedPreview]);
+  }, [mode, colorBlocks, imageDimensions, layerHeight, layerCount, whiteBackingLayers, backingFilament, filamentRequestPayload, refreshSimulatedPreview]);
 
   const printStack = useMemo(
     () => buildPrintStack(
       layerCount,
       layerHeight,
       whiteBackingLayers,
-      backingMode,
+      backingFilament ?? null,
     ),
-[layerCount, layerHeight, whiteBackingLayers, backingMode]
+[layerCount, layerHeight, whiteBackingLayers, backingFilament]
   );
 
   // Update a color block's RGB/hex values (manual color adjustment)
@@ -845,8 +855,8 @@ export const useImageProcessor = () => {
     detailSize,
     layerCount,
     whiteBackingLayers,
-    backingMode,
-    setBackingMode,
+    backingFilament,
+    setBackingFilament,
     targetWidth,
     targetHeight,
     maxDimension,

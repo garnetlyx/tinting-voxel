@@ -38,7 +38,7 @@ def _default_backing_key_parts(colors: Colors) -> tuple[str, Optional[tuple]]:
     what warmup stores. Explicit callers pass their own parts."""
     from services.print_stack import PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label
 
-    label = resolve_backing_label(colors, DEFAULT_BACKING_LAYERS, 'white')
+    label = resolve_backing_label(colors, DEFAULT_BACKING_LAYERS)
     suffix = backing_suffix(label, DEFAULT_BACKING_LAYERS)
     boundary = PRINT_BACKGROUND_RGB if suffix else None
     return suffix, boundary

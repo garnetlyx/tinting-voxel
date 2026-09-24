@@ -2,6 +2,7 @@ import React, { useId, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useTranslation } from '../i18n';
 import type { FilamentColorConfig, TransmissionDistance } from '../api/types';
+import { filamentLabel } from '../utils/filaments';
 
 interface FilamentColorRowProps {
   config: FilamentColorConfig;
@@ -21,7 +22,7 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
   const { t } = useTranslation();
   const [showChannels, setShowChannels] = useState(false);
   const channelsId = useId();
-  const label = config.name[0]?.toUpperCase() ?? '';
+  const label = filamentLabel(config);
   const td = config.transmission_distance;
   const channels: [number, number, number] = Array.isArray(td) ? td : [td, td, td];
   const displayedTd = Array.isArray(td) ? Number((td.reduce((sum, value) => sum + value, 0) / td.length).toPrecision(4)) : td;

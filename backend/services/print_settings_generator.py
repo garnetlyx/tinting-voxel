@@ -23,7 +23,7 @@ def generate_print_settings(
     image_dimensions: dict,
     filament_colors: list[dict],
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
-    backing_mode: str = 'white',
+    backing_label: Optional[str] = None,
     filament_preset: Optional[str] = None,
 ) -> str:
     """
@@ -36,6 +36,7 @@ def generate_print_settings(
         image_dimensions: Dict with 'width' and 'height' keys (pixels)
         filament_colors: List of dicts with 'name', 'hex', 'transmission_distance'.
                          Must contain at least 1 color.
+        backing_label: Label of the backing filament (resolve_backing_label)
         filament_preset: Name of the preset used (if any)
 
     Returns:
@@ -60,7 +61,7 @@ def generate_print_settings(
         layer_count=layer_count,
         layer_height=layer_height,
         backing_layers=white_backing_layers,
-        backing_mode=backing_mode,
+        backing_label=backing_label,
     )
 
     extruders = []
@@ -86,7 +87,10 @@ def generate_print_settings(
             "slicer_layers_per_color_layer": slices_per_color,
             "color_layer_count": layer_count,
             "backing_color_layer_count": print_stack["whiteBackingLayers"],
-            "backing_mode": print_stack["backingMode"],
+            "backing_filament": next(
+                (color['name'] for color in filament_colors if color['name'][0].upper() == print_stack["backingFilament"]),
+                None,
+            ),
         },
         "object_dimensions": {
             "width_mm": width_mm,

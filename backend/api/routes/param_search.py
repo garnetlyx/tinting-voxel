@@ -221,7 +221,7 @@ async def api_param_search(
     layer_height: Optional[float] = Form(None, gt=0, le=10),
     pixel_size: float = Form(0.42, gt=0, le=10),
     white_backing_layers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
-    backing_mode: str = Form("white", pattern=r'^(white|black)$'),
+    backing_filament: Optional[str] = Form(None, pattern=r'^[A-Z]$'),
     max_colors: int = Form(10, ge=1, le=settings.max_target_colors),
     color_threshold: float = Form(50, ge=0, le=1000),
     detail_size: float = Form(0.42, ge=0.2, le=0.9),
@@ -248,7 +248,7 @@ async def api_param_search(
             pixel_size=pixel_size,
             white_backing_layers=white_backing_layers,
             detail_size=detail_size,
-            backing_mode=backing_mode,
+            backing_filament=backing_filament,
         ),
         colors=colors,
         baseline_params=(

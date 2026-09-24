@@ -37,7 +37,7 @@ class FixedParams:
     pixel_size: float
     white_backing_layers: int
     detail_size: float
-    backing_mode: str = "white"
+    backing_filament: Optional[str] = None
 
 
 @dataclass
@@ -213,7 +213,7 @@ class Evaluator:
             layer_count=self._fixed.layer_count,
             layer_height=self._fixed.layer_height,
             white_backing_layers=self._fixed.white_backing_layers,
-            backing_mode=self._fixed.backing_mode,
+            backing_filament=self._fixed.backing_filament,
             detail_size=self._fixed.detail_size,
         )
         return result["processedImage"]
@@ -236,7 +236,7 @@ class Evaluator:
             self._fixed.layer_count, self._fixed.layer_height, self._colors,
             n_targets=len(vector_results),
             backing_layers=self._fixed.white_backing_layers,
-            backing_mode=self._fixed.backing_mode,
+            backing_filament=self._fixed.backing_filament,
         )
         preview = build_vector_simulated_preview(
             quantized_image=quantized,
@@ -247,7 +247,7 @@ class Evaluator:
             layer_count=self._fixed.layer_count,
             layer_height=self._fixed.layer_height,
             white_backing_layers=self._fixed.white_backing_layers,
-            backing_mode=self._fixed.backing_mode,
+            backing_filament=self._fixed.backing_filament,
             ref_matrices=ref_matrices,
         )
         return preview["processedImage"]

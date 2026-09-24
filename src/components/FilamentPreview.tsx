@@ -5,7 +5,7 @@ import { useTranslation } from '../i18n';
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import type { BackingMode, FilamentColorConfig, FilamentPreset } from '../api/types';
+import type { FilamentColorConfig, FilamentPreset } from '../api/types';
 import { getFilamentPreview } from '../api/client';
 
 interface ColorMatrixEntry {
@@ -27,7 +27,7 @@ interface FilamentPreviewProps {
   layerCount: number;
   layerHeight: number;
   whiteBackingLayers: number;
-  backingMode: BackingMode;
+  backingFilament?: string;
   isConfigValid: boolean;
   disabled?: boolean;
 }
@@ -38,7 +38,7 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
   layerCount,
   layerHeight,
   whiteBackingLayers,
-  backingMode,
+  backingFilament,
   isConfigValid,
   disabled = false,
 }) => {
@@ -66,8 +66,8 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
     try {
       // Send only filamentPreset if it's set, otherwise send filamentColors
       const requestBody = filamentPreset
-        ? { filamentPreset, layerCount, layerHeight, whiteBackingLayers, backingMode }
-        : { filamentColors, layerCount, layerHeight, whiteBackingLayers, backingMode };
+        ? { filamentPreset, layerCount, layerHeight, whiteBackingLayers, backingFilament }
+        : { filamentColors, layerCount, layerHeight, whiteBackingLayers, backingFilament };
       const result = await getFilamentPreview(requestBody, controller.signal);
       if (!controller.signal.aborted) {
         setPreview(result);
@@ -82,7 +82,7 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
         setLoading(false);
       }
     }
-  }, [filamentColors, filamentPreset, layerCount, layerHeight, whiteBackingLayers, backingMode, isConfigValid, disabled]);
+  }, [filamentColors, filamentPreset, layerCount, layerHeight, whiteBackingLayers, backingFilament, isConfigValid, disabled]);
 
   // Auto-fetch on config change with debounce
   useEffect(() => {

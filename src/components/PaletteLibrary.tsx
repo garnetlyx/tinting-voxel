@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import type { PaletteInfo, PaletteLibraryResponse, FilamentColorConfig } from '../api/types';
 import { getPaletteLibrary } from '../api/client';
+import { filamentLabel } from '../utils/filaments';
 
 interface PaletteLibraryProps {
   onApplyPalette: (colors: FilamentColorConfig[]) => void;
@@ -116,14 +117,14 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                       <div
                         key={idx}
                         className="flex flex-col items-center"
-                        title={t('common:colorEntry', { index: idx + 1, code: color.name[0]?.toUpperCase() ?? '?', hex: color.hex })}
+                        title={t('common:colorEntry', { index: idx + 1, code: filamentLabel(color) || '?', hex: color.hex })}
                       >
                         <div
                           className="h-6 w-6 border border-ink/40"
                           style={{ backgroundColor: color.hex }}
                         />
                         <span className="mt-0.5 max-w-[40px] truncate font-mono text-[10px] text-ink-muted">
-                          {color.name[0]?.toUpperCase() ?? String(idx + 1)}
+                          {filamentLabel(color) || String(idx + 1)}
                         </span>
                       </div>
                     ))}

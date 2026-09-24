@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ParameterPanel } from './ParameterPanel';
@@ -33,12 +33,18 @@ describe('ParameterPanel', () => {
     onMaxDimensionChange: vi.fn(),
     whiteBackingLayers: 1,
     onWhiteBackingLayersChange: vi.fn(),
-    backingMode: 'white' as const,
-    onBackingModeChange: vi.fn(),
+    filamentColors: [
+      { name: 'Cyan', hex: '#3D79C6', transmission_distance: 0.2 },
+      { name: 'Magenta', hex: '#B3356E', transmission_distance: 0.2 },
+      { name: 'Yellow', hex: '#FFE665', transmission_distance: 0.2 },
+      { name: 'Grey', hex: '#9A9D9C', transmission_distance: 0.2 },
+    ],
+    backingFilament: 'G',
+    onBackingFilamentChange: vi.fn(),
         printStack: {
       opticalLayerCount: 4,
       whiteBackingLayers: 1,
-      backingMode: 'white' as const,
+      backingFilament: 'G',
       totalLayerCount: 5,
       totalHeightMm: 0.4,
     },
@@ -81,6 +87,27 @@ describe('ParameterPanel', () => {
     expect(slider).toHaveAttribute('max', '8');
     expect(screen.getByRole('slider', { name: 'Layer Height' })).toHaveAttribute('aria-valuetext', '0.08 mm');
     expect(screen.getByText('Up to 8 for the current filament set')).toBeInTheDocument();
+  });
+
+  it('picks the backing filament from the current set', async () => {
+    const user = userEvent.setup();
+    const onBackingFilamentChange = vi.fn();
+    render(<ParameterPanel {...defaultProps} onBackingFilamentChange={onBackingFilamentChange} />);
+
+    const picker = within(screen.getByRole('group', { name: 'Backing filament' }));
+    expect(picker.getAllByRole('button').map(button => button.textContent)).toEqual(['Cyan', 'Magenta', 'Yellow', 'Grey']);
+    expect(picker.getByRole('button', { name: 'Grey' })).toHaveAttribute('aria-pressed', 'true');
+    expect(picker.getByRole('button', { name: 'Yellow' })).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(picker.getByRole('button', { name: 'Cyan' }));
+    expect(onBackingFilamentChange).toHaveBeenCalledWith('C');
+  });
+
+  it('disables the backing filament choice without backing layers', () => {
+    render(<ParameterPanel {...defaultProps} whiteBackingLayers={0} />);
+
+    const buttons = within(screen.getByRole('group', { name: 'Backing filament' })).getAllByRole('button');
+    expect(buttons.every(button => button.hasAttribute('disabled'))).toBe(true);
   });
 
   it('keeps the Local-photo 200 mm pixel pitch selectable without rounding it', () => {

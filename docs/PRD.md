@@ -171,7 +171,7 @@ tinting-voxel solves these by:
 - Batch processor UI (up to 20 images)
 - Filament config panel + preset manager; one TD field with optional RGB expansion
 - Regular color layers default to 0.08 mm; high-transmission color layers to 0.84 mm (three 0.28 mm slicer layers)
-- Three backing color layers by default; light/dark selects the closest available material
+- Three backing color layers by default, printed in a filament picked from the current set (default: the filament closest to white)
 - Palette library selector
 - Parameter-search modal with backend warmup UX
 - Color adjustment panel

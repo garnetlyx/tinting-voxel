@@ -148,7 +148,7 @@ docker compose up --build  # Build and run
 | POST | `/api/v2/download-svg-3mf` | SVG-mode 3MF with configurable colors |
 | POST | `/api/v2/print-settings` | JSON print settings for slicers |
 | GET | `/api/v2/filament-presets` | List available filament presets |
-| POST | `/api/v2/layer-limit` | Largest color-layer count a filament set can search |
+| POST | `/api/v2/filament-set` | A filament set's color-layer maximum and default backing filament |
 
 ### Other
 | Method | Endpoint | Description |
@@ -221,7 +221,7 @@ enumeration order), which matches exactly what matching every code returns.
 Enumeration plus matching must fit `full_enumeration_budget_seconds`; over
 budget, translucent sets use composition pruning and opaque sets are rejected,
 as are pruned searches estimated over `stack_search_limit_seconds`.
-`/api/v2/layer-limit` reports the largest layer count whose search fits
+`/api/v2/filament-set` reports the largest layer count whose search fits
 `layer_limit_budget_share` of that limit at `max_target_colors` targets, and the
 layer slider stops there. Custom sets at that limit can keep millions of
 distinct colors, so CIEDE2000 scoring runs in `DISTANCE_CHUNK` slices
@@ -291,7 +291,11 @@ loads the catalog, print defaults, and TD transparency rule from
 high-transmission color layers at 0.84 mm (three 0.28 mm slicer layers), with
 three backing color layers. Pruning and the height default use the material
 set's mean RGB TD against the threshold in `core/stack_prune.py`. The backing
-mode selects actual light/dark material layers under common white illumination.
+block is one of the set's filaments, picked in the Backing section
+(`backingFilament`, a filament label); until one is picked it is the filament
+closest to white by CIEDE2000 (`print_stack.default_backing_label`, reported by
+`/api/v2/filament-set`). Its actual layers are predicted under the same white
+illumination as the color stack.
 
 Parameter search scores the current settings and `param_search_trials` others
 by the mean CIEDE2000 between the image on the model grid and each simulated

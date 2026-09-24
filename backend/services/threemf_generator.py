@@ -63,7 +63,7 @@ def generate_3mf(
     colors: Optional[Colors] = None,
     color_hex_map: Optional[dict] = None,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
 ) -> bytes:
     """
     Generate a single 3MF file with color-separated objects.
@@ -110,7 +110,7 @@ def generate_3mf(
         layer_count=layer_count,
         colors=colors,
         backing_layers=white_backing_layers,
-        backing_mode=backing_mode,
+        backing_filament=backing_filament,
     )
 
     _log_input_color_brightness(input_colors, "3MF")
@@ -120,9 +120,9 @@ def generate_3mf(
     z_offset = 0.0
 
     n_white = normalize_backing_layers(white_backing_layers)
-    w_label = resolve_backing_label(colors, n_white, backing_mode)
+    w_label = resolve_backing_label(colors, n_white, backing_filament)
     if n_white > 0:
-        logger.info("3MF: printed backing mode='%s', label='%s', layers=%d", backing_mode, w_label, n_white)
+        logger.info("3MF: printed backing label='%s', layers=%d", w_label, n_white)
 
     # The raw pixel x layer count is logged for observability; the complexity
     # guard applies to the real merged box count (block_box_runs).
@@ -160,7 +160,7 @@ def generate_svg_3mf(
     colors: Optional[Colors] = None,
     color_hex_map: Optional[dict] = None,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
     detail_size: Optional[float] = None,
 ) -> bytes:
     """
@@ -194,7 +194,7 @@ def generate_svg_3mf(
 
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
         layer_count, layer_height, colors, n_targets=len(vector_results),
-        backing_layers=white_backing_layers, backing_mode=backing_mode,
+        backing_layers=white_backing_layers, backing_filament=backing_filament,
     )
 
     labels = colors.get_labels()
@@ -204,7 +204,7 @@ def generate_svg_3mf(
     # Map with order refinement for composition-pruned translucent sets
     # (same as the pixel STL/3MF paths); codes carry the backing suffix.
     from services.image_processor import _map_and_refine
-    _b_label = resolve_backing_label(colors, white_backing_layers, backing_mode)
+    _b_label = resolve_backing_label(colors, white_backing_layers, backing_filament)
     _b_suffix = backing_suffix(_b_label, white_backing_layers)
     _b_boundary = PRINT_BACKGROUND_RGB if _b_suffix else None
     result_codes, _ = _map_and_refine(
@@ -221,9 +221,9 @@ def generate_svg_3mf(
     z_offset = 0.0
 
     n_white = normalize_backing_layers(white_backing_layers)
-    w_label = resolve_backing_label(colors, n_white, backing_mode)
+    w_label = resolve_backing_label(colors, n_white, backing_filament)
     if n_white > 0:
-        logger.info("SVG-3MF: printed backing mode='%s', label='%s', layers=%d", backing_mode, w_label, n_white)
+        logger.info("SVG-3MF: printed backing label='%s', layers=%d", w_label, n_white)
 
     total_optimized_boxes = 0
     partition = finalize_vector_partition(

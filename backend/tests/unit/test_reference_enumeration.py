@@ -39,7 +39,7 @@ CASES = [
 @pytest.mark.parametrize("preset,layers,height,backing", CASES)
 def test_full_enumeration_keeps_first_code_per_distinct_color(preset, layers, height, backing):
     colors = Colors.from_configs(get_preset(preset))
-    suffix = backing_suffix(resolve_backing_label(colors, backing, "white"), backing)
+    suffix = backing_suffix(resolve_backing_label(colors, backing), backing)
     boundary = PRINT_BACKGROUND_RGB if suffix else None
     all_codes = ["".join(p) for p in itertools.product(colors.get_labels(), repeat=layers)]
 
@@ -50,7 +50,7 @@ def test_full_enumeration_keeps_first_code_per_distinct_color(preset, layers, he
 def test_code_list_enumeration_keeps_list_order():
     colors = Colors.from_configs(get_preset("clear_cmyg"))
     compositions = composition_codes(colors.get_labels(), 6)
-    suffix = backing_suffix(resolve_backing_label(colors, 3, "white"), 3)
+    suffix = backing_suffix(resolve_backing_label(colors, 3), 3)
 
     expected = _first_occurrences(compositions, _brute_force(colors, compositions, 0.84, suffix, PRINT_BACKGROUND_RGB))
     got = _distinct_reference_colors(colors, 6, 0.84, suffix, PRINT_BACKGROUND_RGB, code_list=compositions)
@@ -60,7 +60,7 @@ def test_code_list_enumeration_keeps_list_order():
 @pytest.mark.parametrize("preset,layers,height,backing", CASES)
 def test_matching_representatives_equals_matching_every_code(preset, layers, height, backing):
     colors = Colors.from_configs(get_preset(preset))
-    suffix = backing_suffix(resolve_backing_label(colors, backing, "white"), backing)
+    suffix = backing_suffix(resolve_backing_label(colors, backing), backing)
     boundary = PRINT_BACKGROUND_RGB if suffix else None
     all_codes = ["".join(p) for p in itertools.product(colors.get_labels(), repeat=layers)]
     all_rgbs = _brute_force(colors, all_codes, height, suffix, boundary)

@@ -94,7 +94,7 @@ def generate_batch_stl_zip(
     layer_count: int,
     colors: Optional[Colors] = None,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
 ) -> bytes:
     """
     Generate a ZIP containing per-image STL ZIPs from batch results.
@@ -138,7 +138,7 @@ def generate_batch_stl_zip(
                     layer_count=layer_count,
                     colors=colors,
                     white_backing_layers=white_backing_layers,
-                    backing_mode=backing_mode,
+                    backing_filament=backing_filament,
                 )
                 outer_zip.writestr(f"{base_name}.zip", inner_zip_bytes)
                 stl_success_count += 1

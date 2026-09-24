@@ -1,5 +1,10 @@
 import type { FilamentColorConfig, FilamentPresetsResponse, TransmissionDistance } from '../api/types';
 
+/** A filament's label: the first letter of its name, as in blend codes. */
+export function filamentLabel(color: Pick<FilamentColorConfig, 'name'>): string {
+  return color.name[0]?.toUpperCase() ?? '';
+}
+
 export function isTransmissionDistance(value: unknown): value is TransmissionDistance {
   const valid = (channel: unknown) => typeof channel === 'number' && Number.isFinite(channel) && channel > 0 && channel <= 1000;
   return Array.isArray(value) ? value.length === 3 && value.every(valid) : valid(value);

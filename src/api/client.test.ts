@@ -317,7 +317,7 @@ describe('getFilamentPreview', () => {
       layerCount: 4,
       layerHeight: 0.08,
       whiteBackingLayers: 3,
-      backingMode: 'black',
+      backingFilament: 'K',
     };
     const result = await getFilamentPreview(params);
     expect(result).toEqual(mockPreview);

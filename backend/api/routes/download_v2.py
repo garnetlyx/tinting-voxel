@@ -19,13 +19,14 @@ from api.models import (
     FilamentPresetInfo,
     FilamentPresetsResponse,
     PrintSettingsRequest,
-    LayerLimitRequest,
+    FilamentSetRequest,
 )
 from core.color_config import (
     PRESETS,
     PRESET_DISPLAY_NAMES,
 )
 from services.print_settings_generator import generate_print_settings
+from services.print_stack import default_backing_label, resolve_backing_label
 from config.settings import settings
 from services.image_processor import MAX_PROCESSING_DIMENSION
 from config.print_defaults import (
@@ -88,12 +89,17 @@ async def api_get_filament_presets(request: Request):
 
 
 
-@router.post("/layer-limit")
+@router.post("/filament-set")
 @limiter.limit("60/minute")
-@handle_api_errors("computing the layer limit")
-async def api_layer_limit(request: Request, body: LayerLimitRequest):
-    """Most color layers this filament set can process within the stack-search limit."""
-    return {"maxLayerCount": await run_in_threadpool(max_color_layers, body.resolved_colors)}
+@handle_api_errors("describing the filament set")
+async def api_filament_set(request: Request, body: FilamentSetRequest):
+    """What a filament set supports: the most color layers it can process within
+    the stack-search limit, and the backing filament used unless one is chosen."""
+    colors = body.resolved_colors
+    return {
+        "maxLayerCount": await run_in_threadpool(max_color_layers, colors),
+        "defaultBackingFilament": default_backing_label(colors),
+    }
 
 @router.post("/download-stl")
 @limiter.limit("5/minute")
@@ -114,7 +120,7 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
         layer_count=body.layerCount,
         colors=colors,
         white_backing_layers=body.whiteBackingLayers,
-        backing_mode=body.backingMode,
+        backing_filament=body.backingFilament,
     )
 
     _record_export("stl", started, body.layerCount, len(color_blocks), zip_content)
@@ -150,7 +156,7 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
         image_dimensions=image_dimensions,
         colors=colors,
         white_backing_layers=body.whiteBackingLayers,
-        backing_mode=body.backingMode,
+        backing_filament=body.backingFilament,
         detail_size=body.detailSize,
     )
 
@@ -197,7 +203,7 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
         colors=colors,
         color_hex_map=color_hex_map,
         white_backing_layers=body.whiteBackingLayers,
-        backing_mode=body.backingMode,
+        backing_filament=body.backingFilament,
     )
 
     _record_export("3mf", started, body.layerCount, len(color_blocks), threemf_content)
@@ -241,7 +247,7 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
         colors=colors,
         color_hex_map=color_hex_map,
         white_backing_layers=body.whiteBackingLayers,
-        backing_mode=body.backingMode,
+        backing_filament=body.backingFilament,
         detail_size=body.detailSize,
     )
 
@@ -285,7 +291,7 @@ async def api_print_settings(request: Request, body: PrintSettingsRequest):
         image_dimensions=image_dimensions,
         filament_colors=filament_colors_dicts,
         white_backing_layers=body.whiteBackingLayers,
-        backing_mode=body.backingMode,
+        backing_label=resolve_backing_label(body.resolved_colors, body.whiteBackingLayers, body.backingFilament),
         filament_preset=preset_name,
     )
 

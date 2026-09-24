@@ -2,16 +2,12 @@
 from config.print_defaults import DEFAULT_BACKING_LAYERS
 from typing import Optional
 
-from core.blend_color import Colors
+import numpy as np
 
-BACKING_MODES = ('white', 'black')
+from core.blend_color import Colors
+from core.color_materials import Color
 
 PRINT_BACKGROUND_RGB = (255.0, 255.0, 255.0)
-
-_BACKING_TARGET_RGB = {
-    'white': (255, 255, 255),
-    'black': (0, 0, 0),
-}
 
 
 def normalize_backing_layers(backing_layers: Optional[int]) -> int:
@@ -21,38 +17,41 @@ def normalize_backing_layers(backing_layers: Optional[int]) -> int:
     return max(0, int(backing_layers))
 
 
-def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
-    h = hex_color.lstrip('#')
-    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+def default_backing_label(colors: Colors) -> str:
+    """The filament that looks closest to white (CIEDE2000).
+
+    The backing reflects light back through the color layers, so a light
+    neutral keeps colors true. RGB distance would rank a bright yellow closer
+    to white than a neutral grey.
+    """
+    labels = colors.get_labels()
+    if not labels:
+        raise ValueError("Colors instance has no colors defined")
+    filament_lab = np.array([Color.get_lab(colors[label].rgb)[:3] for label in labels])
+    white_lab = np.array(Color.get_lab((255, 255, 255))[:3])
+    return labels[int(np.argmin(Color.perceptual_distance_raw(white_lab, filament_lab)))]
 
 
 def resolve_backing_label(
     colors: Colors,
     backing_layers: Optional[int],
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
 ) -> Optional[str]:
-    """
-    Resolve the backing-block filament label for the requested mode.
+    """The label of the filament printed as the backing block (None without one).
 
-    The backing filament is the one CLOSEST to the mode's pole (pure white /
-    pure black) — a set without an exact #FFFFFF or near-black filament still
-    resolves instead of erroring.
+    backing_filament names one of the set's filaments by label; when omitted
+    the set's default_backing_label applies.
     """
-    if backing_mode not in BACKING_MODES:
-        raise ValueError(f"backing_mode must be one of {BACKING_MODES}, got {backing_mode!r}")
     if normalize_backing_layers(backing_layers) <= 0:
         return None
-
+    if backing_filament is None:
+        return default_backing_label(colors)
     labels = colors.get_labels()
-    if not labels:
-        raise ValueError("Colors instance has no colors defined")
-    target = _BACKING_TARGET_RGB[backing_mode]
-    return min(
-        labels,
-        key=lambda label: sum(
-            (a - b) ** 2 for a, b in zip(_hex_to_rgb(colors[label].hex), target)
-        ),
-    )
+    if backing_filament not in labels:
+        raise ValueError(
+            f"Backing filament '{backing_filament}' is not in this filament set ({', '.join(labels)})."
+        )
+    return backing_filament
 
 
 def backing_suffix(backing_label: Optional[str], backing_layers: Optional[int]) -> str:
@@ -75,7 +74,7 @@ def build_print_stack(
     layer_count: int,
     layer_height: float,
     backing_layers: Optional[int] = None,
-    backing_mode: str = 'white',
+    backing_label: Optional[str] = None,
 ) -> dict:
     """Build shared stack metadata for UI, exports, and print settings."""
     backing = normalize_backing_layers(backing_layers)
@@ -83,7 +82,7 @@ def build_print_stack(
     return {
         "opticalLayerCount": layer_count,
         "whiteBackingLayers": backing,
-        "backingMode": backing_mode,
+        "backingFilament": backing_label if backing else None,
         "totalLayerCount": total_layer_count,
         "totalHeightMm": total_layer_count * layer_height,
     }

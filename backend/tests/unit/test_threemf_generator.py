@@ -36,12 +36,12 @@ def test_svg_3mf_uses_selected_backing_and_detail_size(monkeypatch, default_colo
         image_dimensions={'width': 5, 'height': 5},
         colors=default_colors,
         white_backing_layers=2,
-        backing_mode='black',
+        backing_filament='K',
         detail_size=0.82,
     )
     assert zipfile.is_zipfile(BytesIO(result))
     assert observed['matrix']['backing_layers'] == 2
-    assert observed['matrix']['backing_mode'] == 'black'
+    assert observed['matrix']['backing_filament'] == 'K'
     assert observed['partition'][2:] == (0.2, 0.82)
 
 

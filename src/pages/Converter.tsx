@@ -73,8 +73,8 @@ const Converter: React.FC = () => {
     layerCount,
     maxLayerCount,
     whiteBackingLayers,
-    backingMode,
-    setBackingMode,
+    backingFilament,
+    setBackingFilament,
     targetWidth,
     targetHeight,
     maxDimension,
@@ -322,7 +322,7 @@ const Converter: React.FC = () => {
                 layerHeight={layerHeight}
                 layerCount={layerCount}
                 whiteBackingLayers={whiteBackingLayers}
-                backingMode={backingMode}
+                backingFilament={backingFilament}
                 filamentPreset={filamentPreset ?? undefined}
                 filamentColors={filamentPreset ? undefined : filamentColors}
                 detailSize={detailSize}
@@ -366,8 +366,9 @@ const Converter: React.FC = () => {
                 onMaxDimensionChange={setMaxDimension}
                 whiteBackingLayers={whiteBackingLayers}
                 onWhiteBackingLayersChange={setWhiteBackingLayers}
-                backingMode={backingMode}
-                onBackingModeChange={setBackingMode}
+                filamentColors={filamentColors}
+                backingFilament={backingFilament}
+                onBackingFilamentChange={setBackingFilament}
                 printStack={printStack}
                 onReprocess={() => handleReprocess()}
                 processing={processing}
@@ -395,7 +396,7 @@ const Converter: React.FC = () => {
                   layerCount={layerCount}
                   layerHeight={layerHeight}
                   whiteBackingLayers={whiteBackingLayers}
-                  backingMode={backingMode}
+                  backingFilament={backingFilament}
                   isConfigValid={isFilamentConfigValid}
                   disabled={processing}
                 />
@@ -457,7 +458,7 @@ const Converter: React.FC = () => {
               layerCount,
               layerHeight,
               whiteBackingLayers,
-              backingMode,
+              backingFilament,
               maxColors,
               colorThreshold,
               detailSize,

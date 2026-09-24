@@ -9,7 +9,7 @@ import colorsys
 import itertools
 import logging
 from io import BytesIO
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -36,11 +36,11 @@ class FilamentPreviewService:
     """
 
     def __init__(self, colors: Colors, layer_count: int = 4, layer_height: float = 0.08,
-                 backing_layers: int = DEFAULT_BACKING_LAYERS, backing_mode: str = "white"):
+                 backing_layers: int = DEFAULT_BACKING_LAYERS, backing_filament: Optional[str] = None):
         self.colors = colors
         self.layer_count = layer_count
         self.layer_height = layer_height
-        label = resolve_backing_label(colors, backing_layers, backing_mode)
+        label = resolve_backing_label(colors, backing_layers, backing_filament)
         suffix = backing_suffix(label, backing_layers)
         self.generator = BlendTestGenerator(
             colors=colors,

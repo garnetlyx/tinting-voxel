@@ -21,6 +21,6 @@
   "nozzle": "{{diameter}} mm 喷嘴",
   "currentSize": "{{width}} mm × {{height}} mm",
   "stack": "{{optical}} 层颜色 + {{backing}} 层背衬 = {{total}} 层",
-  "backingMode_white": "浅色背衬",
-  "backingMode_black": "深色背衬"
+  "backingFilament": "背衬耗材",
+  "backingFilamentHelp": "打印在颜色层下方。未选择时，使用最接近白色的耗材。"
 }

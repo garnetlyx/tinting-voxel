@@ -1,10 +1,10 @@
-import type { BackingMode, PrintStackInfo } from '../api/types';
+import type { FilamentLabel, PrintStackInfo } from '../api/types';
 
 export function buildPrintStack(
   layerCount: number,
   layerHeight: number,
   whiteBackingLayers: number,
-  backingMode: BackingMode = 'white',
+  backingFilament: FilamentLabel | null,
 ): PrintStackInfo {
   const opticalLayerCount = layerCount;
   const totalLayerCount = opticalLayerCount + whiteBackingLayers;
@@ -13,7 +13,7 @@ export function buildPrintStack(
   return {
     opticalLayerCount,
     whiteBackingLayers,
-    backingMode,
+    backingFilament: whiteBackingLayers > 0 ? backingFilament : null,
     totalLayerCount,
     totalHeightMm,
   };

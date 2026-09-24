@@ -287,7 +287,7 @@ def compute_reference_matrices(
     prune: Optional[bool] = None,
     n_targets: Optional[int] = None,
     backing_layers: Optional[int] = None,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
 ) -> tuple:
     """
     Compute color reference matrices for Beer-Lambert mapping.
@@ -328,7 +328,7 @@ def compute_reference_matrices(
     from services.print_stack import (
         PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
     )
-    b_label = resolve_backing_label(colors, backing_layers, backing_mode)
+    b_label = resolve_backing_label(colors, backing_layers, backing_filament)
     b_suffix = backing_suffix(b_label, backing_layers)
     b_boundary = PRINT_BACKGROUND_RGB if b_suffix else None
 
@@ -410,7 +410,7 @@ def map_color_blocks_to_blend_results(
     layer_count: int,
     colors: Colors,
     backing_layers: Optional[int] = None,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
     """
     Map source RGB blocks to nearest printable blend codes and RGBs.
@@ -424,7 +424,7 @@ def map_color_blocks_to_blend_results(
     return _map_source_colors_to_blends(
         [(block['r'], block['g'], block['b']) for block in color_blocks],
         colors, layer_count, layer_height,
-        backing_layers=backing_layers, backing_mode=backing_mode,
+        backing_layers=backing_layers, backing_filament=backing_filament,
     )
 
 
@@ -779,7 +779,7 @@ def generate_stl_zip(
     use_greedy_meshing: bool = True,
     colors: Optional[Colors] = None,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
 ) -> bytes:
     """
     Generate ZIP file containing merged STL files by primary color
@@ -824,7 +824,7 @@ def generate_stl_zip(
         layer_count=layer_count,
         colors=active_colors,
         backing_layers=white_backing_layers,
-        backing_mode=backing_mode,
+        backing_filament=backing_filament,
     )
 
     _log_input_color_brightness(input_colors, "STL")
@@ -841,12 +841,9 @@ def generate_stl_zip(
     z_offset = 0.0
 
     n_white = normalize_backing_layers(white_backing_layers)
-    w_label = resolve_backing_label(active_colors, n_white, backing_mode)
+    w_label = resolve_backing_label(active_colors, n_white, backing_filament)
     if n_white > 0:
-        logger.info(
-            "Printed backing: mode='%s', label='%s', layers=%d (closest %s filament)",
-            backing_mode, w_label, n_white, backing_mode,
-        )
+        logger.info("Printed backing: label='%s', layers=%d", w_label, n_white)
 
     logger.info(
         "STL generation: %d color blocks, %d layers, %dx%d image, ~%d estimated boxes",
@@ -891,7 +888,7 @@ def generate_stl_zip(
         layer_count=layer_count,
         layer_height=layer_height,
         backing_layers=n_white,
-        backing_mode=backing_mode,
+        backing_label=w_label,
     )
     physical_height = print_stack["totalHeightMm"]
     prefix = get_filename_prefix(active_colors)

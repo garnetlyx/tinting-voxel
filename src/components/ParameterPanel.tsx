@@ -4,11 +4,12 @@ import { useTranslation } from '../i18n';
  */
 import React, { useEffect, useId, useState } from 'react';
 import { RefreshCw, SlidersHorizontal } from 'lucide-react';
-import type { PrintStackInfo, ProcessingMode } from '../api/types';
+import type { FilamentColorConfig, PrintStackInfo, ProcessingMode } from '../api/types';
 import { LAYER_HEIGHT_MIN_MM, LAYER_HEIGHT_MAX_MM } from '../api/types';
 import { ModeSelector } from './ModeSelector';
 import { RailSection } from './RailSection';
 import { RangeField } from './RangeField';
+import { filamentLabel } from '../utils/filaments';
 
 const DETAIL_SIZES_MM = [0.22, 0.42, 0.62, 0.82];
 
@@ -47,8 +48,10 @@ interface ParameterPanelProps {
   onMaxDimensionChange: (value: number) => void;
   whiteBackingLayers: number;
   onWhiteBackingLayersChange: (value: number) => void;
-  backingMode: 'white' | 'black';
-  onBackingModeChange: (mode: 'white' | 'black') => void;
+  /** The current filament set; one of them is printed as the backing block. */
+  filamentColors: FilamentColorConfig[];
+  backingFilament?: string;
+  onBackingFilamentChange: (label: string) => void;
   printStack: PrintStackInfo;
   onReprocess: () => void;
   processing: boolean;
@@ -57,7 +60,7 @@ interface ParameterPanelProps {
 }
 
 /** Color layers over backing layers, drawn as the stack prints (top first). */
-const StackDiagram: React.FC<{ stack: PrintStackInfo }> = ({ stack }) => (
+const StackDiagram: React.FC<{ stack: PrintStackInfo; backingHex?: string }> = ({ stack, backingHex }) => (
   <div aria-hidden="true" className="flex w-16 shrink-0 flex-col gap-px">
     {Array.from({ length: stack.opticalLayerCount }, (_, i) => (
       <span
@@ -69,7 +72,8 @@ const StackDiagram: React.FC<{ stack: PrintStackInfo }> = ({ stack }) => (
     {Array.from({ length: stack.whiteBackingLayers }, (_, i) => (
       <span
         key={`b${i}`}
-        className={`block h-1.5 border ${stack.backingMode === 'black' ? 'border-ink bg-ink' : 'border-rule-strong bg-paper-raised'}`}
+        className="block h-1.5 border border-ink/25"
+        style={{ background: backingHex }}
       />
     ))}
   </div>
@@ -104,8 +108,9 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   onMaxDimensionChange,
   whiteBackingLayers,
   onWhiteBackingLayersChange,
-  backingMode,
-  onBackingModeChange,
+  filamentColors,
+  backingFilament,
+  onBackingFilamentChange,
   printStack,
   onReprocess,
   processing,
@@ -114,6 +119,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
 }) => {
   const { t } = useTranslation();
   const detailSizeLabelId = useId();
+  const backingFilamentLabelId = useId();
   const formatMaxDimension = (value: number) => value.toFixed(1);
   const [maxDimensionInput, setMaxDimensionInput] = useState(formatMaxDimension(maxDimension));
   const [isEditingMaxDimension, setIsEditingMaxDimension] = useState(false);
@@ -297,24 +303,37 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
               onChange={(e) => onWhiteBackingLayersChange(Math.max(0, Math.min(5, parseInt(e.target.value || '0', 10))))}
               className="tv-input w-20 font-mono"
             />
-            <div className="tv-seg flex-1">
-              {(['white', 'black'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  aria-pressed={backingMode === m}
-                  onClick={() => onBackingModeChange(m)}
-                  className="tv-seg-item"
-                >
-                  {t(`parameters:backingMode_${m}`)}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
+        <div>
+          <p id={backingFilamentLabelId} className="text-sm font-medium text-ink-soft">{t('parameters:backingFilament')}</p>
+          <div role="group" aria-labelledby={backingFilamentLabelId} className="mt-1.5 flex flex-wrap gap-1.5">
+            {filamentColors.map((filament) => {
+              const label = filamentLabel(filament);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={backingFilament === label}
+                  disabled={whiteBackingLayers === 0}
+                  onClick={() => onBackingFilamentChange(label)}
+                  className="inline-flex items-center gap-1.5 rounded-sheet border border-rule-strong bg-paper-raised px-2 py-1 text-xs font-semibold text-ink-soft transition-colors hover:border-ink disabled:cursor-not-allowed disabled:opacity-45 aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-paper-raised"
+                >
+                  <span aria-hidden="true" className="h-3 w-3 rounded-[2px] border border-ink/25" style={{ background: filament.hex }} />
+                  {filament.name}
+                </button>
+              );
+            })}
+          </div>
+          <p className="tv-help mt-1">{t('parameters:backingFilamentHelp')}</p>
+        </div>
+
         <div className="flex items-center gap-4 rounded-sheet border border-rule bg-paper-raised p-3">
-          <StackDiagram stack={printStack} />
+          <StackDiagram
+            stack={printStack}
+            backingHex={filamentColors.find((filament) => filamentLabel(filament) === printStack.backingFilament)?.hex}
+          />
           <div className="min-w-0 space-y-1">
             <p className="text-xs text-ink-soft">
               {t('parameters:stack', { optical: printStack.opticalLayerCount, backing: printStack.whiteBackingLayers, total: printStack.totalLayerCount })}

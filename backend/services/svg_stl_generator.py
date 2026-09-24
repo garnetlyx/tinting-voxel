@@ -39,7 +39,7 @@ def generate_svg_stl_zip(
     image_dimensions: dict,
     colors: Colors,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
     detail_size: Optional[float] = None,
 ) -> bytes:
     """
@@ -69,7 +69,7 @@ def generate_svg_stl_zip(
     # Compute reference matrices locally (thread-safe, backing-aware)
     ref_code_matrix, ref_rgb_matrix = stl_generator.compute_reference_matrices(
         layer_count, layer_height, active_colors, n_targets=len(vector_results),
-        backing_layers=white_backing_layers, backing_mode=backing_mode,
+        backing_layers=white_backing_layers, backing_filament=backing_filament,
     )
 
     # Initialize mesh map for each primary color dynamically
@@ -81,7 +81,7 @@ def generate_svg_stl_zip(
     # Map to blend codes using Beer-Lambert model (with order refinement
     # for composition-pruned translucent sets); codes carry the backing suffix.
     from services.image_processor import _map_and_refine
-    _b_label = resolve_backing_label(active_colors, white_backing_layers, backing_mode)
+    _b_label = resolve_backing_label(active_colors, white_backing_layers, backing_filament)
     _b_suffix = backing_suffix(_b_label, white_backing_layers)
     _b_boundary = PRINT_BACKGROUND_RGB if _b_suffix else None
     result_codes, _ = _map_and_refine(
@@ -101,9 +101,9 @@ def generate_svg_stl_zip(
     z_offset = 0.0
 
     n_white = normalize_backing_layers(white_backing_layers)
-    w_label = resolve_backing_label(active_colors, n_white, backing_mode)
+    w_label = resolve_backing_label(active_colors, n_white, backing_filament)
     if n_white > 0:
-        logger.info("SVG-STL: printed backing mode='%s', label='%s', layers=%d", backing_mode, w_label, n_white)
+        logger.info("SVG-STL: printed backing label='%s', layers=%d", w_label, n_white)
 
     partition = finalize_vector_partition(
         vector_results, image_dimensions, pixel_size, detail_size,
@@ -154,7 +154,7 @@ def generate_svg_stl_zip(
         layer_count=layer_count,
         layer_height=layer_height,
         backing_layers=n_white,
-        backing_mode=backing_mode,
+        backing_label=w_label,
     )
     physical_height = print_stack["totalHeightMm"]
     prefix = get_filename_prefix(active_colors)

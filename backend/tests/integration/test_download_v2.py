@@ -304,14 +304,14 @@ def test_svg_download_forwards_082mm_detail_size(client, monkeypatch, route, gen
         'detailSize': 0.82,
         'layerCount': 4,
         'whiteBackingLayers': 0,
-        'backingMode': 'black',
+        'backingFilament': 'M',
         'imageDimensions': {'width': 4, 'height': 4},
         'filamentPreset': 'bambu_cmyw',
     })
     assert response.status_code == 200, response.text
     assert observed[0]['detail_size'] == 0.82
     assert observed[0]['white_backing_layers'] == 0
-    assert observed[0]['backing_mode'] == 'black'
+    assert observed[0]['backing_filament'] == 'M'
 
 
 # -- 3MF endpoint tests --
@@ -503,10 +503,35 @@ def test_filament_preview_uses_default_three_layer_backing_in_predictions(client
 
 
 
-def test_layer_limit_endpoint_reports_the_filament_set_maximum(client):
-    response = client.post("/api/v2/layer-limit", json={"filamentPreset": "bambu_cmywk"})
+@pytest.mark.parametrize("preset, backing", [("bambu_cmywk", "W"), ("clear_cmyg", "G")])
+def test_filament_set_endpoint_reports_layer_maximum_and_default_backing(client, preset, backing):
+    response = client.post("/api/v2/filament-set", json={"filamentPreset": preset})
     assert response.status_code == 200
     assert 1 <= response.json()["maxLayerCount"] <= MAX_COLOR_LAYERS
+    assert response.json()["defaultBackingFilament"] == backing
+
+
+def test_backing_filament_outside_the_set_is_rejected(client, sample_color_blocks_with_hex):
+    response = client.post("/api/v2/download-stl", json={
+        "layerHeight": 0.08, "pixelSize": 0.08, "layerCount": 4,
+        "imageDimensions": {"width": 4, "height": 4}, "filamentPreset": "bambu_cmyw",
+        "backingFilament": "K", **label_map_request(sample_color_blocks_with_hex, 4, 4),
+    })
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Backing filament 'K' is not in this filament set (C, M, Y, W)."
+
+
+@pytest.mark.parametrize("backing, name", [(None, "Grey"), ("C", "Cyan")])
+def test_print_settings_name_the_backing_filament(client, backing, name):
+    body = {
+        "layerHeight": 0.84, "pixelSize": 0.1, "layerCount": 4, "imageDimensions": {"width": 10, "height": 10},
+        "filamentPreset": "clear_cmyg", "stats": {},
+    }
+    if backing:
+        body["backingFilament"] = backing
+    response = client.post("/api/v2/print-settings", json=body)
+    assert response.status_code == 200, response.text
+    assert response.json()["print_settings"]["backing_filament"] == name
 
 
 @pytest.mark.parametrize("route", ["download-stl", "download-3mf"])

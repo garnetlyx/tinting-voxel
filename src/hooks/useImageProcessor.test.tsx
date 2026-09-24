@@ -4,7 +4,7 @@ import { useImageProcessor } from './useImageProcessor';
 import { filamentCatalog } from '../test/filamentCatalog';
 import {
   getFilamentPresets,
-  getLayerLimit,
+  getFilamentSet,
   download3MFV2,
   downloadPrintSettings,
   downloadSTLV2,
@@ -21,7 +21,7 @@ vi.mock('../api/client', () => ({
   downloadSVGSTLV2: vi.fn(),
   download3MFV2: vi.fn(),
   downloadPrintSettings: vi.fn(),
-  getLayerLimit: vi.fn(),
+  getFilamentSet: vi.fn(),
 }));
 
 const mockedProcessImage = vi.mocked(processImage);
@@ -52,7 +52,7 @@ describe('useImageProcessor', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.mocked(getFilamentPresets).mockResolvedValue(structuredClone(filamentCatalog));
-    vi.mocked(getLayerLimit).mockResolvedValue(10);
+    vi.mocked(getFilamentSet).mockResolvedValue({ maxLayerCount: 10, defaultBackingFilament: 'W' });
     createdImages = [];
 
     mockedProcessImage.mockResolvedValue({
@@ -65,7 +65,7 @@ describe('useImageProcessor', () => {
       printStack: {
         opticalLayerCount: 4,
         whiteBackingLayers: 3,
-        backingMode: 'white' as const,
+        backingFilament: 'W',
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },
@@ -77,7 +77,7 @@ describe('useImageProcessor', () => {
       printStack: {
         opticalLayerCount: 4,
         whiteBackingLayers: 3,
-        backingMode: 'white' as const,
+        backingFilament: 'W',
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },
@@ -203,7 +203,7 @@ describe('useImageProcessor', () => {
   });
 
   it('uses the layer maximum the backend reports for the filament set', async () => {
-    vi.mocked(getLayerLimit).mockResolvedValue(6);
+    vi.mocked(getFilamentSet).mockResolvedValue({ maxLayerCount: 6, defaultBackingFilament: 'W' });
     const { result } = await renderProcessor();
 
     act(() => {
@@ -213,7 +213,26 @@ describe('useImageProcessor', () => {
 
     await waitFor(() => expect(result.current.maxLayerCount).toBe(6));
     expect(result.current.layerCount).toBe(6);
-    expect(getLayerLimit).toHaveBeenLastCalledWith({ filamentPreset: 'bambu_cmywk' }, expect.any(AbortSignal));
+    expect(getFilamentSet).toHaveBeenLastCalledWith({ filamentPreset: 'bambu_cmywk' }, expect.any(AbortSignal));
+  });
+
+  it('backs each set with its default filament until the user picks one it contains', async () => {
+    vi.mocked(getFilamentSet).mockImplementation(async (filament) => ({
+      maxLayerCount: 10, defaultBackingFilament: filament.filamentPreset === 'clear_cmyg' ? 'G' : 'W',
+    }));
+    const { result } = await renderProcessor();
+
+    act(() => result.current.loadPreset('bambu_cmywk'));
+    await waitFor(() => expect(result.current.backingFilament).toBe('W'));
+    act(() => result.current.setBackingFilament('K'));
+    expect(result.current.backingFilament).toBe('K');
+    expect(result.current.printStack.backingFilament).toBe('K');
+
+    // Clear CMYG has no Key: its own default (grey) applies.
+    act(() => result.current.loadPreset('clear_cmyg'));
+    await waitFor(() => expect(result.current.backingFilament).toBe('G'));
+    act(() => result.current.loadPreset('bambu_cmywk'));
+    await waitFor(() => expect(result.current.backingFilament).toBe('K'));
   });
 
   it('raises the default layer height when the material set mean exceeds the API threshold', async () => {
@@ -258,25 +277,25 @@ describe('useImageProcessor', () => {
       colorBlocks: [{ r: 255, g: 0, b: 0, hex: '#FF0000', count: 1, pixels: [{ x: 0, y: 0 }] }],
       processedImage: 'data:image/png;base64,mock', segmentationImage: 'data:image/png;base64,seg',
       mappedBlockColors: [], mappedBlendPalette: [], imageDimensions: { width: 8, height: 6 },
-      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingMode: 'white', totalLayerCount: 7, totalHeightMm: 0.56 },
+      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingFilament: 'W', totalLayerCount: 7, totalHeightMm: 0.56 },
     });
     const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;
     await act(async () => { result.current.handleApplyEdit(img); });
     mockedSimulatePrintPreview.mockClear();
-    act(() => result.current.setBackingMode('black'));
+    act(() => result.current.setBackingFilament('K'));
     await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
-      expect.objectContaining({ backingMode: 'black', whiteBackingLayers: 3 }), expect.any(AbortSignal),
+      expect.objectContaining({ backingFilament: 'K', whiteBackingLayers: 3 }), expect.any(AbortSignal),
     ));
     act(() => result.current.updateFilamentColor(0, { ...result.current.filamentColors[0], transmission_distance: 3.25 }));
     await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
-      expect.objectContaining({ backingMode: 'black', filamentColors: expect.arrayContaining([expect.objectContaining({ transmission_distance: 3.25 })]) }), expect.any(AbortSignal),
+      expect.objectContaining({ backingFilament: 'K', filamentColors: expect.arrayContaining([expect.objectContaining({ transmission_distance: 3.25 })]) }), expect.any(AbortSignal),
     ));
     await act(async () => result.current.handleDownloadPrintSettings());
-    expect(mockedDownloadPrintSettings).toHaveBeenLastCalledWith(expect.objectContaining({ backingMode: 'black', whiteBackingLayers: 3 }));
-    act(() => result.current.setBackingMode('white'));
+    expect(mockedDownloadPrintSettings).toHaveBeenLastCalledWith(expect.objectContaining({ backingFilament: 'K', whiteBackingLayers: 3 }));
+    act(() => result.current.setBackingFilament('W'));
     await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
-      expect.objectContaining({ backingMode: 'white', whiteBackingLayers: 3 }), expect.any(AbortSignal),
+      expect.objectContaining({ backingFilament: 'W', whiteBackingLayers: 3 }), expect.any(AbortSignal),
     ));
   });
 
@@ -352,7 +371,7 @@ describe('useImageProcessor', () => {
       printStack: {
         opticalLayerCount: 4,
         whiteBackingLayers: 3,
-        backingMode: 'white' as const,
+        backingFilament: 'W',
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },
@@ -384,7 +403,7 @@ describe('useImageProcessor', () => {
       mappedBlockColors: [],
       mappedBlendPalette: [],
       imageDimensions: { width: 8, height: 6 },
-      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingMode: 'white', totalLayerCount: 7, totalHeightMm: 0.56 },
+      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingFilament: 'W', totalLayerCount: 7, totalHeightMm: 0.56 },
     });
     const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;
@@ -407,7 +426,7 @@ describe('useImageProcessor', () => {
       segmentationImage: 'data:image/png;base64,seg',
       mappedBlendPalette: [],
       imageDimensions: { width: 8, height: 6 },
-      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingMode: 'white', totalLayerCount: 7, totalHeightMm: 0.56 },
+      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingFilament: 'W', totalLayerCount: 7, totalHeightMm: 0.56 },
     });
     const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;
@@ -416,10 +435,10 @@ describe('useImageProcessor', () => {
     expect(result.current.renderReady).toBe(true);
     mockedProcessImage.mockClear();
 
-    act(() => result.current.setBackingMode('black'));
+    act(() => result.current.setBackingFilament('K'));
     expect(result.current.renderReady).toBe(false);
     await waitFor(() => expect(mockedProcessImage).toHaveBeenCalledWith(
-      expect.any(File), expect.objectContaining({ mode: 'svg', backingMode: 'black' }), expect.any(AbortSignal),
+      expect.any(File), expect.objectContaining({ mode: 'svg', backingFilament: 'K' }), expect.any(AbortSignal),
     ));
     await waitFor(() => expect(result.current.renderReady).toBe(true));
   });
@@ -506,7 +525,7 @@ describe('useImageProcessor', () => {
       printStack: {
         opticalLayerCount: 4,
         whiteBackingLayers: 3,
-        backingMode: 'white' as const,
+        backingFilament: 'W',
         totalLayerCount: 5,
         totalHeightMm: 0.4,
       },

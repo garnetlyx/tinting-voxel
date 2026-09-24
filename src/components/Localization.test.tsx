@@ -104,10 +104,10 @@ describe('live localization boundaries', () => {
       image: '', colorMatrix: [], stats: { colorCount: colors.length, combinationCount: 1296 },
       imageDimensions: { width: 1, height: 1 }, warnings: [],
     });
-    render(<FilamentPreview filamentColors={colors} filamentPreset={null} layerCount={4} layerHeight={0.08} whiteBackingLayers={3} backingMode="white" isConfigValid />);
+    render(<FilamentPreview filamentColors={colors} filamentPreset={null} layerCount={4} layerHeight={0.08} whiteBackingLayers={3} backingFilament="W" isConfigValid />);
     await act(() => vi.advanceTimersByTimeAsync(550));
     expect(preview).toHaveBeenCalledOnce();
-    expect(preview.mock.calls[0][0]).toEqual({ filamentColors: colors, layerCount: 4, layerHeight: 0.08, whiteBackingLayers: 3, backingMode: 'white' });
+    expect(preview.mock.calls[0][0]).toEqual({ filamentColors: colors, layerCount: 4, layerHeight: 0.08, whiteBackingLayers: 3, backingFilament: 'W' });
     act(() => setLocale('zh-CN'));
     await act(() => vi.advanceTimersByTimeAsync(1000));
     expect(preview).toHaveBeenCalledOnce();

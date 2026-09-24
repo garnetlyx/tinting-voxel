@@ -29,7 +29,7 @@ async def api_filament_preview(request: Request, body: FilamentPreviewRequest):
         layer_count=body.layerCount,
         layer_height=body.layerHeight,
         backing_layers=body.whiteBackingLayers,
-        backing_mode=body.backingMode,
+        backing_filament=body.backingFilament,
     )
 
     result = await run_in_threadpool(service.generate_preview, page=body.page, page_size=body.pageSize)

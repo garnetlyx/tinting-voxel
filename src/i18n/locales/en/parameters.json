@@ -21,6 +21,6 @@
   "nozzle": "{{diameter}} mm nozzle",
   "currentSize": "{{width}} mm × {{height}} mm",
   "stack": "{{optical}} color + {{backing}} backing = {{total}} layers",
-  "backingMode_white": "Light backing",
-  "backingMode_black": "Dark backing"
+  "backingFilament": "Backing filament",
+  "backingFilamentHelp": "Printed under the color layers. Until you pick one, the filament closest to white is used."
 }

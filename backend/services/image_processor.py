@@ -137,12 +137,12 @@ def _map_source_colors_to_blends(
     layer_count: int,
     layer_height: float,
     backing_layers: Optional[int] = None,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
     from services.print_stack import (
         PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
     )
-    b_label = resolve_backing_label(colors, backing_layers, backing_mode)
+    b_label = resolve_backing_label(colors, backing_layers, backing_filament)
     b_suffix = backing_suffix(b_label, backing_layers)
     b_boundary = PRINT_BACKGROUND_RGB if b_suffix else None
     ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
@@ -151,7 +151,7 @@ def _map_source_colors_to_blends(
         colors,
         n_targets=len(source_colors),
         backing_layers=backing_layers,
-        backing_mode=backing_mode,
+        backing_filament=backing_filament,
     )
     return _map_and_refine(
         source_colors, ref_code_matrix, ref_rgb_matrix, colors, layer_count, layer_height,
@@ -196,7 +196,7 @@ def build_simulated_print_preview(
     layer_count: int = 4,
     layer_height: float = 0.08,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
 ) -> dict:
     """
     Build an image-specific print preview from current color blocks
@@ -208,7 +208,7 @@ def build_simulated_print_preview(
         raise ValueError("No color blocks provided")
 
     active_colors = colors or Colors()
-    resolve_backing_label(active_colors, white_backing_layers, backing_mode)
+    b_label = resolve_backing_label(active_colors, white_backing_layers, backing_filament)
     counts = block_cell_counts(labels, len(color_blocks))
     total_pixels = max(1, int(counts.sum()))
 
@@ -232,7 +232,7 @@ def build_simulated_print_preview(
         layer_height=layer_height,
         layer_count=layer_count,
         backing_layers=white_backing_layers,
-        backing_mode=backing_mode,
+        backing_filament=backing_filament,
     )
 
     processed_image = _render_labels(labels, result_rgbs)
@@ -258,7 +258,7 @@ def build_simulated_print_preview(
             layer_count=layer_count,
             layer_height=layer_height,
             backing_layers=white_backing_layers,
-            backing_mode=backing_mode,
+            backing_label=b_label,
         ),
     }
 
@@ -272,7 +272,7 @@ def build_vector_simulated_preview(
     layer_count: int = 4,
     layer_height: float = 0.08,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
     ref_matrices: Optional[tuple] = None,  # Pre-computed (ref_code_matrix, ref_rgb_matrix)
 ) -> dict:
     """Build an image-specific print preview for SVG mode from vectorized regions."""
@@ -280,7 +280,7 @@ def build_vector_simulated_preview(
     from services.print_stack import (
         PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
     )
-    b_label = resolve_backing_label(active_colors, white_backing_layers, backing_mode)
+    b_label = resolve_backing_label(active_colors, white_backing_layers, backing_filament)
     b_suffix = backing_suffix(b_label, white_backing_layers)
     b_boundary = PRINT_BACKGROUND_RGB if b_suffix else None
     image_dimensions = {
@@ -323,7 +323,7 @@ def build_vector_simulated_preview(
             layer_count=layer_count,
             layer_height=layer_height,
             backing_layers=white_backing_layers,
-            backing_mode=backing_mode,
+            backing_filament=backing_filament,
         )
     
     simulated = np.asarray(result_rgbs, dtype=np.uint8)[partition]
@@ -340,7 +340,7 @@ def build_vector_simulated_preview(
             layer_count=layer_count,
             layer_height=layer_height,
             backing_layers=white_backing_layers,
-            backing_mode=backing_mode,
+            backing_label=b_label,
         ),
     }
 
@@ -577,7 +577,7 @@ def process_image(
     layer_count: int = 4,
     layer_height: float = 0.08,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
-    backing_mode: str = 'white',
+    backing_filament: Optional[str] = None,
     detail_size: Optional[float] = None,
 ) -> dict:
     """
@@ -687,7 +687,7 @@ def process_image(
         layer_count=layer_count,
         layer_height=layer_height,
         white_backing_layers=white_backing_layers,
-        backing_mode=backing_mode,
+        backing_filament=backing_filament,
     )
 
     return {

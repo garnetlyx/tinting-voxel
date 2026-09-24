@@ -16,6 +16,7 @@ import type {
   PrintSettingsParams,
   FilamentPresetsResponse,
   FilamentPreviewParams,
+  FilamentSetInfo,
   FilamentPreviewResponse,
   SimulatedPrintPreviewParams,
   SimulatedPrintPreviewResponse,
@@ -98,7 +99,7 @@ export async function processImage(
   if (params.layerHeight !== undefined) formData.append('layerHeight', params.layerHeight.toString());
   if (params.layerCount !== undefined) formData.append('layerCount', params.layerCount.toString());
   if (params.whiteBackingLayers !== undefined) formData.append('whiteBackingLayers', params.whiteBackingLayers.toString());
-  if (params.backingMode !== undefined) formData.append('backingMode', params.backingMode);
+  if (params.backingFilament !== undefined) formData.append('backingFilament', params.backingFilament);
 
   if (params.filamentPreset) {
     formData.append('filamentPreset', params.filamentPreset);
@@ -230,22 +231,23 @@ export async function downloadSTLV2(params: DownloadSTLParamsV2, signal?: AbortS
 }
 
 /**
- * Most color layers the backend can search for a filament set within its time limit.
+ * What a filament set supports: the most color layers the backend can search
+ * within its time limit, and the backing filament used unless one is chosen.
  */
-export async function getLayerLimit(
+export async function getFilamentSet(
   filament: Pick<FilamentPreviewParams, 'filamentPreset' | 'filamentColors'>,
   signal?: AbortSignal,
-): Promise<number> {
-  const response = await fetch(`${API_V2_BASE_URL}/layer-limit`, {
+): Promise<FilamentSetInfo> {
+  const response = await fetch(`${API_V2_BASE_URL}/filament-set`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(filament),
     signal,
   });
   if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to get the layer limit'));
+    throw new Error(await getErrorDetail(response, 'Failed to describe the filament set'));
   }
-  return (await response.json()).maxLayerCount;
+  return response.json();
 }
 
 /**
@@ -406,7 +408,7 @@ export async function batchDownloadSTL(
   formData.append('layerHeight', params.layerHeight.toString());
   formData.append('layerCount', params.layerCount.toString());
   formData.append('whiteBackingLayers', params.whiteBackingLayers.toString());
-  if (params.backingMode !== undefined) formData.append('backingMode', params.backingMode);
+  if (params.backingFilament !== undefined) formData.append('backingFilament', params.backingFilament);
   if (params.filamentPreset) {
     formData.append('filamentPreset', params.filamentPreset);
   }

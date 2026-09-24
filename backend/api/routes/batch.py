@@ -107,7 +107,7 @@ async def api_batch_download_stl(
     layerHeight: Optional[float] = Form(None, gt=0, le=10),
     layerCount: int = Form(4, ge=1, le=MAX_COLOR_LAYERS),
     whiteBackingLayers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
-    backingMode: str = Form("white", pattern=r'^(white|black)$'),
+    backingFilament: Optional[str] = Form(None, pattern=r'^[A-Z]$'),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
@@ -140,7 +140,7 @@ async def api_batch_download_stl(
         layer_count=layerCount,
         colors=colors,
         white_backing_layers=whiteBackingLayers,
-        backing_mode=backingMode,
+        backing_filament=backingFilament,
     )
 
     emit("model_exported", format="batch-stl", groups=batch_result['successCount'], bytes=len(zip_content))

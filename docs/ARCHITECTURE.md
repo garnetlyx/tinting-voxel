@@ -112,7 +112,8 @@ tinting-voxel/
 │   │   ├── image_processor.py    # Image processing + auto-downscale
 │   │   ├── stl_generator.py      # STL file generation
 │   │   ├── svg_stl_generator.py  # SVG-mode STL generation
-│   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
+│   │   ├── threemf_generator.py  # 3MF output (one object, a part per filament)
+│   │   ├── threemf_writer.py     # 3MF packaging (streamed XML, shared vertices)
 │   │   ├── csv_generator.py      # CSV export
 │   │   ├── mesh_optimizer.py     # Greedy meshing optimization
 │   │   ├── vector_processor.py   # Vector/contour processing
@@ -161,7 +162,7 @@ tinting-voxel/
 | **ImageProcessor** | K-means clustering, color extraction from uploaded images | scikit-learn, Pillow |
 | **STLGenerator** | Convert color blocks to layered STL meshes, color mapping | numpy-stl, blend_color |
 | **SVG-STLGenerator** | Vector-based STL generation from SVG contours | numpy-stl, svg.path |
-| **3MFGenerator** | 3MF file generation with named color objects | trimesh, lxml |
+| **3MFGenerator** | 3MF: one object with a named, colored part per filament | NumPy |
 | **MeshOptimizer** | Greedy meshing to reduce box count, face culling | NumPy |
 | **BlendColor (core)** | BlendTestGenerator, colors_key, CIEDE2000 matching | scikit-image, NumPy |
 | **BlendModels** | Shared light-loss allocation using each material’s `T_ch = 10^(-d / TD_ch)` | NumPy |
@@ -449,13 +450,16 @@ slicer layers, while `optical_layer_count` counts the color stack's slicer layer
 The example therefore reports 4 color segments, 3 backing segments, 21 total
 slicer layers, and 12 color-stack slicer layers.
 
-Three backing color layers are printed by default. The light/dark choice selects the
-closest available material to white or black. Its actual layers are appended to the predicted stack under the same
-white illumination; the mode does not add an external backing color.
+Three backing color layers are printed by default, in one of the set's filaments:
+the one the user picks, or else the filament closest to white by CIEDE2000. Its
+actual layers are appended to the predicted stack under the same white
+illumination; no external backing color is added.
 
-Parameter search includes the current configuration and returns all successful
-candidate previews in evaluation order, with `candidate_id` and `is_baseline`.
-Users choose a preview; the service does not assign an image-quality rank.
+Parameter search scores the current configuration and the candidates of a
+pattern search by the mean CIEDE2000 between the image on the model grid and
+each simulated print. The job returns previews in evaluation order with
+`candidate_id`, `is_baseline` and `score`; the dialog ranks them as they arrive,
+and choosing one applies it and cancels the rest.
 
 ### 2. Greedy Meshing
 

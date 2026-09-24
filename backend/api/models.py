@@ -11,7 +11,7 @@ from typing import Annotated, Dict, List, Literal, Optional, Union
 
 import numpy as np
 from pydantic import (
-    BaseModel, ConfigDict, Field, PrivateAttr, StrictBool, StrictFloat, StrictInt,
+    BaseModel, ConfigDict, Field, PrivateAttr, StrictBool, StrictFloat, StrictInt, StringConstraints,
     field_validator, model_validator,
 )
 
@@ -249,20 +249,24 @@ class PrintConfigMixin(FilamentConfigMixin):
 
 
 
-class LayerLimitRequest(PrintConfigMixin):
-    """A filament set whose color-layer maximum is requested."""
+class FilamentSetRequest(PrintConfigMixin):
+    """A filament set to describe (/api/v2/filament-set)."""
+
+# A filament's label: the first letter of its name, as in blend codes.
+FilamentLabel = Annotated[str, StringConstraints(pattern=r'^[A-Z]$')]
+
 
 class WhiteBackingMixin(BaseModel):
-    """Mixin for explicit printed backing configuration (white or black block)."""
+    """Mixin for the printed backing block: layer count and filament."""
     whiteBackingLayers: int = Field(
         DEFAULT_BACKING_LAYERS,
         ge=0,
         le=5,
         description="Number of full-area backing layers printed behind the optical stack"
     )
-    backingMode: Literal['white', 'black'] = Field(
-        'white',
-        description="Backing block filament: closest-to-white or closest-to-black in the set"
+    backingFilament: Optional[FilamentLabel] = Field(
+        None,
+        description="The set's filament printed as the backing block; omitted: the filament closest to white",
     )
 
 
@@ -331,7 +335,7 @@ class PrintStackInfo(BaseModel):
     """Actual exported stack metadata."""
     opticalLayerCount: int = Field(..., ge=0)
     whiteBackingLayers: int = Field(..., ge=0)
-    backingMode: Literal['white', 'black'] = 'white'
+    backingFilament: Optional[FilamentLabel] = None  # None without backing layers
     totalLayerCount: int = Field(..., ge=0)
     totalHeightMm: float = Field(..., ge=0)
 
@@ -417,7 +421,7 @@ class SimulatePreviewRequest(LabelMapMixin, PrintConfigMixin):
     """Request model for print-simulation preview generation."""
     layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
     whiteBackingLayers: int = Field(DEFAULT_BACKING_LAYERS, ge=0, le=5)
-    backingMode: Literal['white', 'black'] = 'white'
+    backingFilament: Optional[FilamentLabel] = None
 
 
 class SimulatedPrintPreviewResponse(BaseModel):
@@ -487,7 +491,7 @@ class BugReportConverterState(BaseModel):
     layerHeight: float = Field(0, ge=0, le=1000)
     layerCount: int = Field(0, ge=0, le=10000)
     whiteBackingLayers: int = Field(0, ge=0, le=10000)
-    backingMode: Literal['white', 'black'] = 'white'
+    backingFilament: Optional[FilamentLabel] = None
     imageWidth: int = Field(0, ge=0, le=100000)
     imageHeight: int = Field(0, ge=0, le=100000)
     colorCount: int = Field(0, ge=0, le=1000000)

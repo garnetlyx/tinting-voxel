@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { ColorBlock, FilamentColorConfig, ImageDimensions, MappedBlockColor } from '../api/types';
+import { filamentLabel } from '../utils/filaments';
 
 /** Read the actual backing material chosen by the backend from its blend codes. */
 export function resolvePreviewBackingHex(
@@ -13,7 +14,7 @@ export function resolvePreviewBackingHex(
   const backingLabel = code[code.length - 1];
   const suffix = backingLabel.repeat(backingLayers);
   if (!mappedBlockColors.every(item => item.code.endsWith(suffix))) return null;
-  return filamentColors.find(color => color.name[0].toUpperCase() === backingLabel)?.hex ?? null;
+  return filamentColors.find(color => filamentLabel(color) === backingLabel)?.hex ?? null;
 }
 
 interface PreviewRectangle {
