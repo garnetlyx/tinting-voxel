@@ -38,9 +38,7 @@ def png_bytes():
 _FAST_FORM = {
     "preset": "bambu_cmyw",
     "mode": "pixel",
-    "strategy": "random",
     "n_trials": "2",
-    "seed": "42",
     "layer_count": "4",
     "layer_height": "0.08",
     "pixel_size": "0.42",
@@ -83,8 +81,7 @@ class TestParamSearchEndpoint:
         assert finished["status"] == "complete"
         assert finished["completed"] == finished["total"] == 3
 
-    def test_results_keep_generation_order_and_label_current_settings(self, client, png_bytes):
-        from services.param_search_service import RandomSearch
+    def test_results_keep_evaluation_order_and_label_current_settings(self, client, png_bytes):
         resp = client.post(
             "/api/param-search", data={**_FAST_FORM, "n_trials": "3"},
             files={"image": ("test.png", png_bytes, "image/png")},
@@ -93,9 +90,10 @@ class TestParamSearchEndpoint:
         results = _wait_for_job(client, resp.json()["job_id"])["results"]
         assert [item["candidate_id"] for item in results] == [1, 2, 3, 4]
         assert [item["is_baseline"] for item in results] == [True, False, False, False]
-        expected = list(RandomSearch("pixel", 3, seed=42).generate())
-        assert [item["params"] for item in results[1:]] == [
-            {**params, "white_backing_layers": 1} for params in expected
+        # The current settings, then the search's coarse lattice in order.
+        assert [item["params"] for item in results] == [
+            {"max_colors": colors, "color_threshold": threshold, "detail_size": 0.42, "white_backing_layers": 1}
+            for colors, threshold in [(10, 50), (6, 10), (6, 15), (6, 40)]
         ]
 
     def test_result_items_have_required_fields(self, client, png_bytes):
@@ -108,10 +106,9 @@ class TestParamSearchEndpoint:
         for item in _wait_for_job(client, resp.json()["job_id"])["results"]:
             assert "candidate_id" in item
             assert "is_baseline" in item
-            assert "rank" not in item
             assert "mode" in item
             assert "params" in item
-            assert "mae" not in item
+            assert isinstance(item["score"], float) and item["score"] >= 0
             assert "preview_image" in item
             assert item["preview_image"].startswith("data:image/png;base64,")
 
@@ -232,7 +229,7 @@ class TestParamSearchProgressEndpoint:
         def slow_evaluate(self, params, mode):
             started.set()
             assert release.wait(timeout=5)
-            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==")
+            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==", 1.0)
 
         monkeypatch.setattr(Evaluator, "evaluate", slow_evaluate)
         try:
@@ -261,7 +258,7 @@ class TestParamSearchProgressEndpoint:
         def slow_evaluate(self, params, mode):
             started.set()
             assert release.wait(timeout=5)
-            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==")
+            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==", 1.0)
 
         monkeypatch.setattr(Evaluator, "evaluate", slow_evaluate)
         try:
@@ -305,7 +302,7 @@ class TestParamSearchProgressEndpoint:
             attempts.append(1)
             if len(attempts) == 2:
                 raise ValueError("Too many colors for this image")
-            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==")
+            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==", 1.0)
 
         monkeypatch.setattr(Evaluator, "evaluate", evaluate)
         resp = client.post(
@@ -346,7 +343,7 @@ class TestParamSearchProgressEndpoint:
 
         def slow_evaluate(self, params, mode):
             time.sleep(0.06)
-            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==")
+            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==", 1.0)
 
         monkeypatch.setattr(Evaluator, "evaluate", slow_evaluate)
         resp = client.post(
@@ -370,7 +367,7 @@ class TestParamSearchProgressEndpoint:
 
         def slow_evaluate(self, params, mode):
             time.sleep(0.1)
-            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==")
+            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==", 1.0)
 
         monkeypatch.setattr(Evaluator, "evaluate", slow_evaluate)
         resp = client.post(
@@ -403,7 +400,7 @@ class TestParamSearchProgressEndpoint:
             if len(calls) == 1:
                 started.set()
                 assert release.wait(timeout=5)
-            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==")
+            return SearchResult(0, False, mode, dict(params), "data:image/png;base64,eA==", 1.0)
 
         monkeypatch.setattr(Evaluator, "evaluate", blocked_once)
 

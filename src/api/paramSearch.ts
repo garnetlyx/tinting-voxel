@@ -27,7 +27,7 @@ export interface ParamSearchConfig {
   /** Current filament configuration; either a named preset or custom colors. */
   preset?: string;
   filamentColors?: FilamentColorConfig[];
-  mode: 'pixel' | 'svg' | 'both';
+  mode: 'pixel' | 'svg';
   layerCount: number;
   layerHeight: number;
   whiteBackingLayers: number;
@@ -38,9 +38,6 @@ export interface ParamSearchConfig {
   numColors: number;
   epsilon: number;
   minArea: number;
-  strategy?: 'grid' | 'random';
-  nTrials?: number;
-  seed?: number;
 }
 
 export interface SearchResultItem {
@@ -49,6 +46,8 @@ export interface SearchResultItem {
   mode: string;
   params: Record<string, number>;
   previewImage: string; // data URL
+  /** Mean CIEDE2000 between the image and this simulated print; lower is closer. */
+  score: number;
 }
 
 export interface ParamSearchResponse {
@@ -77,7 +76,7 @@ export class ParamSearchHttpError extends Error {
 
 function parseResult(raw: {
   candidate_id: number; is_baseline: boolean; mode: string;
-  params: Record<string, number>; preview_image: string;
+  params: Record<string, number>; preview_image: string; score: number;
 }): SearchResultItem {
   return {
     candidateId: raw.candidate_id,
@@ -85,6 +84,7 @@ function parseResult(raw: {
     mode: raw.mode,
     params: raw.params,
     previewImage: raw.preview_image,
+    score: raw.score,
   };
 }
 
@@ -123,9 +123,6 @@ export async function startParamSearch(
   formData.append('epsilon', config.epsilon.toString());
   formData.append('min_area', config.minArea.toString());
   formData.append('pixel_size', pixelSize.toString());
-  formData.append('strategy', config.strategy ?? 'grid');
-  if (config.nTrials !== undefined) formData.append('n_trials', config.nTrials.toString());
-  if (config.seed !== undefined) formData.append('seed', config.seed.toString());
 
   const response = await fetch(`${API_BASE_URL}/param-search`, {
     method: 'POST',

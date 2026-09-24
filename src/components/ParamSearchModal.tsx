@@ -47,20 +47,45 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Closest match first; ties keep evaluation order. The ranking is live while
+  // the search runs, and selecting any card applies it and stops the search.
+  const ranked = [...results].sort((a, b) => a.score - b.score || a.candidateId - b.candidateId);
+  const currentScore = results.find((result) => result.isBaseline)?.score;
+  const searchFinished = phase === 'results';
+
   const cards = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {results.map((result) => {
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {ranked.map((result, index) => {
         const label = result.isBaseline ? t('search:currentSettings') : t('search:candidate', { number: result.candidateId });
+        const best = index === 0;
+        const delta = currentScore === undefined || result.isBaseline ? null : result.score - currentScore;
         return (
           <button key={result.candidateId} onClick={() => {
             onApplyParams(result.params, result.mode, targetMm);
             onClose();
-          }} className="rounded-sheet border border-rule bg-paper-raised p-3 text-left transition-all hover:border-ink hover:shadow-lift">
+          }} className={`rounded-sheet border bg-paper-raised p-3 text-left transition-all hover:border-ink hover:shadow-lift ${best ? 'border-magenta-deep shadow-lift' : 'border-rule'}`}>
             <div className="mb-2 flex items-center gap-2">
+              <span className="font-mono text-xs text-ink-muted" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
               <span className="text-sm font-semibold text-ink">{label}</span>
               <span className="font-mono text-xs text-ink-muted">{t(result.mode === 'pixel' ? 'search:modePixel' : 'search:modeSvg')}</span>
+              {best && (
+                <span className={`ml-auto rounded-[2px] px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide ${searchFinished ? 'bg-magenta-deep text-paper-raised' : 'border border-magenta-deep text-magenta-deep'}`}>
+                  {t(searchFinished ? 'search:bestMatch' : 'search:bestSoFar')}
+                </span>
+              )}
             </div>
             <img src={result.previewImage} alt={label} className="mb-2 w-full rounded-[2px] border border-rule object-contain" style={{ maxHeight: 180 }} />
+            <div className="mb-2 border-b border-rule pb-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-xs text-ink-muted">{t('search:colorDifference')}</span>
+                <span className="font-mono text-base font-medium text-ink">ΔE {result.score.toFixed(2)}</span>
+              </div>
+              {delta !== null && (
+                <p className={`mt-0.5 text-right text-xs ${delta < 0 ? 'text-signal-ok' : 'text-ink-muted'}`}>
+                  {t(delta < 0 ? 'search:closerThanCurrent' : 'search:furtherThanCurrent', { value: Math.abs(delta).toFixed(2) })}
+                </p>
+              )}
+            </div>
             <div className="space-y-0.5 text-xs text-ink-muted">
               {Object.entries(result.params).map(([key, value]) => (
                 <div key={key} className="flex justify-between gap-3">
@@ -72,6 +97,16 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
         );
       })}
     </div>
+  );
+
+  const ranking = (
+    <>
+      <div className="space-y-1">
+        <p className="text-sm text-ink-soft">{phase === 'running' ? t('search:runningNote') : t('search:results', { count: results.length })}</p>
+        <p className="tv-help">{t('search:scoreNote')}</p>
+      </div>
+      {cards}
+    </>
   );
 
   return (
@@ -116,31 +151,20 @@ export const ParamSearchModal: React.FC<ParamSearchModalProps> = ({
                   <progress value={progress.completed} max={progress.total || 1} className="h-1.5 w-full overflow-hidden rounded-full accent-ink" />
                 </div>
               )}
-              {results.length > 0 && (
-                <>
-                  <p className="text-sm text-ink-soft">{t('search:results', { count: results.length })}</p>
-                  {cards}
-                </>
-              )}
+              {results.length > 0 && ranking}
               <button onClick={onClose} className="tv-btn-outline w-full">{t('common:close')}</button>
             </div>
           )}
           {phase === 'results' && (
             <div className="space-y-4">
-              <p className="text-sm text-ink-soft">{t('search:results', { count: results.length })}</p>
-              {cards}
+              {ranking}
               <button onClick={onClose} className="tv-btn-outline w-full">{t('common:close')}</button>
             </div>
           )}
           {phase === 'error' && (
             <div className="space-y-4">
               <div className="rounded-sheet border border-signal-error/30 border-l-4 border-l-signal-error bg-signal-error/5 p-4"><p className="text-sm text-signal-error">{localize(error ?? 'Failed to start parameter search')}</p></div>
-              {results.length > 0 && (
-                <>
-                  <p className="text-sm text-ink-soft">{t('search:results', { count: results.length })}</p>
-                  {cards}
-                </>
-              )}
+              {results.length > 0 && ranking}
               <div className="flex gap-3">
                 <button disabled={!targetValid} onClick={() => onStart(targetMm)} className="tv-btn-primary flex-1">{t('common:retry')}</button>
                 <button onClick={onClose} className="tv-btn-outline flex-1">{t('common:close')}</button>

@@ -40,8 +40,10 @@ class Settings(BaseSettings):
     default_max_colors: int = 10
     default_color_threshold: float = 50.0
 
-    # Parameter search runs after the request returns. Stop between candidates
-    # at this budget and keep all completed full-resolution previews.
+    # Parameter search runs after the request returns. It scores the current
+    # settings and then this many other settings (services/param_search_service.py).
+    param_search_trials: int = 20
+    # Stop between candidates at this budget and keep all completed previews.
     param_search_job_budget_seconds: float = 1800.0
     # A job whose page stopped polling (closed, reloaded, crashed) stops after
     # its current candidate, so it cannot hold the only search slot. Hidden

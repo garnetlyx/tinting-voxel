@@ -6,7 +6,6 @@ from config.print_defaults import DEFAULT_BACKING_LAYERS, MAX_COLOR_LAYERS
 import logging
 import time
 from typing import Optional
-from io import BytesIO
 
 import cv2
 import numpy as np
@@ -32,7 +31,7 @@ from api.responses import json_response
 from api.validators import validate_image_upload
 from core.stack_prune import is_translucent_set
 from services.image_processor import (
-    resample_to_model_grid,
+    load_model_grid,
     _image_to_data_url,
     build_simulated_print_preview,
     build_vector_simulated_preview,
@@ -42,7 +41,6 @@ from services.telemetry import emit
 from services.vector_processor import (
     VectorProcessorConfig,
     process_image_vector_with_preview,
-    render_vector_results_image,
 )
 
 logger = logging.getLogger(__name__)
@@ -164,16 +162,7 @@ def _svg_mode_response(
 ) -> Response:
     """Vectorize, map and preview an image in SVG mode (runs in a worker thread)."""
     started = time.perf_counter()
-    img = Image.open(BytesIO(image_bytes))
-    # Convert RGBA to RGB with white background if needed
-    if img.mode == 'RGBA':
-        background = Image.new('RGB', img.size, (255, 255, 255))
-        background.paste(img, mask=img.split()[3])
-        img = background
-    else:
-        img = img.convert('RGB')
-
-    img, pixelSize = resample_to_model_grid(img, pixelSize, detailSize)
+    img, pixelSize = load_model_grid(image_bytes, pixelSize, detailSize)
     img_array = np.array(img)
 
     config = VectorProcessorConfig(
@@ -187,7 +176,6 @@ def _svg_mode_response(
     vector_results, quantized = process_image_vector_with_preview(img_array, config)
 
     from services.stl_generator import compute_reference_matrices
-    from core.color_materials import Color
 
     # compute_reference_matrices serves every caller through the
     # content-keyed matrix cache.

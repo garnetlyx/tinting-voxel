@@ -105,19 +105,22 @@ test.describe('Param Search Modal', () => {
       });
     });
 
-    // The first completed full-resolution preview becomes visible while the
-    // remaining evaluations are still running.
+    // Completed full-resolution previews become visible, closest match first,
+    // while the remaining evaluations are still running.
+    const preview = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
     await page.route('**/api/param-search/progress/**', async (route) => {
+      const after = Number(new URL(route.request().url()).searchParams.get('after'));
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          job_id: 'test-job-123', completed: 1, total: 21, status: 'running', error: null,
-          results: [{
-            candidate_id: 1, is_baseline: true, mode: 'pixel',
-            params: { max_colors: 10, color_threshold: 40 },
-            preview_image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-          }],
+          job_id: 'test-job-123', completed: 2, total: 21, status: 'running', error: null,
+          results: [
+            { candidate_id: 1, is_baseline: true, mode: 'pixel', params: { max_colors: 10, color_threshold: 40 },
+              preview_image: preview, score: 10.68 },
+            { candidate_id: 2, is_baseline: false, mode: 'pixel', params: { max_colors: 64, color_threshold: 10 },
+              preview_image: preview, score: 8.85 },
+          ].filter((result) => result.candidate_id > after),
         }),
       });
     });
@@ -127,6 +130,11 @@ test.describe('Param Search Modal', () => {
     await page.getByRole('button', { name: /Generate options/ }).click();
 
     await expect(page.getByAltText('Current settings')).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText('1 / 21')).toBeVisible();
+    await expect(page.getByText('2 / 21')).toBeVisible();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('img')).toHaveCount(2);
+    await expect(dialog.getByRole('img').first()).toHaveAttribute('alt', 'Option 2');
+    await expect(dialog.getByText('Best so far')).toBeVisible();
+    await expect(dialog.getByText('1.83 closer than current')).toBeVisible();
   });
 });

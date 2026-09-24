@@ -486,6 +486,23 @@ def model_pitch(width_px: int, height_px: int, pixel_size: float, detail_size: O
     return pitch
 
 
+def load_model_grid(
+    image_bytes: bytes, pixel_size: float, detail_size: Optional[float],
+) -> tuple[Image.Image, float]:
+    """An upload as RGB resampled to its model grid; returns the image and its pitch in mm.
+
+    Transparent areas become white: no filament there leaves the white base.
+    """
+    img = Image.open(BytesIO(image_bytes))
+    if img.mode == 'RGBA':
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        background.paste(img, mask=img.split()[3])
+        img = background
+    else:
+        img = img.convert('RGB')
+    return resample_to_model_grid(img, pixel_size, detail_size)
+
+
 def resample_to_model_grid(
     img: Image.Image, pixel_size: float, detail_size: Optional[float],
 ) -> tuple[Image.Image, float]:
@@ -577,20 +594,7 @@ def process_image(
         Dictionary containing colorBlocks, processedImage, segmentationImage,
         mappedBlendPalette, and imageDimensions
     """
-    # Load and optionally downscale image
-    img = Image.open(BytesIO(image_bytes))
-    # Convert RGBA to RGB with white background for 3D printing
-    # (transparent = no filament = white base color)
-    if img.mode == 'RGBA':
-        # Create white background
-        background = Image.new('RGB', img.size, (255, 255, 255))
-        # Paste RGBA image onto white background using alpha channel as mask
-        background.paste(img, mask=img.split()[3])  # alpha channel
-        img = background
-    else:
-        img = img.convert('RGB')
-
-    img, pixel_size = resample_to_model_grid(img, pixel_size, detail_size)
+    img, pixel_size = load_model_grid(image_bytes, pixel_size, detail_size)
     width, height = img.size
 
     # Convert to numpy array

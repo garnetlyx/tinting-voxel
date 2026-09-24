@@ -1,85 +1,51 @@
-"""Parameter generation covers its ranges and is reproducible for a fixed seed."""
+"""Pattern search visits every grid point exactly once, whatever the scores."""
+import math
+
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from services.param_search_service import GridSearch, RandomSearch
+
+from services.param_search_service import SEARCH_SPACES, PatternSearch, SearchSpace
 
 
-@given(
-    ranges=st.fixed_dictionaries({
-        "a": st.lists(st.integers(0, 10), min_size=1, max_size=4),
-        "b": st.lists(st.floats(0, 1, allow_nan=False, allow_infinity=False), min_size=1, max_size=3),
-        "c": st.lists(st.integers(0, 5), min_size=1, max_size=2),
-    })
-)
-@settings(max_examples=100)
-def test_grid_search_completeness(ranges):
-    """Property 5: GridSearch yields exactly product(len(range)) combinations with correct keys."""
-    gs = GridSearch(mode="pixel", param_ranges=ranges)
-    expected_total = 1
-    for v in ranges.values():
-        expected_total *= len(v)
-
-    combos = list(gs.generate())
-    assert len(combos) == expected_total, f"Expected {expected_total} combos, got {len(combos)}"
-    assert gs.total() == expected_total
-
-    expected_keys = set(ranges.keys())
-    for combo in combos:
-        assert set(combo.keys()) == expected_keys, f"Combo keys mismatch: {combo.keys()}"
+@st.composite
+def spaces(draw):
+    axes = {}
+    coarse = {}
+    for name in draw(st.lists(st.sampled_from("abc"), min_size=1, max_size=3, unique=True)):
+        values = tuple(sorted(draw(st.sets(st.integers(0, 50), min_size=1, max_size=6))))
+        axes[name] = values
+        coarse[name] = tuple(sorted(draw(st.sets(st.sampled_from(values), min_size=1))))
+    return SearchSpace(axes=axes, coarse=coarse, diagonal=draw(st.booleans()))
 
 
-# ---------------------------------------------------------------------------
-# Property 6: Random search trial count
-# Feature: param-search-optimizer, Property 6: Random search trial count
-# ---------------------------------------------------------------------------
-
-@given(n=st.integers(1, 200))
-@settings(max_examples=100)
-def test_random_search_trial_count(n):
-    """Property 6: RandomSearch yields exactly n_trials combinations."""
-    rs = RandomSearch(mode="pixel", n_trials=n)
-    combos = list(rs.generate())
-    assert len(combos) == n, f"Expected {n} trials, got {len(combos)}"
-    assert rs.total() == n
-
-
-# ---------------------------------------------------------------------------
-# Property 7: Random search bounds containment
-# Feature: param-search-optimizer, Property 7: Random search bounds containment
-# ---------------------------------------------------------------------------
-
-@given(n=st.integers(1, 50))
-@settings(max_examples=100)
-def test_random_search_bounds_containment(n):
-    """Property 7: All sampled values are within their specified bounds."""
-    bounds = {
-        "max_colors": ("int", 4, 16),
-        "color_threshold": ("float", 10.0, 100.0),
-        "detail_size": ("float", 0.22, 0.82),
-        "white_backing_layers": ("choice", [0, 1]),
-    }
-    rs = RandomSearch(mode="pixel", n_trials=n, param_bounds=bounds)
-    for combo in rs.generate():
-        assert 4 <= combo["max_colors"] <= 16
-        assert 10.0 <= combo["color_threshold"] <= 100.0
-        assert 0.22 <= combo["detail_size"] <= 0.82
-        assert combo["white_backing_layers"] in (0, 1)
+@given(space=spaces(), data=st.data())
+@settings(max_examples=100, deadline=None)
+def test_every_grid_point_is_visited_once_despite_failures(space, data):
+    search = PatternSearch(space)
+    visited = []
+    while (params := search.next()) is not None:
+        assert set(params) == set(space.axes)
+        assert all(params[name] in values for name, values in space.axes.items())
+        failed = data.draw(st.booleans())
+        search.record(params, None if failed else data.draw(st.floats(0, 100)))
+        visited.append(tuple(params[name] for name in space.axes))
+    assert len(visited) == len(set(visited)) == math.prod(len(values) for values in space.axes.values())
 
 
-# ---------------------------------------------------------------------------
-# Property 8: Random search reproducibility
-# Feature: param-search-optimizer, Property 8: Random search reproducibility
-# ---------------------------------------------------------------------------
+@given(space=spaces(), data=st.data())
+@settings(max_examples=100, deadline=None)
+def test_recorded_current_settings_are_never_revisited(space, data):
+    search = PatternSearch(space)
+    current = {name: data.draw(st.sampled_from(values)) for name, values in space.axes.items()}
+    search.record(current, 1.0)
+    while (params := search.next()) is not None:
+        assert params != current
+        search.record(params, data.draw(st.floats(0, 100)))
 
-@given(
-    seed=st.integers(0, 2**31 - 1),
-    n=st.integers(1, 50),
-)
-@settings(max_examples=100)
-def test_random_search_reproducibility(seed, n):
-    """Property 8: Same seed produces identical sequences."""
-    rs1 = RandomSearch(mode="pixel", n_trials=n, seed=seed)
-    rs2 = RandomSearch(mode="pixel", n_trials=n, seed=seed)
-    combos1 = list(rs1.generate())
-    combos2 = list(rs2.generate())
-    assert combos1 == combos2, "Same seed must produce identical sequences"
+
+def test_served_spaces_have_their_lattice_on_the_grid():
+    for space in SEARCH_SPACES.values():
+        assert list(space.axes) == list(space.coarse)
+        for name, values in space.axes.items():
+            assert list(values) == sorted(set(values))
+            assert set(space.coarse[name]) <= set(values)

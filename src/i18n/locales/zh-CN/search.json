@@ -4,9 +4,9 @@
   "invalidTargetEdge": "请输入大于 0 且不超过 {{max}} mm 的尺寸。",
   "waitingToStart": "正在等待上一次搜索结束或搜索资源空出…",
   "startOptimization": "生成方案",
-  "searchingForOptimalParametersPleaseWait": "正在生成预览…",
+  "searchingForOptimalParametersPleaseWait": "正在搜索最接近原图的设置…",
   "progress": "进度",
-  "results": "已生成 {{count}} 个方案。选择预览即可应用。",
+  "results": "共 {{count}} 个方案，最接近的排在最前。选择预览即可应用。",
   "modePixel": "像素",
   "modeSvg": "SVG",
   "max_colors": "最多颜色数",
@@ -18,5 +18,12 @@
   "white_backing_layers": "背衬层数",
   "pixel_size": "像素尺寸",
   "currentSettings": "当前设置",
-  "candidate": "方案 {{number}}"
+  "candidate": "方案 {{number}}",
+  "runningNote": "每完成一个预览，排序都会更新。随时选择预览即可应用并停止搜索。",
+  "scoreNote": "ΔE 为原图与模拟打印之间的平均 CIEDE2000 色差，数值越低越接近。",
+  "bestMatch": "最佳匹配",
+  "bestSoFar": "目前最佳",
+  "colorDifference": "色差",
+  "closerThanCurrent": "比当前设置更接近原图 {{value}}",
+  "furtherThanCurrent": "比当前设置更偏离原图 {{value}}"
 }

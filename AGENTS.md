@@ -52,7 +52,7 @@ tinting-voxel/
 │   │   ├── label_map.py          # Model-grid label maps (export/preview payloads)
 │   │   ├── matrix_cache.py       # Reference-matrix cache (powers /api/cache-stats)
 │   │   ├── mesh_optimizer.py     # Greedy meshing optimization
-│   │   ├── param_search_service.py # Auto parameter sweep engine
+│   │   ├── param_search_service.py # Scored pattern search over settings
 │   │   ├── print_settings_generator.py # Slicer settings JSON
 │   │   ├── print_stack.py       # Print stack modeling
 │   │   ├── raster_cleanup.py    # Raster post-processing cleanup
@@ -293,9 +293,14 @@ three backing color layers. Pruning and the height default use the material
 set's mean RGB TD against the threshold in `core/stack_prune.py`. The backing
 mode selects actual light/dark material layers under common white illumination.
 
-Parameter search returns every successful candidate in evaluation order,
-including the current settings. Candidate IDs identify evaluations; users
-choose previews without an automatic image-quality ranking.
+Parameter search scores the current settings and `param_search_trials` others
+by the mean CIEDE2000 between the image on the model grid and each simulated
+print. Candidates come from a pattern search on a fixed grid per mode
+(`SEARCH_SPACES` in `services/param_search_service.py`: a coarse lattice, then
+the neighbors of the best point not yet expanded); model size, detail size and
+print stack stay at the user's values. The job reports candidates in
+evaluation order, the dialog ranks them by score as they arrive, and choosing
+one applies it and cancels the rest.
 
 Material measurements and photograph calibration belong to the research
 repository. Production uses the material fields directly. Bambu and clear presets use

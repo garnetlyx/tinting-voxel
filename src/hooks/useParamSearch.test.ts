@@ -32,6 +32,7 @@ const firstPreview = {
   mode: 'pixel',
   params: { max_colors: 10, color_threshold: 50, detail_size: 0.42 },
   previewImage: 'data:image/png;base64,first',
+  score: 10.68,
 };
 
 describe('useParamSearch', () => {

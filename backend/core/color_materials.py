@@ -38,6 +38,21 @@ def _ciede2000(lab_color: np.ndarray, ref_lab: np.ndarray) -> np.ndarray:
     )).reshape(-1)
 
 
+def mean_ciede2000(rgb_a: np.ndarray, rgb_b: np.ndarray) -> float:
+    """Mean CIEDE2000 between two 8-bit RGB images of one shape, pixel by pixel."""
+    from skimage.color import deltaE_ciede2000
+
+    if rgb_a.shape != rgb_b.shape:
+        raise ValueError(f"Image shapes differ: {rgb_a.shape} vs {rgb_b.shape}")
+    a = rgb_a.reshape(-1, 1, 3)
+    b = rgb_b.reshape(-1, 1, 3)
+    total = 0.0
+    for start in range(0, len(a), DISTANCE_CHUNK):
+        stop = start + DISTANCE_CHUNK
+        total += float(deltaE_ciede2000(rgb2lab(a[start:stop]), rgb2lab(b[start:stop]), channel_axis=-1).sum())
+    return total / len(a)
+
+
 def _penalized_ciede2000(lab_color: np.ndarray, ref_lab: np.ndarray) -> np.ndarray:
     """CIEDE2000 with dark-color adjustments.
 

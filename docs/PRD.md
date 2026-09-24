@@ -126,9 +126,11 @@ tinting-voxel solves these by:
 
 #### Flow 4 — Parameter Search (auto-tune)
 1. User uploads an image and opens the parameter-search modal.
-2. Backend evaluates the current settings and sweeps `maxColors` / `colorThreshold` combinations. Every successful candidate remains available in evaluation order; candidate numbers are identifiers, not quality rankings.
-3. User picks the variant with the best perceived preview and proceeds to
-   export.
+2. Backend scores the current settings, then pattern-searches the mode's settings
+   (pixel: `maxColors` / `colorThreshold`; SVG: color count, simplification,
+   minimum area) by the mean CIEDE2000 between the image and each simulated print.
+3. Previews rank closest first as they finish; the user picks one at any time,
+   which applies it and stops the search, and proceeds to export.
 
 > Material measurements belong to the companion research repository. Production
 > material inputs are limited to hex color and scalar or RGB transmission distance.

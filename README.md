@@ -12,7 +12,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 - **Interface Languages** - English and Simplified Chinese with automatic detection, persistent switching, and feature-based translation resources
 - **Bug Reports** - In-app feedback with optional page screenshots, conversion settings, and diagnostic logs
 - **3D WebGL Preview** - three.js render with orbit controls before export
-- **Parameter Auto-Search** - Compare every successful maxColors / colorThreshold candidate, including the current settings, in evaluation order
+- **Parameter Auto-Search** - Scores the current settings and a pattern search over the mode's settings by mean CIEDE2000 against the image; previews rank closest first as they finish, and choosing one applies it
 - **Greedy Meshing Optimization** - 70-80% file size reduction vs naive pixel-to-box approach
 
 ## Tech Stack

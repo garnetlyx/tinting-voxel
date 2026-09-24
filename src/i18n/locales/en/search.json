@@ -4,9 +4,9 @@
   "invalidTargetEdge": "Enter a size greater than 0 and no more than {{max}} mm for this image.",
   "waitingToStart": "Waiting for the previous search to finish or for a search slot to open…",
   "startOptimization": "Generate options",
-  "searchingForOptimalParametersPleaseWait": "Generating previews…",
+  "searchingForOptimalParametersPleaseWait": "Searching for the settings closest to your image…",
   "progress": "Progress",
-  "results": "Generated {{count}} previews. Select one to apply its settings.",
+  "results": "{{count}} previews, closest match first. Select one to apply its settings.",
   "modePixel": "Pixel",
   "modeSvg": "SVG",
   "max_colors": "Max colors",
@@ -18,5 +18,12 @@
   "white_backing_layers": "Backing layers",
   "pixel_size": "Pixel size",
   "currentSettings": "Current settings",
-  "candidate": "Option {{number}}"
+  "candidate": "Option {{number}}",
+  "runningNote": "The ranking updates as each preview finishes. Select any preview to apply it and stop the search.",
+  "scoreNote": "ΔE is the mean CIEDE2000 color difference between your image and the simulated print; lower is closer.",
+  "bestMatch": "Best match",
+  "bestSoFar": "Best so far",
+  "colorDifference": "Color difference",
+  "closerThanCurrent": "{{value}} closer than current",
+  "furtherThanCurrent": "{{value}} further than current"
 }

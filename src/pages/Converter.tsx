@@ -464,8 +464,6 @@ const Converter: React.FC = () => {
               numColors,
               epsilon,
               minArea,
-              strategy: 'random',
-              nTrials: 20,
             },
             imageDimensions,
           );

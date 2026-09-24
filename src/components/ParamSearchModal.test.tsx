@@ -1,6 +1,6 @@
 /**
  * Tests for ParamSearchModal component.
- * Covers config, running, results, and error phases.
+ * Covers config, running, results, and error phases, and the ranking by score.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -27,6 +27,7 @@ const mockResults: SearchResultItem[] = [
     mode: 'pixel',
     params: { max_colors: 10, color_threshold: 40 },
     previewImage: 'data:image/png;base64,abc',
+    score: 10.68,
   },
   {
     candidateId: 2,
@@ -34,8 +35,19 @@ const mockResults: SearchResultItem[] = [
     mode: 'pixel',
     params: { max_colors: 8, color_threshold: 65.19, white_backing_layers: 3 },
     previewImage: 'data:image/png;base64,def',
+    score: 12.5,
+  },
+  {
+    candidateId: 3,
+    isBaseline: false,
+    mode: 'pixel',
+    params: { max_colors: 64, color_threshold: 10 },
+    previewImage: 'data:image/png;base64,ghi',
+    score: 8.85,
   },
 ];
+
+const cardOrder = () => screen.getAllByRole('img').map((image) => image.getAttribute('alt'));
 
 describe('ParamSearchModal', () => {
   it('config step renders size input; the search reuses the current filament config', () => {
@@ -74,18 +86,24 @@ describe('ParamSearchModal', () => {
     render(<ParamSearchModal {...baseProps} phase="running" progress={progress} />);
 
     expect(screen.getByText('5 / 20')).toBeInTheDocument();
-    expect(screen.queryByText(/MAE|best/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/best so far|best match/i)).not.toBeInTheDocument();
   });
 
-  it('shows completed previews while the remaining options are still running', () => {
-    render(<ParamSearchModal {...baseProps} phase="running" results={[mockResults[0]]}
-      progress={{ jobId: 'job-1', completed: 1, total: 21, status: 'running', settled: false, results: [mockResults[0]] }} />);
+  it('ranks previews live while the remaining options are still running', () => {
+    const { rerender } = render(<ParamSearchModal {...baseProps} phase="running" results={mockResults.slice(0, 2)}
+      progress={{ jobId: 'job-1', completed: 2, total: 21, status: 'running', settled: false, results: [] }} />);
 
-    expect(screen.getByText('1 / 21')).toBeInTheDocument();
-    expect(screen.getByAltText('Current settings')).toBeInTheDocument();
+    expect(screen.getByText('2 / 21')).toBeInTheDocument();
+    expect(cardOrder()).toEqual(['Current settings', 'Option 2']);
+    expect(screen.getByText('Best so far')).toBeInTheDocument();
+    expect(screen.queryByText('Best match')).not.toBeInTheDocument();
+
+    rerender(<ParamSearchModal {...baseProps} phase="running" results={mockResults}
+      progress={{ jobId: 'job-1', completed: 3, total: 21, status: 'running', settled: false, results: [] }} />);
+    expect(cardOrder()).toEqual(['Option 3', 'Current settings', 'Option 2']);
   });
 
-  it('results step renders unranked cards and calls onApplyParams on click', async () => {
+  it('results step ranks cards by color difference and applies the selected one', async () => {
     const user = userEvent.setup();
     const onApplyParams = vi.fn();
     const onClose = vi.fn();
@@ -100,18 +118,19 @@ describe('ParamSearchModal', () => {
       />,
     );
 
-    // Both result cards should be visible
-    expect(screen.getByText('Current settings')).toBeInTheDocument();
-    expect(screen.getByText('Option 2')).toBeInTheDocument();
+    expect(cardOrder()).toEqual(['Option 3', 'Current settings', 'Option 2']);
+    expect(screen.getByText('Best match')).toBeInTheDocument();
+    expect(screen.getByText('ΔE 8.85')).toBeInTheDocument();
+    expect(screen.getByText('ΔE 10.68')).toBeInTheDocument();
+    expect(screen.getByText('1.83 closer than current')).toBeInTheDocument();
+    expect(screen.getByText('1.82 further than current')).toBeInTheDocument();
     expect(screen.getByText('65.19')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.queryByText('3.00')).not.toBeInTheDocument();
 
-    // Apply the current settings card without a quality ranking.
-    const firstCard = screen.getByAltText('Current settings').closest('button');
-    await user.click(firstCard!);
+    await user.click(screen.getByAltText('Option 3').closest('button')!);
 
-    expect(onApplyParams).toHaveBeenCalledWith(mockResults[0].params, mockResults[0].mode, 100);
+    expect(onApplyParams).toHaveBeenCalledWith(mockResults[2].params, mockResults[2].mode, 100);
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -134,6 +153,7 @@ describe('ParamSearchModal', () => {
     render(<ParamSearchModal {...baseProps} phase="error" error="Candidate failed" results={[mockResults[0]]} />);
     expect(screen.getByText('Candidate failed')).toBeInTheDocument();
     expect(screen.getByAltText('Current settings')).toBeInTheDocument();
+    expect(screen.getByText('Best so far')).toBeInTheDocument();
   });
 
   it('does not render when isOpen is false', () => {

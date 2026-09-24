@@ -381,6 +381,7 @@ class SearchResultItem(BaseModel):
     mode: str
     params: dict
     preview_image: str  # data URL (base64 PNG)
+    score: float  # mean CIEDE2000 between the image and this simulated print
 
 
 class ParamSearchResponse(BaseModel):

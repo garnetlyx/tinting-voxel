@@ -19,7 +19,6 @@ from api.validators import validate_image_upload
 from config.print_defaults import DEFAULT_BACKING_LAYERS, MAX_COLOR_LAYERS
 from config.settings import settings
 from services.telemetry import emit
-from core.blend_color import Colors
 from services.param_search_service import (
     FixedParams,
     ParamSearchConfig,
@@ -62,6 +61,7 @@ class SearchJob:
             mode=result.mode,
             params=result.params,
             preview_image=result.preview_data_url,
+            score=result.score,
         )
         with self._lock:
             if self._status == "running":
@@ -215,10 +215,8 @@ async def api_param_search(
     image: UploadFile = File(...),
     preset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
-    mode: str = Form("pixel", pattern=r"^(pixel|svg|both)$"),
-    strategy: str = Form("grid", pattern=r"^(grid|random)$"),
-    n_trials: int = Form(50, ge=1, le=500),
-    seed: Optional[int] = Form(None),
+    mode: str = Form("pixel", pattern=r"^(pixel|svg)$"),
+    n_trials: int = Form(settings.param_search_trials, ge=1, le=500),
     layer_count: int = Form(4, ge=1, le=MAX_COLOR_LAYERS),
     layer_height: Optional[float] = Form(None, gt=0, le=10),
     pixel_size: float = Form(0.42, gt=0, le=10),
@@ -231,7 +229,7 @@ async def api_param_search(
     epsilon: float = Form(2.0, gt=0, le=100),
     min_area: float = Form(4.0, gt=0, le=100),
 ):
-    """Render alternatives using the current image and print configuration."""
+    """Score the current settings and search for closer ones for this image and print."""
     image_bytes = await image.read()
     validate_image_upload(image.filename, image_bytes)
 
@@ -243,31 +241,21 @@ async def api_param_search(
     layer_height = resolve_layer_height(layer_height, colors)
     config = ParamSearchConfig(
         mode=mode,
-        strategy=strategy,
         n_trials=n_trials,
-        seed=seed,
         fixed=FixedParams(
             layer_count=layer_count,
             layer_height=layer_height,
             pixel_size=pixel_size,
             white_backing_layers=white_backing_layers,
+            detail_size=detail_size,
             backing_mode=backing_mode,
         ),
         colors=colors,
-        param_ranges=None,
-        baseline_params={
-            "pixel": {
-                "max_colors": max_colors,
-                "color_threshold": color_threshold,
-                "detail_size": detail_size,
-            },
-            "svg": {
-                "num_colors": num_colors,
-                "epsilon": epsilon,
-                "min_area": min_area,
-                "detail_size": detail_size,
-            },
-        },
+        baseline_params=(
+            {"max_colors": max_colors, "color_threshold": color_threshold}
+            if mode == "pixel" else
+            {"num_colors": num_colors, "epsilon": epsilon, "min_area": min_area}
+        ),
     )
 
     service = ParamSearchService(config)

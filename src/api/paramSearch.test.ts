@@ -48,8 +48,6 @@ describe('startParamSearch', () => {
         numColors: 8,
         epsilon: 2,
         minArea: 4,
-        strategy: 'random',
-        nTrials: 20,
       },
       { width: 896, height: 1344 },
     );
@@ -67,6 +65,9 @@ describe('startParamSearch', () => {
     // pixel_size derived from the target physical size
     expect(Number(form.get('pixel_size'))).toBeCloseTo(200 / 1344, 6);
     expect(form.get('filamentColors')).toBe(JSON.stringify(colors));
+    // The server owns the search strategy and its trial budget.
+    expect(form.get('strategy')).toBeNull();
+    expect(form.get('n_trials')).toBeNull();
   });
 
   it('throws the backend detail on error responses', async () => {
@@ -102,13 +103,14 @@ describe('startParamSearch', () => {
       json: async () => ({
         job_id: 'job-1', completed: 2, total: 21, status: 'running', error: null,
         results: [{ candidate_id: 2, is_baseline: false, mode: 'pixel',
-          params: { detail_size: 0.42 }, preview_image: 'data:image/png;base64,abc' }],
+          params: { detail_size: 0.42 }, preview_image: 'data:image/png;base64,abc', score: 8.85 }],
       }),
     }).mockResolvedValueOnce({ ok: true }));
 
     const progress = await getParamSearchProgress('job-1', 1);
     expect(progress.completed).toBe(2);
     expect(progress.results[0].candidateId).toBe(2);
+    expect(progress.results[0].score).toBe(8.85);
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/param-search/progress/job-1?after=1');
 
     await cancelParamSearch('job-1');
