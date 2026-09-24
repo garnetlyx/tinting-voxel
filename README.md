@@ -6,7 +6,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 
 - **Optical Color Mixing** - One transmission formula for every filament: `T_ch = 10^(-d / TD_ch)`, composed by light-loss allocation using the filament hex color
 - **N-Color Support (4–16 colors)** - Arbitrary color codes with custom hex values and a single transmission-distance field, accepting one number or three RGB values
-- **Multiple Output Formats** - STL ZIP, SVG-STL, **3MF** (with named color objects), SVG-3MF, CSV, and slicer print-settings JSON
+- **Multiple Output Formats** - STL ZIP, SVG-STL, **3MF** (one object with a named, colored part per filament), SVG-3MF, CSV, and slicer print-settings JSON
 - **Batch Processing** - Process up to 20 images in one run
 - **Palette Library** - Four built-in filament configurations supplied by the backend catalog
 - **Interface Languages** - English and Simplified Chinese with automatic detection, persistent switching, and feature-based translation resources
@@ -18,7 +18,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 ## Tech Stack
 
 - **Frontend**: React 19 + TypeScript + Vite + build-time Tailwind CSS + three.js
-- **Backend**: Python 3 + FastAPI + numpy-stl + PIL + scikit-learn + trimesh + lxml
+- **Backend**: Python 3 + FastAPI + numpy-stl + PIL + scikit-learn
 - **Testing**: pytest (~700 backend tests), Vitest (frontend), Playwright (E2E)
 
 ## Project Structure
@@ -123,7 +123,7 @@ The full endpoint list is in [AGENTS.md](AGENTS.md). Highlights:
 
 - `POST /api/v2/download-stl` — N-color STL ZIP
 - `POST /api/v2/download-svg-stl` — N-color SVG-mode STL
-- `POST /api/v2/download-3mf` — 3MF with named color objects
+- `POST /api/v2/download-3mf` — 3MF: one object with a named, colored part per filament
 - `POST /api/v2/download-svg-3mf` — SVG-mode 3MF
 - `POST /api/v2/print-settings` — slicer print-settings JSON
 - `GET  /api/v2/filament-presets` — available filament presets

@@ -7,7 +7,7 @@ Image-to-STL/3MF color block converter that transforms images into layered 3D-pr
 ## Tech Stack
 
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + three.js
-- **Backend**: Python 3 + FastAPI + numpy-stl + PIL + scikit-learn + trimesh
+- **Backend**: Python 3 + FastAPI + numpy-stl + PIL + scikit-learn
 - **Testing**: pytest (backend), Vitest (frontend), Playwright (E2E)
 - **Deploy**: Docker, Railway, Fly.io
 
@@ -58,7 +58,8 @@ tinting-voxel/
 │   │   ├── raster_cleanup.py    # Raster post-processing cleanup
 │   │   ├── stl_generator.py      # STL file generation
 │   │   ├── svg_stl_generator.py  # SVG-mode STL generation
-│   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
+│   │   ├── threemf_generator.py  # 3MF output (one object, a part per filament)
+│   │   ├── threemf_writer.py     # 3MF packaging (streamed XML, shared vertices)
 │   │   └── vector_processor.py   # Vector/contour processing
 │   ├── config/           # Configuration (settings, constants, logging_setup)
 │   └── tests/            # Test suite (~770 tests)
@@ -143,7 +144,7 @@ docker compose up --build  # Build and run
 |--------|----------|-------------|
 | POST | `/api/v2/download-stl` | STL ZIP with configurable colors |
 | POST | `/api/v2/download-svg-stl` | SVG-mode STL with configurable colors |
-| POST | `/api/v2/download-3mf` | 3MF file with named color objects |
+| POST | `/api/v2/download-3mf` | 3MF: one object with a named, colored part per filament |
 | POST | `/api/v2/download-svg-3mf` | SVG-mode 3MF with configurable colors |
 | POST | `/api/v2/print-settings` | JSON print settings for slicers |
 | GET | `/api/v2/filament-presets` | List available filament presets |
@@ -235,7 +236,10 @@ coordinate lists (2M cells: ~2.7 MB instead of ~45 MB, and no per-pixel Python
 objects). Internally, processing, previews and the STL/3MF generators work on
 the label array; `block_box_runs` in `services/stl_generator.py` meshes and
 extrudes each block's footprint for both generators within `stl_max_boxes`.
-The process response still lists pixels per block for the browser.
+The process response still lists pixels per block for the browser. A 3MF holds
+one object assembled from one part per filament, each with its filament color
+as a 3MF material color (`services/threemf_writer.py`), so slicers load a
+single object whose color layers stay in register.
 
 Images larger than the model grid budget (`max_model_cells`, 4096 px per side)
 are resampled at their physical size, snapping to whole detail-width cells when

@@ -156,8 +156,8 @@ tinting-voxel solves these by:
 
 **Output formats**
 - Color-block CSV
-- V2: N-color STL ZIP, N-color SVG-STL, **3MF** (named color objects, trimesh
-  + lxml), **SVG-3MF**, print-settings JSON
+- V2: N-color STL ZIP, N-color SVG-STL, **3MF** (one object with a named,
+  colored part per filament), **SVG-3MF**, print-settings JSON
 - Greedy meshing (70–80% box-count reduction), face culling
 - Double-sided print support
 

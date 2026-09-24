@@ -1,23 +1,22 @@
 """
-3MF generation service - produces a single 3MF file with color-separated objects.
+3MF generation service: one object with a part per filament.
 
-Uses trimesh for 3MF export. Each filament color layer becomes a separate
-object in the 3MF file, which slicers like Bambu Studio can assign to
-different extruders.
+Each filament's layers become one colored part of a single object
+(services/threemf_writer.py), which slicers like Bambu Studio assign to
+filament slots.
 """
 from config.print_defaults import DEFAULT_BACKING_LAYERS
 import logging
 import re
-from io import BytesIO
 from typing import Optional
 
 import numpy as np
-import trimesh
 
 from core.blend_color import Colors
 from config.settings import settings
 from services.label_map import EMPTY
 from services.mesh_optimizer import BoxRange, boxes_from_rectangles, greedy_mesh_2d
+from services.threemf_writer import Part, write_3mf
 from services.print_stack import (
     PRINT_BACKGROUND_RGB,
     backing_suffix,
@@ -37,68 +36,21 @@ from services.vector_processor import finalize_vector_partition
 
 logger = logging.getLogger(__name__)
 
-# Decimal places (mm) of exported vertex coordinates: 1 nm.
-VERTEX_DECIMALS = 6
-
-
-def _boxes_to_trimesh(
-    box_batches: list[list[BoxRange]],
-    color_rgb: Optional[tuple[int, int, int]] = None,
-) -> trimesh.Trimesh:
-    """Build an indexed mesh directly from compact box ranges."""
-    box_count = sum(len(batch) for batch in box_batches)
-    if box_count == 0:
-        return trimesh.Trimesh()
-
-    vertices = np.empty((box_count * 8, 3), dtype=np.float64)
-    faces = np.empty((box_count * 12, 3), dtype=np.int64)
-    local_faces = np.array([
-        [0, 3, 1], [1, 3, 2],
-        [0, 4, 7], [0, 7, 3],
-        [4, 5, 6], [4, 6, 7],
-        [5, 1, 2], [5, 2, 6],
-        [2, 3, 6], [3, 7, 6],
-        [0, 1, 5], [0, 5, 4],
-    ], dtype=np.int64)
-
-    box_offset = 0
-    for batch in box_batches:
-        if not batch:
-            continue
-        coords = np.asarray(batch, dtype=np.float64)
-        count = len(batch)
-        x1, x2 = coords[:, 0, 0], coords[:, 0, 1]
-        y1, y2 = coords[:, 1, 0], coords[:, 1, 1]
-        z1, z2 = coords[:, 2, 0], coords[:, 2, 1]
-        batch_vertices = np.empty((count, 8, 3), dtype=np.float64)
-        batch_vertices[:, 0] = np.column_stack((x1, y1, z1))
-        batch_vertices[:, 1] = np.column_stack((x2, y1, z1))
-        batch_vertices[:, 2] = np.column_stack((x2, y2, z1))
-        batch_vertices[:, 3] = np.column_stack((x1, y2, z1))
-        batch_vertices[:, 4] = np.column_stack((x1, y1, z2))
-        batch_vertices[:, 5] = np.column_stack((x2, y1, z2))
-        batch_vertices[:, 6] = np.column_stack((x2, y2, z2))
-        batch_vertices[:, 7] = np.column_stack((x1, y2, z2))
-
-        vertex_start = box_offset * 8
-        face_start = box_offset * 12
-        vertices[vertex_start:vertex_start + count * 8] = batch_vertices.reshape(-1, 3)
-        offsets = (np.arange(count, dtype=np.int64) * 8 + vertex_start)[:, None, None]
-        faces[face_start:face_start + count * 12] = (local_faces[None, :, :] + offsets).reshape(-1, 3)
-        box_offset += count
-
-    box_batches.clear()
-    # The 3MF writer prints every coordinate at full repr precision; nanometre
-    # rounding keeps shared corners identical and roughly halves the text to
-    # format and compress (grid pitches like 500/1270 mm have 17 digits).
-    np.round(vertices, VERTEX_DECIMALS, out=vertices)
-    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
-    mesh.merge_vertices()
-
-    if color_rgb:
-        mesh.visual.face_colors = np.array([*color_rgb, 255], dtype=np.uint8)
-
-    return mesh
+def _package(code_mesh_map: dict[str, list[list[BoxRange]]], colors: Colors,
+             color_hex_map: Optional[dict]) -> bytes:
+    """One object with a part per filament, colored by the filament's hex."""
+    hex_by_label = color_hex_map or {}
+    parts = [
+        Part(
+            name=colors[label].name,
+            color=hex_by_label.get(label, colors[label].hex),
+            boxes=[box for batch in batches for box in batch],
+        )
+        for label, batches in code_mesh_map.items()
+    ]
+    result = write_3mf(parts, object_name="Tinting Voxel")
+    logger.info("Generated 3MF file: %d filament parts, %d bytes", sum(bool(p.boxes) for p in parts), len(result))
+    return result
 
 
 def generate_3mf(
@@ -146,7 +98,7 @@ def generate_3mf(
                     f"Invalid hex color '{hex_color}' for label '{label}'"
                 )
 
-    # Keep compact box ranges until the final indexed trimesh conversion.
+    # Box ranges per filament until packaging (services/threemf_writer.py).
     code_mesh_map: dict[str, list[list[BoxRange]]] = {label: [] for label in colors.get_labels()}
 
     # Map input colors to blend codes (shared with processing and STL export);
@@ -196,42 +148,7 @@ def generate_3mf(
         logger.info("3MF: added 1 merged white backing block at z=%.2f-%.2f mm",
                      optical_top, optical_top + n_white * layer_height)
 
-    logger.info("Mesh generation complete, converting to trimesh objects...")
-
-    # Convert to trimesh Scene with named objects
-    scene = trimesh.Scene()
-
-    for label, mesh_arrays in code_mesh_map.items():
-        if not mesh_arrays:
-            continue
-
-        # Resolve visual color from hex map
-        rgb = None
-        if color_hex_map and label in color_hex_map:
-            hex_color = color_hex_map[label]
-            rgb = (
-                int(hex_color[1:3], 16),
-                int(hex_color[3:5], 16),
-                int(hex_color[5:7], 16),
-            )
-
-        mesh_obj = _boxes_to_trimesh(mesh_arrays, color_rgb=rgb)
-        geom_name = f"color_{label}"
-        scene.add_geometry(mesh_obj, node_name=geom_name, geom_name=geom_name)
-        logger.info("Converted color '%s': %d triangles", label, len(mesh_obj.faces))
-
-    # Export as 3MF
-    logger.info("Exporting 3MF file with %d objects...", len(scene.geometry))
-    buf = BytesIO()
-    scene.export(buf, file_type='3mf')
-    result = buf.getvalue()
-
-    logger.info(
-        "Generated 3MF file: %d objects, %d bytes",
-        len(scene.geometry), len(result)
-    )
-
-    return result
+    return _package(code_mesh_map, colors, color_hex_map)
 
 
 def generate_svg_3mf(
@@ -344,25 +261,4 @@ def generate_svg_3mf(
         logger.info("SVG-3MF: added 1 merged white backing block at z=%.2f-%.2f mm",
                      optical_top, optical_top + n_white * layer_height)
 
-    scene = trimesh.Scene()
-    for label, mesh_arrays in code_mesh_map.items():
-        if not mesh_arrays:
-            continue
-        rgb = None
-        if color_hex_map and label in color_hex_map:
-            hex_color = color_hex_map[label]
-            rgb = tuple(int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
-        mesh_obj = _boxes_to_trimesh(mesh_arrays, color_rgb=rgb)
-        geom_name = f"color_{label}"
-        scene.add_geometry(mesh_obj, node_name=geom_name, geom_name=geom_name)
-
-    buf = BytesIO()
-    scene.export(buf, file_type='3mf')
-    result = buf.getvalue()
-
-    logger.info(
-        "Generated SVG 3MF file: %d objects, %d bytes",
-        len(scene.geometry), len(result)
-    )
-
-    return result
+    return _package(code_mesh_map, colors, color_hex_map)

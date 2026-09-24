@@ -150,3 +150,53 @@ class TestGenerate3MF:
         )
         assert isinstance(result, bytes)
         assert len(result) > 0
+
+
+def _model_xml(data: bytes):
+    import xml.etree.ElementTree as ET
+    with zipfile.ZipFile(BytesIO(data)) as archive:
+        return ET.fromstring(archive.read("3D/3dmodel.model"))
+
+
+CORE = "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}"
+MATERIAL = "{http://schemas.microsoft.com/3dmanufacturing/material/2015/02}"
+
+
+def test_3mf_is_one_object_with_a_colored_part_per_filament(simple_color_blocks, default_colors):
+    """Slicers load one multi-part object (layers stay in register) whose parts
+    carry the filament colors as a standard 3MF color group."""
+    data = generate_3mf(
+        color_blocks=simple_color_blocks, labels=labels_from_blocks(simple_color_blocks, 4, 4),
+        layer_height=0.08, pixel_size=0.5, layer_count=4, colors=default_colors,
+        color_hex_map={label: default_colors[label].hex for label in default_colors.get_labels()},
+    )
+    model = _model_xml(data)
+    resources = model.find(f"{CORE}resources")
+    colors = [c.get("color") for c in resources.find(f"{MATERIAL}colorgroup")]
+    objects = resources.findall(f"{CORE}object")
+    parts = [o for o in objects if o.find(f"{CORE}mesh") is not None]
+    assembly = [o for o in objects if o.find(f"{CORE}components") is not None]
+
+    assert len(assembly) == 1
+    items = model.find(f"{CORE}build").findall(f"{CORE}item")
+    assert [item.get("objectid") for item in items] == [assembly[0].get("id")]
+    assert [c.get("objectid") for c in assembly[0].find(f"{CORE}components")] == [p.get("id") for p in parts]
+    by_name = {default_colors[label].name: default_colors[label].hex.upper() for label in default_colors.get_labels()}
+    for part in parts:
+        assert part.get("pid") == resources.find(f"{MATERIAL}colorgroup").get("id")
+        assert colors[int(part.get("pindex"))] == by_name[part.get("name")]
+
+
+def test_3mf_parts_share_vertices_and_keep_every_box_face():
+    from services.threemf_writer import Part, write_3mf
+
+    boxes = [((0.0, 1.0), (0.0, 1.0), (0.0, 0.08)), ((1.0, 2.0), (0.0, 1.0), (0.0, 0.08))]
+    model = _model_xml(write_3mf([Part("Cyan", "#3d79c6", boxes)], "Print"))
+    mesh = model.find(f"{CORE}resources").find(f"{CORE}object").find(f"{CORE}mesh")
+    vertices = [(float(v.get("x")), float(v.get("y")), float(v.get("z"))) for v in mesh.find(f"{CORE}vertices")]
+    triangles = [tuple(int(t.get(k)) for k in ("v1", "v2", "v3")) for t in mesh.find(f"{CORE}triangles")]
+    assert len(vertices) == 12  # two boxes sharing four corners
+    assert len(triangles) == 24
+    assert sorted({v[0] for v in vertices}) == [0.0, 1.0, 2.0]
+    assert {v[2] for v in vertices} == {0.0, 0.08}
+    assert all(max(t) < len(vertices) for t in triangles)
