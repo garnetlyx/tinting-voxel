@@ -95,6 +95,11 @@ class Settings(BaseSettings):
     # host has fewer usable CPUs or threads do not help (core/parallel.py).
     compute_threads: int = 8
 
+    # Reference-matrix cache budget in references across all entries (about
+    # 150 bytes each as DataFrames). Presets need thousands; one custom set at
+    # its layer limit can need millions (16 opaque colors x 6 layers: 2.8M).
+    matrix_cache_max_references: int = 6_000_000
+
     # STL/3MF generation: cap on total merged boxes per request. Greedy meshing
     # collapses runs of same-color pixels, so the guard is enforced on the REAL
     # merged box count (cumulative across color blocks), not on the raw

@@ -414,51 +414,17 @@ def map_color_blocks_to_blend_results(
     """
     Map source RGB blocks to nearest printable blend codes and RGBs.
 
-    Uses the same reference matrices and LAB nearest-neighbor matching as STL export.
-    The printed backing block participates in the simulation (backing-aware
-    matrices); returned codes carry the backing as a trailing suffix.
+    Uses the same reference matrices and matching as the processing preview
+    (and reuses its results). The printed backing block participates in the
+    simulation (backing-aware matrices); returned codes carry the backing as a
+    trailing suffix.
     """
-    from services.print_stack import (
-        PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
+    from services.image_processor import _map_source_colors_to_blends
+    return _map_source_colors_to_blends(
+        [(block['r'], block['g'], block['b']) for block in color_blocks],
+        colors, layer_count, layer_height,
+        backing_layers=backing_layers, backing_mode=backing_mode,
     )
-    b_label = resolve_backing_label(colors, backing_layers, backing_mode)
-    b_suffix = backing_suffix(b_label, backing_layers)
-    b_boundary = PRINT_BACKGROUND_RGB if b_suffix else None
-    input_colors = [(block['r'], block['g'], block['b']) for block in color_blocks]
-    ref_code_matrix, ref_rgb_matrix = compute_reference_matrices(
-        layer_count,
-        layer_height,
-        colors,
-        n_targets=len(input_colors),
-        backing_layers=backing_layers,
-        backing_mode=backing_mode,
-    )
-    result_codes, result_rgbs = Color.map_to_nearest_color(
-        input_colors,
-        ref_code_matrix,
-        ref_rgb_matrix,
-    )
-    # Translucent sets match against composition representatives; recover the
-    # best ordering across the top compositions (no-op for opaque sets).
-    from core.stack_prune import refine_matches
-    result_codes, result_rgbs = refine_matches(
-        input_colors,
-        result_codes,
-        result_rgbs,
-        ref_code_matrix,
-        ref_rgb_matrix,
-        colors,
-        layer_height,
-        codes_to_rgb=_build_codes_to_rgb(
-            colors, layer_count, layer_height,
-            backing_suffix=b_suffix, background_rgb=b_boundary,
-        ),
-    )
-    normalized_rgbs = [
-        tuple(int(channel) for channel in np.asarray(rgb).tolist())
-        for rgb in result_rgbs
-    ]
-    return [code + b_suffix for code in result_codes], normalized_rgbs
 
 
 def _log_blend_code_distribution(

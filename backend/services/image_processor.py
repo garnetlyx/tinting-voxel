@@ -6,6 +6,9 @@ from config.settings import settings
 import base64
 import logging
 import math
+import threading
+import weakref
+from collections import OrderedDict
 from io import BytesIO
 from typing import Callable, Optional
 
@@ -13,7 +16,7 @@ import numpy as np
 import cv2
 from PIL import Image
 
-from core.blend_color import Colors
+from core.blend_color import Colors, colors_key
 from core.color_materials import Color
 from services.print_stack import build_print_stack, resolve_backing_label
 from services.raster_cleanup import color_distance, regularize_printable_regions
@@ -29,6 +32,14 @@ MAX_PROCESSING_DIMENSION = 4096
 # O(n²) path without the lossy 5-bit bucket pre-quantization. Above it
 # (natural-photo scale) the pre-quantization engages to bound the merge cost.
 EXACT_MERGE_MAX_UNIQUE = 4096
+# Unique colors per slice when assigning them to the final colors.
+NEAREST_FINAL_CHUNK = 65_536
+# Mapping results kept per reference matrix, so exports and preview refreshes
+# reuse the mapping processing already computed. Entries are keyed by the
+# matrix object and removed with it (matrices live in services/matrix_cache).
+MAPPINGS_PER_MATRIX = 16
+_mapping_cache: dict[int, OrderedDict] = {}
+_mapping_lock = threading.Lock()
 
 
 def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
@@ -74,6 +85,19 @@ def _map_and_refine(
     from core.stack_prune import refine_matches
     from services.stl_generator import _build_codes_to_rgb
 
+    mappings = _matrix_mappings(ref_code_matrix)
+    key = (
+        tuple(tuple(int(channel) for channel in rgb) for rgb in source_colors),
+        colors_key(colors), layer_count, layer_height, backing_suffix,
+        None if background_rgb is None else tuple(background_rgb),
+    )
+    with _mapping_lock:
+        cached = mappings.get(key)
+        if cached is not None:
+            mappings.move_to_end(key)
+    if cached is not None:
+        return list(cached[0]), list(cached[1])
+
     result_codes, result_rgbs = Color.map_to_nearest_color(
         source_colors, ref_code_matrix, ref_rgb_matrix,
     )
@@ -94,7 +118,24 @@ def _map_and_refine(
         tuple(int(channel) for channel in np.asarray(rgb).tolist())
         for rgb in result_rgbs
     ]
-    return [code + backing_suffix for code in result_codes], normalized_rgbs
+    codes = [code + backing_suffix for code in result_codes]
+    with _mapping_lock:
+        mappings[key] = (tuple(codes), tuple(normalized_rgbs))
+        while len(mappings) > MAPPINGS_PER_MATRIX:
+            mappings.popitem(last=False)
+    return codes, normalized_rgbs
+
+
+def _matrix_mappings(ref_code_matrix) -> OrderedDict:
+    """The mapping results cached for this reference matrix."""
+    matrix_id = id(ref_code_matrix)
+    with _mapping_lock:
+        mappings = _mapping_cache.get(matrix_id)
+        if mappings is None:
+            mappings = _mapping_cache[matrix_id] = OrderedDict()
+            # Drop the entry with its matrix, before the id can be reused.
+            weakref.finalize(ref_code_matrix, _mapping_cache.pop, matrix_id, None)
+    return mappings
 
 
 def _map_source_colors_to_blends(
@@ -637,11 +678,12 @@ def process_image(
         [((p >> 16) & 0xFF, (p >> 8) & 0xFF, p & 0xFF) for p in unique_packed],
         dtype=np.float32,
     )
-    # Batch nearest-neighbor: (n_unique, 3) vs (n_final, 3)
-    # Use broadcasting; n_unique up to ~32k after pre-quant, n_final <= max_colors
-    diffs = unique_rgb[:, np.newaxis, :] - final_rgb[np.newaxis, :, :]  # (U, F, 3)
-    sq_dists = (diffs * diffs).sum(axis=2)  # (U, F)
-    unique_to_final = sq_dists.argmin(axis=1)  # (U,) index into color_blocks
+    # Batch nearest-neighbor: (n_unique, 3) vs (n_final, 3). A resampled photo
+    # has up to ~1M unique colors, so broadcast in slices to bound memory.
+    unique_to_final = np.empty(len(unique_rgb), dtype=np.intp)  # index into color_blocks
+    for start in range(0, len(unique_rgb), NEAREST_FINAL_CHUNK):
+        diffs = unique_rgb[start:start + NEAREST_FINAL_CHUNK, np.newaxis, :] - final_rgb[np.newaxis, :, :]
+        unique_to_final[start:start + NEAREST_FINAL_CHUNK] = (diffs * diffs).sum(axis=2).argmin(axis=1)
 
     # Map each pixel to its final color index via the inverse array
     pixel_to_final = unique_to_final[inverse]  # (total_pixels,)

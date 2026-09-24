@@ -113,3 +113,24 @@ def test_startup_warmup_serves_real_requests():
         4, 0.08, Colors.from_configs(get_preset('bambu_cmywk')), n_targets=10, backing_layers=3,
     )
     assert request[0] is warmed[0]
+
+
+def test_cache_stays_within_its_reference_budget(monkeypatch):
+    """Large custom sets evict older entries by total references; the newest stays."""
+    import pandas as pd
+
+    from config.settings import settings
+    from core.blend_color import Colors
+
+    monkeypatch.setattr(settings, "matrix_cache_max_references", 10)
+    colors = Colors.from_configs(color_config.get_preset("bambu_cmywk"))
+    small = pd.DataFrame([["A"] * 4])
+    large = pd.DataFrame([["A"] * 8])
+    matrix_cache.set_cached_matrices(colors, 4, 0.08, small, small)
+    matrix_cache.set_cached_matrices(colors, 5, 0.08, large, large)
+    assert matrix_cache.get_cached_matrices(colors, 4, 0.08) is None
+    assert matrix_cache.get_cache_stats()["references"] == 8
+    too_large = pd.DataFrame([["A"] * 12])
+    matrix_cache.set_cached_matrices(colors, 6, 0.08, too_large, too_large)
+    assert matrix_cache.get_cached_matrices(colors, 6, 0.08) is not None
+    assert matrix_cache.get_cache_stats()["size"] == 1

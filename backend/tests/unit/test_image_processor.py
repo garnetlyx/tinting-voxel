@@ -398,3 +398,41 @@ def test_every_exported_pixel_region_holds_the_detail_width(pixel_size):
     assert unprintable_pixels(labels, 0.42 / pixel_size / 2).sum() <= 0.001 * labels.size
     dark = [index for index, block in enumerate(result['colorBlocks']) if block['r'] + block['g'] + block['b'] < 150]
     assert dark and np.isin(labels, dark).sum() > 0.05 * labels.size
+
+
+def test_exports_reuse_the_mapping_processing_computed(monkeypatch):
+    """The same sources against the same reference matrix map once; the cached
+    result goes away with its matrix."""
+    import gc
+
+    import services.image_processor as image_processor
+    from core.blend_color import Colors
+    from core.color_config import get_preset
+    from core.color_materials import Color
+    from services.stl_generator import map_color_blocks_to_blend_results
+
+    from services.stl_generator import compute_reference_matrices
+
+    colors = Colors.from_configs(get_preset("bambu_cmywk"))
+    blocks = [{'r': 200, 'g': 40, 'b': 60}, {'r': 20, 'g': 90, 'b': 180}]
+    sources = [(b['r'], b['g'], b['b']) for b in blocks]
+    compute_reference_matrices(4, 0.08, colors, n_targets=2, backing_layers=3)  # runs the one-time cost probe
+    calls = []
+    original = Color.map_to_nearest_color
+    monkeypatch.setattr(Color, "map_to_nearest_color", staticmethod(lambda *a: calls.append(1) or original(*a)))
+
+    first = image_processor._map_source_colors_to_blends(sources, colors, 4, 0.08, backing_layers=3)
+    second = map_color_blocks_to_blend_results(blocks, 0.08, 4, colors, backing_layers=3)
+    assert first == second
+    assert len(calls) == 1
+
+    image_processor._mapping_cache.clear()  # entries also leave with their matrix:
+    matrix, _ = compute_reference_matrices(4, 0.08, colors, n_targets=2, backing_layers=3)
+    image_processor._matrix_mappings(matrix)
+    assert id(matrix) in image_processor._mapping_cache
+    matrix_id = id(matrix)
+    from services.matrix_cache import clear_cache
+    clear_cache()
+    del matrix
+    gc.collect()
+    assert matrix_id not in image_processor._mapping_cache

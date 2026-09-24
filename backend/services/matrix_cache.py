@@ -11,7 +11,8 @@ cache exactly like named presets — no preset-name special casing.
 
 The cache is a small LRU: entries are pandas DataFrames whose size grows
 with the candidate count, so only the most recent configurations are
-retained.
+retained, within settings.matrix_cache_max_references in total (the newest
+entry is always kept).
 """
 from config.print_defaults import DEFAULT_BACKING_LAYERS
 import logging
@@ -20,6 +21,7 @@ from typing import Optional
 
 import pandas as pd
 
+from config.settings import settings
 from core.blend_color import Colors, colors_key
 from core import color_config as _color_config
 
@@ -86,7 +88,10 @@ def set_cached_matrices(
     key = _cache_key(colors, layer_count, layer_height, pruned, backing_suffix, background_rgb)
     _MATRIX_CACHE[key] = (ref_code_matrix, ref_rgb_matrix)
     _MATRIX_CACHE.move_to_end(key)
-    while len(_MATRIX_CACHE) > _MAX_ENTRIES:
+    while len(_MATRIX_CACHE) > 1 and (
+        len(_MATRIX_CACHE) > _MAX_ENTRIES
+        or sum(code.size for code, _ in _MATRIX_CACHE.values()) > settings.matrix_cache_max_references
+    ):
         _MATRIX_CACHE.popitem(last=False)
 
 
@@ -152,5 +157,6 @@ def get_cache_stats() -> dict:
     """Get cache statistics."""
     return {
         "size": len(_MATRIX_CACHE),
+        "references": sum(code.size for code, _ in _MATRIX_CACHE.values()),
         "keys": [repr(key) for key in _MATRIX_CACHE.keys()],
     }

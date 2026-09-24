@@ -72,3 +72,18 @@ def test_matching_representatives_equals_matching_every_code(preset, layers, hei
     got_codes, got_rgbs = Color.map_to_nearest_color(targets, *representatives)
     assert got_codes == expected_codes
     assert [list(v) for v in got_rgbs] == [list(v) for v in expected_rgbs]
+
+
+@pytest.mark.parametrize("source", [(62.0, 10.0, -35.0), (22.0, 30.0, 18.0), (18.0, 1.0, -2.0)])
+def test_chunked_distance_scoring_matches_one_pass(monkeypatch, source):
+    """Scoring references in slices bounds memory without changing any score
+    (covers the plain, dark-chromatic and dark-neutral metric branches)."""
+    import core.color_materials as materials
+
+    ref_lab = np.random.default_rng(7).uniform([0, -80, -80], [100, 80, 80], size=(5_000, 3))
+    monkeypatch.setattr(materials, "DISTANCE_CHUNK", 10**9)
+    one_pass = (Color.perceptual_distance(source, ref_lab), Color.perceptual_distance_raw(source, ref_lab))
+    monkeypatch.setattr(materials, "DISTANCE_CHUNK", 777)
+    chunked = (Color.perceptual_distance(source, ref_lab), Color.perceptual_distance_raw(source, ref_lab))
+    assert np.array_equal(one_pass[0], chunked[0])
+    assert np.array_equal(one_pass[1], chunked[1])

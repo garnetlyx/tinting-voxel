@@ -34,6 +34,9 @@ from services.vector_processor import finalize_vector_partition
 
 logger = logging.getLogger(__name__)
 
+# Decimal places (mm) of exported vertex coordinates: 1 nm.
+VERTEX_DECIMALS = 6
+
 
 def _boxes_to_trimesh(
     box_batches: list[list[BoxRange]],
@@ -44,7 +47,7 @@ def _boxes_to_trimesh(
     if box_count == 0:
         return trimesh.Trimesh()
 
-    vertices = np.empty((box_count * 8, 3), dtype=np.float32)
+    vertices = np.empty((box_count * 8, 3), dtype=np.float64)
     faces = np.empty((box_count * 12, 3), dtype=np.int64)
     local_faces = np.array([
         [0, 3, 1], [1, 3, 2],
@@ -59,12 +62,12 @@ def _boxes_to_trimesh(
     for batch in box_batches:
         if not batch:
             continue
-        coords = np.asarray(batch, dtype=np.float32)
+        coords = np.asarray(batch, dtype=np.float64)
         count = len(batch)
         x1, x2 = coords[:, 0, 0], coords[:, 0, 1]
         y1, y2 = coords[:, 1, 0], coords[:, 1, 1]
         z1, z2 = coords[:, 2, 0], coords[:, 2, 1]
-        batch_vertices = np.empty((count, 8, 3), dtype=np.float32)
+        batch_vertices = np.empty((count, 8, 3), dtype=np.float64)
         batch_vertices[:, 0] = np.column_stack((x1, y1, z1))
         batch_vertices[:, 1] = np.column_stack((x2, y1, z1))
         batch_vertices[:, 2] = np.column_stack((x2, y2, z1))
@@ -82,6 +85,10 @@ def _boxes_to_trimesh(
         box_offset += count
 
     box_batches.clear()
+    # The 3MF writer prints every coordinate at full repr precision; nanometre
+    # rounding keeps shared corners identical and roughly halves the text to
+    # format and compress (grid pitches like 500/1270 mm have 17 digits).
+    np.round(vertices, VERTEX_DECIMALS, out=vertices)
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
     mesh.merge_vertices()
 
