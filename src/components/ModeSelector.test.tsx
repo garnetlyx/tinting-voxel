@@ -10,16 +10,16 @@ describe('ModeSelector', () => {
     expect(screen.getByText('SVG')).toBeInTheDocument();
   });
 
-  it('highlights the active mode (pixel)', () => {
+  it('marks the active mode as pressed (pixel)', () => {
     render(<ModeSelector mode="pixel" onModeChange={() => {}} />);
-    const pixelBtn = screen.getByText('Pixel').closest('button')!;
-    expect(pixelBtn.className).toContain('border-purple-600');
+    expect(screen.getByText('Pixel').closest('button')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('SVG').closest('button')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('highlights the active mode (svg)', () => {
+  it('marks the active mode as pressed (svg)', () => {
     render(<ModeSelector mode="svg" onModeChange={() => {}} />);
-    const svgBtn = screen.getByText('SVG').closest('button')!;
-    expect(svgBtn.className).toContain('border-purple-600');
+    expect(screen.getByText('SVG').closest('button')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Pixel').closest('button')).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('calls onModeChange when clicking a mode button', async () => {

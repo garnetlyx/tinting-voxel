@@ -11,45 +11,42 @@ export const MappedBlendPalette: React.FC<MappedBlendPaletteProps> = ({ entries 
   if (entries.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-gray-800">{t('preview:mappedBlendPalette')}</h3>
-      </div>
-
-      <div className="space-y-2">
+    <section>
+      <h2 className="tv-heading mb-3">{t('preview:mappedBlendPalette')}</h2>
+      <div className="grid gap-x-6 sm:grid-cols-2 2xl:grid-cols-3">
         {entries.map((entry, index) => (
           <div
             key={`${entry.code}-${entry.sourceHex}-${index}`}
-            className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+            className="flex items-center justify-between gap-3 border-b border-rule py-2"
           >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex shrink-0 items-center">
                 <div
-                  className="h-6 w-6 rounded border border-gray-200"
+                  className="h-7 w-7 border border-ink/30"
                   style={{ backgroundColor: entry.sourceHex }}
                   title={t('preview:source', { hex: entry.sourceHex })}
                 />
-                <span className="text-xs text-gray-400">→</span>
+                <span className="px-1 text-xs text-ink-muted" aria-hidden="true">→</span>
                 <div
-                  className="h-6 w-6 rounded border border-gray-200"
+                  className="h-7 w-7 border border-ink/30"
                   style={{ backgroundColor: entry.hex }}
                   title={t('preview:printable', { hex: entry.hex })}
                 />
               </div>
-              <div>
-                <div className="text-sm font-medium text-gray-800">{entry.code}</div>
-                <div className="text-xs text-gray-500">
+              <div className="min-w-0">
+                <div className="truncate font-mono text-sm font-medium text-ink">{entry.code}</div>
+                <div className="truncate font-mono text-[11px] text-ink-muted">
                   {t('preview:mapping', { source: entry.sourceHex, target: entry.hex })}
                 </div>
               </div>
             </div>
-            <div className="text-right text-xs text-gray-500">
-              <div className="font-medium text-gray-700">{entry.pixelCount.toLocaleString()} px</div>
-              <div>{entry.pixelPercent.toFixed(1)}%</div>
+            <div className="shrink-0 text-right font-mono text-xs text-ink-muted">
+              <div className="text-ink">{entry.pixelPercent.toFixed(1)}%</div>
+              <div>{entry.pixelCount.toLocaleString()} px</div>
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 };

@@ -12,7 +12,7 @@ interface VectorColorListProps {
 export const VectorColorList: React.FC<VectorColorListProps> = ({ vectorResults }) => {
   const { t } = useTranslation();
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
       {vectorResults.map((result, index) => {
         const regionCount = result.regions.length;
         const holeCount = result.regions.reduce((sum, region) => sum + region.holes.length, 0);
@@ -20,20 +20,22 @@ export const VectorColorList: React.FC<VectorColorListProps> = ({ vectorResults 
         return (
         <div
           key={index}
-          className="border rounded-lg p-3 hover:shadow-lg transition-shadow"
+          className="rounded-sheet border border-rule bg-paper-raised p-1.5 transition-shadow hover:shadow-lift"
         >
           <div
-            className="w-full h-20 rounded-md mb-2"
+            className="mb-2 h-20 w-full rounded-[2px]"
             style={{ backgroundColor: `rgb(${result.color[0]},${result.color[1]},${result.color[2]})` }}
           />
-          <div className="text-xs text-gray-600 mb-1">
-            RGB({result.color[0]},{result.color[1]},{result.color[2]})
-          </div>
-          <div className="text-xs text-gray-500">
-            {t('preview:vertices', { count: result.polygon_points })}
-          </div>
-          <div className="text-xs text-gray-500">
-            {t('preview:regions', { count: regionCount })}{holeCount > 0 ? t('preview:holes', { count: holeCount }) : ''}
+          <div className="px-1.5 pb-1">
+            <div className="font-mono text-[11px] text-ink">
+              RGB({result.color[0]},{result.color[1]},{result.color[2]})
+            </div>
+            <div className="text-[11px] text-ink-muted">
+              {t('preview:vertices', { count: result.polygon_points })}
+            </div>
+            <div className="text-[11px] text-ink-muted">
+              {t('preview:regions', { count: regionCount })}{holeCount > 0 ? t('preview:holes', { count: holeCount }) : ''}
+            </div>
           </div>
         </div>
         );

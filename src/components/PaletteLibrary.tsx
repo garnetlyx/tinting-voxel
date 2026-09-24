@@ -6,7 +6,7 @@ import { useTranslation } from '../i18n';
  * Displays the supported filament configurations with color swatches.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2 } from 'lucide-react';
 import type { PaletteInfo, PaletteLibraryResponse, FilamentColorConfig } from '../api/types';
 import { getPaletteLibrary } from '../api/client';
 
@@ -70,14 +70,17 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
 
 
   return (
-    <div className="border border-gray-200 rounded-lg">
+    <div className="rounded-sheet border border-rule bg-paper-raised">
       <button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg flex items-center justify-between"
+        aria-expanded={isExpanded}
+        className="flex w-full items-center justify-between gap-3 rounded-sheet px-4 py-2.5 text-left text-sm font-semibold text-ink transition-colors hover:bg-paper-sunk"
       >
         <span>{t('palettes:paletteLibrary')}</span>
-        <span className="text-gray-400 text-xs">
+        <span className="flex items-center gap-1 text-xs font-normal text-ink-muted">
           {isExpanded ? t('common:hide') : t('palettes:browseCuratedPalettes')}
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
         </span>
       </button>
 
@@ -86,29 +89,29 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
           {/* Loading */}
           {loading && (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+              <Loader2 className="h-5 w-5 animate-spin text-ink" aria-hidden="true" />
             </div>
           )}
 
           {/* Error */}
           {error && (
-            <p className="text-red-500 text-sm">{localize(error)}</p>
+            <p className="text-sm text-signal-error">{localize(error)}</p>
           )}
 
           {/* Palette Grid */}
           {!loading && library && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+            <div className="tv-scroll grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
               {library.palettes.map(palette => (
                 <div
                   key={palette.id}
-                  className="border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-colors"
+                  className="rounded-sheet border border-rule bg-paper p-3 transition-colors hover:border-ink"
                 >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <h4 className="text-sm font-medium text-gray-800">{paletteText(`${palette.id}_name`, palette.name)}</h4>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-ink">{paletteText(`${palette.id}_name`, palette.name)}</h4>
                   </div>
 
                   {/* Color Swatches */}
-                  <div className="flex gap-1 mb-2">
+                  <div className="mb-2.5 flex gap-1">
                     {palette.colors.map((color, idx) => (
                       <div
                         key={idx}
@@ -116,10 +119,10 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                         title={t('common:colorEntry', { index: idx + 1, code: color.name[0]?.toUpperCase() ?? '?', hex: color.hex })}
                       >
                         <div
-                          className="w-6 h-6 rounded border border-gray-300"
+                          className="h-6 w-6 border border-ink/40"
                           style={{ backgroundColor: color.hex }}
                         />
-                        <span className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[40px]">
+                        <span className="mt-0.5 max-w-[40px] truncate font-mono text-[10px] text-ink-muted">
                           {color.name[0]?.toUpperCase() ?? String(idx + 1)}
                         </span>
                       </div>
@@ -129,7 +132,7 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
                   <button
                     onClick={() => handleApply(palette)}
                     disabled={disabled}
-                    className="w-full py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 transition-colors"
+                    className="tv-btn-outline tv-btn-sm w-full"
                   >{t('common:apply')}</button>
                 </div>
               ))}
@@ -137,7 +140,7 @@ export const PaletteLibrary: React.FC<PaletteLibraryProps> = ({
           )}
 
           {!loading && library && library.palettes.length === 0 && (
-            <p className="text-gray-500 text-sm text-center py-3">{t('palettes:noPalettesFound')}</p>
+            <p className="py-3 text-center text-sm text-ink-muted">{t('palettes:noPalettesFound')}</p>
           )}
         </div>
       )}

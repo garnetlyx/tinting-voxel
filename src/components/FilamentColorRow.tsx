@@ -27,19 +27,19 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
   const displayedTd = Array.isArray(td) ? Number((td.reduce((sum, value) => sum + value, 0) / td.length).toPrecision(4)) : td;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 border-b border-rule/60 pb-1.5 last:border-b-0">
       <div className="flex items-center gap-2">
         <input
           type="color"
           value={config.hex}
           onChange={(e) => onChange(index, { ...config, hex: e.target.value })}
-          className="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+          className="h-8 w-8 cursor-pointer rounded-[2px] border border-ink/50 bg-transparent p-0"
           title={t('filaments:pickColor')}
         />
-        <span className="flex-1 min-w-0 px-2 text-sm" title={t('filaments:label', { code: label })}>
+        <span className="min-w-0 flex-1 px-2 font-mono text-sm font-medium" title={t('filaments:label', { code: label })}>
           {label}
         </span>
-        <div className="w-36 flex items-center gap-1">
+        <div className="flex w-40 items-center gap-1">
           <input
             type="number"
             aria-label={t('filaments:tdEntry', { index: index + 1 })}
@@ -53,14 +53,14 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
             min={0}
             max={1000}
             step="any"
-            className="w-20 px-2 py-1 text-sm border rounded text-right border-gray-300"
+            className="w-24 rounded-sheet border border-rule-strong bg-paper-raised px-2 py-1 text-right font-mono text-sm focus:border-ink focus:outline-none"
           />
           <button
             type="button"
             onClick={() => setShowChannels((visible) => !visible)}
             aria-expanded={showChannels}
             aria-controls={channelsId}
-            className="px-1 py-1 text-xs text-purple-600 hover:text-purple-800 rounded"
+            className="rounded-sheet px-1.5 py-1 font-mono text-xs text-ink-soft transition-colors hover:bg-paper-sunk hover:text-ink aria-expanded:bg-ink aria-expanded:text-paper-raised"
           >
             {t('filaments:rgb')}
           </button>
@@ -69,14 +69,14 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
           type="button"
           onClick={() => onRemove(index)}
           disabled={!canRemove}
-          className="p-1 rounded hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="rounded-sheet p-1 text-ink-muted transition-colors hover:bg-signal-error/10 hover:text-signal-error disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
           title={canRemove ? t('filaments:removeColor') : t('filaments:minimum4ColorsRequired')}
         >
-          <Trash2 className="w-4 h-4 text-red-500" />
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
       {showChannels && (
-        <div id={channelsId} className="flex justify-end gap-2 pr-8 text-xs text-gray-500">
+        <div id={channelsId} className="flex justify-end gap-2 pr-8 font-mono text-xs text-ink-muted">
           {channels.map((value, channel) => (
             <label key={channel} className="flex items-center gap-1">
               {'RGB'[channel]}
@@ -95,7 +95,7 @@ export const FilamentColorRow: React.FC<FilamentColorRowProps> = ({
                     onChange(index, { ...config, transmission_distance: next });
                   }
                 }}
-                className="w-16 rounded border border-gray-300 px-1 py-1 text-right"
+                className="w-16 rounded-sheet border border-rule-strong bg-paper-raised px-1 py-1 text-right focus:border-ink focus:outline-none"
               />
             </label>
           ))}

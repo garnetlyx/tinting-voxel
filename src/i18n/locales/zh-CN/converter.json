@@ -17,5 +17,15 @@
   "title": "Tinting Voxel · 图片转 STL 混色工具",
   "serverStarting": "服务正在启动，请稍候…",
   "simulatedPrint": "打印效果模拟",
-  "description": "将图片转换为分层的彩色 3D 打印模型，预览耗材混色效果，并导出可打印的 STL 或 3MF 文件。"
+  "description": "将图片转换为分层的彩色 3D 打印模型，预览耗材混色效果，并导出可打印的 STL 或 3MF 文件。",
+  "tagline": "图片转 STL 混色工具",
+  "heroTitle": "层层叠色，打印全彩。",
+  "settings": "打印参数",
+  "workspace": "工作区",
+  "sectionColor": "颜色",
+  "sectionLayers": "分层与尺寸",
+  "sectionBacking": "背衬",
+  "sectionFilaments": "耗材",
+  "sectionLibrary": "预设库",
+  "exportTitle": "导出打印文件"
 }

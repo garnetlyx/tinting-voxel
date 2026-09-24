@@ -137,7 +137,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-medium text-gray-700">{t('filaments:savedPresets')}</h4>
+      <h3 className="text-sm font-semibold text-ink">{t('filaments:savedPresets')}</h3>
 
       {/* Save current config */}
       <div className="flex gap-2">
@@ -148,14 +148,14 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
           onKeyDown={handleSaveKeyDown}
           placeholder={t('filaments:presetName')}
           disabled={disabled || !isConfigValid}
-          className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="tv-input min-w-0 flex-1 !py-1.5"
         />
         <button
           onClick={handleSave}
           disabled={disabled || !isConfigValid || !saveName.trim()}
-          className="flex items-center gap-1 text-sm px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="tv-btn-primary tv-btn-sm !px-3"
         >
-          <Save className="w-3.5 h-3.5" />{t('common:save')}</button>
+          <Save className="h-3.5 w-3.5" aria-hidden="true" />{t('common:save')}</button>
       </div>
 
       {/* Preset list */}
@@ -164,7 +164,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
           {presets.map(preset => (
             <div
               key={preset.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-100 group"
+              className="group flex items-center gap-2 rounded-sheet px-2 py-1.5 hover:bg-paper-sunk"
             >
               {editingId === preset.id ? (
                 <>
@@ -174,19 +174,21 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
                     onChange={e => setEditName(e.target.value)}
                     onKeyDown={handleRenameKeyDown}
                     autoFocus
-                    className="flex-1 text-sm border border-purple-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                    className="min-w-0 flex-1 rounded-sheet border border-ink bg-paper-raised px-1.5 py-0.5 text-sm focus:outline-none"
                   />
                   <button
                     onClick={handleConfirmRename}
-                    className="text-green-600 hover:text-green-800 p-0.5"
+                    aria-label={t('common:save')}
+                    className="p-0.5 text-signal-ok hover:text-ink"
                   >
-                    <Check className="w-3.5 h-3.5" />
+                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                   <button
                     onClick={handleCancelRename}
-                    className="text-gray-400 hover:text-gray-600 p-0.5"
+                    aria-label={t('common:cancel')}
+                    className="p-0.5 text-ink-muted hover:text-ink"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </>
               ) : (
@@ -196,12 +198,12 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
                     {preset.colors.slice(0, 6).map((c, i) => (
                       <span
                         key={i}
-                        className="w-3 h-3 rounded-sm border border-gray-200"
+                        className="h-3 w-3 border border-ink/40"
                         style={{ backgroundColor: c.hex }}
                       />
                     ))}
                     {preset.colors.length > 6 && (
-                      <span className="text-[10px] text-gray-400">+{preset.colors.length - 6}</span>
+                      <span className="font-mono text-[10px] text-ink-muted">+{preset.colors.length - 6}</span>
                     )}
                   </div>
 
@@ -209,20 +211,20 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
                   <button
                     onClick={() => onLoadPreset(preset.colors)}
                     disabled={disabled}
-                    className="flex-1 text-left text-sm text-gray-700 hover:text-purple-700 truncate disabled:cursor-not-allowed"
+                    className="flex-1 truncate text-left text-sm text-ink-soft hover:text-ink hover:underline disabled:cursor-not-allowed"
                     title={t('filaments:loadPreset', { name: preset.name, count: preset.colors.length })}
                   >
                     {preset.name}
                   </button>
 
                   {/* Color count */}
-                  <span className="text-[10px] text-gray-400">{t('filaments:compactCount', { count: preset.colors.length })}</span>
+                  <span className="font-mono text-[10px] text-ink-muted">{t('filaments:compactCount', { count: preset.colors.length })}</span>
 
                   {/* Overwrite */}
                   <button
                     onClick={() => onUpdatePreset(preset.id, preset.name, currentColors)}
                     disabled={disabled || !isConfigValid}
-                    className="opacity-0 group-hover:opacity-100 text-blue-500 hover:text-blue-700 disabled:text-gray-300 p-0.5 transition-opacity"
+                    className="p-0.5 text-ink-muted opacity-0 transition-opacity hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 disabled:text-rule-strong"
                     title={t('filaments:overwriteWithCurrentConfig')}
                   >
                     <Save className="w-3 h-3" />
@@ -232,7 +234,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
                   <button
                     onClick={() => handleStartRename(preset)}
                     disabled={disabled}
-                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 disabled:text-gray-300 p-0.5 transition-opacity"
+                    className="p-0.5 text-ink-muted opacity-0 transition-opacity hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 disabled:text-rule-strong"
                     title={t('filaments:rename')}
                   >
                     <Edit2 className="w-3 h-3" />
@@ -242,7 +244,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
                   <button
                     onClick={() => onDeletePreset(preset.id)}
                     disabled={disabled}
-                    className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 disabled:text-gray-300 p-0.5 transition-opacity"
+                    className="p-0.5 text-ink-muted opacity-0 transition-opacity hover:text-signal-error focus-visible:opacity-100 group-hover:opacity-100 disabled:text-rule-strong"
                     title={t('common:delete')}
                   >
                     <Trash2 className="w-3 h-3" />
@@ -255,23 +257,23 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
       )}
 
       {presets.length === 0 && (
-        <p className="text-xs text-gray-400 italic">{t('filaments:noSavedPresetsYet')}</p>
+        <p className="text-xs italic text-ink-muted">{t('filaments:noSavedPresetsYet')}</p>
       )}
 
       {/* Import / Export */}
-      <div className="flex gap-2 pt-1 border-t border-gray-200">
+      <div className="flex gap-4 border-t border-rule pt-2">
         <button
           onClick={handleExport}
           disabled={disabled || presets.length === 0}
-          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="tv-link"
         >
-          <Download className="w-3 h-3" />{t('filaments:export')}</button>
+          <Download className="h-3 w-3" aria-hidden="true" />{t('filaments:export')}</button>
         <button
           onClick={handleImportClick}
           disabled={disabled}
-          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="tv-link"
         >
-          <Upload className="w-3 h-3" />{t('filaments:import')}</button>
+          <Upload className="h-3 w-3" aria-hidden="true" />{t('filaments:import')}</button>
         <input
           ref={fileInputRef}
           type="file"
@@ -283,7 +285,7 @@ export const FilamentPresetManager: React.FC<FilamentPresetManagerProps> = ({
 
       {/* Import feedback */}
       {importMessage && (
-        <p className={`text-xs ${importMessageType === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+        <p className={`text-xs ${importMessageType === 'success' ? 'text-signal-ok' : 'text-signal-error'}`}>
           {localize(importMessage)}
         </p>
       )}

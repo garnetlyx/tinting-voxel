@@ -60,7 +60,7 @@ tinting-voxel/
 │   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
 │   │   └── vector_processor.py   # Vector/contour processing
 │   ├── config/           # Configuration (settings, constants, logging_setup)
-│   └── tests/            # Test suite (~760 tests)
+│   └── tests/            # Test suite (~770 tests)
 │       ├── unit/             # Unit tests
 │       ├── integration/      # Integration tests
 │       ├── performance/      # Performance tests
@@ -172,11 +172,18 @@ docker compose up --build  # Build and run
 - **TypeScript**: Strict mode, ESLint rules
 - **Commits**: Conventional commits (`feat:`, `fix:`, `refactor:`)
 - **Comments**: English only, use `TODO:`, `FIXME:`, `HACK:`
+- **Styling**: print-shop theme. Color tokens are CSS variables in
+  `src/index.css`, mapped to Tailwind names (`paper`, `ink`, `rule`, `cyan`,
+  `magenta`, `yellow`, `signal-*`) in `tailwind.config.cjs`; shared `tv-*`
+  component classes (buttons, fields, sliders, segmented choices) live in the
+  same stylesheet. Fonts are self-hosted with @fontsource (Archivo variable
+  for text and display, DM Mono for values). Selected choices expose
+  `aria-pressed`; sliders are named by their labels (`RangeField`).
 
 ## Testing
 
 ```bash
-# Backend (~760 tests)
+# Backend (~770 tests)
 cd backend && pytest -v
 
 # Frontend (Vitest, 26 test files)
@@ -214,7 +221,11 @@ budget, translucent sets use composition pruning and opaque sets are rejected,
 as are pruned searches estimated over `stack_search_limit_seconds`.
 `/api/v2/layer-limit` reports the largest layer count whose search fits
 `layer_limit_budget_share` of that limit at `max_target_colors` targets, and the
-layer slider stops there.
+layer slider stops there. Custom sets at that limit can keep millions of
+distinct colors, so CIEDE2000 scoring runs in `DISTANCE_CHUNK` slices
+(`core/color_materials.py`), the matrix cache is bounded by
+`matrix_cache_max_references`, and mapping results are cached per reference
+matrix so exports reuse the mapping processing computed.
 
 Images larger than the model grid budget (`max_model_cells`, 4096 px per side)
 are resampled at their physical size, snapping to whole detail-width cells when

@@ -13,6 +13,16 @@ interface ImageComparisonProps {
   processedLabel?: string;
 }
 
+const Figure: React.FC<{ letter: string; caption: string; children: React.ReactNode }> = ({ letter, caption, children }) => (
+  <figure className="min-w-0">
+    <div className="overflow-hidden rounded-sheet border border-rule bg-paper">{children}</div>
+    <figcaption className="mt-2 flex items-baseline gap-2 text-sm">
+      <span className="font-mono text-xs text-ink-muted" aria-hidden="true">{letter}</span>
+      <span className="font-medium text-ink-soft">{caption}</span>
+    </figcaption>
+  </figure>
+);
+
 export const ImageComparison: React.FC<ImageComparisonProps> = ({
   originalImage,
   intermediateImageUrl = null,
@@ -23,53 +33,38 @@ export const ImageComparison: React.FC<ImageComparisonProps> = ({
 }) => {
   const { t } = useTranslation();
   const showIntermediate = Boolean(intermediateImageUrl);
-  const gridClassName = showIntermediate ? 'grid md:grid-cols-3 gap-6' : 'grid md:grid-cols-2 gap-6';
+  const gridClassName = showIntermediate ? 'grid gap-5 md:grid-cols-3' : 'grid gap-5 md:grid-cols-2';
 
   return (
-    <div className="mb-8">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">{t('preview:beforeAndAfterComparison')}</h2>
+    <section>
+      <h2 className="tv-heading mb-4 text-xl">{t('preview:beforeAndAfterComparison')}</h2>
       <div className={gridClassName}>
-        <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-2">{t('preview:originalImage')}</h3>
-          <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
-            {originalImage && (
-              <img
-                src={originalImage.src}
-                alt={t('preview:original')}
-                className="w-full h-auto"
-              />
-            )}
-          </div>
-        </div>
+        <Figure letter="A" caption={t('preview:originalImage')}>
+          {originalImage && (
+            <img src={originalImage.src} alt={t('preview:original')} className="h-auto w-full" />
+          )}
+        </Figure>
         {showIntermediate && (
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">
-              {t('preview:comparisonLabel', { label: intermediateLabel ?? t('preview:intermediate'), count: colorCount })}
-            </h3>
-            <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
-              <img
-                src={intermediateImageUrl ?? undefined}
-                alt={intermediateLabel ?? t('preview:intermediate')}
-                className="w-full h-auto"
-              />
-            </div>
-          </div>
+          <Figure
+            letter="B"
+            caption={t('preview:comparisonLabel', { label: intermediateLabel ?? t('preview:intermediate'), count: colorCount })}
+          >
+            <img
+              src={intermediateImageUrl ?? undefined}
+              alt={intermediateLabel ?? t('preview:intermediate')}
+              className="h-auto w-full"
+            />
+          </Figure>
         )}
-        <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-2">
-            {t('preview:comparisonLabel', { label: processedLabel ?? t('preview:processed'), count: colorCount })}
-          </h3>
-          <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
-            {processedImageUrl && (
-              <img
-                src={processedImageUrl}
-                alt={t('preview:processed')}
-                className="w-full h-auto"
-              />
-            )}
-          </div>
-        </div>
+        <Figure
+          letter={showIntermediate ? 'C' : 'B'}
+          caption={t('preview:comparisonLabel', { label: processedLabel ?? t('preview:processed'), count: colorCount })}
+        >
+          {processedImageUrl && (
+            <img src={processedImageUrl} alt={t('preview:processed')} className="h-auto w-full" />
+          )}
+        </Figure>
       </div>
-    </div>
+    </section>
   );
 };

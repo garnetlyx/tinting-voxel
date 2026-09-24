@@ -246,49 +246,51 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
   const hasEdits = resizePercent !== 100 || (isCropping && cropRegion !== null);
 
   return (
-    <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-          <Crop className="w-4 h-4" />{t('editor:imageEditor')}</h3>
-        <div className="flex gap-2">
+    <section className="space-y-4 rounded-sheet border border-rule bg-paper p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="tv-heading flex items-center gap-2">
+          <Crop className="h-4 w-4" aria-hidden="true" />{t('editor:imageEditor')}</h3>
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={handleReset}
             disabled={disabled || !hasEdits}
-            className="flex items-center gap-1 text-xs px-2 py-1 text-gray-500 hover:text-gray-700 disabled:text-gray-300 transition-colors"
+            className="tv-btn-ghost tv-btn-sm"
           >
-            <RotateCcw className="w-3 h-3" />{t('common:reset')}</button>
+            <RotateCcw className="h-3 w-3" aria-hidden="true" />{t('common:reset')}</button>
           <button
             onClick={onCancel}
             disabled={disabled}
-            className="text-xs px-3 py-1 text-gray-500 hover:text-gray-700 border border-gray-300 rounded transition-colors"
+            className="tv-btn-outline tv-btn-sm"
           >{t('common:cancel')}</button>
           <button
             onClick={handleApply}
             disabled={disabled}
-            className="flex items-center gap-1 text-xs px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-300 transition-colors"
+            className="tv-btn-primary tv-btn-sm !px-3"
           >
-            <Check className="w-3 h-3" />{t('editor:applyProcess')}</button>
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />{t('editor:applyProcess')}</button>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-4 text-sm">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         <div className="flex items-center gap-2">
-          <Maximize2 className="w-3.5 h-3.5 text-gray-500" />
-          <label className="text-gray-600">{t('editor:resize')}</label>
+          <Maximize2 className="h-3.5 w-3.5 text-ink-muted" aria-hidden="true" />
+          <label htmlFor="image-resize" className="text-ink-soft">{t('editor:resize')}</label>
           <input
+            id="image-resize"
             type="range"
             min="10"
             max="100"
             value={resizePercent}
             onChange={(e) => setResizePercent(parseInt(e.target.value))}
             disabled={disabled}
-            className="w-24"
+            className="tv-range w-28"
+            style={{ '--fill': `${((resizePercent - 10) / 90) * 100}%` } as React.CSSProperties}
           />
-          <span className="text-gray-700 w-10 text-right">{resizePercent}%</span>
+          <span className="tv-value w-10 text-right">{resizePercent}%</span>
         </div>
 
-        <span className="text-gray-300">|</span>
+        <span className="hidden h-4 w-px bg-rule-strong sm:block" aria-hidden="true" />
 
         <button
           onClick={() => {
@@ -296,17 +298,14 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
             if (isCropping) setCropRegion(null);
           }}
           disabled={disabled}
-          className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors ${
-            isCropping
-              ? 'bg-purple-100 text-purple-700 border border-purple-300'
-              : 'text-gray-600 hover:bg-gray-200 border border-transparent'
-          }`}
+          aria-pressed={isCropping}
+          className="tv-btn-outline tv-btn-sm aria-pressed:bg-ink aria-pressed:text-paper-raised"
         >
-          <Crop className="w-3 h-3" />
+          <Crop className="h-3 w-3" aria-hidden="true" />
           {isCropping ? t('editor:cropping') : t('editor:crop')}
         </button>
 
-        <span className="text-xs text-gray-400 ml-auto">
+        <span className="ml-auto font-mono text-xs text-ink-muted">
           {effectiveWidth} x {effectiveHeight} px
           {cropRegion && isCropping && (
             <> → {Math.round(cropRegion.width * image.width / effectiveWidth)} x {Math.round(cropRegion.height * image.height / effectiveHeight)} px</>
@@ -317,7 +316,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
       {/* Canvas */}
       <div
         ref={containerRef}
-        className="flex justify-center bg-white rounded border border-gray-200 p-2 overflow-hidden"
+        className="flex justify-center overflow-hidden rounded-sheet border border-rule bg-paper-raised p-2"
       >
         <canvas
           ref={canvasRef}
@@ -335,8 +334,8 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
       </div>
 
       {isCropping && !cropRegion && (
-        <p className="text-xs text-gray-400 text-center">{t('editor:clickAndDragOnTheImageToSelectA')}</p>
+        <p className="tv-help text-center">{t('editor:clickAndDragOnTheImageToSelectA')}</p>
       )}
-    </div>
+    </section>
   );
 };

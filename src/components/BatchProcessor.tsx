@@ -161,7 +161,7 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
   return (
     <div className="space-y-4">
       {/* File Upload Area */}
-      <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-purple-400 hover:bg-purple-50 transition-all">
+      <div className="rounded-sheet border-2 border-dashed border-rule-strong p-6 transition-colors hover:border-ink hover:bg-paper-sunk/60">
         <input
           ref={fileInputRef}
           type="file"
@@ -173,45 +173,45 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={processing || downloading}
-          className="w-full flex flex-col items-center gap-2 text-gray-600 hover:text-purple-600 disabled:opacity-50"
+          className="flex w-full flex-col items-center gap-2 text-ink disabled:opacity-50"
         >
-          <Upload className="w-8 h-8" />
-          <span className="font-medium">{t('batch:selectImages', { max: MAX_FILES })}</span>
-          <span className="text-sm text-gray-400">PNG, JPEG, GIF, WebP, BMP</span>
+          <Upload className="h-7 w-7" aria-hidden="true" />
+          <span className="font-semibold">{t('batch:selectImages', { max: MAX_FILES })}</span>
+          <span className="font-mono text-xs text-ink-muted">PNG, JPEG, GIF, WebP, BMP</span>
         </button>
       </div>
 
       {/* File List */}
       {files.length > 0 && (
-        <div className="bg-gray-50 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-gray-700">
+        <div className="rounded-sheet border border-rule bg-paper p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-semibold text-ink">
               {t('batch:selected', { count: files.length })}
             </h3>
             <button
               onClick={clearAll}
               disabled={processing || downloading}
-              className="text-sm text-red-500 hover:text-red-700 disabled:opacity-50"
+              className="tv-link hover:!text-signal-error"
             >{t('batch:clearAll')}</button>
           </div>
-          <div className="space-y-1 max-h-48 overflow-y-auto">
+          <div className="tv-scroll max-h-48 space-y-1 overflow-y-auto">
             {files.map((file, idx) => {
               const result = results?.results[idx];
               return (
-                <div key={`${file.name}-${idx}`} className="flex items-center justify-between px-3 py-1.5 bg-white rounded text-sm">
+                <div key={`${file.name}-${idx}`} className="flex items-center justify-between rounded-sheet border border-rule/70 bg-paper-raised px-3 py-1.5 text-sm">
                   <div className="flex items-center gap-2 min-w-0">
                     {result && (
                       result.status === 'success'
-                        ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                        : <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        ? <CheckCircle className="h-4 w-4 flex-shrink-0 text-signal-ok" aria-hidden="true" />
+                        : <AlertCircle className="h-4 w-4 flex-shrink-0 text-signal-error" aria-hidden="true" />
                     )}
                     <span className="truncate">{file.name}</span>
-                    <span className="text-gray-400 flex-shrink-0">
+                    <span className="flex-shrink-0 font-mono text-xs text-ink-muted">
                       ({(file.size / 1024).toFixed(1)} KB)
                     </span>
                   </div>
                   {result?.status === 'error' && (
-                    <span className="text-red-500 text-xs truncate mx-2 max-w-[200px]" title={localize(result.error)}>
+                    <span className="mx-2 max-w-[200px] truncate text-xs text-signal-error" title={localize(result.error)}>
                       {localize(result.error)}
                     </span>
                   )}
@@ -219,9 +219,9 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
                     aria-label={t('common:removeFile', { name: file.name })}
                     onClick={() => removeFile(idx)}
                     disabled={processing || downloading}
-                    className="text-gray-400 hover:text-red-500 disabled:opacity-50 flex-shrink-0"
+                    className="flex-shrink-0 text-ink-muted hover:text-signal-error disabled:opacity-50"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               );
@@ -232,19 +232,19 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+        <div role="alert" className="rounded-sheet border border-signal-error/30 border-l-4 border-l-signal-error bg-signal-error/5 p-3 text-sm text-signal-error">
           {localize(error)}
         </div>
       )}
 
       {/* Results Summary */}
       {results && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <h3 className="font-medium text-green-800 mb-1">{t('batch:batchProcessingComplete')}</h3>
-          <p className="text-sm text-green-700">
+        <div role="status" className="rounded-sheet border border-signal-ok/30 border-l-4 border-l-signal-ok bg-signal-ok/5 p-4">
+          <h3 className="mb-1 font-semibold text-signal-ok">{t('batch:batchProcessingComplete')}</h3>
+          <p className="text-sm text-ink-soft">
             {t('batch:summary', { success: results.successCount, total: results.totalImages })}
             {results.errorCount > 0 && (
-              <span className="text-red-600">{' '}{t('batch:failed', { count: results.errorCount })}</span>
+              <span className="text-signal-error">{' '}{t('batch:failed', { count: results.errorCount })}</span>
             )}
           </p>
         </div>
@@ -252,15 +252,15 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
 
       {/* Action Buttons */}
       {files.length > 0 && (
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <button
             onClick={handleProcess}
             disabled={processing || downloading || files.length === 0}
-            className="flex-1 py-2.5 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+            className="tv-btn-outline flex-1 !py-2.5"
           >
             {processing ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />{t('common:processing')}</>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />{t('common:processing')}</>
             ) : (
               t('batch:previewBatch')
             )}
@@ -268,14 +268,14 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
           <button
             onClick={handleDownloadSTL}
             disabled={processing || downloading || files.length === 0}
-            className="flex-1 py-2.5 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+            className="tv-btn-primary flex-1 !py-2.5"
           >
             {downloading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />{t('batch:generatingStls')}</>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />{t('batch:generatingStls')}</>
             ) : (
               <>
-                <Download className="w-4 h-4" />{t('batch:downloadAllStls')}</>
+                <Download className="h-4 w-4" aria-hidden="true" />{t('batch:downloadAllStls')}</>
             )}
           </button>
         </div>

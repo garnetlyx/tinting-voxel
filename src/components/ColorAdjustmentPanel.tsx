@@ -83,26 +83,26 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
   const totalPixels = colorBlocks.reduce((sum, b) => sum + b.count, 0);
 
   return (
-    <div className="mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-800">
+    <section>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="tv-heading text-xl">
           {t('preview:colorBlocks', { count: colorBlocks.length })}
         </h2>
         {mergeSource !== null && (
-          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg">
-            <Merge className="w-4 h-4" />
+          <div className="flex items-center gap-2 rounded-sheet border border-magenta/40 bg-magenta/5 px-3 py-1.5 text-sm text-magenta-deep">
+            <Merge className="h-4 w-4" aria-hidden="true" />
             <span>{t('preview:selectTargetColorToMergeInto')}</span>
             <button
               aria-label={t('common:cancel')} onClick={handleCancelMerge}
-              className="ml-1 p-0.5 hover:bg-blue-100 rounded"
+              className="ml-1 rounded-sheet p-0.5 hover:bg-magenta/10"
             >
-              <X className="w-4 h-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
         {colorBlocks.map((color, index) => {
           const isSelected = selectedIndex === index;
           const isMergeSource = mergeSource === index;
@@ -122,18 +122,18 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
               aria-pressed={isSelected}
               onClick={() => handleSelect(index)}
               onKeyDown={(e) => handleKeyDown(e, index)}
-              className={`border rounded-lg p-3 transition-all cursor-pointer ${
+              className={`cursor-pointer rounded-sheet border bg-paper-raised p-1.5 transition-all ${
                 isMergeSource
-                  ? 'border-blue-500 ring-2 ring-blue-300 opacity-60'
+                  ? 'border-magenta opacity-60 ring-2 ring-magenta/40'
                   : isMergeTarget
-                    ? 'border-blue-400 hover:border-blue-500 hover:ring-2 hover:ring-blue-300'
+                    ? 'border-magenta/50 hover:border-magenta hover:ring-2 hover:ring-magenta/30'
                     : isSelected
-                      ? 'border-purple-500 ring-2 ring-purple-300 shadow-lg'
-                      : 'border-gray-200 hover:shadow-lg hover:border-gray-300'
+                      ? 'border-ink shadow-lift ring-1 ring-ink'
+                      : 'border-rule hover:border-ink/60 hover:shadow-lift'
               }`}
             >
               {/* Color swatch with inline color picker */}
-              <div className="relative w-full h-20 rounded-md mb-2 overflow-hidden">
+              <div className="relative mb-2 h-20 w-full overflow-hidden rounded-[2px]">
                 <div
                   className="w-full h-full"
                   style={{ backgroundColor: `rgb(${color.r},${color.g},${color.b})` }}
@@ -151,35 +151,37 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
               </div>
 
               {/* Color info */}
-              <div className="text-xs text-gray-600 mb-0.5 font-mono">
-                {color.hex.toUpperCase()}
-              </div>
-              <div className="text-xs text-gray-500 mb-0.5">
-                RGB({color.r},{color.g},{color.b})
-              </div>
-              <div className="text-xs text-gray-400">
-                {t('preview:pixelShare', { count: color.count, percentage })}
+              <div className="px-1.5 pb-1">
+                <div className="font-mono text-sm font-medium text-ink">
+                  {color.hex.toUpperCase()}
+                </div>
+                <div className="font-mono text-[11px] text-ink-muted">
+                  RGB({color.r},{color.g},{color.b})
+                </div>
+                <div className="mt-0.5 text-[11px] text-ink-muted">
+                  {t('preview:pixelShare', { count: color.count, percentage })}
+                </div>
               </div>
 
               {/* Action buttons (visible when selected) */}
               {isSelected && !isMergeSource && (
                 <div
-                  className="flex gap-1 mt-2 pt-2 border-t border-gray-100"
+                  className="mt-1.5 flex gap-1 border-t border-rule pt-1.5"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     onClick={() => handleStartMerge(index)}
-                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                    className="tv-btn-ghost tv-btn-sm flex-1 !px-1"
                     title={t('preview:mergeIntoAnotherColor')}
                   >
-                    <Merge className="w-3 h-3" />{t('preview:merge')}</button>
+                    <Merge className="h-3 w-3" aria-hidden="true" />{t('preview:merge')}</button>
                   {colorBlocks.length > 1 && (
                     <button
                       onClick={() => handleDelete(index)}
-                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                      className="tv-btn-ghost tv-btn-sm flex-1 !px-1 hover:!text-signal-error"
                       title={t('preview:deleteAndMergeIntoNearestColor')}
                     >
-                      <Trash2 className="w-3 h-3" />{t('common:delete')}</button>
+                      <Trash2 className="h-3 w-3" aria-hidden="true" />{t('common:delete')}</button>
                   )}
                 </div>
               )}
@@ -187,7 +189,6 @@ export const ColorAdjustmentPanel: React.FC<ColorAdjustmentPanelProps> = ({
           );
         })}
       </div>
-
-    </div>
+    </section>
   );
 };

@@ -10,7 +10,7 @@ export function BugReportButton({ context }: { context: ConverterBugReportState 
   return <>
     <button
       type="button"
-      className="fixed right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-purple-200 bg-white text-purple-700 shadow-lg hover:bg-purple-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-600"
+      className="fixed right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-ink bg-paper-raised text-ink shadow-lift transition-colors hover:bg-ink hover:text-paper-raised"
       style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
       aria-label={t('feedback:reportABug')}
       title={t('feedback:reportABug')}

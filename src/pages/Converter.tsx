@@ -10,6 +10,8 @@ import { useParamSearch } from '../hooks/useParamSearch';
 import { useBackendReady } from '../hooks/useBackendReady';
 import {
   BugReportButton,
+  InkStrip,
+  RailSection,
   ErrorMessage,
   LoadingSpinner,
   ImageUploader,
@@ -128,272 +130,299 @@ const Converter: React.FC = () => {
   const backendReady = useBackendReady();
   const paramSearch = useParamSearch();
   const [paramSearchOpen, setParamSearchOpen] = useState(false);
+  const blocked = !backendReady || filamentCatalogLoading || !!filamentCatalogError;
+  const emptyStage = !image && !isEditing && !processing && !hasResults;
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
-      <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto">
-        <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
-          {/* Header */}
-          <div className="flex flex-col gap-3 mb-8 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-xl sm:text-3xl font-bold text-gray-800 flex items-center gap-3 min-w-0 flex-1">
-              <img src="/brand.svg" alt="" width={32} height={32} className="w-6 h-6 sm:w-8 sm:h-8 shrink-0" />{t('converter:title')}</h1>
-            <div className="flex shrink-0 items-center justify-end gap-2">
+    <div className="min-h-screen">
+      <header className="border-b border-ink/15 bg-paper/90 backdrop-blur-sm lg:sticky lg:top-0 lg:z-30">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:px-8">
+          <img src="/brand.svg" alt="" width={40} height={40} className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
+          <h1 className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-3">
+            <span className="tv-display whitespace-nowrap text-[1.5rem] sm:text-[2.15rem]">Tinting Voxel</span>
+            <span className="sr-only truncate text-sm text-ink-muted sm:not-sr-only">{t('converter:tagline')}</span>
+          </h1>
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-4">
+            <InkStrip colors={filamentColors} className="hidden md:flex" />
             <LanguageSelector />
             <button
+              type="button"
               onClick={() => setShowSettings(!showSettings)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-expanded={showSettings}
+              aria-controls="print-settings"
+              className="tv-btn-ghost !p-2 aria-expanded:text-ink"
               title={showSettings ? t('converter:hideSettingsSidebar') : t('converter:showSettingsSidebar')}
             >
-              <Settings className={`w-6 h-6 ${showSettings ? "text-purple-600" : "text-gray-600"}`} />
+              <Settings className="h-5 w-5" />
             </button>
-            </div>
           </div>
+        </div>
+      </header>
 
-          {/* Backend warming-up banner */}
-          {!backendReady && (
-            <div className="mb-6 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
-              <Loader2 className="w-5 h-5 animate-spin shrink-0" />
-              <span className="text-sm font-medium">{t('converter:serverStarting')}</span>
-            </div>
-          )}
+      <main className="mx-auto max-w-[1600px] px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+        {/* Backend warming-up banner */}
+        {!backendReady && (
+          <div role="status" className="mb-6 flex items-center gap-3 rounded-sheet border border-signal-warn/30 border-l-4 border-l-signal-warn bg-signal-warn/5 px-4 py-3 text-signal-warn">
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden="true" />
+            <span className="text-sm font-medium">{t('converter:serverStarting')}</span>
+          </div>
+        )}
 
-          {filamentCatalogLoading && backendReady && (
-            <div role="status" className="mb-6 flex items-center gap-3 text-gray-600">
-              <Loader2 className="w-5 h-5 animate-spin" />{t('filaments:loadingPresets')}
-            </div>
-          )}
-          {filamentCatalogError && (
-            <div role="alert" className="mb-6 flex items-center gap-3 text-red-700">
-              {t('filaments:loadPresetsFailed')}
-              <button type="button" onClick={reloadFilamentCatalog} className="underline">{t('filaments:retry')}</button>
-            </div>
-          )}
-          <div inert={!backendReady || filamentCatalogLoading || !!filamentCatalogError} className={`grid grid-cols-1 xl:grid-cols-12 gap-8 ${!backendReady || filamentCatalogLoading || filamentCatalogError ? 'pointer-events-none opacity-50' : ''}`}>
+        {filamentCatalogLoading && backendReady && (
+          <div role="status" className="mb-6 flex items-center gap-3 text-sm text-ink-muted">
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />{t('filaments:loadingPresets')}
+          </div>
+        )}
+        {filamentCatalogError && (
+          <div role="alert" className="mb-6 flex items-center gap-3 rounded-sheet border border-signal-error/30 border-l-4 border-l-signal-error bg-signal-error/5 px-4 py-3 text-sm text-signal-error">
+            {t('filaments:loadPresetsFailed')}
+            <button type="button" onClick={reloadFilamentCatalog} className="font-semibold underline underline-offset-4">{t('filaments:retry')}</button>
+          </div>
+        )}
 
-            {/* Left Sidebar: Parameter Panel */}
-            {showSettings && (
-              <div className="xl:col-span-4 space-y-6">
-                <ParameterPanel
-                  mode={mode}
-                  onModeChange={setMode}
-                  maxColors={maxColors}
-                  colorThreshold={colorThreshold}
-                  onMaxColorsChange={setMaxColors}
-                  onColorThresholdChange={setColorThreshold}
-                  epsilon={epsilon}
-                  minArea={minArea}
-                  numColors={numColors}
-                  onEpsilonChange={setEpsilon}
-                  onMinAreaChange={setMinArea}
-                  onNumColorsChange={setNumColors}
-                  layerHeight={layerHeight}
-                  layerCount={layerCount}
-                  maxLayerCount={maxLayerCount}
-                  maxTargetColors={maxTargetColors}
-                  pixelSize={pixelSize}
-                  onLayerHeightChange={setLayerHeight}
-                  onLayerCountChange={setLayerCount}
-                  onPixelSizeChange={setPixelSize}
-                  detailSize={detailSize}
-                  onDetailSizeChange={setDetailSize}
-                  targetWidth={targetWidth}
-                  targetHeight={targetHeight}
-                  maxDimension={maxDimension}
-                  onMaxDimensionChange={setMaxDimension}
-                  whiteBackingLayers={whiteBackingLayers}
-                  onWhiteBackingLayersChange={setWhiteBackingLayers}
-                  backingMode={backingMode}
-                  onBackingModeChange={setBackingMode}
-                  printStack={printStack}
-                  onReprocess={() => handleReprocess()}
-                  processing={processing}
-                  hasImage={image !== null}
-                  onAutoOptimize={() => {
-                    paramSearch.openConfig();
-                    setParamSearchOpen(true);
-                  }}
+        <div
+          inert={blocked}
+          className={`grid gap-10 ${showSettings ? 'xl:grid-cols-[360px_minmax(0,1fr)] 2xl:grid-cols-[400px_minmax(0,1fr)]' : ''} ${blocked ? 'pointer-events-none opacity-50' : ''}`}
+        >
+          {/* Stage: upload, editing and results. First in the DOM so phones reach it first. */}
+          <section
+            aria-label={t('converter:workspace')}
+            className={`tv-sheet tv-marks tv-rise min-w-0 self-start p-4 sm:p-6 lg:p-8 ${showSettings ? 'xl:col-start-2 xl:row-start-1' : ''}`}
+          >
+            {/* Mode Tabs */}
+            <div className="tv-seg mb-6 inline-flex">
+              <button
+                type="button"
+                onClick={() => setAppMode('single')}
+                aria-pressed={appMode === 'single'}
+                className="tv-seg-item flex !flex-none items-center gap-2 whitespace-nowrap !px-4 !text-sm"
+              >
+                <ImageIcon className="h-4 w-4" aria-hidden="true" />{t('converter:singleImage')}</button>
+              <button
+                type="button"
+                onClick={() => setAppMode('batch')}
+                aria-pressed={appMode === 'batch'}
+                className="tv-seg-item flex !flex-none items-center gap-2 whitespace-nowrap !px-4 !text-sm"
+              >
+                <Layers className="h-4 w-4" aria-hidden="true" />{t('converter:batchProcessing')}</button>
+            </div>
+
+            {/* Single Image Mode */}
+            {appMode === 'single' && (
+              <div className="space-y-8">
+                {emptyStage && (
+                  <div className="max-w-2xl">
+                    <p className="tv-display text-balance text-[2.6rem] text-ink sm:text-[3.4rem]">{t('converter:heroTitle')}</p>
+                    <p className="mt-3 text-base leading-relaxed text-ink-soft">{t('converter:description')}</p>
+                  </div>
+                )}
+
+                {/* Image Uploader */}
+                <ImageUploader
+                  onImageUpload={handleImageUpload}
+                  onFileDrop={handleFile}
+                  compact={!emptyStage}
                 />
-                <div className="p-4 bg-gray-50 rounded-lg space-y-4">
-                  <FilamentConfigPanel
-                    presets={filamentPresets}
-                    filamentPreset={filamentPreset}
-                    filamentColors={filamentColors}
-                    isValid={isFilamentConfigValid}
-                    onLoadPreset={loadPreset}
-                    onUpdateColor={updateFilamentColor}
-                    onAddColor={addFilamentColor}
-                    onRemoveColor={removeFilamentColor}
+
+                {/* Image Editor (crop/resize) */}
+                {isEditing && rawImage && maxModelSidePx !== undefined && (
+                  <ImageEditor
+                    image={rawImage}
+                    maxSidePx={maxModelSidePx}
+                    onApply={handleApplyEdit}
+                    onCancel={handleCancelEdit}
                     disabled={processing}
                   />
-                  <FilamentPreview
-                    filamentColors={filamentColors}
-                    filamentPreset={filamentPreset}
-                    layerCount={layerCount}
-                    layerHeight={layerHeight}
-                    whiteBackingLayers={whiteBackingLayers}
-                    backingMode={backingMode}
-                    isConfigValid={isFilamentConfigValid}
-                    disabled={processing}
-                  />
-                  <FilamentPresetManager
-                    presets={filamentStorage.presets}
-                    currentColors={filamentColors}
-                    isConfigValid={isFilamentConfigValid}
-                    onLoadPreset={loadSavedPresetColors}
-                    onSavePreset={filamentStorage.savePreset}
-                    onUpdatePreset={filamentStorage.updatePreset}
-                    onDeletePreset={filamentStorage.deletePreset}
-                    onRenamePreset={filamentStorage.renamePreset}
-                    onExportPresets={filamentStorage.exportPresets}
-                    onImportPresets={filamentStorage.importPresets}
-                    disabled={processing}
-                  />
-                  <PaletteLibrary
-                    onApplyPalette={loadSavedPresetColors}
-                    disabled={processing}
-                  />
-                </div>
+                )}
+
+                {/* Error Message */}
+                {error && <ErrorMessage message={error} />}
+
+                {/* Loading Spinner with progress stages */}
+                {processing && <LoadingSpinner stage={processingStage} />}
+
+                {/* Results */}
+                {!processing && !isEditing && hasResults && (
+                  <div className="space-y-12">
+
+                    {/* Before/After Comparison */}
+                    <ImageComparison
+                      originalImage={image}
+                      intermediateImageUrl={segmentationImageUrl}
+                      intermediateLabel={mode === 'pixel' ? t('converter:groupedColors') : t('converter:vectorizedRegions')}
+                      processedImageUrl={processedImageUrl}
+                      colorCount={resultCount}
+                      processedLabel={t('converter:simulatedPrint')}
+                    />
+
+                    {/* Download Buttons */}
+                    <DownloadButtons
+                      onDownloadCSV={handleDownloadCSV}
+                      onDownloadSTL={handleDownloadSTL}
+                      onDownload3MF={handleDownload3MF}
+                      onDownloadPrintSettings={handleDownloadPrintSettings}
+                      processing={processing || !renderReady}
+                      showCSV={mode === 'pixel'}
+                      summary={`${targetWidth.toFixed(1)} × ${targetHeight.toFixed(1)} × ${printStack.totalHeightMm.toFixed(2)} mm`}
+                    />
+
+                    {/* 3D Preview (pixel mode only) */}
+                    {mode === 'pixel' && colorBlocks.length > 0 && (
+                      <ThreeDPreview
+                        colorBlocks={colorBlocks}
+                        mappedBlockColors={mappedBlockColors}
+                        filamentColors={filamentColors}
+                        imageDimensions={imageDimensions}
+                        layerHeight={layerHeight}
+                        pixelSize={pixelSize}
+                        layerCount={layerCount}
+                        whiteBackingLayers={whiteBackingLayers}
+                        printStack={printStack}
+                      />
+                    )}
+
+                    {mappedBlendPalette.length > 0 && (
+                      <MappedBlendPalette entries={mappedBlendPalette} />
+                    )}
+
+                    {/* Color Blocks Grid with manual adjustment (pixel mode only) */}
+                    {mode === 'pixel' && (
+                      <ColorAdjustmentPanel
+                        colorBlocks={colorBlocks}
+                        onUpdateColor={updateColorBlock}
+                        onMergeColors={mergeColorBlocks}
+                        onDeleteColor={deleteColorBlock}
+                      />
+                    )}
+
+                    {/* Vector Color List (svg mode) */}
+                    {mode === 'svg' && <VectorColorList vectorResults={vectorResults} />}
+                  </div>
+                )}
+
+                {/* Original Image Preview (when no results yet) */}
+                {image && !hasResults && !processing && !isEditing && (
+                  <figure>
+                    <img
+                      src={image.src}
+                      alt={t('converter:preview')}
+                      className="max-w-full rounded-sheet border border-rule"
+                    />
+                    <figcaption className="mt-2 text-sm font-medium text-ink-soft">{t('converter:originalImagePreview')}</figcaption>
+                  </figure>
+                )}
               </div>
             )}
 
-            {/* Right Main Content */}
-            <div className={showSettings ? "xl:col-span-8 space-y-6" : "xl:col-span-12 space-y-6"}>
-              {/* Mode Tabs */}
-              <div className="flex border-b border-gray-200">
-                <button
-                  onClick={() => setAppMode('single')}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${appMode === 'single'
-                    ? 'border-purple-600 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  <ImageIcon className="w-4 h-4" />{t('converter:singleImage')}</button>
-                <button
-                  onClick={() => setAppMode('batch')}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${appMode === 'batch'
-                    ? 'border-purple-600 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  <Layers className="w-4 h-4" />{t('converter:batchProcessing')}</button>
-              </div>
+            {/* Batch Processing Mode */}
+            {appMode === 'batch' && (
+              <BatchProcessor
+                maxColors={maxColors}
+                colorThreshold={colorThreshold}
+                pixelSize={pixelSize}
+                layerHeight={layerHeight}
+                layerCount={layerCount}
+                whiteBackingLayers={whiteBackingLayers}
+                backingMode={backingMode}
+                filamentPreset={filamentPreset ?? undefined}
+                filamentColors={filamentPreset ? undefined : filamentColors}
+                detailSize={detailSize}
+              />
+            )}
+          </section>
 
-              {/* Single Image Mode */}
-              {appMode === 'single' && (
-                <div className="space-y-6">
-                  {/* Image Uploader */}
-                  <ImageUploader
-                    onImageUpload={handleImageUpload}
-                    onFileDrop={handleFile}
-                  />
-
-                  {/* Image Editor (crop/resize) */}
-                  {isEditing && rawImage && maxModelSidePx !== undefined && (
-                    <ImageEditor
-                      image={rawImage}
-                      maxSidePx={maxModelSidePx}
-                      onApply={handleApplyEdit}
-                      onCancel={handleCancelEdit}
-                      disabled={processing}
-                    />
-                  )}
-
-                  {/* Error Message */}
-                  {error && <ErrorMessage message={error} />}
-
-                  {/* Loading Spinner with progress stages */}
-                  {processing && <LoadingSpinner stage={processingStage} />}
-
-                  {/* Results */}
-                  {!processing && !isEditing && hasResults && (
-                    <div className="space-y-6">
-
-                      {/* Before/After Comparison */}
-                      <ImageComparison
-                        originalImage={image}
-                        intermediateImageUrl={segmentationImageUrl}
-                        intermediateLabel={mode === 'pixel' ? t('converter:groupedColors') : t('converter:vectorizedRegions')}
-                        processedImageUrl={processedImageUrl}
-                        colorCount={resultCount}
-                        processedLabel={t('converter:simulatedPrint')}
-                      />
-
-                      {mappedBlendPalette.length > 0 && (
-                        <MappedBlendPalette entries={mappedBlendPalette} />
-                      )}
-
-                      {/* Download Buttons */}
-                      <DownloadButtons
-                        onDownloadCSV={handleDownloadCSV}
-                        onDownloadSTL={handleDownloadSTL}
-                        onDownload3MF={handleDownload3MF}
-                        onDownloadPrintSettings={handleDownloadPrintSettings}
-                        processing={processing || !renderReady}
-                        showCSV={mode === 'pixel'}
-                      />
-
-                      {/* 3D Preview (pixel mode only) */}
-                      {mode === 'pixel' && colorBlocks.length > 0 && (
-                        <ThreeDPreview
-                          colorBlocks={colorBlocks}
-                          mappedBlockColors={mappedBlockColors}
-                          filamentColors={filamentColors}
-                          imageDimensions={imageDimensions}
-                          layerHeight={layerHeight}
-                          pixelSize={pixelSize}
-                          layerCount={layerCount}
-                          whiteBackingLayers={whiteBackingLayers}
-                          printStack={printStack}
-                        />
-                      )}
-
-                      {/* Color Blocks Grid with manual adjustment (pixel mode only) */}
-                      {mode === 'pixel' && (
-                        <ColorAdjustmentPanel
-                          colorBlocks={colorBlocks}
-                          onUpdateColor={updateColorBlock}
-                          onMergeColors={mergeColorBlocks}
-                          onDeleteColor={deleteColorBlock}
-                        />
-                      )}
-
-                      {/* Vector Color List (svg mode) */}
-                      {mode === 'svg' && <VectorColorList vectorResults={vectorResults} />}
-                    </div>
-                  )}
-
-                  {/* Original Image Preview (when no results yet) */}
-                  {image && !hasResults && !processing && !isEditing && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-800 mb-3">{t('converter:originalImagePreview')}</h3>
-                      <img
-                        src={image.src}
-                        alt={t('converter:preview')}
-                        className="max-w-full rounded-lg shadow-md"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Batch Processing Mode */}
-              {appMode === 'batch' && (
-                <BatchProcessor
-                  maxColors={maxColors}
-                  colorThreshold={colorThreshold}
-                  pixelSize={pixelSize}
-                  layerHeight={layerHeight}
+          {/* Settings rail */}
+          {showSettings && (
+            <aside
+              id="print-settings"
+              aria-label={t('converter:settings')}
+              className="tv-scroll grid min-w-0 content-start gap-9 md:grid-cols-2 md:gap-x-12 xl:sticky xl:top-[5.25rem] xl:col-start-1 xl:row-start-1 xl:max-h-[calc(100dvh-6.5rem)] xl:grid-cols-1 xl:self-start xl:overflow-y-auto xl:pr-4"
+            >
+              <ParameterPanel
+                mode={mode}
+                onModeChange={setMode}
+                maxColors={maxColors}
+                colorThreshold={colorThreshold}
+                onMaxColorsChange={setMaxColors}
+                onColorThresholdChange={setColorThreshold}
+                epsilon={epsilon}
+                minArea={minArea}
+                numColors={numColors}
+                onEpsilonChange={setEpsilon}
+                onMinAreaChange={setMinArea}
+                onNumColorsChange={setNumColors}
+                layerHeight={layerHeight}
+                layerCount={layerCount}
+                maxLayerCount={maxLayerCount}
+                maxTargetColors={maxTargetColors}
+                pixelSize={pixelSize}
+                onLayerHeightChange={setLayerHeight}
+                onLayerCountChange={setLayerCount}
+                onPixelSizeChange={setPixelSize}
+                detailSize={detailSize}
+                onDetailSizeChange={setDetailSize}
+                targetWidth={targetWidth}
+                targetHeight={targetHeight}
+                maxDimension={maxDimension}
+                onMaxDimensionChange={setMaxDimension}
+                whiteBackingLayers={whiteBackingLayers}
+                onWhiteBackingLayersChange={setWhiteBackingLayers}
+                backingMode={backingMode}
+                onBackingModeChange={setBackingMode}
+                printStack={printStack}
+                onReprocess={() => handleReprocess()}
+                processing={processing}
+                hasImage={image !== null}
+                onAutoOptimize={() => {
+                  paramSearch.openConfig();
+                  setParamSearchOpen(true);
+                }}
+              />
+              <RailSection index={5} title={t('converter:sectionFilaments')}>
+                <FilamentConfigPanel
+                  presets={filamentPresets}
+                  filamentPreset={filamentPreset}
+                  filamentColors={filamentColors}
+                  isValid={isFilamentConfigValid}
+                  onLoadPreset={loadPreset}
+                  onUpdateColor={updateFilamentColor}
+                  onAddColor={addFilamentColor}
+                  onRemoveColor={removeFilamentColor}
+                  disabled={processing}
+                />
+                <FilamentPreview
+                  filamentColors={filamentColors}
+                  filamentPreset={filamentPreset}
                   layerCount={layerCount}
+                  layerHeight={layerHeight}
                   whiteBackingLayers={whiteBackingLayers}
                   backingMode={backingMode}
-                  filamentPreset={filamentPreset ?? undefined}
-                  filamentColors={filamentPreset ? undefined : filamentColors}
-                  detailSize={detailSize}
+                  isConfigValid={isFilamentConfigValid}
+                  disabled={processing}
                 />
-              )}
-            </div>
-          </div>
+              </RailSection>
+              <RailSection index={6} title={t('converter:sectionLibrary')}>
+                <FilamentPresetManager
+                  presets={filamentStorage.presets}
+                  currentColors={filamentColors}
+                  isConfigValid={isFilamentConfigValid}
+                  onLoadPreset={loadSavedPresetColors}
+                  onSavePreset={filamentStorage.savePreset}
+                  onUpdatePreset={filamentStorage.updatePreset}
+                  onDeletePreset={filamentStorage.deletePreset}
+                  onRenamePreset={filamentStorage.renamePreset}
+                  onExportPresets={filamentStorage.exportPresets}
+                  onImportPresets={filamentStorage.importPresets}
+                  disabled={processing}
+                />
+                <PaletteLibrary
+                  onApplyPalette={loadSavedPresetColors}
+                  disabled={processing}
+                />
+              </RailSection>
+            </aside>
+          )}
         </div>
-      </div>
+      </main>
 
       <BugReportButton context={{
         appMode, mode, pixelSize, layerHeight, layerCount, whiteBackingLayers,

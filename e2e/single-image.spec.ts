@@ -52,15 +52,15 @@ test.describe('Single Image Processing', () => {
 
   test('parameter sliders are visible and adjustable', async ({ page }) => {
     // Settings panel is open by default
-    await expect(page.getByText(/Max Colors:/)).toBeVisible();
-    await expect(page.getByText(/Layer Height:/)).toBeVisible();
-    await expect(page.getByText(/Pixel Size:/)).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Max Colors' })).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Layer Height' })).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Pixel Size' })).toBeVisible();
     await expect(page.getByRole('spinbutton', { name: 'Backing layers' })).toBeVisible();
   });
 
   test('can toggle settings panel visibility', async ({ page }) => {
     // Settings should be visible initially
-    await expect(page.getByText(/Max Colors:/)).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Max Colors' })).toBeVisible();
 
     // Click settings toggle button (the gear icon in the header)
     const settingsButton = page.locator('button').filter({
@@ -69,27 +69,27 @@ test.describe('Single Image Processing', () => {
     await settingsButton.click();
 
     // Settings should be hidden
-    await expect(page.getByText(/Max Colors:/)).not.toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Max Colors' })).not.toBeVisible();
 
     // Click again to show
     await settingsButton.click();
-    await expect(page.getByText(/Max Colors:/)).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Max Colors' })).toBeVisible();
   });
 
   test('can switch between pixel and SVG modes', async ({ page }) => {
     // Default is pixel mode
-    await expect(page.getByText(/Max Colors:/)).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Max Colors' })).toBeVisible();
 
     // Switch to SVG mode
     await page.getByRole('button', { name: /SVG/i }).first().click();
 
     // SVG-specific params should appear
-    await expect(page.getByText(/Number of Colors:/)).toBeVisible();
-    await expect(page.getByText(/Simplification/)).toBeVisible();
-    await expect(page.getByText(/Min Area:/)).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Number of Colors' })).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Simplification' })).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Min Area' })).toBeVisible();
 
     // Pixel-specific params should be hidden
-    await expect(page.getByText(/Max Colors:/)).not.toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Max Colors' })).not.toBeVisible();
   });
 
   test('image editor cancel returns to upload state', async ({ page }) => {

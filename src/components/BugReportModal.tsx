@@ -80,35 +80,35 @@ export function BugReportModal({ context, onClose }: { context: ConverterBugRepo
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" data-html2canvas-ignore
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-[2px]" data-html2canvas-ignore
       onMouseDown={event => { if (event.target === event.currentTarget && !busyRef.current) onClose(); }}>
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="bug-report-title" aria-describedby="bug-report-help"
-        aria-busy={submitting} className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl bg-white p-6 text-gray-800 shadow-xl">
+        aria-busy={submitting} className="tv-sheet max-h-[90dvh] w-full max-w-lg overflow-y-auto p-6 text-ink">
         <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 id="bug-report-title" className="text-xl font-semibold">{t('feedback:reportABug')}</h2>
-          <button type="button" aria-label={t('feedback:closeBugReport')} disabled={submitting} onClick={onClose} className="rounded-lg p-2 hover:bg-gray-100 disabled:opacity-50">
+          <h2 id="bug-report-title" className="tv-heading text-xl">{t('feedback:reportABug')}</h2>
+          <button type="button" aria-label={t('feedback:closeBugReport')} disabled={submitting} onClick={onClose} className="rounded-sheet p-2 hover:bg-paper-sunk disabled:opacity-50">
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
-        <p id="bug-report-help" className="mb-4 text-sm text-gray-500">{t('feedback:descriptionHelp')}</p>
+        <p id="bug-report-help" className="mb-4 text-sm text-ink-muted">{t('feedback:descriptionHelp')}</p>
         {reportId ? <div role="status" className="space-y-4">
-          <p className="flex items-center gap-2 font-medium text-green-700"><CheckCircle2 className="h-5 w-5" />{t('feedback:thanksYourReportHasBeenReceived')}</p>
-          <p className="break-all text-xs text-gray-500">{t('feedback:reportId')}{' '}{reportId}</p>
-          <button type="button" onClick={onClose} className="w-full rounded-lg bg-purple-600 px-4 py-2 text-white hover:bg-purple-700">{t('common:done')}</button>
+          <p className="flex items-center gap-2 font-medium text-signal-ok"><CheckCircle2 className="h-5 w-5" aria-hidden="true" />{t('feedback:thanksYourReportHasBeenReceived')}</p>
+          <p className="break-all font-mono text-xs text-ink-muted">{t('feedback:reportId')}{' '}{reportId}</p>
+          <button type="button" onClick={onClose} className="tv-btn-primary w-full">{t('common:done')}</button>
         </div> : <form onSubmit={event => { event.preventDefault(); void submit(); }}>
-          <label htmlFor="bug-report-description" className="mb-1 block text-sm font-medium">{t('feedback:whatHappened')}<span className="font-normal text-gray-500">{t('feedback:optional')}</span></label>
+          <label htmlFor="bug-report-description" className="mb-1 block text-sm font-medium">{t('feedback:whatHappened')}<span className="font-normal text-ink-muted">{t('feedback:optional')}</span></label>
           <textarea id="bug-report-description" value={description} onChange={event => setDescription(event.target.value.slice(0, 1000))}
             maxLength={1000} rows={4} disabled={submitting} aria-describedby="bug-report-count"
             placeholder={t('feedback:descriptionPlaceholder')}
-            className="w-full resize-y rounded-lg border border-gray-300 p-3 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60" />
-          <p id="bug-report-count" className="mb-4 text-right text-xs text-gray-500">{description.length}/1000</p>
+            className="tv-input resize-y p-3 disabled:opacity-60" />
+          <p id="bug-report-count" className="mb-4 text-right font-mono text-xs text-ink-muted">{description.length}/1000</p>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={includeScreenshot} onChange={event => setIncludeScreenshot(event.target.checked)} disabled={submitting} />{t('feedback:includeAScreenshotOfTheCurrentView')}</label>
-          <p className="mb-5 mt-1 text-xs text-gray-500">{t('feedback:screenshotHelp')}</p>
-          {error && <p role="alert" className="mb-4 text-sm text-red-700">{localize(error)}</p>}
+          <p className="mb-5 mt-1 text-xs text-ink-muted">{t('feedback:screenshotHelp')}</p>
+          {error && <p role="alert" className="mb-4 text-sm text-signal-error">{localize(error)}</p>}
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} disabled={submitting} className="flex-1 rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50 disabled:opacity-50">{t('common:cancel')}</button>
-            <button type="submit" disabled={submitting} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white hover:bg-purple-700 disabled:opacity-50">
+            <button type="button" onClick={onClose} disabled={submitting} className="tv-btn-outline flex-1">{t('common:cancel')}</button>
+            <button type="submit" disabled={submitting} className="tv-btn-primary flex-1">
               {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{submitting ? t('feedback:sending') : t('feedback:sendReport')}
             </button>
           </div>

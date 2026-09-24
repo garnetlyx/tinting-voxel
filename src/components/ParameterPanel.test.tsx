@@ -76,8 +76,11 @@ describe('ParameterPanel', () => {
   it('shows the current filament-aware upper limit for color layers', () => {
     render(<ParameterPanel {...defaultProps} />);
 
-    expect(screen.getByText(/Color Layers: 4/i)).toBeInTheDocument();
-    expect(screen.getByText(/\(max 8 for current filament set\)/i)).toBeInTheDocument();
+    const slider = screen.getByRole('slider', { name: 'Color Layers' });
+    expect(slider).toHaveValue('4');
+    expect(slider).toHaveAttribute('max', '8');
+    expect(screen.getByRole('slider', { name: 'Layer Height' })).toHaveAttribute('aria-valuetext', '0.08 mm');
+    expect(screen.getByText('Up to 8 for the current filament set')).toBeInTheDocument();
   });
 
   it('keeps the Local-photo 200 mm pixel pitch selectable without rounding it', () => {

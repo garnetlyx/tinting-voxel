@@ -152,8 +152,9 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
     const container = containerRef.current;
     if (!container) return;
 
+    // CSS sets the viewport size; the renderer follows it.
     const width = container.clientWidth;
-    const height = 480;
+    const height = container.clientHeight;
 
     // Scene
     const scene = new THREE.Scene();
@@ -237,17 +238,19 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
     };
     animate();
 
-    // Resize handler
-    const handleResize = () => {
+    // Follow the container, which also resizes when the settings rail toggles.
+    const resizeObserver = new ResizeObserver(() => {
       const newWidth = container.clientWidth;
-      camera.aspect = newWidth / height;
+      const newHeight = container.clientHeight;
+      if (newWidth === 0 || newHeight === 0) return;
+      camera.aspect = newWidth / newHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(newWidth, height);
-    };
-    window.addEventListener('resize', handleResize);
+      renderer.setSize(newWidth, newHeight);
+    });
+    resizeObserver.observe(container);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       document.removeEventListener(BUG_REPORT_CAPTURE_EVENT, captureFrame);
       cancelAnimationFrame(animFrameRef.current);
       controls.removeEventListener('change', updateClipping);
@@ -325,61 +328,63 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
 
   if (webglError) {
     return (
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg text-center text-gray-500 text-sm">
-        <Layers className="w-5 h-5 mx-auto mb-2 text-gray-400" />{t('preview:3dPreviewUnavailableWebglNotSupported')}</div>
+      <div className="rounded-sheet border border-dashed border-rule-strong p-6 text-center text-sm text-ink-muted">
+        <Layers className="mx-auto mb-2 h-5 w-5" aria-hidden="true" />{t('preview:3dPreviewUnavailableWebglNotSupported')}</div>
     );
   }
 
   return (
-    <div className="mt-6 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-          <Layers className="w-5 h-5 text-purple-600" />{t('preview:3dPreview')}</h3>
-        <div className="flex gap-2">
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="tv-heading flex items-center gap-2 text-xl">
+          <Layers className="h-5 w-5" aria-hidden="true" />{t('preview:3dPreview')}</h3>
+        <div className="flex gap-1">
           <button
+            type="button"
             onClick={handleResetView}
-            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1"
+            className="tv-btn-ghost tv-btn-sm"
             title={t('preview:resetCamera')}
           >
-            <RotateCcw className="w-3.5 h-3.5" />{t('common:reset')}</button>
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />{t('common:reset')}</button>
           <button
+            type="button"
             onClick={handleFitView}
-            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1"
+            className="tv-btn-ghost tv-btn-sm"
             title={t('preview:topDownView')}
           >
-            <Maximize2 className="w-3.5 h-3.5" />{t('preview:top')}</button>
+            <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />{t('preview:top')}</button>
           <button
+            type="button"
             onClick={() => setShowExploded(!showExploded)}
-            className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${
-              showExploded ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 hover:bg-gray-200'
-            }`}
+            aria-pressed={showExploded}
+            className="tv-btn-ghost tv-btn-sm aria-pressed:bg-ink aria-pressed:text-paper-raised"
             title={t('preview:toggleExplodedView')}
           >
-            <Layers className="w-3.5 h-3.5" />{t('preview:exploded')}</button>
+            <Layers className="h-3.5 w-3.5" aria-hidden="true" />{t('preview:exploded')}</button>
         </div>
       </div>
 
       {/* Size info */}
-      <div className="text-xs text-gray-500 flex gap-4">
-        <span>{physicalWidth} x {physicalHeight} mm</span>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-ink-muted">
+        <span>{physicalWidth} × {physicalHeight} mm</span>
         <span>{t('preview:height')}{' '}{totalHeight} mm</span>
         <span>{t('preview:layers')}{' '}{printStack.opticalLayerCount} + {printStack.whiteBackingLayers}</span>
         <span>{t('preview:voxels', { count: totalPixels })}</span>
-        {isLargeModel && <span className="text-amber-600">{t('preview:largeModel')}</span>}
+        {isLargeModel && <span className="text-signal-warn">{t('preview:largeModel')}</span>}
       </div>
 
       {/* WebGL canvas */}
       <div
         ref={containerRef}
-        className="w-full rounded-lg border-2 border-gray-200 shadow-inner overflow-hidden"
-        style={{ height: 480 }}
+        className="h-[360px] w-full overflow-hidden rounded-sheet border border-rule sm:h-[480px]"
       />
 
       {/* Color visibility toggles */}
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
+          type="button"
           onClick={toggleAllVisibility}
-          className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+          className="tv-btn-outline tv-btn-sm"
         >
           {colorVisibility.every(cv => cv.visible) ? t('preview:hideAll') : t('preview:showAll')}
         </button>
@@ -387,22 +392,24 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
           <button
             key={cv.hex}
             onClick={() => toggleColorVisibility(cv.hex)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
-              cv.visible ? 'bg-gray-100 hover:bg-gray-200' : 'bg-gray-50 text-gray-400'
+            type="button"
+            aria-pressed={cv.visible}
+            className={`flex items-center gap-1.5 rounded-sheet border px-2 py-1 font-mono text-xs transition-colors ${
+              cv.visible ? 'border-rule-strong bg-paper-raised text-ink hover:border-ink' : 'border-rule bg-transparent text-ink-muted'
             }`}
             title={t('preview:visibility', { action: cv.visible ? t('common:hide') : t('common:show'), hex: cv.hex, count: cv.count })}
           >
             <span
-              className="w-3 h-3 rounded-sm border border-gray-300"
+              className="h-3 w-3 border border-ink/40"
               style={{ backgroundColor: cv.hex, opacity: cv.visible ? 1 : 0.3 }}
             />
-            {cv.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            {cv.visible ? <Eye className="h-3 w-3" aria-hidden="true" /> : <EyeOff className="h-3 w-3" aria-hidden="true" />}
             <span>{cv.count}</span>
           </button>
         ))}
       </div>
 
-      <p className="text-xs text-gray-400">{t('preview:dragToRotateScrollToZoomRightClickTo')}</p>
-    </div>
+      <p className="tv-help">{t('preview:dragToRotateScrollToZoomRightClickTo')}</p>
+    </section>
   );
 };

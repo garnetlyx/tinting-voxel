@@ -36,26 +36,26 @@ export const FilamentConfigPanel: React.FC<FilamentConfigPanelProps> = ({
   const canRemove = filamentColors.length > MIN_FILAMENT_COLORS;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <PresetSelector
         presets={presets}
         selectedPreset={filamentPreset}
         onPresetChange={onLoadPreset}
         disabled={disabled}
       />
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500 font-medium">
+          <span className="font-mono text-xs text-ink-muted">
             {t('filaments:capacity', { count: filamentColors.length, max: MAX_FILAMENT_COLORS })}
           </span>
           {!isValid && (
-            <span className="text-xs text-red-500 font-medium">{t('filaments:fixValidationErrorsBelow')}</span>
+            <span className="text-xs font-semibold text-signal-error">{t('filaments:fixValidationErrorsBelow')}</span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-400 px-0.5">
+        <div className="flex items-center gap-2 border-b border-rule px-0.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
           <span className="w-8">{t('filaments:hex')}</span>
           <span className="flex-1">{t('filaments:codeName')}</span>
-          <span className="w-36"><span className="inline-block w-20 text-right">{t('filaments:td')}</span></span>
+          <span className="w-40"><span className="inline-block w-24 text-right">{t('filaments:td')}</span></span>
           <span className="w-6"></span>
         </div>
 
@@ -73,9 +73,9 @@ export const FilamentConfigPanel: React.FC<FilamentConfigPanelProps> = ({
       <button
         onClick={onAddColor}
         disabled={!canAdd || disabled}
-        className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-800 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+        className="tv-btn-outline tv-btn-sm"
       >
-        <Plus className="w-4 h-4" />{t('filaments:addColor')}</button>
+        <Plus className="h-3.5 w-3.5" aria-hidden="true" />{t('filaments:addColor')}</button>
     </div>
   );
 };

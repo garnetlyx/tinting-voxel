@@ -8,11 +8,9 @@ describe('ErrorMessage', () => {
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
   });
 
-  it('displays in a red-themed container', () => {
-    const { container } = render(<ErrorMessage message="Error" />);
-    const wrapper = container.firstChild as HTMLElement;
-    expect(wrapper.className).toContain('bg-red-50');
-    expect(wrapper.className).toContain('border-red-200');
+  it('announces the message as an alert', () => {
+    render(<ErrorMessage message="Error" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Error');
   });
 
   it('renders different messages correctly', () => {

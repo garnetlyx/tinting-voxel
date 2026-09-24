@@ -4,13 +4,16 @@ import { useTranslation } from '../i18n';
  */
 import React, { useRef, useState, useCallback } from 'react';
 import { Upload } from 'lucide-react';
+import { OverprintMark } from './OverprintMark';
 
 interface ImageUploaderProps {
   onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFileDrop?: (file: File) => void;
+  /** A slim bar once an image is loaded; the full drop area otherwise. */
+  compact?: boolean;
 }
 
-export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onFileDrop }) => {
+export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onFileDrop, compact = false }) => {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -38,8 +41,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onF
     }
   }, [onFileDrop]);
 
+  const label = isDragging ? t('editor:dropImageHere') : t('editor:clickOrDragImageHere');
+  const dropState = isDragging
+    ? 'border-magenta bg-magenta/5'
+    : 'border-rule-strong hover:border-ink hover:bg-paper-sunk/60';
+
   return (
-    <div className="mb-8">
+    <div>
       <input
         ref={fileInputRef}
         type="file"
@@ -48,21 +56,31 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onF
         className="hidden"
       />
       <button
+        type="button"
         onClick={() => fileInputRef.current?.click()}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`w-full py-8 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center gap-2 ${
-          isDragging
-            ? 'border-purple-500 bg-purple-100 text-purple-600 scale-[1.02]'
-            : 'border-gray-300 hover:border-purple-400 hover:bg-purple-50 text-gray-600 hover:text-purple-600'
-        }`}
+        className={compact
+          ? `flex w-full items-center gap-3 rounded-sheet border border-dashed px-4 py-3 text-left transition-colors ${dropState}`
+          : `group flex w-full flex-col items-center justify-center gap-4 rounded-sheet border-2 border-dashed px-6 py-12 transition-colors sm:py-16 ${dropState}`}
       >
-        <Upload className={`w-8 h-8 ${isDragging ? 'animate-bounce' : ''}`} />
-        <span className="font-medium">
-          {isDragging ? t('editor:dropImageHere') : t('editor:clickOrDragImageHere')}
-        </span>
-        <span className="text-xs text-gray-400">PNG, JPEG, GIF, WebP, BMP</span>
+        {compact ? (
+          <>
+            <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="text-sm font-semibold">{label}</span>
+            <span className="ml-auto hidden font-mono text-xs text-ink-muted sm:inline">PNG, JPEG, GIF, WebP, BMP</span>
+          </>
+        ) : (
+          <>
+            <OverprintMark className={`h-24 w-24 transition-transform duration-300 sm:h-28 sm:w-28 ${isDragging ? 'scale-110' : 'group-hover:scale-105'}`} />
+            <span className="flex items-center gap-2 text-base font-semibold text-ink">
+              <Upload className={`h-4 w-4 ${isDragging ? 'animate-bounce' : ''}`} aria-hidden="true" />
+              {label}
+            </span>
+            <span className="font-mono text-xs text-ink-muted">PNG, JPEG, GIF, WebP, BMP</span>
+          </>
+        )}
       </button>
     </div>
   );

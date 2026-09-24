@@ -114,22 +114,23 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-gray-700">{t('filaments:achievableFilamentGamut')}</h4>
+        <h3 className="text-sm font-semibold text-ink">{t('filaments:achievableFilamentGamut')}</h3>
         <button
+          type="button"
           onClick={fetchPreview}
           disabled={loading || disabled}
-          className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="tv-link"
         >
-          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />{t('common:refresh')}</button>
+          <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />{t('common:refresh')}</button>
       </div>
 
       {loading && !preview && (
-        <div className="flex items-center justify-center py-6 text-gray-400 text-sm">
-          <RefreshCw className="w-4 h-4 animate-spin mr-2" />{t('filaments:generatingPreview')}</div>
+        <div className="flex items-center justify-center py-6 text-sm text-ink-muted">
+          <RefreshCw className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />{t('filaments:generatingPreview')}</div>
       )}
 
       {error && (
-        <div className="text-xs text-red-500 bg-red-50 p-2 rounded">
+        <div className="rounded-sheet bg-signal-error/5 p-2 text-xs text-signal-error">
           {localize(error)}
         </div>
       )}
@@ -141,18 +142,18 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
             <img
               src={`data:image/png;base64,${preview.image}`}
               alt={t('filaments:filamentColorMatrixPreview')}
-              className={`w-full rounded border border-gray-200 ${loading ? 'opacity-50' : ''}`}
+              className={`w-full rounded-sheet border border-rule ${loading ? 'opacity-50' : ''}`}
               style={{ imageRendering: 'pixelated' }}
             />
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <RefreshCw className="w-5 h-5 animate-spin text-purple-600" />
+                <RefreshCw className="h-5 w-5 animate-spin text-ink" aria-hidden="true" />
               </div>
             )}
           </div>
 
           {/* Stats */}
-          <div className="flex gap-4 text-xs text-gray-500">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-ink-muted">
             <span>
               {t('filaments:filamentCount', { count: preview.stats.colorCount })}
             </span>
@@ -170,9 +171,9 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
               {preview.warnings.map((warning, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 p-2 rounded"
+                  className="flex items-start gap-1.5 rounded-sheet bg-signal-warn/10 p-2 text-xs text-signal-warn"
                 >
-                  <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" aria-hidden="true" />
                   <span>{localize(warning)}</span>
                 </div>
               ))}

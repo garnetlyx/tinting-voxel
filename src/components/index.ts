@@ -22,5 +22,9 @@ export { ThreeDPreview } from './ThreeDPreview';
 export { BatchProcessor } from './BatchProcessor';
 export { PaletteLibrary } from './PaletteLibrary';
 export { ParamSearchModal } from './ParamSearchModal';
+export { InkStrip } from './InkStrip';
+export { OverprintMark } from './OverprintMark';
+export { RailSection } from './RailSection';
+export { RangeField } from './RangeField';
 
 export { BugReportButton } from './BugReportButton';

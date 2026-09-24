@@ -3,6 +3,7 @@
  */
 import { useTranslation } from '../i18n';
 import React from 'react';
+import { OverprintMark } from './OverprintMark';
 
 export type ProcessingStage =
   | 'uploading'
@@ -34,33 +35,37 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   const showStages = stage !== 'idle' && currentIdx >= 0;
 
   return (
-    <div className="text-center py-8">
-      <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-200 border-t-purple-600 mx-auto mb-4"></div>
-      <p className="text-gray-700 font-medium mb-3">{displayMessage}</p>
+    <div role="status" className="flex flex-col items-center py-12 text-center">
+      <div className="animate-spin [animation-duration:2.6s]">
+        <OverprintMark className="h-16 w-16" animated={false} />
+      </div>
+      <p className="mt-5 font-semibold text-ink">{displayMessage}</p>
       {showStages && (
-        <div className="flex justify-center gap-6 text-sm">
+        <ol className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
           {STAGE_ORDER.map((s, idx) => {
             const isComplete = idx < currentIdx;
             const isCurrent = idx === currentIdx;
             return (
-              <div
+              <li
                 key={s}
-                className={`flex items-center gap-1.5 ${
-                  isCurrent
-                    ? 'text-purple-600 font-medium'
-                    : isComplete
-                    ? 'text-green-600'
-                    : 'text-gray-400'
+                aria-current={isCurrent ? 'step' : undefined}
+                className={`flex items-center gap-2 ${
+                  isCurrent ? 'font-semibold text-ink' : isComplete ? 'text-signal-ok' : 'text-ink-muted'
                 }`}
               >
-                <span className="text-xs">
-                  {isComplete ? '\u2713' : isCurrent ? '\u25CF' : '\u25CB'}
+                <span
+                  aria-hidden="true"
+                  className={`flex h-5 w-5 items-center justify-center rounded-full border font-mono text-[10px] ${
+                    isCurrent ? 'border-ink bg-ink text-paper-raised' : isComplete ? 'border-signal-ok' : 'border-rule-strong'
+                  }`}
+                >
+                  {isComplete ? '✓' : idx + 1}
                 </span>
                 {t(STAGE_LABELS[s]).replace(/(?:\.\.\.|…)$/, '')}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
       )}
     </div>
   );

@@ -21,13 +21,14 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">{t('filaments:filamentPreset')}</label>
+      <label htmlFor="filament-preset" className="text-sm font-medium text-ink-soft">{t('filaments:filamentPreset')}</label>
       <select
+        id="filament-preset"
         aria-label={t('filaments:filamentPreset')}
         value={selectedPreset ?? ''}
         onChange={(e) => onPresetChange(e.target.value as FilamentPreset)}
         disabled={disabled}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100"
+        className="tv-select mt-1.5"
       >
         {selectedPreset === null && <option value="" disabled>{t('filaments:custom')}</option>}
         {presets.map((preset) => (

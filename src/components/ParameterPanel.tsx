@@ -1,11 +1,16 @@
 import { useTranslation } from '../i18n';
 /**
- * Parameter adjustment panel component with mode-specific parameters
+ * Print parameters, grouped into numbered sections of the settings rail
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
+import { RefreshCw, SlidersHorizontal } from 'lucide-react';
 import type { PrintStackInfo, ProcessingMode } from '../api/types';
 import { LAYER_HEIGHT_MIN_MM, LAYER_HEIGHT_MAX_MM } from '../api/types';
 import { ModeSelector } from './ModeSelector';
+import { RailSection } from './RailSection';
+import { RangeField } from './RangeField';
+
+const DETAIL_SIZES_MM = [0.22, 0.42, 0.62, 0.82];
 
 interface ParameterPanelProps {
   mode: ProcessingMode;
@@ -44,14 +49,31 @@ interface ParameterPanelProps {
   onWhiteBackingLayersChange: (value: number) => void;
   backingMode: 'white' | 'black';
   onBackingModeChange: (mode: 'white' | 'black') => void;
-  // Base plate
-  // Double-sided
   printStack: PrintStackInfo;
   onReprocess: () => void;
   processing: boolean;
   hasImage: boolean;
   onAutoOptimize?: () => void;
 }
+
+/** Color layers over backing layers, drawn as the stack prints (top first). */
+const StackDiagram: React.FC<{ stack: PrintStackInfo }> = ({ stack }) => (
+  <div aria-hidden="true" className="flex w-16 shrink-0 flex-col gap-px">
+    {Array.from({ length: stack.opticalLayerCount }, (_, i) => (
+      <span
+        key={`c${i}`}
+        className="block h-1.5"
+        style={{ background: 'repeating-linear-gradient(135deg, rgb(var(--cyan)) 0 3px, rgb(var(--magenta)) 3px 6px, rgb(var(--yellow)) 6px 9px)' }}
+      />
+    ))}
+    {Array.from({ length: stack.whiteBackingLayers }, (_, i) => (
+      <span
+        key={`b${i}`}
+        className={`block h-1.5 border ${stack.backingMode === 'black' ? 'border-ink bg-ink' : 'border-rule-strong bg-paper-raised'}`}
+      />
+    ))}
+  </div>
+);
 
 export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   mode,
@@ -91,6 +113,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   onAutoOptimize,
 }) => {
   const { t } = useTranslation();
+  const detailSizeLabelId = useId();
   const formatMaxDimension = (value: number) => value.toFixed(1);
   const [maxDimensionInput, setMaxDimensionInput] = useState(formatMaxDimension(maxDimension));
   const [isEditingMaxDimension, setIsEditingMaxDimension] = useState(false);
@@ -112,238 +135,222 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   };
 
   return (
-    <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-4">
-      <ModeSelector
-        mode={mode}
-        onModeChange={onModeChange}
-        disabled={processing}
-      />
+    <>
+      <RailSection index={1} title={t('parameters:processingMode')}>
+        <ModeSelector mode={mode} onModeChange={onModeChange} disabled={processing} />
+      </RailSection>
 
-      {mode === 'pixel' ? (
-        <>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:maxColors')}{' '}{maxColors}
-            </label>
-            <input
-              type="range"
-              min="2"
-              max={maxTargetColors}
+      <RailSection index={2} title={t('converter:sectionColor')}>
+        {mode === 'pixel' ? (
+          <>
+            <RangeField
+              label={t('parameters:maxColors')}
+              display={String(maxColors)}
               value={maxColors}
-              onChange={(e) => onMaxColorsChange(parseInt(e.target.value))}
-              className="w-full"
+              min={2}
+              max={maxTargetColors ?? 100}
+              onChange={onMaxColorsChange}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:colorMergeThreshold')}{' '}{colorThreshold}
-            </label>
-            <input
-              type="range"
-              min="10"
-              max="100"
+            <RangeField
+              label={t('parameters:colorMergeThreshold')}
+              display={String(colorThreshold)}
               value={colorThreshold}
-              onChange={(e) => onColorThresholdChange(parseInt(e.target.value))}
-              className="w-full"
+              min={10}
+              max={100}
+              onChange={onColorThresholdChange}
             />
-          </div>
-        </>
-      ) : (
-        <>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:numberOfColors')}{' '}{numColors}
-            </label>
-            <input
-              type="range"
-              min="2"
-              max="32"
+          </>
+        ) : (
+          <>
+            <RangeField
+              label={t('parameters:numberOfColors')}
+              display={String(numColors)}
               value={numColors}
-              onChange={(e) => onNumColorsChange(parseInt(e.target.value))}
-              className="w-full"
+              min={2}
+              max={32}
+              onChange={onNumColorsChange}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:simplificationEpsilon')}{(epsilon ?? 0).toFixed(1)}
-            </label>
-            <input
-              type="range"
-              min="0.5"
-              max="10"
-              step="0.5"
+            <RangeField
+              label={t('parameters:simplificationEpsilon')}
+              display={(epsilon ?? 0).toFixed(1)}
               value={epsilon}
-              onChange={(e) => onEpsilonChange(parseFloat(e.target.value))}
-              className="w-full"
+              min={0.5}
+              max={10}
+              step={0.5}
+              onChange={onEpsilonChange}
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:minArea')}{' '}{minArea.toFixed(1)} mm²
-            </label>
-            <input
-              type="range"
-              min="0.1"
-              max="20"
-              step="0.1"
+            <RangeField
+              label={t('parameters:minArea')}
+              display={`${minArea.toFixed(1)} mm²`}
               value={minArea}
-              onChange={(e) => onMinAreaChange(parseFloat(e.target.value))}
-              className="w-full"
+              min={0.1}
+              max={20}
+              step={0.1}
+              onChange={onMinAreaChange}
             />
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </RailSection>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:colorLayers')}{' '}{layerCount} <span className="text-xs font-normal text-gray-500">{t('parameters:layerLimit', { max: maxLayerCount })}</span>
-        </label>
-        <input
-          type="range"
-          min="4"
-          max={maxLayerCount}
-          step="1"
+      <RailSection index={3} title={t('converter:sectionLayers')}>
+        <RangeField
+          label={t('parameters:colorLayers')}
+          display={String(layerCount)}
           value={layerCount}
-          onChange={(e) => onLayerCountChange(parseInt(e.target.value, 10))}
-          className="w-full"
+          min={4}
+          max={maxLayerCount}
+          step={1}
+          onChange={onLayerCountChange}
+          hint={t('parameters:layerLimit', { max: maxLayerCount })}
         />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:layerHeight')}{' '}{layerHeight.toFixed(2)} mm
-        </label>
-        <input
-          type="range"
+        <RangeField
+          label={t('parameters:layerHeight')}
+          display={`${layerHeight.toFixed(2)} mm`}
+          value={layerHeight}
           min={LAYER_HEIGHT_MIN_MM}
           max={LAYER_HEIGHT_MAX_MM}
-          step="0.01"
-          value={layerHeight}
-          onChange={(e) => onLayerHeightChange(parseFloat(e.target.value))}
-          className="w-full"
+          step={0.01}
+          onChange={onLayerHeightChange}
         />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:detailSizeNozzleLineWidth')}{(detailSize ?? 0).toFixed(2)} mm
-        </label>
-        <div className="flex gap-2">
-          {[0.22, 0.42, 0.62, 0.82].map((val) => (
-            <button
-              key={val}
-              onClick={() => onDetailSizeChange(val)}
-              className={`flex-1 py-1.5 text-xs rounded border transition-colors ${
-                Math.abs((detailSize ?? 0) - val) < 0.005
-                  ? 'bg-purple-600 text-white border-purple-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:border-purple-400'
-              }`}
-            >
-              {val.toFixed(2)}
-              <span className="block text-gray-400 text-[10px] leading-tight" style={{color: Math.abs((detailSize ?? 0) - val) < 0.005 ? 'rgba(255,255,255,0.75)' : undefined}}>
-                {t('parameters:nozzle', { diameter: (val - 0.02).toFixed(1) })}
-              </span>
-            </button>
-          ))}
+        <div role="group" aria-labelledby={detailSizeLabelId}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span id={detailSizeLabelId} className="text-sm font-medium text-ink-soft">{t('parameters:detailSizeNozzleLineWidth')}</span>
+            <span className="tv-value shrink-0">{(detailSize ?? 0).toFixed(2)} mm</span>
+          </div>
+          <div className="tv-seg mt-2">
+            {DETAIL_SIZES_MM.map((val) => (
+              <button
+                key={val}
+                type="button"
+                aria-pressed={Math.abs((detailSize ?? 0) - val) < 0.005}
+                onClick={() => onDetailSizeChange(val)}
+                className="tv-seg-item group !px-1"
+              >
+                <span className="block font-mono text-[0.8125rem]">{val.toFixed(2)}</span>
+                <span className="block text-[10px] font-medium leading-tight opacity-70">
+                  {t('parameters:nozzle', { diameter: (val - 0.02).toFixed(1) })}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">{t('parameters:pixelSize')}{(pixelSize ?? 0).toFixed(2)} mm
-        </label>
-        <input
-          type="range"
-          min="0.01"
-          max="5"
-          step="any"
+        <RangeField
+          label={t('parameters:pixelSize')}
+          display={`${(pixelSize ?? 0).toFixed(2)} mm`}
           value={pixelSize}
-          onChange={(e) => onPixelSizeChange(parseFloat(e.target.value))}
-          className="w-full"
+          min={0.01}
+          max={5}
+          step="any"
+          onChange={onPixelSizeChange}
         />
-      </div>
+        {targetWidth > 0 && (
+          <div>
+            <label className="text-sm font-medium text-ink-soft" htmlFor="maxDimension">{t('parameters:maxDimensionWidthOrHeight')}</label>
+            <div className="mt-1.5 flex items-center gap-3">
+              <div className="relative w-32 shrink-0">
+                <input
+                  id="maxDimension"
+                  type="number"
+                  min="1"
+                  max="500"
+                  step="1"
+                  value={maxDimensionInput}
+                  onChange={(e) => {
+                    setIsEditingMaxDimension(true);
+                    setMaxDimensionInput(e.target.value);
+                  }}
+                  onFocus={() => setIsEditingMaxDimension(true)}
+                  onBlur={commitMaxDimension}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    }
+                    if (e.key === 'Escape') {
+                      setIsEditingMaxDimension(false);
+                      setMaxDimensionInput(formatMaxDimension(maxDimension));
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  className="tv-input pr-10 font-mono"
+                />
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-ink-muted">mm</span>
+              </div>
+              <p className="tv-value text-ink-muted">
+                {t('parameters:currentSize', { width: targetWidth.toFixed(1), height: targetHeight.toFixed(1) })}
+              </p>
+            </div>
+          </div>
+        )}
+      </RailSection>
 
-      {targetWidth > 0 && (
+      <RailSection index={4} title={t('converter:sectionBacking')}>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="maxDimension">{t('parameters:maxDimensionWidthOrHeight')}</label>
-          <input
-            id="maxDimension"
-            type="number"
-            min="1"
-            max="500"
-            step="1"
-            value={maxDimensionInput}
-            onChange={(e) => {
-              setIsEditingMaxDimension(true);
-              setMaxDimensionInput(e.target.value);
-            }}
-            onFocus={() => setIsEditingMaxDimension(true)}
-            onBlur={commitMaxDimension}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.currentTarget.blur();
-              }
-              if (e.key === 'Escape') {
-                setIsEditingMaxDimension(false);
-                setMaxDimensionInput(formatMaxDimension(maxDimension));
-                e.currentTarget.blur();
-              }
-            }}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
-          <p className="text-xs text-gray-500">
-            {t('parameters:currentSize', { width: targetWidth.toFixed(1), height: targetHeight.toFixed(1) })}
-          </p>
+          <label className="text-sm font-medium text-ink-soft" htmlFor="whiteBackingLayers">{t('parameters:whiteBackingLayers')}</label>
+          <div className="mt-1.5 flex items-center gap-3">
+            <input
+              id="whiteBackingLayers"
+              type="number"
+              min="0"
+              max="5"
+              step="1"
+              value={whiteBackingLayers}
+              onChange={(e) => onWhiteBackingLayersChange(Math.max(0, Math.min(5, parseInt(e.target.value || '0', 10))))}
+              className="tv-input w-20 font-mono"
+            />
+            <div className="tv-seg flex-1">
+              {(['white', 'black'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={backingMode === m}
+                  onClick={() => onBackingModeChange(m)}
+                  className="tv-seg-item"
+                >
+                  {t(`parameters:backingMode_${m}`)}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="whiteBackingLayers">{t('parameters:whiteBackingLayers')}</label>
-        <input
-          id="whiteBackingLayers"
-          type="number"
-          min="0"
-          max="5"
-          step="1"
-          value={whiteBackingLayers}
-          onChange={(e) => onWhiteBackingLayersChange(Math.max(0, Math.min(5, parseInt(e.target.value || '0', 10))))}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          {t('parameters:stack', { optical: printStack.opticalLayerCount, backing: printStack.whiteBackingLayers, total: printStack.totalLayerCount })}
-        </p>
-        <div className="mt-2 flex gap-1">
-          {(['white', 'black'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => onBackingModeChange(m)}
-              className={`flex-1 py-1.5 px-2 text-xs rounded-md border transition-colors ${
-                backingMode === m
-                  ? 'bg-purple-600 text-white border-purple-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400'
-              }`}
-            >
-              {t(`parameters:backingMode_${m}`)}
-            </button>
-          ))}
+        <div className="flex items-center gap-4 rounded-sheet border border-rule bg-paper-raised p-3">
+          <StackDiagram stack={printStack} />
+          <div className="min-w-0 space-y-1">
+            <p className="text-xs text-ink-soft">
+              {t('parameters:stack', { optical: printStack.opticalLayerCount, backing: printStack.whiteBackingLayers, total: printStack.totalLayerCount })}
+            </p>
+            <p className="text-xs text-ink-muted">
+              {t('parameters:actualExportHeight')}{' '}
+              <span className="tv-value">{printStack.totalHeightMm.toFixed(2)} mm</span>
+            </p>
+          </div>
         </div>
-      </div>
-
-      <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">{t('parameters:actualExportHeight')}{' '}{printStack.totalHeightMm.toFixed(2)} mm
-      </div>
+      </RailSection>
 
       {hasImage && (
-        <button
-          onClick={onReprocess}
-          disabled={processing}
-          className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400"
-        >
-          {processing ? t('common:processing') : t('parameters:reprocess')}
-        </button>
+        <div className="sticky bottom-0 z-10 -mx-1 flex gap-2 border-t border-rule bg-paper/95 px-1 py-3 backdrop-blur-sm md:col-span-2 xl:col-span-1">
+          <button
+            type="button"
+            onClick={onReprocess}
+            disabled={processing}
+            className="tv-btn-primary flex-1 whitespace-nowrap !px-3"
+          >
+            <RefreshCw className={`h-4 w-4 ${processing ? 'animate-spin' : ''}`} aria-hidden="true" />
+            {processing ? t('common:processing') : t('parameters:reprocess')}
+          </button>
+          {onAutoOptimize && (
+            <button
+              type="button"
+              onClick={onAutoOptimize}
+              disabled={processing}
+              className="tv-btn-outline flex-1 whitespace-nowrap !px-3"
+            >
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+              {t('parameters:autoOptimizeParameters')}
+            </button>
+          )}
+        </div>
       )}
-
-      {hasImage && onAutoOptimize && (
-        <button
-          onClick={onAutoOptimize}
-          disabled={processing}
-          className="w-full py-2 border border-purple-500 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >{t('parameters:autoOptimizeParameters')}</button>
-      )}
-    </div>
+    </>
   );
 };
