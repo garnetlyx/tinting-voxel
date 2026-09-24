@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from config.print_defaults import DEFAULT_FILAMENT_PRESET
-from config.settings import settings
+from core.parallel import worker_threads
 from core.color_config import get_preset, normalize_transmission_distance
 
 import numpy as np
@@ -152,8 +152,8 @@ class Color:
 
         # Each input is an independent vectorized pass over the references;
         # numpy releases the GIL, so large matches spread across threads.
-        if len(inp_lab) > 1 and len(ref_lab) * len(inp_lab) >= PARALLEL_MATCH_MIN_PAIRS:
-            with ThreadPoolExecutor(max_workers=settings.compute_threads) as pool:
+        if worker_threads() > 1 and len(inp_lab) > 1 and len(ref_lab) * len(inp_lab) >= PARALLEL_MATCH_MIN_PAIRS:
+            with ThreadPoolExecutor(max_workers=worker_threads()) as pool:
                 nearest_indices = list(pool.map(nearest, inp_lab))
         else:
             nearest_indices = [nearest(lab_color) for lab_color in inp_lab]

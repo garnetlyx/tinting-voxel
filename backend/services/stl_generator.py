@@ -19,6 +19,7 @@ import pandas as pd
 from config.settings import settings
 from core.blend_color import BlendTestGenerator, Color, Colors, colors_key
 from core.blend_models import blend_tables, rgb_from_indices
+from core.parallel import available_cpus, set_worker_threads, worker_threads
 from services.mesh_optimizer import boxes_from_rectangles, greedy_mesh_2d, pixels_to_grid
 from services.print_stack import (
     backing_suffix,
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 _probe_state: dict = {}
 
 # Codes blended per enumeration work item; bounds per-thread temporaries.
-_ENUMERATION_CHUNK_CODES = 1 << 16
+_ENUMERATION_CHUNK_CODES = 1 << 14
 
 # Global reference-matrix state (module-level cache for the legacy
 # initialize_color_mapping path used by tests and warmup).
@@ -109,13 +110,14 @@ def _distinct_reference_colors(
         rep_key.append(unique[order])
 
     starts = range(0, total, _ENUMERATION_CHUNK_CODES)
-    with ThreadPoolExecutor(max_workers=settings.compute_threads) as pool:
+    threads = worker_threads()
+    with ThreadPoolExecutor(max_workers=threads) as pool:
         # Bounded look-ahead keeps finished chunks from piling up in memory;
         # chunks are consumed in order so first occurrences stay first.
         pending: deque = deque()
         for start in starts:
             pending.append((start, pool.submit(chunk_keys, start)))
-            if len(pending) >= 2 * settings.compute_threads:
+            if len(pending) >= 2 * threads:
                 done_start, future = pending.popleft()
                 keep_first_occurrences(done_start, future.result())
         while pending:
@@ -141,6 +143,8 @@ def _distinct_reference_colors(
 def _probe_throughput() -> tuple[float, float]:
     """Measure the enumeration and matching rates on this host.
 
+    Times the enumeration on one thread and on every usable CPU (capped by
+    settings.compute_threads) and keeps the faster for all vectorized work.
     Returns seconds per enumerated code (blend, dedup and representative
     decoding) and seconds per (reference color x target) match under the
     production metric. Both stages are linear in their counts.
@@ -157,9 +161,17 @@ def _probe_throughput() -> tuple[float, float]:
         )
     })
     layers = 9  # 262,144 codes: a real full enumeration
-    t0 = _time.perf_counter()
-    codes, rgbs = _distinct_reference_colors(probe_colors, layers, 0.08)
-    build = (_time.perf_counter() - t0) / (4 ** layers)
+    _distinct_reference_colors(probe_colors, 4, 0.08)  # warm up numpy
+    cpus = available_cpus()
+    rates: dict[int, float] = {}
+    for threads in sorted({1, min(settings.compute_threads, cpus)}):
+        set_worker_threads(threads)
+        t0 = _time.perf_counter()
+        codes, rgbs = _distinct_reference_colors(probe_colors, layers, 0.08)
+        rates[threads] = (_time.perf_counter() - t0) / (4 ** layers)
+    threads = min(rates, key=rates.get)
+    set_worker_threads(threads)
+    build = rates[threads]
 
     targets = [(120 + i, 130 + i % 7, 140) for i in range(64)]
     code_df, rgb_df = _as_matrices(codes, rgbs)
@@ -168,8 +180,9 @@ def _probe_throughput() -> tuple[float, float]:
     match = (_time.perf_counter() - t0) / (len(codes) * len(targets))
     _probe_state.update(build_s_per_code=build, match_s_per_ref_target=match)
     logger.info(
-        "Enumeration cost probe: build %.2e s/code, match %.2e s/(color x target)",
-        build, match,
+        "Enumeration cost probe: %d usable CPUs, build s/code by threads %s -> %d threads; "
+        "match %.2e s/(color x target)",
+        cpus, {t: f"{r:.2e}" for t, r in rates.items()}, threads, match,
     )
     return build, match
 
