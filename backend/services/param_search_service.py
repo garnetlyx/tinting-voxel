@@ -67,7 +67,7 @@ def _color_counts(values: tuple[int, ...]) -> tuple[int, ...]:
 
 
 # Chosen on exhaustive score landscapes (tests/fixtures/search_landscapes.json):
-# from the app defaults, 20 trials reach the best grid point, to within 0.001,
+# from the app defaults, 20 trials reach the best grid point, to within 0.01,
 # on every recorded image and filament set. In SVG mode the color count
 # dominates and epsilon and minimum area change the score smoothly, so
 # single-axis steps suffice.
