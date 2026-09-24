@@ -531,6 +531,9 @@ def quantize_colors_with_labels(
     ], axis=1).astype(np.float32)
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
+    # k-means++ draws from OpenCV's per-thread RNG, whose state carries over
+    # between calls; reseed it so an image always clusters the same way.
+    cv2.setRNGSeed(0)
     _, labels, _ = cv2.kmeans(
         pixels_lch_weighted,
         num_colors,

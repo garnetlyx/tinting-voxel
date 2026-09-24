@@ -354,6 +354,17 @@ class TestVectorProcessorIntegration:
 class TestHuePriorityQuantization:
     """quantize_colors_with_labels should separate hues before lightness."""
 
+    def test_same_image_quantizes_identically_on_every_call(self):
+        """Search previews must match applying the same settings later."""
+        from services.vector_processor import quantize_colors_with_labels
+
+        image = np.random.default_rng(3).integers(0, 256, (48, 64, 3), dtype=np.uint8)
+        first = quantize_colors_with_labels(image, 12)
+        for _ in range(3):
+            again = quantize_colors_with_labels(image, 12)
+            assert np.array_equal(again[1], first[1])
+            assert again[2] == first[2]
+
     def test_same_hue_different_lightness_same_cluster(self):
         """
         Two blues with the same hue angle but different lightness should land
