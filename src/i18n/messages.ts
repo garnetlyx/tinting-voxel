@@ -47,7 +47,6 @@ const exactMessages = new Map<string, keyof typeof errors>([
 const patterns: readonly [RegExp, keyof typeof errors, readonly string[]][] = [
   [/^Search stopped after (\d+)s; (\d+) of (\d+) previews completed\.$/, 'searchStoppedAtLimit', ['seconds', 'completed', 'total']],
   [/^Too many requests\. Please try again in (\d+) seconds\.$/, 'tooManyRequestsRetryIn', ['seconds']],
-  [/^Image too large \((\d+)x(\d+)\)\. Maximum dimension is (\d+)px\.$/, 'imageTooLarge', ['width', 'height', 'max']],
   [/^Unsupported file type: (.*?)\. Please upload a PNG, JPEG, GIF, WebP, or BMP image\.$/, 'unsupportedType', ['type']],
   [/^(\d+) file\(s\) skipped \(unsupported format\)$/, 'skippedFiles', ['count']],
   [/^Maximum (\d+) images allowed\. Extra files were dropped\.$/, 'tooManyImages', ['max']],

@@ -133,7 +133,6 @@ async def api_batch_download_stl(
         generate_batch_stl_zip,
         batch_results=batch_result['results'],
         layer_height=layerHeight,
-        pixel_size=pixelSize,
         layer_count=layerCount,
         colors=colors,
         white_backing_layers=whiteBackingLayers,

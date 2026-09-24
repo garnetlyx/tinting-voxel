@@ -205,7 +205,7 @@ class TestQA131HealthEndpointInfoLeakage:
         )
 
 
-# -- QA-132: _downscale_if_needed can produce 0-dimension image ---------------
+# -- QA-132: resample_to_model_grid can produce 0-dimension image ---------------
 # File: backend/services/image_processor.py:135-157
 # int(width * scale) truncates to 0 for extreme aspect ratios, e.g.,
 # 1x100000 image => scale=0.01024, new_width=int(0.01024)=0.
@@ -215,41 +215,41 @@ class TestQA132DownscaleZeroDimension:
 
     def test_extreme_aspect_ratio_no_zero_dimension(self):
         """Downscaling a 1x10000 image should not produce 0-width."""
-        from services.image_processor import _downscale_if_needed
+        from services.image_processor import resample_to_model_grid
 
         # Create extreme aspect ratio image: 1px wide, 10000px tall
         img = Image.new('RGB', (1, 10000), color=(255, 0, 0))
 
         try:
-            result = _downscale_if_needed(img, 1024)
+            result, _ = resample_to_model_grid(img, 1.0, None)
             width, height = result.size
             assert width > 0 and height > 0, (
-                f"BUG QA-132: _downscale_if_needed produced {width}x{height} "
+                f"BUG QA-132: resample_to_model_grid produced {width}x{height} "
                 f"for 1x10000 input. int() truncation creates 0-dimension."
             )
         except (ValueError, Exception) as e:
             pytest.fail(
-                f"BUG QA-132: _downscale_if_needed crashes with '{e}' for "
+                f"BUG QA-132: resample_to_model_grid crashes with '{e}' for "
                 f"1x10000 input. int(1 * 0.1024) = 0, causing PIL resize "
                 f"to fail. Clamp new dimensions to min 1px."
             )
 
     def test_extreme_horizontal_no_zero_height(self):
         """Downscaling a 10000x1 image should not produce 0-height."""
-        from services.image_processor import _downscale_if_needed
+        from services.image_processor import resample_to_model_grid
 
         img = Image.new('RGB', (10000, 1), color=(0, 255, 0))
 
         try:
-            result = _downscale_if_needed(img, 1024)
+            result, _ = resample_to_model_grid(img, 1.0, None)
             width, height = result.size
             assert width > 0 and height > 0, (
-                f"BUG QA-132: _downscale_if_needed produced {width}x{height} "
+                f"BUG QA-132: resample_to_model_grid produced {width}x{height} "
                 f"for 10000x1 input. Clamp both dimensions to min 1px."
             )
         except (ValueError, Exception) as e:
             pytest.fail(
-                f"BUG QA-132: _downscale_if_needed crashes with '{e}' for "
+                f"BUG QA-132: resample_to_model_grid crashes with '{e}' for "
                 f"10000x1 input. Clamp both dimensions to min 1px."
             )
 
@@ -638,7 +638,7 @@ class TestQA144FormParamsNoUpperBound:
 
 # -- QA-145: SVG mode does not downscale images --------------------------------
 # File: backend/api/routes/image.py:72-74
-# Pixel mode calls process_image() which downscales via _downscale_if_needed.
+# Pixel mode calls process_image() which downscales via resample_to_model_grid.
 # SVG mode opens the image directly without downscaling.
 
 # -- QA-146: Batch download silently falls back on malformed filamentColors ----

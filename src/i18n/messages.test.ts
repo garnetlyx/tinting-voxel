@@ -7,7 +7,6 @@ afterEach(() => setLocale('en'));
 describe('frontend message compatibility adapter', () => {
   it.each([
     ['Failed to download STL', 'STL 下载失败'],
-    ['Image too large (9000x6000). Maximum dimension is 8192px.', '图片过大（9000 × 6000）。最长边不得超过 8192 像素。'],
     ['Unsupported file type: image/avif. Please upload a PNG, JPEG, GIF, WebP, or BMP image.', '不支持此文件类型：image/avif。请上传 PNG、JPEG、GIF、WebP 或 BMP 图片。'],
     ['3 file(s) skipped (unsupported format)', '已跳过 3 个不支持格式的文件'],
     ['Maximum 20 images allowed. Extra files were dropped.', '最多允许 20 张图片，已忽略多余文件。'],

@@ -15,6 +15,8 @@ interface CropRegion {
 
 interface ImageEditorProps {
   image: HTMLImageElement;
+  /** Longest output side; processing never uses more, and larger canvases can fail on phones. */
+  maxSidePx: number;
   onApply: (editedImage: HTMLImageElement) => void;
   onCancel: () => void;
   disabled?: boolean;
@@ -22,6 +24,7 @@ interface ImageEditorProps {
 
 export const ImageEditor: React.FC<ImageEditorProps> = ({
   image,
+  maxSidePx,
   onApply,
   onCancel,
   disabled = false,
@@ -199,6 +202,11 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
   // Apply edits and create new HTMLImageElement
   const handleApply = () => {
     const canvas = document.createElement('canvas');
+    const setOutputSize = (width: number, height: number) => {
+      const scale = Math.min(1, maxSidePx / Math.max(width, height));
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+    };
 
     if (cropRegion && isCropping) {
       // Apply crop on the resized image coordinates, mapping back to original
@@ -207,19 +215,17 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
       const srcW = cropRegion.width * image.width / effectiveWidth;
       const srcH = cropRegion.height * image.height / effectiveHeight;
 
-      canvas.width = Math.round(srcW);
-      canvas.height = Math.round(srcH);
+      setOutputSize(srcW, srcH);
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(image, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
       }
     } else if (resizePercent !== 100) {
       // Apply resize only
-      canvas.width = effectiveWidth;
-      canvas.height = effectiveHeight;
+      setOutputSize(effectiveWidth, effectiveHeight);
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.drawImage(image, 0, 0, effectiveWidth, effectiveHeight);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
       }
     } else {
       // No edits, pass through original

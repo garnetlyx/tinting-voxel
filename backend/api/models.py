@@ -401,6 +401,7 @@ class BatchImageResult(BaseModel):
     colorBlocks: Optional[List[ColorBlock]] = None
     processedImage: Optional[str] = None
     imageDimensions: Optional[ImageDimensions] = None
+    pixelSize: Optional[float] = None  # Model grid pitch in mm
     error: Optional[str] = None
 
 

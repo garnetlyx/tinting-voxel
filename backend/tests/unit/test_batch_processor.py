@@ -122,7 +122,6 @@ class TestGenerateBatchStlZip:
         zip_bytes = generate_batch_stl_zip(
             batch_results=batch['results'],
             layer_height=0.08,
-            pixel_size=0.08,
             layer_count=4,
         )
 
@@ -145,7 +144,6 @@ class TestGenerateBatchStlZip:
         zip_bytes = generate_batch_stl_zip(
             batch_results=batch['results'],
             layer_height=0.08,
-            pixel_size=0.08,
             layer_count=4,
         )
 
@@ -168,7 +166,6 @@ class TestGenerateBatchStlZip:
         zip_bytes = generate_batch_stl_zip(
             batch_results=batch['results'],
             layer_height=0.08,
-            pixel_size=0.08,
             layer_count=4,
         )
 
@@ -185,7 +182,6 @@ class TestGenerateBatchStlZip:
             generate_batch_stl_zip(
                 batch_results=results,
                 layer_height=0.08,
-                pixel_size=0.08,
                 layer_count=4,
             )
 
@@ -201,7 +197,6 @@ class TestGenerateBatchStlZip:
         zip_bytes = generate_batch_stl_zip(
             batch_results=batch['results'],
             layer_height=0.08,
-            pixel_size=0.08,
             layer_count=4,
             colors=colors,
         )

@@ -29,8 +29,7 @@ from api.rate_limiter import limiter
 from api.responses import json_response
 from api.validators import validate_image_upload
 from services.image_processor import (
-    MAX_PROCESSING_DIMENSION,
-    _downscale_if_needed,
+    resample_to_model_grid,
     _image_to_data_url,
     build_simulated_print_preview,
     build_vector_simulated_preview,
@@ -105,8 +104,8 @@ async def api_process_image(
             )
 
             logger.info(
-                "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.2f, detailSize=%s",
-                maxColors, colorThreshold, pixelSize, str(detailSize)
+                "Pixel mode - maxColors=%d, colorThreshold=%.1f, pixelSize=%.3f (model %.3f), detailSize=%s",
+                maxColors, colorThreshold, pixelSize, result['pixelSize'], str(detailSize)
             )
             logger.info(
                 "Processed image: %dx%d, extracted %d colors",
@@ -115,11 +114,7 @@ async def api_process_image(
                 len(result['colorBlocks'])
             )
 
-            return json_response(ProcessImageResponse(
-                **result,
-                pixelSize=pixelSize,
-                detailSize=detailSize,
-            ))
+            return json_response(ProcessImageResponse(**result, detailSize=detailSize))
 
         return await run_in_threadpool(build_pixel_response)
 
@@ -152,8 +147,7 @@ def _svg_mode_response(
     else:
         img = img.convert('RGB')
 
-    # Standard safety downscale only; detailSize no longer drives global SVG resampling.
-    img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
+    img, pixelSize = resample_to_model_grid(img, pixelSize, detailSize)
     img_array = np.array(img)
 
     config = VectorProcessorConfig(

@@ -105,7 +105,7 @@ tinting-voxel solves these by:
 ### 3.2 User Flows
 
 #### Flow 1 — Basic Image-to-Mesh Conversion
-1. User uploads PNG/JPG (≤10MB, auto-downscaled past 1024px).
+1. User uploads PNG/JPG (≤10MB); large images are resampled to the model grid (≤2M cells, ≤4096px per side) at their physical size.
 2. Backend extracts dominant colors via K-means in CIELAB space.
 3. Backend maps colors to the configured N-color set using shared transmission
    and light-loss allocation with CIEDE2000 distance.
@@ -141,7 +141,7 @@ tinting-voxel solves these by:
 
 **Image input**
 - PNG / JPG / JPEG / BMP / GIF / WebP upload with magic-byte validation
-- Auto-downscale past `MAX_PROCESSING_DIMENSION` (4096px)
+- Resample to the model grid: at most `max_model_cells` cells and `MAX_PROCESSING_DIMENSION` (4096px) per side
 - Canvas crop/resize editor (frontend)
 - Drag-and-drop + click upload
 
@@ -262,8 +262,8 @@ defaults. Bambu and clear presets use RGB-channel TD; custom materials accept a 
   Safari 14+, Edge 90+).
 - **Backend**: Python 3.8+ runtime (type hints throughout).
 - **Deployment**: Docker, Railway, Fly.io, or self-hosted.
-- **File support**: PNG, JPG, JPEG, BMP, GIF, WebP (≤10MB; auto-downscaled
-  past 4096px).
+- **File support**: PNG, JPG, JPEG, BMP, GIF, WebP (≤10MB; resampled to at
+  most 2M cells and 4096px per side, keeping the physical size).
 
 ### 6.2 Performance Requirements
 

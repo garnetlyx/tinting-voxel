@@ -207,6 +207,14 @@ enumeration order), which matches exactly what matching every code returns.
 Enumeration plus matching must fit `full_enumeration_budget_seconds`; over
 budget, translucent sets use composition pruning and opaque sets are rejected.
 
+Images larger than the model grid budget (`max_model_cells`, 4096 px per side)
+are resampled at their physical size, snapping to whole detail-width cells when
+resampling would land between half and one detail width. The browser applies
+the same policy before upload (`src/utils/modelGrid.ts` mirrors
+`image_processor.model_pitch`; the limits come from `/api/v2/filament-presets`),
+and responses report the model pitch as `pixelSize`. Vectorized work uses the
+thread count the startup probe found fastest (`core/parallel.py`).
+
 ### Key Patterns
 - `FilamentConfigMixin` in `models.py` provides shared filament validation
 - `@handle_api_errors` decorator in `error_handlers.py` standardizes error handling

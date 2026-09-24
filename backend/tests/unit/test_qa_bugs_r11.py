@@ -101,7 +101,6 @@ class TestQA111BatchSTLSilentFailure:
             result = generate_batch_stl_zip(
                 batch_results=invalid_results,
                 layer_height=0.08,
-                pixel_size=0.08,
                 layer_count=4,
             )
 

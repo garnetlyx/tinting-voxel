@@ -148,7 +148,7 @@ describe('useImageProcessor', () => {
   it('uses catalog metadata and TD for an arbitrary preset identity', async () => {
     const supplied = structuredClone(filamentCatalog);
     supplied.presets = [{ ...supplied.presets[2], name: 'new-material-set' }];
-    supplied.defaults = { filament_preset: 'new-material-set', backing_layers: 2, regular_layer_height_mm: 0.1, transparent_layer_height_mm: 0.7 };
+    supplied.defaults = { ...supplied.defaults, filament_preset: 'new-material-set', backing_layers: 2, regular_layer_height_mm: 0.1, transparent_layer_height_mm: 0.7 };
     vi.mocked(getFilamentPresets).mockResolvedValueOnce(supplied);
     const { result } = await renderProcessor();
     expect(result.current.filamentPreset).toBe('new-material-set');
@@ -509,6 +509,23 @@ describe('useImageProcessor', () => {
     expect(result.current.targetWidth).toBeCloseTo(200);
     expect(result.current.targetHeight).toBeCloseTo(150);
     expect(result.current.maxDimension).toBeCloseTo(200);
+  });
+
+  it('resamples a large photo to the model grid instead of rejecting it', async () => {
+    const { result } = await renderProcessor();
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+    Object.defineProperty(img, 'width', { value: 5000, configurable: true });
+    Object.defineProperty(img, 'height', { value: 4000, configurable: true });
+
+    await act(async () => {
+      result.current.handleApplyEdit(img);
+    });
+
+    expect(result.current.error).toBeNull();
+    // 20 MP at 200 mm fits the 2M-cell budget as a 1581 x 1264 grid.
+    const calls = mockedProcessImage.mock.calls;
+    const params = calls[calls.length - 1][1];
+    expect(params.pixelSize).toBeCloseTo(200 / 1581, 9);
   });
 
   it('falls back to filamentColors after the preset is edited into a custom config', async () => {

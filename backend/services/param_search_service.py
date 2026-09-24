@@ -82,9 +82,7 @@ class Evaluator:
         return result["processedImage"]
 
     def _run_svg(self, params: dict) -> str:
-        from services.image_processor import (
-            MAX_PROCESSING_DIMENSION, _downscale_if_needed, build_vector_simulated_preview,
-        )
+        from services.image_processor import build_vector_simulated_preview, resample_to_model_grid
         from services.stl_generator import compute_reference_matrices
         from services.vector_processor import VectorProcessorConfig, process_image_vector_with_preview
 
@@ -95,14 +93,14 @@ class Evaluator:
             img = background
         else:
             img = img.convert("RGB")
-        img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
-        pixel_size = self._fixed.pixel_size
+        detail_size = float(params.get("detail_size", 0.42))
+        img, pixel_size = resample_to_model_grid(img, self._fixed.pixel_size, detail_size)
         config = VectorProcessorConfig(
             epsilon=float(params.get("epsilon", 2.0)),
             min_area=max(1, int(float(params.get("min_area", 4.0)) / (pixel_size * pixel_size))),
             num_colors=int(params.get("num_colors", 8)),
             pixel_size=pixel_size,
-            detail_size=float(params.get("detail_size", 0.42)),
+            detail_size=detail_size,
         )
         vector_results, quantized = process_image_vector_with_preview(np.array(img), config)
         ref_matrices = compute_reference_matrices(

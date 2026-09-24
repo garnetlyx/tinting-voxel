@@ -24,6 +24,8 @@ from core.color_config import (
     PRESET_DISPLAY_NAMES,
 )
 from services.print_settings_generator import generate_print_settings
+from config.settings import settings
+from services.image_processor import MAX_PROCESSING_DIMENSION
 from config.print_defaults import (
     DEFAULT_FILAMENT_PRESET, DEFAULT_BACKING_LAYERS,
     REGULAR_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM,
@@ -65,6 +67,8 @@ async def api_get_filament_presets(request: Request):
             "backing_layers": DEFAULT_BACKING_LAYERS,
             "regular_layer_height_mm": REGULAR_LAYER_HEIGHT_MM,
             "transparent_layer_height_mm": TRANSPARENT_LAYER_HEIGHT_MM,
+            "max_model_cells": settings.max_model_cells,
+            "max_model_side_px": MAX_PROCESSING_DIMENSION,
         },
         transparency={"td_threshold_mm": TRANSPARENT_TD_THRESHOLD_MM, "aggregation": "mean"},
     )

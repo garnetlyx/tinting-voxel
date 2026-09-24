@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     # browser tabs may poll only once a minute.
     param_search_abandon_seconds: float = 180.0
 
+    # Model grid cell budget: larger images are resampled to at most this many
+    # cells, which bounds processing, cleanup and export time (see
+    # image_processor.model_pitch).
+    max_model_cells: int = 2_000_000
+
     # File Upload
     max_upload_size: int = 10 * 1024 * 1024  # 10MB
     allowed_extensions: list[str] = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"]
@@ -74,8 +79,9 @@ class Settings(BaseSettings):
     # bounds every sync endpoint anyway.
     full_enumeration_budget_seconds: float = 60.0
 
-    # Worker threads for vectorized stack enumeration and color matching
-    # (numpy releases the GIL). Match the container's vCPU limit.
+    # Upper bound on worker threads for vectorized stack enumeration and color
+    # matching (numpy releases the GIL). The startup probe uses fewer when the
+    # host has fewer usable CPUs or threads do not help (core/parallel.py).
     compute_threads: int = 8
 
     # STL/3MF generation: cap on total merged boxes per request. Greedy meshing

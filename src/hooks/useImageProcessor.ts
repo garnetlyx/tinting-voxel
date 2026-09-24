@@ -30,6 +30,7 @@ import {
 } from '../api/client';
 import { useFilamentStorage } from './useFilamentStorage';
 import { buildPrintStack } from '../utils/printStack';
+import { modelGridSize, modelPitch } from '../utils/modelGrid';
 
 const MIN_FILAMENT_COLORS = 4;
 const MAX_FILAMENT_COLORS = 16;
@@ -187,7 +188,6 @@ export const useImageProcessor = () => {
   const completedRenderKeyRef = useRef<string | null>(null);
   // Set to true when handleApplyEdit cannot determine image dimensions upfront;
   // handleProcessImage will then apply the default after the API returns dimensions.
-  const shouldApplyDefaultMaxDimensionRef = useRef(false);
 
   // Load a built-in preset into filamentColors
   const loadPreset = useCallback((preset: FilamentPreset) => {
@@ -293,7 +293,7 @@ export const useImageProcessor = () => {
     layerHeight, layerCount, whiteBackingLayers, backingMode, filamentRequestPayload]);
 
   // Process image by calling backend API
-  const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode, overridePixelSize?: number, overrides?: Partial<{
+  const handleProcessImage = useCallback(async (img: HTMLImageElement, currentMode?: ProcessingMode, overrideLongestMm?: number, overrides?: Partial<{
     maxColors: number; colorThreshold: number; epsilon: number; minArea: number; numColors: number;
     detailSize: number; whiteBackingLayers: number;
   }>) => {
@@ -313,28 +313,33 @@ export const useImageProcessor = () => {
     setProcessingStage('uploading');
     setError(null);
 
-    const requestParams = makeProcessParams(currentMode, overridePixelSize, overrides);
+    // The physical size is the source of truth: resample the image to the
+    // model grid the backend will use, and send the pitch of that grid.
+    const longestMm = overrideLongestMm ?? maxDimension;
+    const sourcePitch = longestMm / Math.max(img.width, img.height);
+    const limits = filamentCatalog
+      ? { maxCells: filamentCatalog.defaults.max_model_cells, maxSidePx: filamentCatalog.defaults.max_model_side_px }
+      : null;
+    const grid = limits
+      ? modelGridSize(img.width, img.height, sourcePitch, modelPitch(
+        img.width, img.height, sourcePitch, overrides?.detailSize ?? detailSize, limits,
+      ))
+      : { width: img.width, height: img.height };
+    const requestParams = makeProcessParams(currentMode, longestMm / Math.max(grid.width, grid.height), overrides);
     const processingMode = requestParams.mode;
     const requestKey = printableRenderKey(requestParams);
     requestedRenderKeyRef.current = requestKey;
 
     try {
-      const maxDimension = 4096;
-      if (img.width > maxDimension || img.height > maxDimension) {
-        setError(`Image too large (${img.width}x${img.height}). Maximum dimension is ${maxDimension}px.`);
-        setProcessing(false);
-        setProcessingStage('idle');
-        return;
-      }
-
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = grid.width;
+      canvas.height = grid.height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         throw new Error('Failed to get 2D canvas context');
       }
-      ctx.drawImage(img, 0, 0);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, grid.width, grid.height);
 
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((b) => {
@@ -362,18 +367,6 @@ export const useImageProcessor = () => {
       }
       if (result.detailSize !== undefined && result.detailSize !== null) {
         setDetailSize(result.detailSize);
-      }
-      // Fallback: if handleApplyEdit couldn't compute default upfront (image dimensions
-      // were 0), compute it now from the backend-returned dimensions.
-      if (shouldApplyDefaultMaxDimensionRef.current) {
-        const defaultPixelSize = computeDefaultPixelSize(
-          result.imageDimensions.width,
-          result.imageDimensions.height,
-        );
-        if (defaultPixelSize !== null) {
-          setPixelSize(defaultPixelSize);
-        }
-        shouldApplyDefaultMaxDimensionRef.current = false;
       }
 
       if (processingMode === 'pixel') {
@@ -406,7 +399,7 @@ export const useImageProcessor = () => {
         setProcessingStage('idle');
       }
     }
-  }, [makeProcessParams, isFilamentConfigValid]);
+  }, [makeProcessParams, isFilamentConfigValid, maxDimension, filamentCatalog, detailSize]);
 
   const currentRenderKey = printableRenderKey(makeProcessParams());
   const renderReady = completedRenderKeyRef.current === currentRenderKey;
@@ -473,31 +466,18 @@ export const useImageProcessor = () => {
 
   // Apply edited image from ImageEditor and start processing
   const handleApplyEdit = useCallback((editedImg: HTMLImageElement) => {
-    // Predict the backend-downscaled dimensions (MAX_PROCESSING_DIMENSION=4096)
-    // so we can compute the correct default pixelSize upfront, matching what the
-    // backend will actually return in imageDimensions.
     const imgW = editedImg.naturalWidth || editedImg.width;
     const imgH = editedImg.naturalHeight || editedImg.height;
-    const BACKEND_MAX_DIM = 4096;
-    let processedW = imgW;
-    let processedH = imgH;
-    if (imgW > 0 && imgH > 0 && Math.max(imgW, imgH) > BACKEND_MAX_DIM) {
-      const scale = BACKEND_MAX_DIM / Math.max(imgW, imgH);
-      processedW = Math.round(imgW * scale);
-      processedH = Math.round(imgH * scale);
-    }
-    const defaultPixelSize = processedW > 0 && processedH > 0
-      ? computeDefaultPixelSize(processedW, processedH)
-      : null;
-    if (defaultPixelSize !== null) {
-      setPixelSize(defaultPixelSize);
-    } else {
-      shouldApplyDefaultMaxDimensionRef.current = true;
-    }
+    const defaultPixelSize = computeDefaultPixelSize(imgW, imgH);
     setImage(editedImg);
     setRawImage(null);
     setIsEditing(false);
-    handleProcessImage(editedImg, undefined, defaultPixelSize ?? undefined);
+    if (defaultPixelSize === null) {
+      setError('Failed to load image. The file may be corrupted or not a valid image.');
+      return;
+    }
+    setPixelSize(defaultPixelSize);
+    handleProcessImage(editedImg, undefined, defaultPixelSize * Math.max(imgW, imgH));
   }, [handleProcessImage]);
 
   // Cancel editing and revert to previous state
@@ -508,15 +488,15 @@ export const useImageProcessor = () => {
 
   // Reprocess image with current parameters
   const handleReprocess = (
-    overridePixelSize?: number,
+    overrideLongestMm?: number,
     overrides?: Parameters<typeof handleProcessImage>[3],
     modeOverride?: ProcessingMode,
   ) => {
     // onClick handlers forward the MouseEvent as the first argument; guard
-    // against non-number values leaking into the pixelSize override.
-    const pixelSizeOverride = typeof overridePixelSize === 'number' ? overridePixelSize : undefined;
+    // against non-number values leaking into the size override.
+    const longestMmOverride = typeof overrideLongestMm === 'number' ? overrideLongestMm : undefined;
     if (image) {
-      handleProcessImage(image, modeOverride, pixelSizeOverride, overrides);
+      handleProcessImage(image, modeOverride, longestMmOverride, overrides);
     }
   };
 
@@ -840,6 +820,7 @@ export const useImageProcessor = () => {
 
     // Filament state
     filamentPresets: filamentCatalog?.presets ?? [],
+    maxModelSidePx: filamentCatalog?.defaults.max_model_side_px,
     filamentCatalogLoading,
     filamentCatalogError,
     reloadFilamentCatalog,

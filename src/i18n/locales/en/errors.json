@@ -37,7 +37,6 @@
   "networkerrorWhenAttemptingToFetchResource": "NetworkError when attempting to fetch resource.",
   "loadFailed": "Load failed",
   "screenshotIsTooLarge": "Screenshot is too large",
-  "imageTooLarge": "Image too large ({{width}}x{{height}}). Maximum dimension is {{max}}px.",
   "unsupportedType": "Unsupported file type: {{type}}. Please upload a PNG, JPEG, GIF, WebP, or BMP image.",
   "skippedFiles": "{{count}} file(s) skipped (unsupported format)",
   "tooManyImages": "Maximum {{max}} images allowed. Extra files were dropped.",

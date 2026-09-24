@@ -2,8 +2,10 @@
 Image processing service for color extraction and clustering
 """
 from config.print_defaults import DEFAULT_BACKING_LAYERS
+from config.settings import settings
 import base64
 import logging
+import math
 from io import BytesIO
 from typing import Callable, Optional
 
@@ -436,32 +438,45 @@ def reassign_colors(main_colors: list[dict], rest_colors: list[dict]) -> list[di
     return main_colors
 
 
-def _downscale_if_needed(img: Image.Image, max_dim: int) -> Image.Image:
+def model_pitch(width_px: int, height_px: int, pixel_size: float, detail_size: Optional[float]) -> float:
+    """Model grid pitch in mm for a width_px x height_px image at pixel_size mm per pixel.
+
+    Images within settings.max_model_cells cells and MAX_PROCESSING_DIMENSION
+    cells per side keep their pixel grid; larger ones are resampled to fit.
+    When resampling, a pitch between half and one detail width becomes one
+    detail width: such cells add no printable resolution but make the
+    printability cleanup slow.
     """
-    Downscale image if either dimension exceeds max_dim, preserving aspect ratio.
-
-    Args:
-        img: PIL Image
-        max_dim: Maximum allowed dimension
-
-    Returns:
-        Original or downscaled PIL Image
-    """
-    width, height = img.size
-    if width <= max_dim and height <= max_dim:
-        return img
-
-    scale = max_dim / max(width, height)
-    new_width = int(width * scale)
-    new_height = int(height * scale)
-    # Clamp to minimum 1 pixel to prevent zero-dimension images
-    new_width = max(1, new_width)
-    new_height = max(1, new_height)
-    logger.info(
-        "Downscaling image from %dx%d to %dx%d for processing",
-        width, height, new_width, new_height
+    pitch = max(
+        pixel_size,
+        pixel_size * math.sqrt(width_px * height_px / settings.max_model_cells),
+        pixel_size * max(width_px, height_px) / MAX_PROCESSING_DIMENSION,
     )
-    return img.resize((new_width, new_height), Image.LANCZOS)
+    if detail_size and pitch > pixel_size and detail_size / 2 < pitch < detail_size:
+        pitch = detail_size
+    return pitch
+
+
+def resample_to_model_grid(
+    img: Image.Image, pixel_size: float, detail_size: Optional[float],
+) -> tuple[Image.Image, float]:
+    """Resample an image to its model grid; returns the image and its pitch in mm.
+
+    Grid sides round down, so the pitch never falls below model_pitch and a
+    grid that is already at its pitch passes through unchanged.
+    """
+    pitch = model_pitch(img.width, img.height, pixel_size, detail_size)
+    if pitch <= pixel_size:
+        return img, pixel_size
+    scale = pixel_size / pitch
+    size = (max(1, math.floor(img.width * scale)), max(1, math.floor(img.height * scale)))
+    # The longest side keeps its physical length.
+    actual_pitch = pixel_size * max(img.width, img.height) / max(size)
+    logger.info(
+        "Resampling image from %dx%d to %dx%d (%.3f -> %.3f mm cells)",
+        img.width, img.height, size[0], size[1], pixel_size, actual_pitch,
+    )
+    return img.resize(size, Image.LANCZOS), actual_pitch
 
 
 def merge_small_pixels_to_neighbors(
@@ -563,9 +578,7 @@ def process_image(
     else:
         img = img.convert('RGB')
 
-    # Standard safety downscale only
-    img = _downscale_if_needed(img, MAX_PROCESSING_DIMENSION)
-
+    img, pixel_size = resample_to_model_grid(img, pixel_size, detail_size)
     width, height = img.size
 
     # Convert to numpy array
@@ -690,5 +703,6 @@ def process_image(
             'width': width,
             'height': height
         },
+        'pixelSize': pixel_size,
         'printStack': simulated_preview['printStack'],
     }

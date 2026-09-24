@@ -82,6 +82,7 @@ const Converter: React.FC = () => {
     // Filament state
     filamentPresets,
     filamentCatalogLoading,
+    maxModelSidePx,
     filamentCatalogError,
     reloadFilamentCatalog,
     filamentPreset,
@@ -284,9 +285,10 @@ const Converter: React.FC = () => {
                   />
 
                   {/* Image Editor (crop/resize) */}
-                  {isEditing && rawImage && (
+                  {isEditing && rawImage && maxModelSidePx !== undefined && (
                     <ImageEditor
                       image={rawImage}
+                      maxSidePx={maxModelSidePx}
                       onApply={handleApplyEdit}
                       onCancel={handleCancelEdit}
                       disabled={processing}
@@ -451,13 +453,10 @@ const Converter: React.FC = () => {
           if ('white_backing_layers' in params) { setWhiteBackingLayers(params.white_backing_layers); overrides.whiteBackingLayers = params.white_backing_layers; }
           const nextMode = resultMode === 'pixel' || resultMode === 'svg' ? resultMode : undefined;
           if (nextMode) setMode(nextMode);
-          // Re-apply the pixel size the search evaluated at, so the reprocessed
-          // result matches the card preview (pixel_size is a run-fixed param and
-          // is not part of the per-result params dict).
-          const longestPx = Math.max(imageDimensions.width, imageDimensions.height);
-          const nextPixelSize = longestPx > 0 ? targetLongestEdgeMm / longestPx : undefined;
-          if (nextPixelSize) setPixelSize(nextPixelSize);
-          handleReprocess(nextPixelSize, overrides, nextMode);
+          // Re-apply the model size the search evaluated at, so the reprocessed
+          // result matches the card preview (the size is fixed for a whole run
+          // and is not part of the per-result params dict).
+          handleReprocess(targetLongestEdgeMm, overrides, nextMode);
         }}
       />
     </div>

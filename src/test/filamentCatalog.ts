@@ -15,6 +15,9 @@ export const filamentCatalog: FilamentPresetsResponse = {
     { name: 'clear_cmyg', display_name: 'Clear CMYG', colors: [...transparent.slice(0, 3), { name: 'Grey', hex: '#999999', transmission_distance: [5, 6, 7] }] },
     { name: 'clear_cmyw', display_name: 'Clear CMYW', colors: transparent },
   ],
-  defaults: { filament_preset: 'bambu_cmywk', backing_layers: 3, regular_layer_height_mm: 0.08, transparent_layer_height_mm: 0.84 },
+  defaults: {
+    filament_preset: 'bambu_cmywk', backing_layers: 3, regular_layer_height_mm: 0.08, transparent_layer_height_mm: 0.84,
+    max_model_cells: 2_000_000, max_model_side_px: 4096,
+  },
   transparency: { td_threshold_mm: 4.5, aggregation: 'mean' },
 };

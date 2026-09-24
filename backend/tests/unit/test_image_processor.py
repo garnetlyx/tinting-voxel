@@ -8,13 +8,14 @@ import numpy as np
 import pytest
 from PIL import Image
 
+from config.settings import settings
 from services.image_processor import (
     MAX_PROCESSING_DIMENSION,
-    _downscale_if_needed,
     build_simulated_print_preview,
     build_vector_simulated_preview,
     merge_small_pixels_to_neighbors,
     process_image,
+    resample_to_model_grid,
 )
 
 
@@ -33,42 +34,55 @@ def _decode_data_url_image(data_url: str) -> np.ndarray:
     return np.array(Image.open(BytesIO(image_bytes)).convert("RGB"))
 
 
-class TestDownscaleIfNeeded:
-    """Tests for _downscale_if_needed."""
+class TestModelGrid:
+    """The model grid resolution policy (resample_to_model_grid)."""
 
-    def test_small_image_unchanged(self):
-        """Image smaller than max_dim is not modified."""
+    def test_image_within_the_limits_keeps_its_pitch(self):
         img = Image.new('RGB', (100, 100))
-        result = _downscale_if_needed(img, 1024)
+        result, pitch = resample_to_model_grid(img, 0.05, 0.42)
         assert result.size == (100, 100)
+        assert pitch == 0.05
 
-    def test_exactly_max_dim_unchanged(self):
-        """Image exactly at max_dim is not modified."""
-        img = Image.new('RGB', (1024, 512))
-        result = _downscale_if_needed(img, 1024)
-        assert result.size == (1024, 512)
+    def test_cell_budget_bounds_the_grid(self, monkeypatch):
+        monkeypatch.setattr(settings, "max_model_cells", 10_000)
+        img = Image.new('RGB', (400, 300))
+        result, pitch = resample_to_model_grid(img, 1.0, None)
+        assert result.size[0] * result.size[1] <= 10_000
+        assert max(result.size) * pitch == pytest.approx(400.0)
 
-    def test_large_width_downscaled(self):
-        """Image with width > max_dim is downscaled."""
-        img = Image.new('RGB', (2048, 1024))
-        result = _downscale_if_needed(img, 1024)
-        assert result.size[0] == 1024
-        assert result.size[1] == 512
+    def test_side_length_is_capped(self):
+        img = Image.new('RGB', (MAX_PROCESSING_DIMENSION + 500, 10))
+        result, _ = resample_to_model_grid(img, 1.0, None)
+        assert max(result.size) <= MAX_PROCESSING_DIMENSION
 
-    def test_large_height_downscaled(self):
-        """Image with height > max_dim is downscaled."""
-        img = Image.new('RGB', (512, 2048))
-        result = _downscale_if_needed(img, 1024)
-        assert result.size[0] == 256
-        assert result.size[1] == 1024
+    def test_forced_pitch_below_one_detail_snaps_to_the_detail(self, monkeypatch):
+        # The cell budget alone would give 0.3 mm cells; with 0.42 mm detail
+        # the grid uses whole detail-width cells instead.
+        monkeypatch.setattr(settings, "max_model_cells", 10_000)
+        img = Image.new('RGB', (300, 300))
+        result, pitch = resample_to_model_grid(img, 0.1, 0.42)
+        assert pitch >= 0.42
+        assert result.size == (71, 71)
 
-    def test_aspect_ratio_preserved(self):
-        """Downscaling preserves aspect ratio."""
-        img = Image.new('RGB', (3000, 2000))
-        result = _downscale_if_needed(img, 1024)
-        original_ratio = 3000 / 2000
-        new_ratio = result.size[0] / result.size[1]
-        assert abs(original_ratio - new_ratio) < 0.01
+    def test_native_pixel_art_is_not_resampled(self):
+        # 0.3 mm pixels with 0.42 mm detail stay crisp when no limit forces resampling.
+        img = Image.new('RGB', (64, 64))
+        result, pitch = resample_to_model_grid(img, 0.3, 0.42)
+        assert result.size == (64, 64)
+        assert pitch == 0.3
+
+    def test_resampled_grid_passes_through_unchanged(self, monkeypatch):
+        monkeypatch.setattr(settings, "max_model_cells", 100_000)
+        img = Image.new('RGB', (2000, 1500))
+        once, pitch = resample_to_model_grid(img, 0.05, 0.42)
+        twice, again = resample_to_model_grid(once, pitch, 0.42)
+        assert twice.size == once.size
+        assert again == pitch
+
+    @pytest.mark.parametrize("size", [(1, 10000), (10000, 1)])
+    def test_extreme_aspect_ratio_keeps_every_side(self, size):
+        result, _ = resample_to_model_grid(Image.new('RGB', size), 1.0, None)
+        assert min(result.size) >= 1
 
 
 class TestProcessImageLargeHandling:

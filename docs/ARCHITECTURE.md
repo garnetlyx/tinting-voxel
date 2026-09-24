@@ -506,7 +506,7 @@ Groups similar colors using scikit-learn's MiniBatchKMeans:
 ## Security Considerations
 
 - **File Validation**: Magic number check for image formats
-- **Size Limits**: 10MB max upload, 1024x1024 max dimensions
+- **Size Limits**: 10MB max upload; the model grid holds at most 2M cells and 4096px per side (larger images are resampled)
 - **Input Sanitization**: Pydantic validation on all parameters
 - **CORS**: Restricted to configured origins
 - **No Persistence**: All files processed in-memory, cleaned immediately
