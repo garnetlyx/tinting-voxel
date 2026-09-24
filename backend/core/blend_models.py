@@ -114,6 +114,56 @@ def _blend_unified(
     )
 
 
+def blend_tables(layer_height: float, color_key: tuple) -> tuple[list[str], np.ndarray, np.ndarray]:
+    """Material labels with their per-layer transmission and absorption rows."""
+    layer_height = _coerce_layer_height(layer_height)
+    color_map = _build_color_map_from_key(color_key)
+    labels = list(color_map.keys())
+    t_table = np.empty((len(labels), 3), dtype=np.float64)
+    absorb_table = np.empty((len(labels), 3), dtype=np.float64)
+    for i, label in enumerate(labels):
+        t_table[i] = color_map[label].transmission(layer_height)
+        absorb_table[i] = color_map[label].get_absorption()
+    return labels, t_table, absorb_table
+
+
+def rgb_from_indices(
+    idx: np.ndarray,
+    t_table: np.ndarray,
+    absorb_table: np.ndarray,
+    background_rgb=None,
+) -> np.ndarray:
+    """Blend index-encoded stack codes (codes, layers) to 0-255 float RGB.
+
+    Each color's per-layer transmission is position-independent, so the
+    whole light-loss allocation reduces to cumulative products over (codes,
+    layers, channels). Numerically equivalent to _blend_unified per code.
+    """
+    background = _normalize_background_rgb(background_rgb)
+    transmissions = t_table[idx]                           # (n, L, 3)
+    remain_before = np.concatenate(
+        [
+            np.ones((len(idx), 1, 3), dtype=np.float64),
+            np.cumprod(transmissions, axis=1)[:, :-1],
+        ],
+        axis=1,
+    )
+    loss = remain_before * (1.0 - transmissions)           # (n, L, 3)
+    backing = np.prod(transmissions, axis=1)               # (n, 3)
+    total = loss.sum(axis=1) + backing                     # ~1 by telescoping
+    total = np.where(total > 0, total, 1.0)[:, None, :]
+    loss /= total
+    backing_weight = backing / total[:, 0, :]              # (n, 3)
+
+    absorption = absorb_table[idx]                         # (n, L, 3)
+    rgb = 1.0 - (absorption * loss).sum(axis=1)            # (n, 3)
+    rgb = (
+        backing_weight * background[None, :]
+        + (1.0 - backing_weight) * rgb
+    )
+    return np.clip(rgb * 255.0, 0.0, 255.0)
+
+
 def codes_to_rgb_batch(
     codes,
     layer_height: float,
@@ -122,27 +172,9 @@ def codes_to_rgb_batch(
     chunk_size: int = 65536,
 ) -> list[tuple]:
     """Blend many stack codes with the per-code invariants hoisted out of
-    the loop.
-
-    Full enumeration explodes combinatorially (e.g. 5 colors x 8 layers =
-    390,625 codes); blending them one at a time recomputes per-color
-    constants for every code. Vectorized chunk-wise over codes — each
-    color's per-layer transmission is position-independent, so the whole
-    light-loss allocation reduces to cumulative products over (codes,
-    layers, channels). Numerically equivalent to _blend_unified per code.
-    """
-    layer_height = _coerce_layer_height(layer_height)
-    color_map = _build_color_map_from_key(color_key)
-    labels = list(color_map.keys())
+    the loop (see rgb_from_indices)."""
+    labels, t_table, absorb_table = blend_tables(layer_height, color_key)
     label_idx = {label: i for i, label in enumerate(labels)}
-
-    t_table = np.empty((len(labels), 3), dtype=np.float64)
-    absorb_table = np.empty((len(labels), 3), dtype=np.float64)
-    for i, label in enumerate(labels):
-        t_table[i] = color_map[label].transmission(layer_height)
-        absorb_table[i] = color_map[label].get_absorption()
-
-    background = _normalize_background_rgb(background_rgb)
 
     out: list[tuple] = []
     normalized = [_normalize_code(code) for code in codes]
@@ -151,29 +183,7 @@ def codes_to_rgb_batch(
         idx = np.array(
             [[label_idx[c] for c in code] for code in chunk], dtype=np.int64
         )
-        transmissions = t_table[idx]                       # (n, L, 3)
-        remain_before = np.concatenate(
-            [
-                np.ones((len(chunk), 1, 3), dtype=np.float64),
-                np.cumprod(transmissions, axis=1)[:, :-1],
-            ],
-            axis=1,
-        )
-        loss = remain_before * (1.0 - transmissions)       # (n, L, 3)
-        backing = np.prod(transmissions, axis=1)           # (n, 3)
-        total = loss.sum(axis=1) + backing                 # ~1 by telescoping
-        total = np.where(total > 0, total, 1.0)[:, None, :]
-        loss /= total
-        backing_weight = backing / total[:, 0, :]          # (n, 3)
-
-        absorption = absorb_table[idx]                     # (n, L, 3)
-        rgb = 1.0 - (absorption * loss).sum(axis=1)        # (n, 3)
-        rgb = (
-            backing_weight * background[None, :]
-            + (1.0 - backing_weight) * rgb
-        )
-        rgb = np.clip(rgb * 255.0, 0.0, 255.0)
-        out.extend(rgb.tolist())
+        out.extend(rgb_from_indices(idx, t_table, absorb_table, background_rgb).tolist())
     return out
 
 

@@ -158,7 +158,7 @@ class TestComputeReferenceMatricesEdgeCases:
                  "#112233", "#445566", "#778899", "#0B0F0C"])
         })
         import services.stl_generator as sg
-        monkeypatch.setattr(sg, "_estimate_full_enumeration_seconds", lambda n, t: 1e9)
+        monkeypatch.setattr(sg, "_estimate_build_seconds", lambda n: 1e9)
         with pytest.raises(ValueError, match="over the .* budget"):
             compute_reference_matrices(
                 layer_count=8,  # 8^8 = 16,777,216 codes, hundreds of seconds

@@ -40,13 +40,12 @@ def pixels_to_grid(
         2D numpy boolean array where True indicates a pixel is present
     """
     grid = np.zeros((height, width), dtype=bool)
-    dropped = 0
-    for pixel in pixels:
-        x, y = pixel['x'], pixel['y']
-        if 0 <= x < width and 0 <= y < height:
-            grid[y, x] = True
-        else:
-            dropped += 1
+    if not pixels:
+        return grid
+    xs = np.fromiter((pixel['x'] for pixel in pixels), dtype=np.int64, count=len(pixels))
+    ys = np.fromiter((pixel['y'] for pixel in pixels), dtype=np.int64, count=len(pixels))
+    inside = (xs >= 0) & (xs < width) & (ys >= 0) & (ys < height)
+    dropped = len(pixels) - int(inside.sum())
     if dropped > 0:
         if dropped == len(pixels):
             raise ValueError(
@@ -57,51 +56,8 @@ def pixels_to_grid(
             "Dropped %d of %d pixels outside image bounds (%dx%d)",
             dropped, len(pixels), width, height
         )
+    grid[ys[inside], xs[inside]] = True
     return grid
-
-
-def find_max_rectangle(
-    grid: np.ndarray,
-    start_x: int,
-    start_y: int
-) -> tuple[int, int, int, int]:
-    """
-    Find the maximum rectangle starting from a given position.
-
-    Uses a greedy approach: first expand width as far as possible,
-    then expand height while maintaining full width.
-
-    Args:
-        grid: 2D boolean grid
-        start_x: Starting x coordinate
-        start_y: Starting y coordinate
-
-    Returns:
-        Tuple of (x, y, width, height) for the rectangle
-    """
-    if not grid[start_y, start_x]:
-        return (start_x, start_y, 0, 0)
-
-    height, width = grid.shape
-
-    # Find maximum width at starting row
-    max_width = 0
-    for x in range(start_x, width):
-        if grid[start_y, x]:
-            max_width += 1
-        else:
-            break
-
-    # Find maximum height that maintains this width
-    max_height = 1
-    for y in range(start_y + 1, height):
-        # Check if entire row segment is set
-        if np.all(grid[y, start_x:start_x + max_width]):
-            max_height += 1
-        else:
-            break
-
-    return (start_x, start_y, max_width, max_height)
 
 
 class MeshTooComplexError(ValueError):
@@ -114,55 +70,71 @@ def greedy_mesh_2d(
     max_rectangles: int | None = None,
 ) -> list[tuple[int, int, int, int]]:
     """
-    Apply greedy meshing algorithm to merge pixels into rectangles.
+    Cover the set cells of a grid with disjoint rectangles.
 
-    Scans the grid left-to-right, top-to-bottom. For each unprocessed
-    pixel, finds the maximum rectangle and marks it as processed.
+    Each row splits into horizontal runs, and identical runs on consecutive
+    rows merge into one rectangle. Fully vectorized over the grid's bounding
+    box; rectangles are returned in scan order (top to bottom, left to right).
 
     Args:
         grid: 2D boolean grid where True indicates a pixel is present
-        max_rectangles: abort with MeshTooComplexError once the rectangle
-            list would exceed this count, so pathological (noise-like)
-            inputs fail fast instead of exhausting memory
+        max_rectangles: abort with MeshTooComplexError once more rectangles
+            than this would be produced, so pathological (noise-like) inputs
+            fail fast instead of exhausting memory
 
     Returns:
         List of rectangles as (x, y, width, height) tuples
     """
-    if not grid.any():
+    rows = np.flatnonzero(grid.any(axis=1))
+    if len(rows) == 0:
         return []
+    cols = np.flatnonzero(grid.any(axis=0))
+    y_off, x_off = int(rows[0]), int(cols[0])
+    sub = grid[y_off:int(rows[-1]) + 1, x_off:int(cols[-1]) + 1]
 
-    # Work on a copy to avoid modifying original
-    remaining = grid.copy()
-    rectangles = []
+    edges = np.diff(np.pad(sub.astype(np.int8), ((0, 0), (1, 1))), axis=1)
+    run_y, run_x0 = np.nonzero(edges == 1)
+    _, run_x1 = np.nonzero(edges == -1)  # row-major: the k-th end closes the k-th start
 
-    height, width = grid.shape
-
-    # Scan left-to-right, top-to-bottom
-    for y in range(height):
-        for x in range(width):
-            if remaining[y, x]:
-                # Find maximum rectangle starting here
-                rect = find_max_rectangle(remaining, x, y)
-                rx, ry, rw, rh = rect
-
-                if rw > 0 and rh > 0:
-                    if max_rectangles is not None and len(rectangles) >= max_rectangles:
-                        raise MeshTooComplexError(
-                            f"Greedy meshing exceeded {max_rectangles:,} rectangles; "
-                            f"the image has too much fine detail to mesh within the "
-                            f"memory budget. Reduce image size or increase color merge."
-                        )
-                    rectangles.append(rect)
-                    # Mark as processed
-                    remaining[ry:ry + rh, rx:rx + rw] = False
-
-    logger.debug(
-        "Greedy meshing: %d pixels -> %d rectangles",
-        grid.sum(),
-        len(rectangles)
+    order = np.lexsort((run_y, run_x1, run_x0))
+    run_y, run_x0, run_x1 = run_y[order], run_x0[order], run_x1[order]
+    opens = np.ones(len(run_y), dtype=bool)
+    opens[1:] = (
+        (run_x0[1:] != run_x0[:-1]) | (run_x1[1:] != run_x1[:-1]) | (run_y[1:] != run_y[:-1] + 1)
     )
+    first = np.flatnonzero(opens)
+    last = np.append(first[1:], len(run_y)) - 1
+    if max_rectangles is not None and len(first) > max_rectangles:
+        raise MeshTooComplexError(
+            f"Greedy meshing exceeded {max_rectangles:,} rectangles; "
+            f"the image has too much fine detail to mesh within the "
+            f"memory budget. Reduce image size or increase color merge."
+        )
 
+    rect_x, rect_y = run_x0[first] + x_off, run_y[first] + y_off
+    rect_w, rect_h = run_x1[first] - run_x0[first], run_y[last] - run_y[first] + 1
+    scan = np.lexsort((rect_x, rect_y))
+    rectangles = list(zip(
+        rect_x[scan].tolist(), rect_y[scan].tolist(), rect_w[scan].tolist(), rect_h[scan].tolist(),
+    ))
+    logger.debug("Greedy meshing: %d pixels -> %d rectangles", int(sub.sum()), len(rectangles))
     return rectangles
+
+
+BoxRange = tuple[tuple[float, float], tuple[float, float], tuple[float, float]]
+
+
+def boxes_from_rectangles(
+    rectangles: list[tuple[int, int, int, int]],
+    pixel_size: float,
+    z_min: float,
+    z_max: float,
+) -> list[BoxRange]:
+    """Extrude grid rectangles (x, y, width, height) into box ranges in mm."""
+    return [
+        ((x * pixel_size, (x + w) * pixel_size), (y * pixel_size, (y + h) * pixel_size), (z_min, z_max))
+        for x, y, w, h in rectangles
+    ]
 
 
 def generate_optimized_boxes(
@@ -173,7 +145,7 @@ def generate_optimized_boxes(
     z_min: float,
     z_max: float,
     max_rectangles: int | None = None,
-) -> list[tuple[tuple[float, float], tuple[float, float], tuple[float, float]]]:
+) -> list[BoxRange]:
     """
     Generate optimized box ranges using greedy meshing.
 
@@ -191,23 +163,7 @@ def generate_optimized_boxes(
         List of (xrange, yrange, zrange) tuples for each optimized box
     """
     grid = pixels_to_grid(pixels, width, height)
-    rectangles = greedy_mesh_2d(grid, max_rectangles=max_rectangles)
-
-    boxes = []
-    for x, y, w, h in rectangles:
-        xrange = (x * pixel_size, (x + w) * pixel_size)
-        yrange = (y * pixel_size, (y + h) * pixel_size)
-        zrange = (z_min, z_max)
-        boxes.append((xrange, yrange, zrange))
-
-    logger.info(
-        "Optimized %d pixels into %d boxes (%.1f%% reduction)",
-        len(pixels),
-        len(boxes),
-        (1 - len(boxes) / max(len(pixels), 1)) * 100
-    )
-
-    return boxes
+    return generate_optimized_boxes_from_grid(grid, pixel_size, z_min, z_max, max_rectangles)
 
 
 def generate_optimized_boxes_from_grid(
@@ -216,7 +172,7 @@ def generate_optimized_boxes_from_grid(
     z_min: float,
     z_max: float,
     max_rectangles: int | None = None,
-) -> list[tuple[tuple[float, float], tuple[float, float], tuple[float, float]]]:
+) -> list[BoxRange]:
     """
     Generate optimized boxes directly from a boolean grid.
 
@@ -224,15 +180,7 @@ def generate_optimized_boxes_from_grid(
     available as a rasterized occupancy mask.
     """
     rectangles = greedy_mesh_2d(grid, max_rectangles=max_rectangles)
-
-    boxes = []
-    for x, y, w, h in rectangles:
-        xrange = (x * pixel_size, (x + w) * pixel_size)
-        yrange = (y * pixel_size, (y + h) * pixel_size)
-        zrange = (z_min, z_max)
-        boxes.append((xrange, yrange, zrange))
-
-    return boxes
+    return boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
 
 
 # =============================================================================

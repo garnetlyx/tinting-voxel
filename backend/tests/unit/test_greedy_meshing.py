@@ -7,7 +7,6 @@ into larger rectangular blocks to reduce STL file size.
 import numpy as np
 
 from services.mesh_optimizer import (
-    find_max_rectangle,
     greedy_mesh_2d,
     pixels_to_grid,
 )
@@ -42,38 +41,6 @@ class TestPixelsToGrid:
         assert grid[0, 1]
         assert grid[0, 2]
         assert grid.sum() == 3
-
-
-class TestFindMaxRectangle:
-    """Tests for finding maximum rectangle from a starting point"""
-
-    def test_single_cell(self):
-        """Single isolated cell should return 1x1 rectangle"""
-        grid = np.zeros((5, 5), dtype=bool)
-        grid[2, 2] = True
-        rect = find_max_rectangle(grid, start_x=2, start_y=2)
-        assert rect == (2, 2, 1, 1)  # x, y, width, height
-
-    def test_horizontal_row(self):
-        """Horizontal row should return correct width"""
-        grid = np.zeros((5, 5), dtype=bool)
-        grid[0, 0:3] = True  # 3 cells in a row
-        rect = find_max_rectangle(grid, start_x=0, start_y=0)
-        assert rect == (0, 0, 3, 1)
-
-    def test_vertical_column(self):
-        """Vertical column should return correct height"""
-        grid = np.zeros((5, 5), dtype=bool)
-        grid[0:3, 0] = True  # 3 cells in a column
-        rect = find_max_rectangle(grid, start_x=0, start_y=0)
-        assert rect == (0, 0, 1, 3)
-
-    def test_full_rectangle(self):
-        """Full rectangle should be detected"""
-        grid = np.zeros((5, 5), dtype=bool)
-        grid[1:4, 1:4] = True  # 3x3 block
-        rect = find_max_rectangle(grid, start_x=1, start_y=1)
-        assert rect == (1, 1, 3, 3)
 
 
 class TestGreedyMesh2D:
@@ -169,23 +136,6 @@ class TestMeshOptimizationIntegration:
         # Verify total area matches
         total_area = sum(w * h for _, _, w, h in rects)
         assert total_area == pixel_count
-
-
-class TestFindMaxRectangleEdgeCases:
-    """Edge case tests for find_max_rectangle"""
-
-    def test_start_on_empty_cell(self):
-        """Starting on empty cell should return zero-size rectangle"""
-        grid = np.zeros((5, 5), dtype=bool)
-        rect = find_max_rectangle(grid, start_x=2, start_y=2)
-        assert rect == (2, 2, 0, 0)
-
-    def test_boundary_conditions(self):
-        """Rectangle at grid boundary should not overflow"""
-        grid = np.zeros((3, 3), dtype=bool)
-        grid[2, 2] = True  # bottom-right corner
-        rect = find_max_rectangle(grid, start_x=2, start_y=2)
-        assert rect == (2, 2, 1, 1)
 
 
 class TestGenerateOptimizedBoxes:

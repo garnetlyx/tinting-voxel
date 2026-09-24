@@ -172,7 +172,7 @@ class TestDynamicMeshMap:
 
     @pytest.mark.parametrize("color_count", [4, 6, 8, 10])
     def test_initialize_color_mapping_creates_correct_combinations(self, color_count):
-        """initialize_color_mapping creates N^layer_count combinations."""
+        """initialize_color_mapping enumerates the N^layer_count combinations."""
         # Create N colors with unique first letters
         names = ["Alpha", "Beta", "Cyan", "Delta", "Echo", "Foxtrot",
                  "Green", "Hue", "Indigo", "Jade"][:color_count]
@@ -198,11 +198,12 @@ class TestDynamicMeshMap:
         assert stl_generator._current_colors is not None
         assert len(stl_generator._current_colors) == color_count
 
-        # Verify combinations count: N^layer_count
-        expected_combos = color_count ** layer_count
-        actual_combos = len(stl_generator._reference_code_matrix.values.flatten())
-        # Account for padding in matrix
-        assert actual_combos >= expected_combos
+        # One representative per distinct color of the N^layer_count
+        # combinations, and every color takes part.
+        codes = set(stl_generator._reference_code_matrix.values.ravel())
+        assert all(len(code) == layer_count for code in codes)
+        assert set("".join(codes)) == set(colors.get_labels())
+        assert len(codes) <= color_count ** layer_count
 
 
 class TestFilenamePrefix:

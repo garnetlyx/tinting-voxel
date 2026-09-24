@@ -126,10 +126,13 @@ def test_clear_8l_process_image_pruned_vs_full_enumeration_benchmark():
     _pruned_df, _ = _crm(8, 0.84, colors)
     settings.full_enumeration_budget_seconds = original_budget
     matrix_cache.clear_cache()
-    full_codes = {_full_df.iat[r, c] for r in range(_full_df.shape[0]) for c in range(_full_df.shape[1])}
-    pruned_codes = {_pruned_df.iat[r, c] for r in range(_pruned_df.shape[0]) for c in range(_pruned_df.shape[1])}
-    assert len(full_codes) == 4**8, f"full matrix must enumerate {4**8} codes, got {len(full_codes)}"
-    assert len(pruned_codes) == 165, f"pruned matrix must hold 165 compositions, got {len(pruned_codes)}"
+    full_codes = set(_full_df.to_numpy().ravel())
+    pruned_codes = set(_pruned_df.to_numpy().ravel())
+    # Both matrices keep one code per distinct color: full enumeration keeps
+    # orderings, pruning only canonical compositions (at most C(11, 8) = 165).
+    assert any(list(code) != sorted(code) for code in full_codes), "full matrix must hold orderings"
+    assert all(list(code) == sorted(code) for code in pruned_codes), "pruned matrix must hold compositions"
+    assert len(pruned_codes) <= 165 < len(full_codes)
 
     assert full["colorBlocks"] and pruned["colorBlocks"]
     # Completion, not a hard latency gate: under a full-suite parallel load the
@@ -150,7 +153,8 @@ def test_clear_8l_process_image_pruned_vs_full_enumeration_benchmark():
         "layer_count": 8,
         "layer_height": 0.84,
         "full_enumeration_codes": 4**8,
-        "composition_representatives": 165,
+        "full_distinct_colors": len(full_codes),
+        "composition_representatives": len(pruned_codes),
         "pruned_process_image_s": round(t_pruned, 2),
         "full_process_image_s": round(t_full, 2),
         "full_over_pruned": round(t_full / t_pruned, 1),

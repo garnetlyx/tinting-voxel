@@ -1,6 +1,8 @@
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from config.print_defaults import DEFAULT_FILAMENT_PRESET
+from config.settings import settings
 from core.color_config import get_preset, normalize_transmission_distance
 
 import numpy as np
@@ -9,6 +11,9 @@ from skimage.color import rgb2lab
 
 if TYPE_CHECKING:
     from core.color_config import ColorConfig
+
+# Below this many (reference x input) pairs, thread startup outweighs the gain.
+PARALLEL_MATCH_MIN_PAIRS = 1_000_000
 
 
 class Color:
@@ -142,14 +147,19 @@ class Color:
         inp = np.array(input_colors) / 255.0
         inp_lab = rgb2lab(inp.reshape(-1, 1, 3)).reshape(-1, 3)
 
-        results_code = []
-        results_color = []
-        for lab_color in inp_lab:
-            dists = Color.perceptual_distance(lab_color, ref_lab)
-            nearest_idx = int(np.argmin(dists))
-            results_code.append(ref_blend_codes[nearest_idx])
-            results_color.append(np.round(ref_colors[nearest_idx] * 255).astype(int))
+        def nearest(lab_color) -> int:
+            return int(np.argmin(Color.perceptual_distance(lab_color, ref_lab)))
 
+        # Each input is an independent vectorized pass over the references;
+        # numpy releases the GIL, so large matches spread across threads.
+        if len(inp_lab) > 1 and len(ref_lab) * len(inp_lab) >= PARALLEL_MATCH_MIN_PAIRS:
+            with ThreadPoolExecutor(max_workers=settings.compute_threads) as pool:
+                nearest_indices = list(pool.map(nearest, inp_lab))
+        else:
+            nearest_indices = [nearest(lab_color) for lab_color in inp_lab]
+
+        results_code = [ref_blend_codes[i] for i in nearest_indices]
+        results_color = [np.round(ref_colors[i] * 255).astype(int) for i in nearest_indices]
         return results_code, results_color
 
 

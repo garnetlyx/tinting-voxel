@@ -8,6 +8,8 @@ import itertools
 import logging
 import threading
 import zipfile
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from typing import Optional
 
@@ -16,7 +18,8 @@ import pandas as pd
 
 from config.settings import settings
 from core.blend_color import BlendTestGenerator, Color, Colors, colors_key
-from services.mesh_optimizer import generate_optimized_boxes
+from core.blend_models import blend_tables, rgb_from_indices
+from services.mesh_optimizer import boxes_from_rectangles, greedy_mesh_2d, pixels_to_grid
 from services.print_stack import (
     backing_suffix,
     build_print_stack,
@@ -27,10 +30,12 @@ from services.print_stack import (
 
 logger = logging.getLogger(__name__)
 
-# Probe-calibrated throughput for the full-enumeration cost model (self-
-# adjusting to the host CPU; measured once, cached). Covers the complete
-# build+match path; see _probe_throughput for the decomposition.
+# Probe-calibrated throughput for the enumeration cost model (self-adjusting
+# to the host CPU; measured once, cached). See _probe_throughput.
 _probe_state: dict = {}
+
+# Codes blended per enumeration work item; bounds per-thread temporaries.
+_ENUMERATION_CHUNK_CODES = 1 << 16
 
 # Global reference-matrix state (module-level cache for the legacy
 # initialize_color_mapping path used by tests and warmup).
@@ -41,26 +46,107 @@ _current_colors = None
 _global_state_lock = threading.Lock()
 
 
-def _probe_throughput() -> tuple[float, float, float]:
-    """Measure the COMPLETE per-code cost of the enumeration path.
+def _distinct_reference_colors(
+    colors: Colors,
+    layer_count: int,
+    layer_height: float,
+    suffix: str = '',
+    boundary: Optional[tuple] = None,
+    code_list: Optional[list[str]] = None,
+) -> tuple[list[str], list[tuple[int, int, int]]]:
+    """One (code, 8-bit color) per distinct reference color.
 
-    Both timed runs cover everything compute_reference_matrices plus its
-    callers' matching perform on a full enumeration: permutation
-    generation, code strings, batch blend, padding, DataFrame
-    construction, cell extraction, Lab conversion, and n-target deltaE
-    matching. Nothing is built before the timers start.
+    Codes are visited in enumeration order: the ordered product of the
+    labels (first layer most significant), or ``code_list``. Each color keeps
+    the first code that renders it, so nearest-color matching over these
+    representatives returns what matching over every code returns: equal
+    colors have equal distances, and argmin keeps the earliest candidate.
+    Blending runs on index arrays in parallel chunks; only representatives
+    become strings.
+    """
+    labels, t_table, absorb_table = blend_tables(layer_height, colors_key(colors))
+    n_labels = len(labels)
+    label_idx = {label: i for i, label in enumerate(labels)}
+    suffix_idx = np.array([label_idx[c] for c in suffix], dtype=np.int64)
+    if code_list is None:
+        total = n_labels ** layer_count
+    else:
+        lookup = np.zeros(128, dtype=np.int64)
+        for label, i in label_idx.items():
+            lookup[ord(label)] = i
+        encoded = np.frombuffer(''.join(code_list).encode('ascii'), dtype=np.uint8)
+        encoded = encoded.reshape(len(code_list), layer_count)
+        total = len(code_list)
 
-    Decomposition: the 1-target run gives the full build + fixed-match
-    cost per code; the 64-target run isolates the marginal per-target
-    term (amplified above timing noise). All rates are per code and
-    linear in code count (verified 20k..1M codes).
+    def chunk_keys(start: int) -> np.ndarray:
+        stop = min(start + _ENUMERATION_CHUNK_CODES, total)
+        if code_list is None:
+            flat = np.arange(start, stop, dtype=np.int64)
+            digits = np.empty((stop - start, layer_count), dtype=np.int64)
+            for position in range(layer_count - 1, -1, -1):
+                digits[:, position] = flat % n_labels
+                flat //= n_labels
+        else:
+            digits = lookup[encoded[start:stop]]
+        if len(suffix_idx):
+            digits = np.concatenate(
+                [digits, np.broadcast_to(suffix_idx, (len(digits), len(suffix_idx)))], axis=1,
+            )
+        rgb = np.round(rgb_from_indices(digits, t_table, absorb_table, boundary)).astype(np.uint32)
+        return (rgb[:, 0] << 16) | (rgb[:, 1] << 8) | rgb[:, 2]
+
+    seen = np.zeros(1 << 24, dtype=bool)
+    rep_index: list[np.ndarray] = []
+    rep_key: list[np.ndarray] = []
+
+    def keep_first_occurrences(start: int, keys: np.ndarray) -> None:
+        unique, first = np.unique(keys, return_index=True)
+        fresh = ~seen[unique]
+        unique, first = unique[fresh], first[fresh]
+        order = np.argsort(first, kind='stable')
+        seen[unique] = True
+        rep_index.append(start + first[order])
+        rep_key.append(unique[order])
+
+    starts = range(0, total, _ENUMERATION_CHUNK_CODES)
+    with ThreadPoolExecutor(max_workers=settings.compute_threads) as pool:
+        # Bounded look-ahead keeps finished chunks from piling up in memory;
+        # chunks are consumed in order so first occurrences stay first.
+        pending: deque = deque()
+        for start in starts:
+            pending.append((start, pool.submit(chunk_keys, start)))
+            if len(pending) >= 2 * settings.compute_threads:
+                done_start, future = pending.popleft()
+                keep_first_occurrences(done_start, future.result())
+        while pending:
+            done_start, future = pending.popleft()
+            keep_first_occurrences(done_start, future.result())
+
+    index = np.concatenate(rep_index)
+    keys = np.concatenate(rep_key)
+    if code_list is None:
+        digits = np.empty((len(index), layer_count), dtype=np.int64)
+        flat = index.copy()
+        for position in range(layer_count - 1, -1, -1):
+            digits[:, position] = flat % n_labels
+            flat //= n_labels
+        label_array = np.array(labels)
+        codes = [''.join(row) for row in label_array[digits].tolist()]
+    else:
+        codes = [code_list[i] for i in index.tolist()]
+    rgb = np.stack([(keys >> 16) & 255, (keys >> 8) & 255, keys & 255], axis=1)
+    return codes, [tuple(row) for row in rgb.tolist()]
+
+
+def _probe_throughput() -> tuple[float, float]:
+    """Measure the enumeration and matching rates on this host.
+
+    Returns seconds per enumerated code (blend, dedup and representative
+    decoding) and seconds per (reference color x target) match under the
+    production metric. Both stages are linear in their counts.
     """
     if _probe_state:
-        return (
-            _probe_state["build_s_per_code"],
-            _probe_state["match_fixed_s_per_code"],
-            _probe_state["match_marginal_s_per_code_per_target"],
-        )
+        return _probe_state["build_s_per_code"], _probe_state["match_s_per_ref_target"]
     import time as _time
     from core.color_materials import Color as _C
     probe_colors = Colors(colors={
@@ -70,47 +156,49 @@ def _probe_throughput() -> tuple[float, float, float]:
             [0.5, 0.5, 0.6, 0.6],
         )
     })
-    gen = BlendTestGenerator(colors=probe_colors, layer_height=0.08, layer_count_max=8)
-    labels = probe_colors.get_labels()
-    n = 4 ** 8  # 65,536 codes: a real full enumeration
-    targets_64 = [(120 + i, 130 + i % 7, 140) for i in range(64)]
+    layers = 9  # 262,144 codes: a real full enumeration
+    t0 = _time.perf_counter()
+    codes, rgbs = _distinct_reference_colors(probe_colors, layers, 0.08)
+    build = (_time.perf_counter() - t0) / (4 ** layers)
 
-    def _timed_full_matrix(n_targets: int) -> float:
-        t0 = _time.perf_counter()
-        perms = list(itertools.product(labels, repeat=8))
-        codes = [''.join(p) for p in perms]
-        rgb_list = gen.codes_to_rgb(codes)
-        rows = int(np.sqrt(n))
-        cols = (n + rows - 1) // rows
-        pad = rows * cols - n
-        code_p = codes + [codes[-1]] * pad
-        rgb_p = rgb_list + [rgb_list[-1]] * pad
-        code_df = pd.DataFrame([code_p[i * cols:(i + 1) * cols] for i in range(rows)])
-        rgb_df = pd.DataFrame([rgb_p[i * cols:(i + 1) * cols] for i in range(rows)])
-        _C.map_to_nearest_color(targets_64[:n_targets], code_df, rgb_df)
-        return _time.perf_counter() - t0
-
-    per_code_1 = _timed_full_matrix(1) / n
-    per_code_64 = _timed_full_matrix(64) / n
-    marginal = max((per_code_64 - per_code_1) / 63.0, 0.0)
-    fixed = max(per_code_1 - marginal, 0.0)
-    build = fixed  # the 1-target run IS the complete build + fixed match
-    _probe_state.update(
-        build_s_per_code=build,
-        match_fixed_s_per_code=fixed,
-        match_marginal_s_per_code_per_target=marginal,
-    )
+    targets = [(120 + i, 130 + i % 7, 140) for i in range(64)]
+    code_df, rgb_df = _as_matrices(codes, rgbs)
+    t0 = _time.perf_counter()
+    _C.map_to_nearest_color(targets, code_df, rgb_df)
+    match = (_time.perf_counter() - t0) / (len(codes) * len(targets))
+    _probe_state.update(build_s_per_code=build, match_s_per_ref_target=match)
     logger.info(
-        "Enumeration cost probe (complete path): build+fixed %.2e s/code, "
-        "marginal %.2e s/code/target",
-        build, marginal,
+        "Enumeration cost probe: build %.2e s/code, match %.2e s/(color x target)",
+        build, match,
     )
-    return build, fixed, marginal
+    return build, match
 
 
-def _estimate_full_enumeration_seconds(n_codes: int, n_targets: int) -> float:
-    build_rate, match_fixed, match_marginal = _probe_throughput()
-    return n_codes * (build_rate + match_marginal * n_targets)
+def _estimate_build_seconds(n_codes: int) -> float:
+    """Wall time to enumerate n_codes and keep their distinct colors."""
+    return n_codes * _probe_throughput()[0]
+
+
+def _estimate_match_seconds(n_references: int, n_targets: int) -> float:
+    """Wall time to match n_targets against n_references distinct colors."""
+    return n_references * n_targets * _probe_throughput()[1]
+
+
+def _as_matrices(codes: list[str], rgbs: list[tuple]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Lay codes and colors out as padded rectangular DataFrames.
+
+    Padding repeats the last entry, which matching never prefers (argmin keeps
+    the first of equal distances).
+    """
+    n = len(codes)
+    rows = int(np.sqrt(n))
+    cols = (n + rows - 1) // rows
+    pad_count = rows * cols - n
+    codes_padded = codes + [codes[-1]] * pad_count
+    rgbs_padded = rgbs + [rgbs[-1]] * pad_count
+    code_df = pd.DataFrame([codes_padded[i * cols:(i + 1) * cols] for i in range(rows)])
+    rgb_df = pd.DataFrame([rgbs_padded[i * cols:(i + 1) * cols] for i in range(rows)])
+    return code_df, rgb_df
 
 
 from core.blend_models import codes_to_rgb_batch
@@ -148,30 +236,31 @@ def compute_reference_matrices(
     """
     Compute color reference matrices for Beer-Lambert mapping.
 
-    Thread-safe: returns new matrices without modifying global state.
+    The matrices hold one representative code per distinct 8-bit reference
+    color (see _distinct_reference_colors), so matching them is equivalent
+    to matching every candidate code. Thread-safe: returns cached or new
+    matrices without modifying global state.
 
     Args:
         layer_count: Number of layers for color blending
         layer_height: Height of each layer in mm
         colors: Colors instance defining the filament configuration
         n_targets: Number of input colors that will be matched against the
-            matrix; included in the wall-time estimate so the enumeration
-            decision accounts for the matching pass, not just the build
+            matrix; the matching pass is part of the wall-time decision
 
     Returns:
         Tuple of (code_matrix, rgb_matrix) as DataFrames
 
     prune:
-        None (default) enumerates fully whenever the probe-extrapolated wall
-        time fits the budget (settings.full_enumeration_budget_seconds) and
-        falls back to composition representatives when only a translucent
-        set could otherwise meet it; False forces the full ordered
-        enumeration in every regime (correctness oracle for the pruned path).
-        Pruning is never forced outside the translucent regime.
+        None (default) enumerates every ordered code whenever the estimated
+        enumeration plus matching time fits settings.full_enumeration_budget_seconds,
+        and otherwise uses one representative per composition for translucent
+        sets; False forces full enumeration (the oracle for the pruned path).
+        Pruning is never applied outside the translucent regime.
 
     Raises:
-        ValueError: If the estimated full-enumeration time exceeds the budget
-            for a set that cannot be pruned (opaque/mixed)
+        ValueError: If the estimate exceeds the budget for a set that cannot
+            be pruned (opaque/mixed)
     """
     if layer_count <= 0:
         raise ValueError(f"layer_count must be positive, got {layer_count}")
@@ -200,102 +289,56 @@ def compute_reference_matrices(
         )
 
     from core.stack_prune import composition_codes, is_translucent_set
-
-    translucent = is_translucent_set(colors)
-    # The enumeration decision is time-budget driven (no fixed code-count
-    # cap): full enumeration whenever the probe-extrapolated wall time fits
-    # settings.full_enumeration_budget_seconds, composition pruning when
-    # only a translucent set could otherwise meet it, rejection otherwise.
-    # Pruning is never forced onto an opaque set — its ΔE budget is
-    # validated only for transparent sets.
-    estimated_seconds = _estimate_full_enumeration_seconds(
-        permutation_count, n_targets or 10,
-    )
-    within_budget = estimated_seconds <= settings.full_enumeration_budget_seconds
-    use_prune = translucent and prune is not False and not within_budget
-    if not translucent and not within_budget:
-        # Opaque over-budget enumeration rejects unconditionally: composition
-        # pruning is not validated for opaque sets and there is no fallback.
-        # (A translucent set with prune=False is the bounded full-enumeration
-        # oracle and stays allowed — the caller explicitly accepted its cost.)
-        raise ValueError(
-            f"Full enumeration for {len(items)} colors x {layer_count} layers "
-            f"({permutation_count:,} codes) is estimated at "
-            f"{estimated_seconds:.0f}s, over the "
-            f"{settings.full_enumeration_budget_seconds:.0f}s budget, and "
-            f"composition pruning is not validated for a non-transparent set. "
-            f"Reduce the number of colors or layers."
-        )
-    # Serve every caller (process, downloads, batch, search) through the
-    # content-keyed matrix cache. The target count only decides full vs
-    # pruned, so it is not part of the key.
     from services.matrix_cache import get_cached_matrices, set_cached_matrices
-    cached = get_cached_matrices(colors, layer_count, layer_height, pruned=use_prune,
-                                 backing_suffix=b_suffix, background_rgb=b_boundary)
-    if cached is not None:
-        return cached
 
-    generator = BlendTestGenerator(
-        colors=colors,
-        layer_height=layer_height,
-        layer_count_max=layer_count,
-        backing_suffix=b_suffix,
-        background_rgb=b_boundary,
-    )
+    budget = settings.full_enumeration_budget_seconds
+    targets = n_targets or 10
+    cache_args = dict(backing_suffix=b_suffix, background_rgb=b_boundary)
 
-    if use_prune:
-        # Translucent regime over budget: one canonical representative per
-        # composition (C(N+L-1, L) candidates; see core/stack_prune.py)
-        # instead of the full ordered product; order is recovered per match
-        # by refine_matches().
-        code_list = composition_codes(items, layer_count)
+    # Full enumeration: every ordered code, reduced to its distinct colors.
+    # The matrix cache serves every caller (process, downloads, batch,
+    # search); the target count only decides whether to use it.
+    full = get_cached_matrices(colors, layer_count, layer_height, pruned=False, **cache_args)
+    estimated = 0.0 if full is not None else _estimate_build_seconds(permutation_count)
+    if full is None and (estimated <= budget or prune is False):
+        codes, rgbs = _distinct_reference_colors(colors, layer_count, layer_height, b_suffix, b_boundary)
+        full = _as_matrices(codes, rgbs)
+        set_cached_matrices(colors, layer_count, layer_height, *full, pruned=False, **cache_args)
+        logger.info(
+            "Enumerated %d codes (%d colors x %d layers): %d distinct colors",
+            permutation_count, len(items), layer_count, len(codes),
+        )
+    if full is not None:
+        estimated += _estimate_match_seconds(full[0].size, targets)
+        if prune is False or estimated <= budget:
+            return full
+
+    if not is_translucent_set(colors):
+        # Composition pruning is validated only for translucent sets.
+        raise ValueError(
+            f"Stack search for {len(items)} colors x {layer_count} layers "
+            f"({permutation_count:,} codes) is estimated at {estimated:.0f}s, over the "
+            f"{budget:.0f}s budget, and composition pruning is not validated for a "
+            f"non-transparent set. Reduce the number of colors or layers."
+        )
+
+    # Translucent regime over budget: one canonical representative per
+    # composition (C(N+L-1, L) candidates; see core/stack_prune.py); order is
+    # recovered per match by refine_matches().
+    pruned = get_cached_matrices(colors, layer_count, layer_height, pruned=True, **cache_args)
+    if pruned is None:
+        compositions = composition_codes(items, layer_count)
+        codes, rgbs = _distinct_reference_colors(
+            colors, layer_count, layer_height, b_suffix, b_boundary, code_list=compositions,
+        )
+        pruned = _as_matrices(codes, rgbs)
+        set_cached_matrices(colors, layer_count, layer_height, *pruned, pruned=True, **cache_args)
         logger.info(
             "Pruned stack candidates: %d compositions of %d colors x %d layers, "
-            "%d diverse orderings in matrix (full ordered set would be %d; "
-            "full estimate %.0fs over %.0fs budget)",
-            len(set("".join(sorted(c)) for c in code_list)), len(items), layer_count,
-            len(code_list), permutation_count,
-            estimated_seconds, settings.full_enumeration_budget_seconds,
+            "%d distinct colors (full estimate %.0fs over %.0fs budget)",
+            len(compositions), len(items), layer_count, len(codes), estimated, budget,
         )
-    else:
-        perms = list(itertools.product(items, repeat=layer_count))
-        code_list = [''.join(p) for p in perms]
-
-    # The reference palette lives in the 8-bit image domain: input pixels
-    # are 8-bit, so each code's reference color is its rendered color as it
-    # appears in an image. Comparing 8-bit inputs against float references
-    # inverts rounding boundaries (a neighbor code's float prediction can sit
-    # closer to the rounded pixel than the code that generated it).
-    rgb_list = [
-        tuple(int(channel) for channel in np.clip(np.round(rgb), 0, 255))
-        for rgb in generator.codes_to_rgb(code_list)
-    ]
-
-    n = len(code_list)
-    rows = int(np.sqrt(n))
-    cols = (n + rows - 1) // rows
-
-    # Pad with last valid entry to avoid empty-string codes in nearest-color matching
-    pad_count = rows * cols - n
-    pad_code = code_list[-1] if code_list else ''
-    pad_rgb = rgb_list[-1] if rgb_list else (255, 255, 255)
-    code_list_padded = code_list + [pad_code] * pad_count
-    rgb_list_padded = rgb_list + [pad_rgb] * pad_count
-
-    code_matrix = [code_list_padded[i*cols:(i+1)*cols] for i in range(rows)]
-    rgb_matrix = [rgb_list_padded[i*cols:(i+1)*cols] for i in range(rows)]
-
-    code_df = pd.DataFrame(code_matrix)
-    rgb_df = pd.DataFrame(rgb_matrix)
-
-    logger.info(
-        "Computed reference matrices: %d colors, %d candidates%s",
-        len(items), len(code_list),
-        " (composition-pruned)" if use_prune else "",
-    )
-    set_cached_matrices(colors, layer_count, layer_height, code_df, rgb_df, pruned=use_prune,
-                        backing_suffix=b_suffix, background_rgb=b_boundary)
-    return code_df, rgb_df
+    return pruned
 
 
 def map_color_blocks_to_blend_results(
@@ -643,6 +686,18 @@ def generate_boxes_batch(
     return triangles.reshape(-1, 3, 3)
 
 
+def layer_runs(blend_code: str, z_offset: float, layer_height: float) -> list[tuple[str, float, float]]:
+    """(label, z_min, z_max) per run of identical layers: a run such as YYYYY is
+    one solid extrusion, not five stacked copies with internal faces."""
+    runs = []
+    start = 0
+    for label, group in itertools.groupby(blend_code):
+        length = len(list(group))
+        runs.append((label, z_offset + start * layer_height, z_offset + (start + length) * layer_height))
+        start += length
+    return runs
+
+
 def get_filename_prefix(colors: Colors) -> str:
     """Use the material code order for exported filenames."""
     return ''.join(colors.get_labels())
@@ -743,32 +798,22 @@ def generate_stl_zip(
         # the backing block itself is a single merged box below — strip the
         # suffix before per-pixel meshing to avoid double geometry.
         blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)  # e.g., "CCCM"
+        runs = layer_runs(blend_code, z_offset, layer_height)
 
-        # Group contiguous identical colors vertically to eliminate internal faces
-        start_idx = 0
-        for code_char, group in itertools.groupby(blend_code):
-            group_len = len(list(group))
-            z_min = z_offset + start_idx * layer_height
-            z_max = z_offset + (start_idx + group_len) * layer_height
-            start_idx += group_len
+        # The block's footprint is meshed once; each vertical run extrudes it.
+        rectangles = None
+        if use_greedy_meshing and len(pixels) > 1:
+            rectangles = greedy_mesh_2d(
+                pixels_to_grid(pixels, width, height),
+                max_rectangles=_remaining_box_budget() // max(len(runs), 1),
+            )
 
-            if use_greedy_meshing and len(pixels) > 1:
-                # Use greedy meshing to merge adjacent pixels
-                optimized_boxes = generate_optimized_boxes(
-                    pixels=pixels,
-                    width=width,
-                    height=height,
-                    pixel_size=pixel_size,
-                    z_min=z_min,
-                    z_max=z_max,
-                    max_rectangles=_remaining_box_budget(),
-                )
+        for code_char, z_min, z_max in runs:
+            if rectangles is not None:
+                optimized_boxes = boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
                 total_original_boxes += len(pixels)
                 total_optimized_boxes += len(optimized_boxes)
-
-                # Batch-generate all box meshes at once
-                batch_mesh = generate_boxes_batch(optimized_boxes)
-                code_mesh_map[code_char].append(batch_mesh)
+                code_mesh_map[code_char].append(generate_boxes_batch(optimized_boxes))
             else:
                 # Original per-pixel box generation
                 total_original_boxes += len(pixels)

@@ -1,6 +1,5 @@
 """Generate SVG-mode STL files from the printable pixel partition."""
 from config.print_defaults import DEFAULT_BACKING_LAYERS
-import itertools
 import logging
 import zipfile
 from io import BytesIO
@@ -8,7 +7,7 @@ from typing import Optional
 
 from core.blend_color import Colors
 from config.settings import settings
-from services.mesh_optimizer import generate_optimized_boxes_from_grid
+from services.mesh_optimizer import boxes_from_rectangles, greedy_mesh_2d
 from services import stl_generator
 from services.print_stack import (
     PRINT_BACKGROUND_RGB,
@@ -22,6 +21,7 @@ from services.stl_generator import (
     generate_box,
     generate_boxes_batch,
     get_filename_prefix,
+    layer_runs,
     merge_stl_meshes,
     _log_blend_code_distribution,
     _log_input_color_brightness,
@@ -117,21 +117,14 @@ def generate_svg_stl_zip(
         total_regions += len(result['regions'])
         blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)
 
-        # Generate mesh for each layer
-        start_idx = 0
-        for code_char, group in itertools.groupby(blend_code):
-            group_len = len(list(group))
-            z_min = z_offset + start_idx * layer_height
-            z_max = z_offset + (start_idx + group_len) * layer_height
-            start_idx += group_len
-
-            boxes = generate_optimized_boxes_from_grid(
-                grid=region_grid,
-                pixel_size=pixel_size,
-                z_min=z_min,
-                z_max=z_max,
-                max_rectangles=max(0, settings.stl_max_boxes - total_boxes),
-            )
+        # The region is meshed once; each vertical run extrudes it.
+        runs = layer_runs(blend_code, z_offset, layer_height)
+        rectangles = greedy_mesh_2d(
+            region_grid,
+            max_rectangles=max(0, settings.stl_max_boxes - total_boxes) // max(len(runs), 1),
+        )
+        for code_char, z_min, z_max in runs:
+            boxes = boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
             if boxes:
                 total_boxes += len(boxes)
                 code_mesh_map[code_char].append(generate_boxes_batch(boxes))

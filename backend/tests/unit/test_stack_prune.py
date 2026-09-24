@@ -86,6 +86,12 @@ def _codes_from_matrix(code_df):
     return code_df.to_numpy().ravel().tolist()
 
 
+def _is_full_enumeration(code_df, layer_count, layer_height, colors) -> bool:
+    """The matrix is the full-enumeration oracle, not composition-pruned."""
+    full_df, _ = compute_reference_matrices(layer_count, layer_height, colors, prune=False)
+    return set(_codes_from_matrix(code_df)) == set(_codes_from_matrix(full_df))
+
+
 class TestCandidateGeneration:
     def test_composition_count_matches_combinatorics(self):
         labels = ["C", "M", "Y", "W", "G"]
@@ -103,8 +109,12 @@ class TestCandidateGeneration:
         colors = _five_transparent_colors()
         full_df, _ = compute_reference_matrices(8, 0.84, colors, prune=False)
         pruned_df, _ = compute_reference_matrices(8, 0.84, colors)
-        assert len(set(_codes_from_matrix(full_df))) == FULL_CODES_5X8
-        assert len(set(_codes_from_matrix(pruned_df))) == COMPOSITIONS_5X8
+        full_codes = set(_codes_from_matrix(full_df))
+        pruned_codes = set(_codes_from_matrix(pruned_df))
+        # One code per distinct color: orderings for the full set, canonical
+        # compositions for the pruned one.
+        assert pruned_codes <= set(composition_codes(colors.get_labels(), 8))
+        assert len(pruned_codes) <= COMPOSITIONS_5X8 < len(full_codes) <= FULL_CODES_5X8
 
     def test_distinct_permutations_unique_and_capped(self):
         perms = distinct_permutations("CCMMYYWG")
@@ -152,7 +162,7 @@ class TestRegimeGate:
     def test_opaque_set_keeps_full_enumeration(self):
         bambu = Colors.from_configs(get_preset("bambu_cmywk"))
         code_df, _ = compute_reference_matrices(4, 0.08, bambu)
-        assert len(set(_codes_from_matrix(code_df))) == 5**4
+        assert _is_full_enumeration(code_df, 4, 0.08, bambu)
 
     def test_custom_set_within_budget_keeps_full_enumeration(self):
         """A custom set with a high TD mean classifies
@@ -168,7 +178,7 @@ class TestRegimeGate:
         colors = Colors.from_configs(custom)
         assert is_translucent_set(colors)
         code_df, _ = compute_reference_matrices(4, 0.84, colors)
-        assert len(set(_codes_from_matrix(code_df))) == 4**4  # 256 exact, not C(7,3)=35
+        assert _is_full_enumeration(code_df, 4, 0.84, colors)  # exact, not the 35 compositions
 
     def test_mixed_set_keeps_full_enumeration(self):
         """Opaque/mixed sets remain exact: one opaque filament disqualifies
@@ -181,7 +191,7 @@ class TestRegimeGate:
         colors = Colors.from_configs(mixed)
         assert not is_translucent_set(colors)
         code_df, _ = compute_reference_matrices(4, 0.84, colors)
-        assert len(set(_codes_from_matrix(code_df))) == 5**4  # full, not C(8,4)=70
+        assert _is_full_enumeration(code_df, 4, 0.84, colors)  # full, not the 70 compositions
 
 
 class TestRefinement:
@@ -414,25 +424,38 @@ class TestBudgetUsesRealTargetCount:
 
     def test_more_targets_flip_regime_to_pruned(self, monkeypatch):
         from config.settings import settings as _settings
+        from services import matrix_cache as _mc
         from services import stl_generator as _sg
+        colors = _five_transparent_colors()
+        full_df, _ = compute_reference_matrices(8, 0.84, colors, prune=False)
+        build = _sg._estimate_build_seconds(5**8)
+        est_1 = build + _sg._estimate_match_seconds(full_df.size, 1)
+        est_many = build + _sg._estimate_match_seconds(full_df.size, 10_000)
         # Budget set BETWEEN the two estimates so the assertion is about the
         # target-count dependency, not host speed.
-        colors = _five_transparent_colors()
-        est_1 = _sg._estimate_full_enumeration_seconds(5**8, 1)
-        est_many = _sg._estimate_full_enumeration_seconds(5**8, 10_000)
         monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", (est_1 + est_many) / 2)
+        _mc.clear_cache()
         few, _ = compute_reference_matrices(8, 0.84, colors, n_targets=1)
+        _mc.clear_cache()
         many, _ = compute_reference_matrices(8, 0.84, colors, n_targets=10_000)
-        n_few = len(set(_codes_from_matrix(few)))
-        n_many = len(set(_codes_from_matrix(many)))
-        assert n_few == 5**8, "1 target fits the budget -> full enumeration"
-        assert n_many == 495, "10k targets exceed it -> composition pruning"
+        few_codes = set(_codes_from_matrix(few))
+        many_codes = set(_codes_from_matrix(many))
+        assert few_codes == set(_codes_from_matrix(full_df)), "1 target fits the budget -> full enumeration"
+        assert many_codes <= set(composition_codes(colors.get_labels(), 8)), (
+            "10k targets exceed it -> composition pruning"
+        )
+        _mc.clear_cache()
+
+
+def _distinct_hex_colors(labels: str, td: float) -> Colors:
+    hexes = ["#3D79C6", "#B3356E", "#FFE665", "#FFFFFF", "#112233", "#445566", "#778899", "#0B0F0C"]
+    return Colors(colors={label: Color(label, td, hexes[i]) for i, label in enumerate(labels)})
 
 
 class TestEstimateAccuracy:
     """The probe model must track the measured uncached wall time of the
-    complete production path — compute_reference_matrices (build) plus
-    map_to_nearest_color for the same target count — within 0.1x..3x."""
+    complete production path — compute_reference_matrices (enumeration)
+    plus map_to_nearest_color for the same target count — within 0.1x..3x."""
 
     def _measure_end_to_end(self, colors, layer_count, layer_height, n_targets):
         import time as _time
@@ -442,82 +465,61 @@ class TestEstimateAccuracy:
         _mc.clear_cache()
         t0 = _time.perf_counter()
         code_df, rgb_df = _crm(layer_count, layer_height, colors, n_targets=n_targets)
-        targets = [(120, 130, 140)] * n_targets
+        targets = [(120 + i, 130, 140) for i in range(n_targets)]
         _C.map_to_nearest_color(targets, code_df, rgb_df)
         measured = _time.perf_counter() - t0
         _mc.clear_cache()
-        return measured
+        return measured, code_df.size
 
     def test_estimate_tracks_measured_end_to_end(self):
-        from core.color_materials import Color as _C
-        from services.stl_generator import _estimate_full_enumeration_seconds as _est
-        colors = Colors(colors={
-            l: _C(l, td, h) for l, h, td in zip(
-                "CMYWK",
-                ["#3D79C6", "#B3356E", "#FFE665", "#FFFFFF", "#0B0F0C"],
-                [0.5, 0.5, 0.6, 0.6, 0.3],
-            )
-        })
-        n, n_targets = 5 ** 5, 10  # 3,125 codes: fast, representative shape
-        est = _est(n, n_targets)
-        measured = self._measure_end_to_end(colors, 5, 0.08, n_targets)
-        assert est <= measured * 3, (
-            f"estimate {est:.3f}s exceeds measured {measured:.3f}s by >3x"
-        )
-        assert est >= measured * 0.1, (
-            f"estimate {est:.3f}s is >10x below measured {measured:.3f}s"
-        )
+        from services import stl_generator as _sg
+        colors = _distinct_hex_colors("CMYWK", 0.5)
+        n_targets = 10
+        measured, n_references = self._measure_end_to_end(colors, 8, 0.08, n_targets)
+        est = _sg._estimate_build_seconds(5 ** 8) + _sg._estimate_match_seconds(n_references, n_targets)
+        assert est <= measured * 3, f"estimate {est:.3f}s exceeds measured {measured:.3f}s by >3x"
+        assert est >= measured * 0.1, f"estimate {est:.3f}s is >10x below measured {measured:.3f}s"
 
     def test_within_budget_accepted_regardless_of_code_count(self, monkeypatch):
         """Frozen policy: the time budget is the ONLY enumeration gate —
-        no fixed code-count cap. A set whose probe estimate fits the budget
+        no fixed code-count cap. A set whose estimate fits the budget
         enumerates fully no matter how many codes that is."""
         from config.settings import settings as _settings
-        from core.color_materials import Color as _C
         from services import matrix_cache as _mc
         from services import stl_generator as _sg
         from services.stl_generator import compute_reference_matrices as _crm
-        opaque = Colors(colors={
-            l: _C(l, 0.5, h) for l, h in zip(
-                "ABCDEFGH", [f"#00{i:02d}00" for i in range(8)])
-        })
-        est = _sg._estimate_full_enumeration_seconds(8 ** 8, 10)
-        # Budget set comfortably ABOVE the estimate: the 8^8 (16.7M-code)
+        from core.stack_prune import _matrix_is_fully_enumerated
+        opaque = _distinct_hex_colors("ABCDEFGH", 0.5)
+        # Budget comfortably ABOVE the estimate: the 8^8 (16.7M-code)
         # enumeration must be admitted — there is no count ceiling.
-        monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", est * 10)
+        monkeypatch.setattr(
+            _settings, "full_enumeration_budget_seconds", _sg._estimate_build_seconds(8 ** 8) * 10 + 60,
+        )
         _mc.clear_cache()
         df, _ = _crm(8, 0.08, opaque, n_targets=10)
-        uniq = set(_codes_from_matrix(df))
-        assert len(uniq) == 8 ** 8
+        assert _matrix_is_fully_enumerated(df)
         _mc.clear_cache()
 
     def test_regime_flips_at_budget_boundary(self, monkeypatch):
-        """Behavior near the 60s boundary: the budget decides full vs prune
-        using the end-to-end estimate, and translucent sets over budget
-        prune while opaque sets reject."""
+        """Behavior near the budget boundary: the estimate decides full vs
+        prune, and translucent sets over budget prune."""
         from config.settings import settings as _settings
-        from core.color_materials import Color as _C
         from services import matrix_cache as _mc
         from services import stl_generator as _sg
         from services.stl_generator import compute_reference_matrices as _crm
-        translucent = Colors(colors={
-            l: _C(l, td, h) for l, h, td in zip(
-                "CMYWK", ["#4C72A0"] * 5, [5.0] * 5)
-        })
-        est = _sg._estimate_full_enumeration_seconds(5 ** 5, 10)
-        # Just over the measured cost -> within budget -> full enumeration.
+        translucent = _distinct_hex_colors("CMYWK", 5.0)
+        full_df, _ = _crm(5, 0.08, translucent, prune=False)
+        est = _sg._estimate_build_seconds(5 ** 5) + _sg._estimate_match_seconds(full_df.size, 10)
+        # Over the estimate -> within budget -> full enumeration.
         monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", est * 2)
         _mc.clear_cache()
         df, _ = _crm(5, 0.08, translucent, n_targets=10)
-        # DataFrame is padded to a rectangle; the distinct-code count is
-        # the true enumeration size.
-        uniq = set(_codes_from_matrix(df))
-        assert len(uniq) == 5 ** 5
-        # Just under the measured cost -> over budget -> pruned (translucent).
+        assert set(_codes_from_matrix(df)) == set(_codes_from_matrix(full_df))
+        # Under the estimate -> over budget -> pruned (translucent).
         monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", est * 0.5)
         _mc.clear_cache()
         df_p, _ = _crm(5, 0.08, translucent, n_targets=10)
-        assert df_p.size < 5 ** 5  # composition representatives
+        assert set(_codes_from_matrix(df_p)) <= set(composition_codes(translucent.get_labels(), 5))
         _mc.clear_cache()
 
 

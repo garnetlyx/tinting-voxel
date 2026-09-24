@@ -76,12 +76,77 @@ def unprintable_pixels(labels: np.ndarray, radius: float) -> np.ndarray:
     return result
 
 
-def _nearest_label(labels: np.ndarray, pixels: np.ndarray, sources: np.ndarray) -> np.ndarray:
-    """Label of the nearest ``sources`` pixel for each ``pixels`` pixel."""
+def _nearest_source_labels(
+    labels: np.ndarray, pixels: np.ndarray, sources: np.ndarray,
+) -> np.ndarray:
+    """Label of the nearest ``sources`` pixel for each ``pixels`` pixel.
+
+    Works on a window around ``pixels`` that grows until every answer is
+    provably global: a source outside the window lies beyond the window edge,
+    so a nearest distance within the distance to that edge cannot be beaten.
+    """
     import scipy.ndimage as ndi
 
-    indices = ndi.distance_transform_edt(~sources, return_distances=False, return_indices=True)
-    return labels[indices[0][pixels], indices[1][pixels]]
+    height, width = labels.shape
+    ys, xs = np.nonzero(pixels)
+    margin = 8
+    while True:
+        y0, y1 = max(0, int(ys.min()) - margin), min(height, int(ys.max()) + margin + 1)
+        x0, x1 = max(0, int(xs.min()) - margin), min(width, int(xs.max()) + margin + 1)
+        if (y1 - y0) * (x1 - x0) * 2 >= height * width:
+            # A window this large costs about as much as the whole image.
+            y0, y1, x0, x1 = 0, height, 0, width
+        window = sources[y0:y1, x0:x1]
+        whole = (y0, y1, x0, x1) == (0, height, 0, width)
+        if window.any():
+            distances, indices = ndi.distance_transform_edt(~window, return_indices=True)
+            local_y, local_x = ys - y0, xs - x0
+            found = distances[local_y, local_x]
+            # Distance from each pixel to the nearest window edge that is not an image edge.
+            edge = np.full(len(ys), np.inf)
+            if y0 > 0:
+                edge = np.minimum(edge, local_y + 1)
+            if y1 < height:
+                edge = np.minimum(edge, (y1 - y0) - local_y)
+            if x0 > 0:
+                edge = np.minimum(edge, local_x + 1)
+            if x1 < width:
+                edge = np.minimum(edge, (x1 - x0) - local_x)
+            if whole or np.all(found <= edge):
+                return labels[indices[0][local_y, local_x] + y0, indices[1][local_y, local_x] + x0]
+        margin *= 2
+
+
+def _nearest_other_printable_labels(
+    labels: np.ndarray, covered: np.ndarray, unresolved: dict[int, np.ndarray],
+) -> dict[int, np.ndarray]:
+    """For each label's pixels, the label of the nearest printable pixel of another material.
+
+    One distance transform to the nearest printable pixel of any material
+    answers every pixel whose nearest printable pixel is already another
+    material; only pixels nearest to their own material search again, among
+    the other materials, on a window around them. Labels with no printable
+    pixel of another material anywhere are omitted.
+    """
+    import scipy.ndimage as ndi
+
+    if not covered.any():
+        return {}
+    indices = ndi.distance_transform_edt(~covered, return_distances=False, return_indices=True)
+    nearest = labels[indices[0], indices[1]]
+    assigned: dict[int, np.ndarray] = {}
+    for label, pixels in unresolved.items():
+        sources = covered & (labels != label)
+        if not sources.any():
+            continue
+        values = nearest[pixels]
+        own = values == label
+        if own.any():
+            own_pixels = np.zeros_like(pixels)
+            own_pixels[pixels] = own
+            values[own] = _nearest_source_labels(labels, own_pixels, sources)
+        assigned[label] = values
+    return assigned
 
 
 def _widen_or_discard(
@@ -169,10 +234,10 @@ def _widen_or_discard(
         else:
             pending = unresolved.setdefault(label, np.zeros(labels.shape, dtype=bool))
             pending[y0:y1, x0:x1] |= local
+    assigned = _nearest_other_printable_labels(labels, covered_any, unresolved)
     for label, pixels in unresolved.items():
-        sources = covered_any & (labels != label)
-        if sources.any():
-            result[pixels] = _nearest_label(labels, pixels, sources)
+        if label in assigned:
+            result[pixels] = assigned[label]
         elif label != dominant:
             # Nothing anywhere is printable yet: the largest material absorbs the rest.
             result[pixels] = dominant

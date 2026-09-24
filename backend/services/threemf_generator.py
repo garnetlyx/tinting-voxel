@@ -6,7 +6,6 @@ object in the 3MF file, which slicers like Bambu Studio can assign to
 different extruders.
 """
 from config.print_defaults import DEFAULT_BACKING_LAYERS
-import itertools
 import logging
 import re
 from io import BytesIO
@@ -17,7 +16,7 @@ import trimesh
 
 from core.blend_color import Color, Colors
 from config.settings import settings
-from services.mesh_optimizer import generate_optimized_boxes
+from services.mesh_optimizer import BoxRange, boxes_from_rectangles, greedy_mesh_2d, pixels_to_grid
 from services.print_stack import (
     PRINT_BACKGROUND_RGB,
     backing_suffix,
@@ -27,20 +26,13 @@ from services.print_stack import (
 )
 from services.stl_generator import (
     compute_reference_matrices,
+    layer_runs,
     _log_blend_code_distribution,
     _log_input_color_brightness,
 )
-from services.mesh_optimizer import generate_optimized_boxes_from_grid
 from services.vector_processor import finalize_vector_partition
 
 logger = logging.getLogger(__name__)
-
-
-BoxRange = tuple[
-    tuple[float, float],
-    tuple[float, float],
-    tuple[float, float],
-]
 
 
 def _boxes_to_trimesh(
@@ -195,23 +187,19 @@ def generate_3mf(
         pixels = color_block['pixels']
         # Backing suffix -> single merged block below; strip before meshing.
         blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)
+        runs = layer_runs(blend_code, z_offset, layer_height)
 
-        # A run such as YYYYY is one solid extrusion, not five stacked
-        # copies of the same surface mesh. This matches the STL path and
-        # removes internal horizontal faces before trimesh export.
-        start_idx = 0
-        for code_char, group in itertools.groupby(blend_code):
-            group_len = len(list(group))
-            z_min = z_offset + start_idx * layer_height
-            z_max = z_offset + (start_idx + group_len) * layer_height
-            start_idx += group_len
+        # The block's footprint is meshed once; each vertical run extrudes it.
+        rectangles = None
+        if use_greedy_meshing and len(pixels) > 1:
+            rectangles = greedy_mesh_2d(
+                pixels_to_grid(pixels, width, height),
+                max_rectangles=_remaining_box_budget() // max(len(runs), 1),
+            )
 
-            if use_greedy_meshing and len(pixels) > 1:
-                optimized_boxes = generate_optimized_boxes(
-                    pixels=pixels, width=width, height=height,
-                    pixel_size=pixel_size, z_min=z_min, z_max=z_max,
-                    max_rectangles=_remaining_box_budget(),
-                )
+        for code_char, z_min, z_max in runs:
+            if rectangles is not None:
+                optimized_boxes = boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
                 total_optimized_boxes += len(optimized_boxes)
                 code_mesh_map[code_char].append(optimized_boxes)
             else:
@@ -369,21 +357,14 @@ def generate_svg_3mf(
         if not region_grid.any():
             continue
         blend_code = strip_backing_suffix(result_codes[idx], w_label, n_white)
+        runs = layer_runs(blend_code, z_offset, layer_height)
 
-        start_idx = 0
-        for code_char, group in itertools.groupby(blend_code):
-            group_len = len(list(group))
-            z_min = z_offset + start_idx * layer_height
-            z_max = z_offset + (start_idx + group_len) * layer_height
-            start_idx += group_len
-
-            boxes = generate_optimized_boxes_from_grid(
-                grid=region_grid,
-                pixel_size=pixel_size,
-                z_min=z_min,
-                z_max=z_max,
-                max_rectangles=_remaining_box_budget(),
-            )
+        # The region is meshed once; each vertical run extrudes it.
+        rectangles = greedy_mesh_2d(
+            region_grid, max_rectangles=_remaining_box_budget() // max(len(runs), 1),
+        )
+        for code_char, z_min, z_max in runs:
+            boxes = boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
             if boxes:
                 total_optimized_boxes += len(boxes)
                 code_mesh_map[code_char].append(boxes)

@@ -75,7 +75,7 @@ class TestPermutationBombDoS:
         # probe-measured estimate can legitimately fit the budget on fast
         # hosts; the guard decision is what this test pins).
         import services.stl_generator as sg
-        monkeypatch.setattr(sg, "_estimate_full_enumeration_seconds", lambda n, t: 1e9)
+        monkeypatch.setattr(sg, "_estimate_build_seconds", lambda n: 1e9)
         with pytest.raises(ValueError, match="over the .* budget"):
             initialize_color_mapping(layer_count=8, colors=colors)
 

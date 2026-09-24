@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     # bounds every sync endpoint anyway.
     full_enumeration_budget_seconds: float = 60.0
 
+    # Worker threads for vectorized stack enumeration and color matching
+    # (numpy releases the GIL). Match the container's vCPU limit.
+    compute_threads: int = 8
+
     # STL/3MF generation: cap on total merged boxes per request. Greedy meshing
     # collapses runs of same-color pixels, so the guard is enforced on the REAL
     # merged box count (cumulative across color blocks), not on the raw

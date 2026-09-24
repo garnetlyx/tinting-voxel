@@ -75,8 +75,8 @@ class FilamentPreviewService:
         # is the caller's escape hatch for very large grids.
         permutation_count = num_colors ** self.layer_count
         from config.settings import settings
-        from services.stl_generator import _estimate_full_enumeration_seconds
-        estimated = _estimate_full_enumeration_seconds(permutation_count, 1)
+        from services.stl_generator import _estimate_build_seconds
+        estimated = _estimate_build_seconds(permutation_count)
         if estimated > settings.full_enumeration_budget_seconds and page is None:
             raise ValueError(
                 f"Preview grid for {num_colors} colors x {self.layer_count} layers "
