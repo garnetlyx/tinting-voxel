@@ -1,8 +1,10 @@
 """
 Image processing endpoints
 """
-from config.print_defaults import DEFAULT_BACKING_LAYERS
+from config.settings import settings
+from config.print_defaults import DEFAULT_BACKING_LAYERS, MAX_COLOR_LAYERS
 import logging
+import time
 from typing import Optional
 from io import BytesIO
 
@@ -28,6 +30,7 @@ from api.models import (
 from api.rate_limiter import limiter
 from api.responses import json_response
 from api.validators import validate_image_upload
+from core.stack_prune import is_translucent_set
 from services.image_processor import (
     resample_to_model_grid,
     _image_to_data_url,
@@ -35,6 +38,7 @@ from services.image_processor import (
     build_vector_simulated_preview,
     process_image,
 )
+from services.telemetry import emit
 from services.vector_processor import (
     VectorProcessorConfig,
     process_image_vector_with_preview,
@@ -53,15 +57,15 @@ async def api_process_image(
     request: Request,
     image: UploadFile = File(...),
     mode: str = Form("pixel"),
-    maxColors: int = Form(10, ge=1, le=1024),
+    maxColors: int = Form(10, ge=1, le=settings.max_target_colors),
     colorThreshold: float = Form(50, ge=0, le=1000),
     pixelSize: float = Form(0.2, gt=0, le=10),
     epsilon: float = Form(2.0, gt=0, le=100),
     minArea: float = Form(4.0, gt=0, le=100),
-    numColors: int = Form(8, ge=1, le=256),
+    numColors: int = Form(8, ge=1, le=settings.max_target_colors),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
     layerHeight: Optional[float] = Form(None, gt=0, le=10),
-    layerCount: int = Form(4, ge=1, le=10),
+    layerCount: int = Form(4, ge=1, le=MAX_COLOR_LAYERS),
     whiteBackingLayers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
     backingMode: str = Form("white", pattern=r'^(white|black)$'),
     filamentPreset: Optional[str] = Form(None),
@@ -88,8 +92,10 @@ async def api_process_image(
     colors = get_colors_from_request(parsed_preset, parsed_colors)
     layerHeight = resolve_layer_height(layerHeight, colors)
 
+    filament = getattr(parsed_preset, "value", parsed_preset) or "custom"
     if processing_mode == ProcessingMode.PIXEL:
         def build_pixel_response() -> Response:
+            started = time.perf_counter()
             result = process_image(
                 image_bytes=image_bytes,
                 max_colors=maxColors,
@@ -114,13 +120,31 @@ async def api_process_image(
                 len(result['colorBlocks'])
             )
 
+            _record_processing(
+                "pixel", started, result['imageDimensions'], result['pixelSize'], detailSize,
+                len(result['colorBlocks']), layerCount, layerHeight, whiteBackingLayers, filament, colors,
+            )
             return json_response(ProcessImageResponse(**result, detailSize=detailSize))
 
         return await run_in_threadpool(build_pixel_response)
 
     return await run_in_threadpool(
         _svg_mode_response, image_bytes, epsilon, minArea, numColors, pixelSize, detailSize,
-        colors, layerCount, layerHeight, whiteBackingLayers, backingMode,
+        colors, layerCount, layerHeight, whiteBackingLayers, backingMode, filament,
+    )
+
+
+def _record_processing(
+    mode: str, started: float, dimensions: dict, pixel_size: float, detail_size: Optional[float],
+    color_count: int, layer_count: int, layer_height: float, backing_layers: int, filament: str, colors,
+) -> None:
+    emit(
+        "image_processed", mode=mode, width=dimensions['width'], height=dimensions['height'],
+        cells=dimensions['width'] * dimensions['height'], pixel_size=round(pixel_size, 4),
+        detail_size=detail_size, colors=color_count, layer_count=layer_count,
+        layer_height=layer_height, backing_layers=backing_layers, filament=filament,
+        filament_colors=len(colors), translucent=is_translucent_set(colors),
+        duration_ms=round((time.perf_counter() - started) * 1000),
     )
 
 
@@ -136,8 +160,10 @@ def _svg_mode_response(
     layerHeight: float,
     whiteBackingLayers: int,
     backingMode: str,
+    filament: str,
 ) -> Response:
     """Vectorize, map and preview an image in SVG mode (runs in a worker thread)."""
+    started = time.perf_counter()
     img = Image.open(BytesIO(image_bytes))
     # Convert RGBA to RGB with white background if needed
     if img.mode == 'RGBA':
@@ -224,6 +250,10 @@ def _svg_mode_response(
         ref_matrices=(ref_code_matrix, ref_rgb_matrix),  # Pass pre-computed matrices
     )
 
+    _record_processing(
+        "svg", started, {'width': img.width, 'height': img.height}, pixelSize, detailSize,
+        len(vector_results), layerCount, layerHeight, whiteBackingLayers, filament, colors,
+    )
     return json_response(SVGProcessImageResponse(
         vectorResults=vector_results,
         processedImage=simulated_preview["processedImage"],

@@ -1,7 +1,8 @@
 """
 Batch processing endpoints for multiple images.
 """
-from config.print_defaults import DEFAULT_BACKING_LAYERS
+from config.settings import settings
+from config.print_defaults import DEFAULT_BACKING_LAYERS, MAX_COLOR_LAYERS
 import logging
 from typing import List, Optional
 
@@ -14,6 +15,7 @@ from api.filament_payload import get_colors_from_request, parse_filament_form_pa
 from api.models import BatchProcessResponse
 from api.rate_limiter import limiter
 from api.responses import json_response
+from services.telemetry import emit
 from services.batch_processor import (
     MAX_BATCH_SIZE,
     generate_batch_stl_zip,
@@ -64,7 +66,7 @@ async def _read_batch_files(images: List[UploadFile]) -> list:
 async def api_batch_process(
     request: Request,
     images: List[UploadFile] = File(...),
-    maxColors: int = Form(10, ge=1, le=1024),
+    maxColors: int = Form(10, ge=1, le=settings.max_target_colors),
     colorThreshold: float = Form(50, ge=0, le=1000),
     pixelSize: float = Form(0.2, gt=0, le=10),
     detailSize: Optional[float] = Form(None, ge=0.2, le=0.9),
@@ -83,6 +85,8 @@ async def api_batch_process(
         detail_size=detailSize,
     )
 
+    emit("batch_processed", images=result['totalImages'], succeeded=result['successCount'],
+         failed=result['errorCount'])
     logger.info(
         "Batch processed %d images: %d success, %d errors",
         result['totalImages'], result['successCount'], result['errorCount'],
@@ -97,11 +101,11 @@ async def api_batch_process(
 async def api_batch_download_stl(
     request: Request,
     images: List[UploadFile] = File(...),
-    maxColors: int = Form(10, ge=1, le=1024),
+    maxColors: int = Form(10, ge=1, le=settings.max_target_colors),
     colorThreshold: float = Form(50, ge=0, le=1000),
     pixelSize: float = Form(0.2, gt=0, le=10),
     layerHeight: Optional[float] = Form(None, gt=0, le=10),
-    layerCount: int = Form(4, ge=1, le=10),
+    layerCount: int = Form(4, ge=1, le=MAX_COLOR_LAYERS),
     whiteBackingLayers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
     backingMode: str = Form("white", pattern=r'^(white|black)$'),
     filamentPreset: Optional[str] = Form(None),
@@ -139,6 +143,7 @@ async def api_batch_download_stl(
         backing_mode=backingMode,
     )
 
+    emit("model_exported", format="batch-stl", groups=batch_result['successCount'], bytes=len(zip_content))
     logger.info(
         "Generated batch STL ZIP for %d/%d images",
         batch_result['successCount'], batch_result['totalImages'],

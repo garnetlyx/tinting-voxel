@@ -3,9 +3,10 @@ STL generation service with color mapping and mesh merging
 
 Includes optimization via greedy meshing to reduce file sizes.
 """
-from config.print_defaults import DEFAULT_BACKING_LAYERS
+from config.print_defaults import DEFAULT_BACKING_LAYERS, MAX_COLOR_LAYERS
 import itertools
 import logging
+import math
 import threading
 import zipfile
 from collections import deque
@@ -187,6 +188,47 @@ def _probe_throughput() -> tuple[float, float]:
     return build, match
 
 
+def _estimate_pruned_seconds(n_labels: int, layer_count: int, n_targets: int) -> float:
+    """Upper bound on the composition-pruned search: blend and match every
+    composition, then refine each target over the orderings of its candidate
+    pool (core/stack_prune.refine_matches)."""
+    from core.stack_prune import MAX_CANDIDATE_COMPOSITIONS, MAX_PERMS_PER_COMPOSITION
+    build, match = _probe_throughput()
+    compositions = math.comb(n_labels + layer_count - 1, layer_count)
+    orderings = min(math.factorial(layer_count), MAX_PERMS_PER_COMPOSITION)
+    pool = min(MAX_CANDIDATE_COMPOSITIONS, compositions)
+    return (
+        compositions * build
+        # Stage-1 match plus refinement's two distance passes over every composition.
+        + 3 * compositions * n_targets * match
+        + n_targets * pool * orderings * match
+        + min(compositions, n_targets * pool) * orderings * build
+    )
+
+
+def max_color_layers(colors: Colors) -> int:
+    """Largest color-layer count whose stack search fits
+    settings.layer_limit_budget_share of settings.stack_search_limit_seconds for
+    settings.max_target_colors targets: exhaustive search for opaque sets,
+    exhaustive or composition-pruned for translucent sets."""
+    from core.stack_prune import is_translucent_set
+    budget = settings.stack_search_limit_seconds * settings.layer_limit_budget_share
+    targets = settings.max_target_colors
+    n_labels = len(colors.get_labels())
+    translucent = is_translucent_set(colors)
+    for layers in range(MAX_COLOR_LAYERS, 1, -1):
+        full = _estimate_build_seconds(n_labels ** layers)
+        if not translucent:
+            if full <= budget:
+                return layers
+        elif (
+            full + _estimate_match_seconds(n_labels ** layers, targets) <= budget
+            or _estimate_pruned_seconds(n_labels, layer_count=layers, n_targets=targets) <= budget
+        ):
+            return layers
+    return 1
+
+
 def _estimate_build_seconds(n_codes: int) -> float:
     """Wall time to enumerate n_codes and keep their distinct colors."""
     return n_codes * _probe_throughput()[0]
@@ -338,6 +380,13 @@ def compute_reference_matrices(
     # Translucent regime over budget: one canonical representative per
     # composition (C(N+L-1, L) candidates; see core/stack_prune.py); order is
     # recovered per match by refine_matches().
+    pruned_estimate = _estimate_pruned_seconds(len(items), layer_count, targets)
+    if pruned_estimate > settings.stack_search_limit_seconds:
+        raise ValueError(
+            f"Stack search for {len(items)} colors x {layer_count} layers is estimated at "
+            f"{pruned_estimate:.0f}s even with composition pruning, over the "
+            f"{settings.stack_search_limit_seconds:.0f}s limit. Reduce the number of colors or layers."
+        )
     pruned = get_cached_matrices(colors, layer_count, layer_height, pruned=True, **cache_args)
     if pruned is None:
         compositions = composition_codes(items, layer_count)

@@ -4,6 +4,7 @@ V2 Download endpoints with configurable filament colors.
 Uses the shared material configuration for all exports.
 """
 import logging
+import time
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
@@ -18,6 +19,7 @@ from api.models import (
     FilamentPresetInfo,
     FilamentPresetsResponse,
     PrintSettingsRequest,
+    LayerLimitRequest,
 )
 from core.color_config import (
     PRESETS,
@@ -29,16 +31,25 @@ from services.image_processor import MAX_PROCESSING_DIMENSION
 from config.print_defaults import (
     DEFAULT_FILAMENT_PRESET, DEFAULT_BACKING_LAYERS,
     REGULAR_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM,
+    MAX_COLOR_LAYERS,
 )
 from core.stack_prune import TRANSPARENT_TD_THRESHOLD_MM
 
-from services.stl_generator import generate_stl_zip
+from services.stl_generator import generate_stl_zip, max_color_layers
+from services.telemetry import emit
 from services.svg_stl_generator import generate_svg_stl_zip
 from services.threemf_generator import generate_3mf, generate_svg_3mf
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v2", tags=["Downloads V2"])
+
+
+def _record_export(fmt: str, started: float, layer_count: int, groups: int, content: bytes) -> None:
+    emit(
+        "model_exported", format=fmt, layer_count=layer_count, groups=groups,
+        bytes=len(content), duration_ms=round((time.perf_counter() - started) * 1000),
+    )
 
 
 @router.get("/filament-presets", response_model=FilamentPresetsResponse)
@@ -69,10 +80,20 @@ async def api_get_filament_presets(request: Request):
             "transparent_layer_height_mm": TRANSPARENT_LAYER_HEIGHT_MM,
             "max_model_cells": settings.max_model_cells,
             "max_model_side_px": MAX_PROCESSING_DIMENSION,
+            "max_color_layers": MAX_COLOR_LAYERS,
+            "max_target_colors": settings.max_target_colors,
         },
         transparency={"td_threshold_mm": TRANSPARENT_TD_THRESHOLD_MM, "aggregation": "mean"},
     )
 
+
+
+@router.post("/layer-limit")
+@limiter.limit("60/minute")
+@handle_api_errors("computing the layer limit")
+async def api_layer_limit(request: Request, body: LayerLimitRequest):
+    """Most color layers this filament set can process within the stack-search limit."""
+    return {"maxLayerCount": await run_in_threadpool(max_color_layers, body.resolved_colors)}
 
 @router.post("/download-stl")
 @limiter.limit("5/minute")
@@ -83,6 +104,7 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
     color_blocks = [block.model_dump() for block in body.colorBlocks]
     image_dimensions = body.imageDimensions.model_dump()
 
+    started = time.perf_counter()
     zip_content = await run_in_threadpool(
         generate_stl_zip,
         color_blocks=color_blocks,
@@ -95,6 +117,7 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
         backing_mode=body.backingMode,
     )
 
+    _record_export("stl", started, body.layerCount, len(color_blocks), zip_content)
     logger.info(
         "Generated STL ZIP (v2, %d colors) for %d color blocks, %dx%d pixels",
         len(colors), len(color_blocks),
@@ -117,6 +140,7 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
     vector_results = [result.model_dump() for result in body.vectorResults]
     image_dimensions = body.imageDimensions.model_dump()
 
+    started = time.perf_counter()
     zip_content = await run_in_threadpool(
         generate_svg_stl_zip,
         vector_results=vector_results,
@@ -130,6 +154,7 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
         detail_size=body.detailSize,
     )
 
+    _record_export("svg-stl", started, body.layerCount, len(vector_results), zip_content)
     logger.info(
         "Generated STL ZIP (v2 SVG mode, %d colors) for %d color groups, %dx%d pixels",
         len(colors), len(vector_results),
@@ -161,6 +186,7 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
         for label in colors.get_labels():
             color_hex_map[label] = colors[label].hex
 
+    started = time.perf_counter()
     threemf_content = await run_in_threadpool(
         generate_3mf,
         color_blocks=color_blocks,
@@ -174,6 +200,7 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
         backing_mode=body.backingMode,
     )
 
+    _record_export("3mf", started, body.layerCount, len(color_blocks), threemf_content)
     logger.info(
         "Generated 3MF for %d color blocks, %dx%d pixels",
         len(color_blocks), image_dimensions['width'], image_dimensions['height']
@@ -203,6 +230,7 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
         for label in colors.get_labels():
             color_hex_map[label] = colors[label].hex
 
+    started = time.perf_counter()
     threemf_content = await run_in_threadpool(
         generate_svg_3mf,
         vector_results=vector_results,
@@ -217,6 +245,7 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
         detail_size=body.detailSize,
     )
 
+    _record_export("svg-3mf", started, body.layerCount, len(vector_results), threemf_content)
     logger.info(
         "Generated SVG 3MF for %d color groups, %dx%d pixels",
         len(vector_results), image_dimensions['width'], image_dimensions['height']
@@ -260,6 +289,7 @@ async def api_print_settings(request: Request, body: PrintSettingsRequest):
         filament_preset=preset_name,
     )
 
+    emit("model_exported", format="print-settings", layer_count=body.layerCount)
     logger.info("Generated print settings JSON")
 
     return Response(

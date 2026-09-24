@@ -26,6 +26,8 @@ interface ParameterPanelProps {
   layerHeight: number;
   layerCount: number;
   maxLayerCount: number;
+  /** Most colors a request may use (served by the backend). */
+  maxTargetColors?: number;
   pixelSize: number;
   onLayerHeightChange: (value: number) => void;
   onLayerCountChange: (value: number) => void;
@@ -67,6 +69,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
   layerHeight,
   layerCount,
   maxLayerCount,
+  maxTargetColors,
   pixelSize,
   onLayerHeightChange,
   onLayerCountChange,
@@ -124,7 +127,7 @@ export const ParameterPanel: React.FC<ParameterPanelProps> = ({
             <input
               type="range"
               min="2"
-              max="100"
+              max={maxTargetColors}
               value={maxColors}
               onChange={(e) => onMaxColorsChange(parseInt(e.target.value))}
               className="w-full"

@@ -31,6 +31,7 @@ tinting-voxel/
 │   │       ├── palette.py    # Palette library
 │   │       ├── param_search.py # Background parameter search + candidate previews
 │   │       ├── bug_report.py  # In-app bug reports (storage + optional email)
+│   │       ├── events.py     # Browser usage events
 │   │       └── health.py     # Health check endpoints
 │   ├── core/             # Core algorithms
 │   │   ├── blend_color.py    # Color blending (Beer-Lambert model)
@@ -42,6 +43,7 @@ tinting-voxel/
 │   │   └── palette_library.py # Supported filament palettes
 │   ├── services/         # Business logic
 │   │   ├── analytics.py         # In-memory usage analytics
+│   │   ├── telemetry.py         # Structured usage/operations events
 │   │   ├── bug_report.py       # Bug report storage + optional email delivery
 │   │   ├── batch_processor.py    # Multi-image batch processing
 │   │   ├── csv_generator.py      # CSV export
@@ -57,8 +59,8 @@ tinting-voxel/
 │   │   ├── svg_stl_generator.py  # SVG-mode STL generation
 │   │   ├── threemf_generator.py  # 3MF output (trimesh+lxml)
 │   │   └── vector_processor.py   # Vector/contour processing
-│   ├── config/           # Configuration (settings, constants)
-│   └── tests/            # Test suite (~750 tests)
+│   ├── config/           # Configuration (settings, constants, logging_setup)
+│   └── tests/            # Test suite (~760 tests)
 │       ├── unit/             # Unit tests
 │       ├── integration/      # Integration tests
 │       ├── performance/      # Performance tests
@@ -75,9 +77,10 @@ tinting-voxel/
 │   │   ├── FilamentConfigPanel.tsx # N-color filament config
 │   │   └── ImageEditor.tsx       # Canvas crop/resize editor
 │   ├── hooks/            # Custom hooks
+│   ├── utils/            # Shared helpers (model grid, telemetry, bug reports)
 │   ├── i18n/             # Locale runtime and feature translations (en, zh-CN)
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (8 spec files, 48 tests)
+├── e2e/                  # Playwright E2E tests (8 spec files, 49 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config
@@ -143,6 +146,7 @@ docker compose up --build  # Build and run
 | POST | `/api/v2/download-svg-3mf` | SVG-mode 3MF with configurable colors |
 | POST | `/api/v2/print-settings` | JSON print settings for slicers |
 | GET | `/api/v2/filament-presets` | List available filament presets |
+| POST | `/api/v2/layer-limit` | Largest color-layer count a filament set can search |
 
 ### Other
 | Method | Endpoint | Description |
@@ -156,6 +160,7 @@ docker compose up --build  # Build and run
 | DELETE | `/api/param-search/progress/{job_id}` | Cancel the search job |
 | GET | `/api/palettes/` | List color palettes |
 | GET | `/api/palettes/{id}` | Get specific palette |
+| POST | `/api/events` | Browser usage events (batched, anonymous) |
 | GET | `/api/analytics` | Usage analytics |
 | GET | `/api/cache-stats` | Reference-matrix cache stats |
 | GET | `/api/health` | Health check |
@@ -171,13 +176,13 @@ docker compose up --build  # Build and run
 ## Testing
 
 ```bash
-# Backend (~750 tests)
+# Backend (~760 tests)
 cd backend && pytest -v
 
-# Frontend (Vitest, 24 test files)
+# Frontend (Vitest, 26 test files)
 npm test
 
-# E2E (8 spec files, 48 tests)
+# E2E (8 spec files, 49 tests)
 npx playwright test
 ```
 
@@ -205,7 +210,11 @@ Stack search (`compute_reference_matrices`) blends every ordered code on index
 arrays in parallel and keeps one code per distinct 8-bit color (the first in
 enumeration order), which matches exactly what matching every code returns.
 Enumeration plus matching must fit `full_enumeration_budget_seconds`; over
-budget, translucent sets use composition pruning and opaque sets are rejected.
+budget, translucent sets use composition pruning and opaque sets are rejected,
+as are pruned searches estimated over `stack_search_limit_seconds`.
+`/api/v2/layer-limit` reports the largest layer count whose search fits
+`layer_limit_budget_share` of that limit at `max_target_colors` targets, and the
+layer slider stops there.
 
 Images larger than the model grid budget (`max_model_cells`, 4096 px per side)
 are resampled at their physical size, snapping to whole detail-width cells when
@@ -214,6 +223,24 @@ the same policy before upload (`src/utils/modelGrid.ts` mirrors
 `image_processor.model_pitch`; the limits come from `/api/v2/filament-presets`),
 and responses report the model pitch as `pixelSize`. Vectorized work uses the
 thread count the startup probe found fastest (`core/parallel.py`).
+
+### Telemetry
+Production writes one JSON object per log line (`LOG_FORMAT=json`,
+`config/logging_setup.py`), so `extra` fields become Railway log attributes.
+`services/telemetry.emit` records named events: `api_request` (route template,
+status, duration) for every API call, `api_error`, `image_processed`,
+`model_exported`, `param_search_started`/`param_search_finished`,
+`batch_processed`, and `bug_report_submitted`; counts since startup appear in
+`/api/analytics`. The browser (`src/utils/telemetry.ts`) batches page views,
+client errors, failed API responses (including edge failures the origin never
+sees), user-visible errors, and funnel steps to `/api/events`, logged as
+`client.<name>`. There are no cookies or stored IDs: a random ID groups one page
+load, visitors are counted with a salted hash that rotates daily, and browsers
+sending Global Privacy Control or Do Not Track send nothing. Event property
+names must pass `ClientEvent` in `api/models.py`; one invalid event rejects its
+whole batch. Railway log filters, for example:
+`@event:image_processed AND @duration_ms:>10000`, `@event:client.api_failed`,
+`@event:api_request AND @status:>=500`, `@level:error`.
 
 ### Key Patterns
 - `FilamentConfigMixin` in `models.py` provides shared filament validation

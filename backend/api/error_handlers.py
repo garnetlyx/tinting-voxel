@@ -6,6 +6,8 @@ import logging
 
 from fastapi import HTTPException
 
+from services.telemetry import emit
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,12 +26,16 @@ def handle_api_errors(operation: str):
         async def wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
-            except HTTPException:
+            except HTTPException as e:
+                emit("api_error", operation=operation, status=e.status_code, error="HTTPException",
+                     detail=str(e.detail)[:200])
                 raise
             except ValueError as e:
+                emit("api_error", operation=operation, status=422, error="ValueError", detail=str(e)[:200])
                 raise HTTPException(status_code=422, detail=str(e))
             except Exception as e:
                 logger.error("Error %s: %s", operation, str(e), exc_info=True)
+                emit("api_error", operation=operation, status=500, error=type(e).__name__, detail=str(e)[:200])
                 raise HTTPException(status_code=500, detail="An internal error occurred")
         return wrapper
     return decorator

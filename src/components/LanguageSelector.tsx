@@ -1,5 +1,6 @@
 import { Languages } from 'lucide-react';
 import { setLocale, supportedLocales, useTranslation, type Locale } from '../i18n';
+import { track } from '../utils/telemetry';
 
 export function LanguageSelector() {
   const { t, i18n } = useTranslation();
@@ -9,7 +10,10 @@ export function LanguageSelector() {
       <select
         aria-label={t('common:language')}
         value={i18n.resolvedLanguage ?? 'en'}
-        onChange={event => setLocale(event.target.value as Locale)}
+        onChange={event => {
+          setLocale(event.target.value as Locale);
+          track('language_changed', { locale: event.target.value });
+        }}
         className="min-w-0 bg-transparent focus:outline-purple-600"
       >
         {supportedLocales.map(locale => <option key={locale.code} value={locale.code} lang={locale.code}>{locale.label}</option>)}

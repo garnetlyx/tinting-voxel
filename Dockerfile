@@ -45,6 +45,7 @@ USER appuser
 # Configure environment for production
 ENV ENVIRONMENT=production
 ENV LOG_LEVEL=INFO
+ENV LOG_FORMAT=json
 ENV HOST=0.0.0.0
 ENV PORT=8000
 
@@ -56,4 +57,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/api/health')"
 
 # Run with uvicorn (uses $PORT env var for PaaS compatibility, defaults to 8000)
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Request telemetry (main.py) replaces uvicorn's plain-text access log.
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --no-access-log

@@ -56,40 +56,6 @@ class TestQA149GetErrorDetailArrayHandling:
 # The backend root_validator rejects this with 422 ("Cannot provide both").
 # The error message shows as "[object Object]" on every page load.
 
-# -- QA-151: Analytics KNOWN_ENDPOINTS missing V2 paths -----------------------
-# File: backend/services/analytics.py:29-42
-# KNOWN_ENDPOINTS lacks all /api/v2/* paths. These get normalized to
-# /api/{unknown}, making V2 endpoint analytics completely useless.
-
-class TestQA151AnalyticsV2EndpointsMissing:
-    """V2 API endpoints should be tracked individually, not as {unknown}."""
-
-    V2_ENDPOINTS = [
-        "/api/v2/download-stl",
-        "/api/v2/download-svg-stl",
-        "/api/v2/download-3mf",
-        "/api/v2/print-settings",
-        "/api/v2/filament-presets",
-    ]
-
-    @pytest.mark.parametrize("path", V2_ENDPOINTS)
-    def test_v2_endpoint_not_normalized_to_unknown(self, path):
-        """V2 endpoint should NOT be normalized to /api/{unknown}."""
-        normalized = AnalyticsCollector._normalize_path(path)
-        assert normalized != "/api/{unknown}", (
-            f"BUG QA-151: V2 endpoint '{path}' is normalized to '/api/{{unknown}}'. "
-            f"Add V2 endpoints to KNOWN_ENDPOINTS in analytics.py."
-        )
-
-    def test_v2_endpoints_in_known_set(self):
-        """V2 endpoints should be in KNOWN_ENDPOINTS."""
-        known = AnalyticsCollector.KNOWN_ENDPOINTS
-        missing = [p for p in self.V2_ENDPOINTS if p not in known]
-        assert not missing, (
-            f"BUG QA-151: V2 endpoints missing from KNOWN_ENDPOINTS: {missing}"
-        )
-
-
 # -- QA-152: health.py dead imports ------------------------------------------
 # File: backend/api/routes/health.py:4-5
 # `import platform` and `import sys` are unused after removing version info.

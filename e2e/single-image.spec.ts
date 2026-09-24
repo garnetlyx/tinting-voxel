@@ -30,6 +30,26 @@ test.describe('Single Image Processing', () => {
     await expect(page.getByRole('button', { name: 'Reprocess' })).toBeVisible();
   });
 
+  test('usage events are accepted by the backend', async ({ page }) => {
+    const names: string[] = [];
+    const statuses: number[] = [];
+    page.on('response', response => {
+      if (new URL(response.url()).pathname !== '/api/events') return;
+      statuses.push(response.status());
+      const batch = response.request().postDataJSON() as { events: Array<{ name: string }> };
+      names.push(...batch.events.map(event => event.name));
+    });
+
+    await uploadAndProcess(page);
+    // Leaving the page sends whatever is still queued.
+    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+
+    await expect.poll(() => names).toEqual(
+      expect.arrayContaining(['page_view', 'image_selected', 'processing_completed']),
+    );
+    expect(statuses.every(status => status === 204)).toBe(true);
+  });
+
   test('parameter sliders are visible and adjustable', async ({ page }) => {
     // Settings panel is open by default
     await expect(page.getByText(/Max Colors:/)).toBeVisible();

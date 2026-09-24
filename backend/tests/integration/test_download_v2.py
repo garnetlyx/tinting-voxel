@@ -3,6 +3,9 @@ import pytest
 import json
 import zipfile
 import struct
+from config.print_defaults import MAX_COLOR_LAYERS
+from config.settings import settings
+from services.image_processor import MAX_PROCESSING_DIMENSION
 
 import numpy as np
 import trimesh
@@ -43,7 +46,11 @@ def test_get_filament_presets_defaults_preserve_distinct_layer_heights(client):
     data = client.get("/api/v2/filament-presets").json()
     assert data["defaults"]["backing_layers"] == 3
     assert data["defaults"]["regular_layer_height_mm"] == 0.08
-    assert data["defaults"]["transparent_layer_height_mm"] == pytest.approx(0.84)
+    assert data["defaults"]["transparent_layer_height_mm"] == 0.84
+    assert data["defaults"]["max_model_cells"] == settings.max_model_cells
+    assert data["defaults"]["max_model_side_px"] == MAX_PROCESSING_DIMENSION
+    assert data["defaults"]["max_color_layers"] == MAX_COLOR_LAYERS
+    assert data["defaults"]["max_target_colors"] == settings.max_target_colors
     assert data["transparency"]["aggregation"] == "mean"
     threshold = data["transparency"]["td_threshold_mm"]
     assert threshold > 0
@@ -499,3 +506,10 @@ def test_filament_preview_uses_default_three_layer_backing_in_predictions(client
     expected_unbacked = codes_to_rgb_batch(["CC"], 0.08, colors_key(colors))[0]
     assert unbacked_entries["CC"] == np.round(expected_unbacked).astype(int).tolist()
     assert entries["CC"] != unbacked_entries["CC"]
+
+
+
+def test_layer_limit_endpoint_reports_the_filament_set_maximum(client):
+    response = client.post("/api/v2/layer-limit", json={"filamentPreset": "bambu_cmywk"})
+    assert response.status_code == 200
+    assert 1 <= response.json()["maxLayerCount"] <= MAX_COLOR_LAYERS

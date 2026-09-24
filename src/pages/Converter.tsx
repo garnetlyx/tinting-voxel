@@ -83,6 +83,7 @@ const Converter: React.FC = () => {
     filamentPresets,
     filamentCatalogLoading,
     maxModelSidePx,
+    maxTargetColors,
     filamentCatalogError,
     reloadFilamentCatalog,
     filamentPreset,
@@ -187,6 +188,7 @@ const Converter: React.FC = () => {
                   layerHeight={layerHeight}
                   layerCount={layerCount}
                   maxLayerCount={maxLayerCount}
+                  maxTargetColors={maxTargetColors}
                   pixelSize={pixelSize}
                   onLayerHeightChange={setLayerHeight}
                   onLayerCountChange={setLayerCount}

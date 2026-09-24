@@ -57,8 +57,10 @@ class Settings(BaseSettings):
     max_upload_size: int = 10 * 1024 * 1024  # 10MB
     allowed_extensions: list[str] = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"]
 
-    # Logging
+    # Logging: "text" for local development, "json" in production (Dockerfile)
+    # so Railway indexes each record's fields.
     log_level: str = "INFO"
+    log_format: str = "text"
 
     # Per-client request limits. E2E runs disable them: one browser drives the
     # whole suite from a single address.
@@ -78,6 +80,15 @@ class Settings(BaseSettings):
     # sets are rejected. 60s matches the Railway edge request timeout that
     # bounds every sync endpoint anyway.
     full_enumeration_budget_seconds: float = 60.0
+    # Ceiling on any stack search's estimated time, pruned or not: beyond it the
+    # request is rejected rather than running into Cloudflare's 100 s origin
+    # timeout.
+    stack_search_limit_seconds: float = 80.0
+    # Share of that ceiling a filament set's color-layer maximum may use,
+    # leaving headroom for image processing and timing variance.
+    layer_limit_budget_share: float = 0.5
+    # Most target colors (pixel max colors, SVG colors) a request may use.
+    max_target_colors: int = 100
 
     # Upper bound on worker threads for vectorized stack enumeration and color
     # matching (numpy releases the GIL). The startup probe uses fewer when the

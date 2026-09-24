@@ -118,81 +118,8 @@ class TestGlobalStateThreadSafety:
         assert max(results) - min(results) < 1000, "Results vary too much"
 
 
-class TestAnalyticsMemoryBounding:
-    """Test analytics memory bounding with LRU eviction."""
-
-    def test_analytics_respects_max_endpoints(self):
-        """Test that analytics doesn't exceed MAX_ENDPOINTS."""
-        collector = AnalyticsCollector()
-        max_endpoints = collector.MAX_ENDPOINTS
-
-        # Record more requests than max
-        for i in range(max_endpoints + 500):
-            collector.record_request(
-                method='GET',
-                path=f'/api/test/{i}',  # Unique path each time
-                status_code=200,
-                response_time_ms=10.0
-            )
-
-        # Should never exceed max
-        summary = collector.get_summary()
-        endpoint_count = len(summary['endpoints'])
-        assert endpoint_count <= max_endpoints, \
-            f"Analytics has {endpoint_count} endpoints, exceeds max {max_endpoints}"
-
-    def test_analytics_lru_eviction(self):
-        """Test that LRU eviction works correctly."""
-        collector = AnalyticsCollector()
-
-        # Use a small test - fill to capacity
-        for i in range(collector.MAX_ENDPOINTS):
-            collector.record_request(
-                method='GET',
-                path=f'/test{i}',
-                status_code=200,
-                response_time_ms=10.0
-            )
-
-        # Verify at capacity
-        summary = collector.get_summary()
-        initial_count = len(summary['endpoints'])
-        assert initial_count == collector.MAX_ENDPOINTS
-
-        # The first endpoint added was 'GET /test0'
-        # It should be the least recently used (first in OrderedDict)
-        # Access it to make it recently used
-        collector.record_request(
-            method='GET',
-            path='/test0',
-            status_code=200,
-            response_time_ms=10.0
-        )
-
-        # Now add a brand new endpoint - should evict 'GET /test1' (now the LRU)
-        collector.record_request(
-            method='GET',
-            path='/brand_new_endpoint',
-            status_code=200,
-            response_time_ms=10.0
-        )
-
-        summary = collector.get_summary()
-        keys = list(summary['endpoints'].keys())
-
-        # Should not exceed capacity
-        assert len(keys) == collector.MAX_ENDPOINTS, \
-            f"Expected {collector.MAX_ENDPOINTS} endpoints, got {len(keys)}"
-
-        # Recently accessed endpoint should still exist
-        assert 'GET /test0' in keys, "Recently accessed endpoint /test0 was evicted"
-
-        # New endpoint should exist
-        assert 'GET /brand_new_endpoint' in keys, "New endpoint not added"
-
-        # Some old endpoint should have been evicted (we can't guarantee which one
-        # without knowing internal OrderedDict state, but we know capacity is respected)
-        assert len(keys) <= collector.MAX_ENDPOINTS
+class TestAnalyticsConcurrency:
+    """Analytics recording is thread safe."""
 
     def test_concurrent_analytics_recording(self):
         """Test thread safety of analytics recording."""
@@ -202,7 +129,7 @@ class TestAnalyticsMemoryBounding:
             for i in range(count):
                 collector.record_request(
                     method='POST',
-                    path=f'/api/endpoint/{endpoint_id}',
+                    route=f'/api/endpoint/{endpoint_id}',
                     status_code=200 if i % 10 != 0 else 500,
                     response_time_ms=15.0 + (i % 50)
                 )
@@ -219,8 +146,7 @@ class TestAnalyticsMemoryBounding:
         summary = collector.get_summary()
         # Should have recorded 1000 requests total
         assert summary['totalRequests'] == 1000
-        # Should respect max endpoints
-        assert len(summary['endpoints']) <= collector.MAX_ENDPOINTS
+        assert len(summary['endpoints']) == 10
 
 
 class TestIntegrationConcurrency:
@@ -260,7 +186,7 @@ class TestIntegrationConcurrency:
                 for _ in range(10):
                     analytics.record_request(
                         method='GET',
-                        path=f'/api/test/{endpoint_id}',
+                        route=f'/api/test/{endpoint_id}',
                         status_code=200,
                         response_time_ms=20.0
                     )

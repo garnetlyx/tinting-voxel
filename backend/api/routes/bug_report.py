@@ -11,6 +11,7 @@ from api.error_handlers import handle_api_errors
 from api.models import BugReportRequest
 from api.rate_limiter import limiter
 from services.bug_report import decode_report_screenshot, save_bug_report, send_bug_report_email
+from services.telemetry import emit
 
 router = APIRouter(tags=['Bug reports'])
 logger = logging.getLogger(__name__)
@@ -45,4 +46,6 @@ async def api_bug_report(request: Request) -> Dict[str, Any]:
         logger.error('Could not save bug report: %s', type(exc).__name__)
         raise HTTPException(status_code=503, detail='Could not save your report. Please try again later.') from exc
     emailed = await send_bug_report_email(report)
-    return {'success': True, 'reportId': report['reportId'], 'delivery': 'email' if emailed else 'stored'}
+    delivery = 'email' if emailed else 'stored'
+    emit('bug_report_submitted', delivery=delivery, screenshot=bool(body.screenshot))
+    return {'success': True, 'reportId': report['reportId'], 'delivery': delivery}

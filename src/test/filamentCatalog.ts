@@ -17,7 +17,7 @@ export const filamentCatalog: FilamentPresetsResponse = {
   ],
   defaults: {
     filament_preset: 'bambu_cmywk', backing_layers: 3, regular_layer_height_mm: 0.08, transparent_layer_height_mm: 0.84,
-    max_model_cells: 2_000_000, max_model_side_px: 4096,
+    max_model_cells: 2_000_000, max_model_side_px: 4096, max_color_layers: 10, max_target_colors: 100,
   },
   transparency: { td_threshold_mm: 4.5, aggregation: 'mean' },
 };

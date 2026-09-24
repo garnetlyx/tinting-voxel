@@ -9,6 +9,7 @@ from api.error_handlers import handle_api_errors
 from api.rate_limiter import limiter
 from api.models import DownloadCSVRequest
 from services.csv_generator import generate_csv
+from services.telemetry import emit
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ async def api_download_csv(request: Request, body: DownloadCSVRequest):
     color_blocks = [block.model_dump() for block in body.colorBlocks]
     csv_content = await run_in_threadpool(generate_csv, color_blocks)
 
+    emit("model_exported", format="csv", groups=len(color_blocks), bytes=len(csv_content))
     logger.info("Generated CSV for %d colors", len(color_blocks))
 
     return Response(

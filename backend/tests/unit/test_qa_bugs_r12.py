@@ -13,48 +13,6 @@ import numpy as np
 from core.blend_color import Color, Colors, BlendTestGenerator, _code_to_rgb_cached
 from core.color_config import ColorConfig
 
-# -- QA-119: analytics middleware creates unbounded key growth -----------------
-# File: backend/services/analytics.py, backend/main.py:85-93
-# The analytics middleware records `path = request.url.path` directly.
-# For endpoints with path parameters like /api/palettes/{palette_id},
-# each unique palette_id creates a new key in the analytics dict.
-# An attacker could send requests to /api/palettes/<random-uuid> thousands
-# of times, each creating a unique key and consuming server memory.
-
-class TestQA119AnalyticsUnboundedKeyGrowth:
-    """Analytics records parameterized paths verbatim, causing memory growth."""
-
-    def test_parameterized_paths_normalized(self):
-        """Analytics should normalize parameterized paths to prevent key explosion."""
-        from services.analytics import AnalyticsCollector
-
-        collector = AnalyticsCollector()
-
-        # Simulate 100 requests with different palette IDs
-        for i in range(100):
-            collector.record_request(
-                method="GET",
-                path=f"/api/palettes/fake-palette-{i}",
-                status_code=404,
-                response_time_ms=10.0,
-            )
-
-        summary = collector.get_summary()
-        endpoint_count = len(summary['endpoints'])
-
-        # If paths are not normalized, we get 100 unique keys
-        # If they are, we should get 1 key like "GET /api/palettes/{id}"
-        assert endpoint_count < 10, (
-            f"BUG QA-119: Analytics recorded {endpoint_count} unique endpoint keys "
-            f"for 100 requests to /api/palettes/<unique-id>. Each unique path "
-            f"parameter creates a new dictionary key, causing unbounded memory "
-            f"growth. Paths with parameters should be normalized (e.g., "
-            f"/api/palettes/{{id}})."
-        )
-
-        collector.reset()
-
-
 # -- QA-120: Palette library palettes have first-letter collision risk ---------
 # File: backend/core/palette_library.py
 # Several palettes have colors whose first letters collide:

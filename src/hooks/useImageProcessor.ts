@@ -27,22 +27,23 @@ import {
   download3MFV2,
   downloadSVG3MFV2,
   downloadPrintSettings,
+  getLayerLimit,
 } from '../api/client';
 import { useFilamentStorage } from './useFilamentStorage';
 import { buildPrintStack } from '../utils/printStack';
 import { modelGridSize, modelPitch } from '../utils/modelGrid';
+import { sanitizeDiagnostic } from '../utils/bugReport';
+import { track } from '../utils/telemetry';
 
 const MIN_FILAMENT_COLORS = 4;
 const MAX_FILAMENT_COLORS = 16;
 const MIN_COLOR_LAYERS = 4;
-const MAX_COLOR_LAYERS = 10;
 const DEFAULT_MAX_DIMENSION_MM = 200;
 const MIN_PIXEL_SIZE_MM = 0.01;
 const MAX_PIXEL_SIZE_MM = 5.0;
 
 const clampPixelSize = (value: number) => Math.max(MIN_PIXEL_SIZE_MM, Math.min(MAX_PIXEL_SIZE_MM, value));
 
-const computeMaxLayerCount = () => MAX_COLOR_LAYERS;
 
 const computeDefaultPixelSize = (widthPx: number, heightPx: number) => {
   const longestSidePx = Math.max(widthPx, heightPx);
@@ -258,7 +259,28 @@ export const useImageProcessor = () => {
     [filamentColors, filamentPreset]
   );
 
-  const maxLayerCount = useMemo(() => computeMaxLayerCount(), []);
+  // The backend knows what each filament set can search within its time limit;
+  // until it answers, the catalog's overall maximum applies.
+  const [filamentSetLayerLimit, setFilamentSetLayerLimit] = useState<number | null>(null);
+  const maxLayerCount = Math.max(
+    MIN_COLOR_LAYERS,
+    filamentSetLayerLimit ?? filamentCatalog?.defaults.max_color_layers ?? MIN_COLOR_LAYERS,
+  );
+  useEffect(() => {
+    if (!filamentCatalog || !isFilamentConfigValid) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      getLayerLimit(filamentRequestPayload, controller.signal)
+        .then(setFilamentSetLayerLimit)
+        .catch(err => {
+          if (!controller.signal.aborted) console.error('Error getting the layer limit:', err);
+        });
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [filamentCatalog, isFilamentConfigValid, filamentRequestPayload]);
 
   const handleSetLayerCount = useCallback((value: number) => {
     setLayerCount(Math.max(MIN_COLOR_LAYERS, Math.min(maxLayerCount, value)));
@@ -329,6 +351,7 @@ export const useImageProcessor = () => {
     const processingMode = requestParams.mode;
     const requestKey = printableRenderKey(requestParams);
     requestedRenderKeyRef.current = requestKey;
+    const startedAt = performance.now();
 
     try {
       const canvas = document.createElement('canvas');
@@ -357,6 +380,10 @@ export const useImageProcessor = () => {
       // Only update state if this request wasn't aborted
       if (controller.signal.aborted) return;
       completedRenderKeyRef.current = requestKey;
+      // Upload, compute and download together, as the user waits for them.
+      track('processing_completed', {
+        mode: processingMode, ms: Math.round(performance.now() - startedAt), width: grid.width, height: grid.height,
+      });
 
       setCurrentImageFile(file);
       setImageDimensions(result.imageDimensions);
@@ -417,6 +444,11 @@ export const useImageProcessor = () => {
   }, [image, hasProcessedGeometry, isFilamentConfigValid, currentRenderKey, handleProcessImage]);
 
 
+  // Every message the user sees, including requests that failed before any response.
+  useEffect(() => {
+    if (error) track('error_shown', { detail: sanitizeDiagnostic(error) });
+  }, [error]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -441,6 +473,9 @@ export const useImageProcessor = () => {
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
+        track('image_selected', {
+          type: file.type, sizeMb: Math.round(file.size / 1e5) / 10, width: img.naturalWidth, height: img.naturalHeight,
+        });
         setRawImage(img);
         setIsEditing(true);
       };
@@ -821,6 +856,7 @@ export const useImageProcessor = () => {
     // Filament state
     filamentPresets: filamentCatalog?.presets ?? [],
     maxModelSidePx: filamentCatalog?.defaults.max_model_side_px,
+    maxTargetColors: filamentCatalog?.defaults.max_target_colors,
     filamentCatalogLoading,
     filamentCatalogError,
     reloadFilamentCatalog,

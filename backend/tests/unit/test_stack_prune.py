@@ -432,8 +432,9 @@ class TestBudgetUsesRealTargetCount:
         est_1 = build + _sg._estimate_match_seconds(full_df.size, 1)
         est_many = build + _sg._estimate_match_seconds(full_df.size, 10_000)
         # Budget set BETWEEN the two estimates so the assertion is about the
-        # target-count dependency, not host speed.
+        # target-count dependency, not host speed; the hard limit is not under test.
         monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", (est_1 + est_many) / 2)
+        monkeypatch.setattr(_settings, "stack_search_limit_seconds", float("inf"))
         _mc.clear_cache()
         few, _ = compute_reference_matrices(8, 0.84, colors, n_targets=1)
         _mc.clear_cache()
@@ -559,3 +560,34 @@ class TestMeanTdContract:
         ])
         assert excess.max() <= METRIC_EXCESS_BUDGET
         assert excess.mean() <= 1.0
+
+
+
+class TestSearchLimit:
+    """Searches estimated over stack_search_limit_seconds are rejected, and each
+    filament set's layer maximum keeps the worst case inside the limit."""
+
+    @pytest.fixture
+    def fixed_rates(self, monkeypatch):
+        from services import stl_generator as _sg
+        # Production-like rates: 8.45e-7 s per enumerated code, 5.06e-8 s per match.
+        monkeypatch.setattr(_sg, "_probe_throughput", lambda: (8.45e-7, 5.06e-8))
+
+    def test_pruned_search_over_the_limit_is_rejected(self, fixed_rates, monkeypatch):
+        from config.settings import settings as _settings
+        from services import matrix_cache as _mc
+        monkeypatch.setattr(_settings, "full_enumeration_budget_seconds", 1e-9)
+        _mc.clear_cache()
+        colors = _distinct_hex_colors("ABCDEFGH", 8.0)
+        with pytest.raises(ValueError, match="even with composition pruning"):
+            compute_reference_matrices(10, 0.84, colors, n_targets=100)
+
+    def test_layer_maximum_keeps_presets_and_caps_large_sets(self, fixed_rates):
+        from services.stl_generator import max_color_layers
+        assert max_color_layers(Colors.from_configs(get_preset("bambu_cmywk"))) == 10
+        assert max_color_layers(Colors.from_configs(get_preset("clear_cmyw"))) == 10
+        opaque16 = _distinct_hex_colors("ABCDEFGH", 0.3)
+        opaque16.colors.update({l: Color(l, 0.3, f"#1{i}2{i}3{i}") for i, l in enumerate("IJKLMNOP")})
+        assert max_color_layers(opaque16) == 6  # 16^6 codes fit; 16^7 do not
+        clear16 = Colors(colors={l: Color(l, 8.0, c.hex) for l, c in opaque16.colors.items()})
+        assert max_color_layers(clear16) < 10

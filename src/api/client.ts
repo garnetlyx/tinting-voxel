@@ -2,6 +2,7 @@
  * API client for backend communication
  */
 import { recordBugReportLog } from '../utils/bugReport';
+import { track } from '../utils/telemetry';
 import type {
   BugReportRequest,
   BugReportResponse,
@@ -41,12 +42,23 @@ function rateLimitMessage(retryAfter: string | null): string {
     : `Too many requests. Please try again in ${Math.ceil(delay / 1000)} seconds.`;
 }
 
+/** Request path with generated IDs masked, so failures group by endpoint. */
+function apiPath(url: string): string {
+  try {
+    return new URL(url).pathname.replace(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi, '{id}');
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Safely extract error detail from a response that may not be JSON
  * FastAPI validation errors return detail as an array of objects
  */
 async function getErrorDetail(response: Response, fallback: string): Promise<string> {
   recordBugReportLog('error', `API request failed (${response.status}): ${response.url || fallback}`);
+  // Edge failures (for example a proxy timeout) never reach the backend's logs.
+  track('api_failed', { status: response.status, path: apiPath(response.url) });
   if (response.status === 429) return rateLimitMessage(response.headers?.get('Retry-After') ?? null);
   try {
     const body = await response.json();
@@ -214,6 +226,25 @@ export async function downloadSTLV2(params: DownloadSTLParamsV2, signal?: AbortS
   }
 
   downloadBlobAsFile(await response.blob(), 'all_color_blocks.zip');
+}
+
+/**
+ * Most color layers the backend can search for a filament set within its time limit.
+ */
+export async function getLayerLimit(
+  filament: Pick<FilamentPreviewParams, 'filamentPreset' | 'filamentColors'>,
+  signal?: AbortSignal,
+): Promise<number> {
+  const response = await fetch(`${API_V2_BASE_URL}/layer-limit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(filament),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(await getErrorDetail(response, 'Failed to get the layer limit'));
+  }
+  return (await response.json()).maxLayerCount;
 }
 
 /**

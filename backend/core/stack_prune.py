@@ -7,11 +7,15 @@ The accepted error against exhaustive search is tested at six and eight layers.
 """
 import itertools
 import logging
+import math
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Optional
 
 import numpy as np
 
 from core.color_materials import Color, Colors
+from core.parallel import worker_threads
 
 logger = logging.getLogger(__name__)
 
@@ -54,15 +58,48 @@ def composition_codes(labels: list, layer_count: int) -> list:
     ]
 
 
+def _unrank_ordering(letters: list[str], counts: list[int], rank: int, total: int) -> str:
+    """The rank-th distinct ordering (lexicographic) of a multiset of letters.
+
+    Removing one letter leaves total * count / remaining orderings (an exact
+    integer identity for multinomial counts), so each step is O(len(letters)).
+    """
+    counts = list(counts)
+    remaining = sum(counts)
+    out = []
+    for _ in range(remaining):
+        for i, letter in enumerate(letters):
+            if counts[i] == 0:
+                continue
+            block = total * counts[i] // remaining
+            if rank < block:
+                out.append(letter)
+                counts[i] -= 1
+                total = block
+                remaining -= 1
+                break
+            rank -= block
+    return "".join(out)
+
+
 def distinct_permutations(code: str, cap: int = MAX_PERMS_PER_COMPOSITION) -> list:
-    """All unique orderings of a code's letters, deterministically capped."""
-    perms = sorted(set("".join(p) for p in itertools.permutations(sorted(code))))
-    if len(perms) > cap:
-        # Evenly sample the sorted ordering space so the cap stays representative
-        # rather than biased toward the lexicographic head.
-        idx = np.linspace(0, len(perms) - 1, cap).round().astype(int)
-        perms = [perms[i] for i in sorted(set(idx.tolist()))]
-    return perms
+    """All unique orderings of a code's letters in lexicographic order,
+    deterministically capped.
+
+    Above the cap, orderings are sampled evenly by rank so the cap stays
+    representative rather than biased toward the lexicographic head; they are
+    unranked directly instead of enumerating every permutation.
+    """
+    letters = sorted(set(code))
+    counts = [code.count(letter) for letter in letters]
+    total = math.factorial(len(code))
+    for count in counts:
+        total //= math.factorial(count)
+    if total <= cap:
+        ranks = range(total)
+    else:
+        ranks = sorted(set(np.linspace(0, total - 1, cap).round().astype(int).tolist()))
+    return [_unrank_ordering(letters, counts, rank, total) for rank in ranks]
 
 
 def _lab(rgb01: np.ndarray) -> np.ndarray:
@@ -73,7 +110,7 @@ def _lab(rgb01: np.ndarray) -> np.ndarray:
 
 
 def _cap_distinct_compositions(
-    pool: list,
+    pool: np.ndarray,
     ref_codes: list,
     rep_pen: np.ndarray,
     rep_raw: np.ndarray,
@@ -83,10 +120,12 @@ def _cap_distinct_compositions(
 
     Matrix padding repeats the final composition (495 compositions pad to
     506 cells); duplicate entries are ranked identically, so deduplicate by
-    code before applying the cap.
+    code before applying the cap. Ties keep index order (stable sort).
     """
+    pool = np.asarray(pool)
+    order = pool[np.argsort(np.minimum(rep_pen[pool], rep_raw[pool]), kind="stable")]
     chosen: dict = {}
-    for j in sorted(pool, key=lambda j: min(rep_pen[j], rep_raw[j])):
+    for j in order.tolist():
         code = ref_codes[j]
         if code in chosen:
             continue
@@ -142,28 +181,30 @@ def refine_matches(
     if _matrix_is_fully_enumerated(code_matrix):
         return stage1_codes, stage1_rgbs
 
-    ref_codes = []
-    ref_rgb01 = []
-    for r in range(code_matrix.shape[0]):
-        for c in range(code_matrix.shape[1]):
-            ref_codes.append(code_matrix.iat[r, c])
-            ref_rgb01.append(np.asarray(rgb_matrix.iat[r, c], dtype=np.float64) / 255.0)
-    ref_rgb01 = np.array(ref_rgb01)
+    ref_codes = code_matrix.to_numpy().ravel().tolist()
+    ref_rgb01 = np.array(rgb_matrix.to_numpy().ravel().tolist(), dtype=np.float64) / 255.0
     ref_lab = _lab(ref_rgb01)
 
     inp_lab = _lab(np.array(input_colors, dtype=np.float64) / 255.0)
 
     perm_cache: dict = {}
-    refined_codes: list = [None] * len(input_colors)
-    refined_rgbs: list = [None] * len(input_colors)
-    perms_evaluated = 0
+    perm_lock = threading.Lock()
 
-    for i, lab_color in enumerate(inp_lab):
+    def orderings(rep_code: str) -> tuple:
+        # Blend every ordering of a composition once; reused by later inputs.
+        with perm_lock:
+            if rep_code not in perm_cache:
+                codes = distinct_permutations(rep_code)
+                rgb = np.array(codes_to_rgb(codes), dtype=np.float64)
+                perm_cache[rep_code] = (codes, rgb, _lab(rgb / 255.0))
+            return perm_cache[rep_code]
+
+    def refine(i: int) -> tuple:
+        lab_color = inp_lab[i]
         rep_pen = Color.perceptual_distance(lab_color, ref_lab)
         rep_raw = Color.perceptual_distance_raw(lab_color, ref_lab)
-        pool = sorted(
-            set(np.where(rep_pen <= rep_pen.min() + margin_delta_e)[0])
-            | set(np.where(rep_raw <= rep_raw.min() + margin_delta_e)[0])
+        pool = np.flatnonzero(
+            (rep_pen <= rep_pen.min() + margin_delta_e) | (rep_raw <= rep_raw.min() + margin_delta_e)
         )
         if len(pool) > max_compositions:
             # Cap by DISTINCT compositions: the reference matrix is padded to
@@ -175,21 +216,12 @@ def refine_matches(
             )
 
         best_code, best_rgb, best_dist = stage1_codes[i], stage1_rgbs[i], float(rep_pen.min())
+        evaluated = 0
         for idx in pool:
-            rep_code = ref_codes[idx]
-            if rep_code not in perm_cache:
-                # Batch-blend every ordering of the composition once; the
-                # result is reused by every subsequent input color.
-                codes = distinct_permutations(rep_code)
-                perm_cache[rep_code] = (
-                    codes,
-                    np.array(codes_to_rgb(codes), dtype=np.float64),
-                )
-            perms, perm_rgb = perm_cache[rep_code]
+            perms, perm_rgb, perm_lab = orderings(ref_codes[idx])
             if len(perm_rgb) > 1:
-                perm_lab = _lab(perm_rgb / 255.0)
                 perm_dists = Color.perceptual_distance(lab_color, perm_lab)
-                perms_evaluated += len(perms)
+                evaluated += len(perms)
                 local = int(np.argmin(perm_dists))
                 if float(perm_dists[local]) < best_dist:
                     best_dist = float(perm_dists[local])
@@ -199,12 +231,14 @@ def refine_matches(
                     best_rgb = tuple(float(v) for v in perm_rgb[local])
                 # The stage-1 representative itself stays a candidate via the
                 # first entry of its (sorted) permutation list.
+        return best_code, best_rgb, evaluated
 
-        refined_codes[i] = best_code
-        refined_rgbs[i] = best_rgb
+    # Inputs refine independently; numpy releases the GIL in the distance passes.
+    with ThreadPoolExecutor(max_workers=worker_threads()) as pool_executor:
+        refined = list(pool_executor.map(refine, range(len(input_colors))))
 
     logger.info(
         "Prune refinement: %d inputs, %d orderings evaluated",
-        len(input_colors), perms_evaluated,
+        len(input_colors), sum(evaluated for _, _, evaluated in refined),
     )
-    return refined_codes, refined_rgbs
+    return [code for code, _, _ in refined], [rgb for _, rgb, _ in refined]

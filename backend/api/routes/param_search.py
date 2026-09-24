@@ -16,8 +16,9 @@ from api.models import (
 )
 from api.rate_limiter import limiter
 from api.validators import validate_image_upload
-from config.print_defaults import DEFAULT_BACKING_LAYERS
+from config.print_defaults import DEFAULT_BACKING_LAYERS, MAX_COLOR_LAYERS
 from config.settings import settings
+from services.telemetry import emit
 from core.blend_color import Colors
 from services.param_search_service import (
     FixedParams,
@@ -187,9 +188,14 @@ def _execute_search(job: SearchJob, service: ParamSearchService, image_bytes: by
             job.finish(error=message)
         else:
             job.finish()
+        snapshot = job.snapshot()
+        emit(
+            "param_search_finished", status=snapshot.status, completed=snapshot.completed,
+            total=job.total, duration_ms=round((time.monotonic() - started) * 1000),
+        )
         logger.info(
             "Param search finished: job_id=%s status=%s completed=%d total=%d elapsed=%.1fs",
-            job.job_id, job.snapshot().status, job.snapshot().completed,
+            job.job_id, snapshot.status, snapshot.completed,
             job.total, time.monotonic() - started,
         )
     except Exception as exc:
@@ -213,15 +219,15 @@ async def api_param_search(
     strategy: str = Form("grid", pattern=r"^(grid|random)$"),
     n_trials: int = Form(50, ge=1, le=500),
     seed: Optional[int] = Form(None),
-    layer_count: int = Form(4, ge=1, le=10),
+    layer_count: int = Form(4, ge=1, le=MAX_COLOR_LAYERS),
     layer_height: Optional[float] = Form(None, gt=0, le=10),
     pixel_size: float = Form(0.42, gt=0, le=10),
     white_backing_layers: int = Form(DEFAULT_BACKING_LAYERS, ge=0, le=5),
     backing_mode: str = Form("white", pattern=r'^(white|black)$'),
-    max_colors: int = Form(10, ge=1, le=1024),
+    max_colors: int = Form(10, ge=1, le=settings.max_target_colors),
     color_threshold: float = Form(50, ge=0, le=1000),
     detail_size: float = Form(0.42, ge=0.2, le=0.9),
-    num_colors: int = Form(8, ge=1, le=256),
+    num_colors: int = Form(8, ge=1, le=settings.max_target_colors),
     epsilon: float = Form(2.0, gt=0, le=100),
     min_area: float = Form(4.0, gt=0, le=100),
 ):
@@ -266,6 +272,7 @@ async def api_param_search(
 
     service = ParamSearchService(config)
     job = _job_store.create(service.total_candidates())
+    emit("param_search_started", candidates=job.total)
     try:
         _search_executor.submit(_execute_search, job, service, image_bytes)
     except RuntimeError as exc:

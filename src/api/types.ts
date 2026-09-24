@@ -128,6 +128,8 @@ export interface FilamentPresetsResponse {
     transparent_layer_height_mm: number;
     max_model_cells: number;
     max_model_side_px: number;
+    max_color_layers: number;
+    max_target_colors: number;
   };
   transparency: {
     td_threshold_mm: number;

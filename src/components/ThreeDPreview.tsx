@@ -6,6 +6,7 @@ import { useTranslation } from '../i18n';
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { BUG_REPORT_CAPTURE_EVENT } from '../utils/bugReport';
+import { track } from '../utils/telemetry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { ColorBlock, FilamentColorConfig, ImageDimensions, MappedBlockColor, PrintStackInfo } from '../api/types';
 import { Eye, EyeOff, RotateCcw, Maximize2, Layers } from 'lucide-react';
@@ -172,6 +173,7 @@ export const ThreeDPreview: React.FC<ThreeDPreviewProps> = ({
         logarithmicDepthBuffer: true,
       });
     } catch {
+      track('webgl_unavailable');
       setWebglError(true);
       return;
     }

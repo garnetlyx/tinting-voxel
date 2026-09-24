@@ -4,6 +4,7 @@ import { useImageProcessor } from './useImageProcessor';
 import { filamentCatalog } from '../test/filamentCatalog';
 import {
   getFilamentPresets,
+  getLayerLimit,
   download3MFV2,
   downloadPrintSettings,
   downloadSTLV2,
@@ -20,6 +21,7 @@ vi.mock('../api/client', () => ({
   downloadSVGSTLV2: vi.fn(),
   download3MFV2: vi.fn(),
   downloadPrintSettings: vi.fn(),
+  getLayerLimit: vi.fn(),
 }));
 
 const mockedProcessImage = vi.mocked(processImage);
@@ -50,6 +52,7 @@ describe('useImageProcessor', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.mocked(getFilamentPresets).mockResolvedValue(structuredClone(filamentCatalog));
+    vi.mocked(getLayerLimit).mockResolvedValue(10);
     createdImages = [];
 
     mockedProcessImage.mockResolvedValue({
@@ -197,6 +200,20 @@ describe('useImageProcessor', () => {
     expect(result.current.filamentColors).toHaveLength(4);
     expect(result.current.maxLayerCount).toBe(10);
     expect(result.current.layerCount).toBe(10);
+  });
+
+  it('uses the layer maximum the backend reports for the filament set', async () => {
+    vi.mocked(getLayerLimit).mockResolvedValue(6);
+    const { result } = await renderProcessor();
+
+    act(() => {
+      result.current.loadPreset('bambu_cmywk');
+      result.current.setLayerCount(10);
+    });
+
+    await waitFor(() => expect(result.current.maxLayerCount).toBe(6));
+    expect(result.current.layerCount).toBe(6);
+    expect(getLayerLimit).toHaveBeenLastCalledWith({ filamentPreset: 'bambu_cmywk' }, expect.any(AbortSignal));
   });
 
   it('raises the default layer height when the material set mean exceeds the API threshold', async () => {

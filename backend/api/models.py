@@ -1,12 +1,16 @@
 """
 Pydantic models for API request and response validation
 """
-from config.print_defaults import DEFAULT_BACKING_LAYERS
+from config.print_defaults import DEFAULT_BACKING_LAYERS, MAX_COLOR_LAYERS
 from core.color_config import normalize_transmission_distance
+import re
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import Annotated, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
+from pydantic import (
+    BaseModel, ConfigDict, Field, PrivateAttr, StrictBool, StrictFloat, StrictInt,
+    field_validator, model_validator,
+)
 
 
 class ProcessingMode(str, Enum):
@@ -212,6 +216,10 @@ class PrintConfigMixin(FilamentConfigMixin):
         return self._resolved_colors
 
 
+
+class LayerLimitRequest(PrintConfigMixin):
+    """A filament set whose color-layer maximum is requested."""
+
 class WhiteBackingMixin(BaseModel):
     """Mixin for explicit printed backing configuration (white or black block)."""
     whiteBackingLayers: int = Field(
@@ -231,7 +239,7 @@ class DownloadSTLRequestV2(PrintConfigMixin, WhiteBackingMixin):
     """Request model for /api/v2/download-stl endpoint with configurable colors."""
     colorBlocks: List[ColorBlock] = Field(..., min_length=1)
     pixelSize: float = Field(..., gt=0, le=10)
-    layerCount: int = Field(..., ge=1, le=10)
+    layerCount: int = Field(..., ge=1, le=MAX_COLOR_LAYERS)
     imageDimensions: ImageDimensions
     mode: ProcessingMode = ProcessingMode.PIXEL
     detailSize: Optional[float] = Field(
@@ -247,7 +255,7 @@ class DownloadSVGSTLRequestV2(PrintConfigMixin, WhiteBackingMixin):
     """Request model for /api/v2/download-svg-stl endpoint with configurable colors."""
     vectorResults: List[VectorColorResult] = Field(..., min_length=1)
     pixelSize: float = Field(..., gt=0, le=10)
-    layerCount: int = Field(..., ge=1, le=10)
+    layerCount: int = Field(..., ge=1, le=MAX_COLOR_LAYERS)
     imageDimensions: ImageDimensions
     detailSize: Optional[float] = Field(
         None, ge=0.2, le=0.9,
@@ -271,7 +279,7 @@ class FilamentPresetsResponse(BaseModel):
 
 class FilamentPreviewRequest(PrintConfigMixin, WhiteBackingMixin):
     """Request model for /api/filament-preview endpoint."""
-    layerCount: int = Field(4, ge=1, le=10)
+    layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
     page: Optional[int] = Field(None, ge=1, description="Page number (1-based) for paginated results")
     pageSize: Optional[int] = Field(None, ge=1, le=10000, description="Number of entries per page")
 
@@ -301,7 +309,7 @@ class PrintStackInfo(BaseModel):
 class PrintSettingsRequest(PrintConfigMixin, WhiteBackingMixin):
     """Request model for /api/v2/print-settings endpoint."""
     pixelSize: float = Field(..., gt=0, le=10)
-    layerCount: int = Field(..., ge=1, le=10)
+    layerCount: int = Field(..., ge=1, le=MAX_COLOR_LAYERS)
     imageDimensions: ImageDimensions
     detailSize: Optional[float] = Field(
         None, ge=0.2, le=0.8,
@@ -378,7 +386,7 @@ class SimulatePreviewRequest(PrintConfigMixin):
     """Request model for print-simulation preview generation."""
     colorBlocks: List[ColorBlock] = Field(..., min_length=1)
     imageDimensions: ImageDimensions
-    layerCount: int = Field(4, ge=1, le=10)
+    layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
     whiteBackingLayers: int = Field(DEFAULT_BACKING_LAYERS, ge=0, le=5)
     backingMode: Literal['white', 'black'] = 'white'
 
@@ -473,3 +481,28 @@ class BugReportRequest(BaseModel):
     description: str = Field('', max_length=1000)
     frontendContext: BugReportContext = Field(default_factory=BugReportContext)
     screenshot: Optional[str] = Field(None, max_length=5 * 1024 * 1024)
+
+
+TelemetryValue = Union[StrictBool, StrictInt, StrictFloat, Annotated[str, Field(max_length=200)]]
+
+
+class ClientEvent(BaseModel):
+    """One browser usage event; props are small primitive values."""
+    name: str = Field(..., pattern=r'^[a-z][a-z0-9_]{1,47}$')
+    props: Dict[str, TelemetryValue] = Field(default_factory=dict, max_length=20)
+    t: Optional[int] = Field(None, ge=0, description="Milliseconds since page load")
+
+    @field_validator('props')
+    @classmethod
+    def validate_prop_names(cls, props: Dict[str, TelemetryValue]) -> Dict[str, TelemetryValue]:
+        from services.telemetry import CLIENT_CONTEXT_FIELDS, RESERVED_FIELDS
+        for key in props:
+            if not re.fullmatch(r'[a-z][a-zA-Z0-9_]{0,39}', key) or key in RESERVED_FIELDS | CLIENT_CONTEXT_FIELDS:
+                raise ValueError(f"Invalid event property name: {key[:40]}")
+        return props
+
+
+class ClientEventBatch(BaseModel):
+    """Events from one page load, sent together."""
+    pageLoadId: str = Field(..., pattern=r'^[A-Za-z0-9-]{8,64}$')
+    events: List[ClientEvent] = Field(..., min_length=1, max_length=50)

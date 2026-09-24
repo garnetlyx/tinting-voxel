@@ -16,17 +16,15 @@ from slowapi.errors import RateLimitExceeded
 
 from api.client_ip import load_cloudflare_networks
 from api.rate_limiter import limiter
-from api.routes import bug_report, batch, download, download_v2, filament, health, image, palette, param_search
+from api.routes import bug_report, batch, download, download_v2, events, filament, health, image, palette, param_search
+from config.logging_setup import configure_logging
 from config.settings import get_cors_origins, settings
 from services.analytics import analytics
+from services.telemetry import emit
 from services.bug_report import install_bug_report_logging
 from services.stl_generator import initialize_color_mapping
 
-# Configure logging
-logging.basicConfig(
-    level=settings.log_level,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+configure_logging(settings.log_format, settings.log_level)
 logger = logging.getLogger(__name__)
 install_bug_report_logging()
 
@@ -100,22 +98,20 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) 
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 
-# Analytics middleware
+# Request telemetry
 @app.middleware("http")
-async def analytics_middleware(request: Request, call_next):
-    """Track request metrics for usage analytics."""
+async def request_telemetry_middleware(request: Request, call_next):
+    """Record every API request by route template (static files are skipped)."""
     start = time.monotonic()
     response = await call_next(request)
     elapsed_ms = (time.monotonic() - start) * 1000
 
-    # Only track /api/ routes (skip static files)
-    path = request.url.path
-    if path.startswith("/api/"):
-        analytics.record_request(
-            method=request.method,
-            path=path,
-            status_code=response.status_code,
-            response_time_ms=elapsed_ms,
+    if request.url.path.startswith("/api/"):
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        analytics.record_request(request.method, route, response.status_code, elapsed_ms)
+        emit(
+            "api_request", method=request.method, route=route,
+            status=response.status_code, duration_ms=round(elapsed_ms),
         )
 
     return response
@@ -141,6 +137,7 @@ async def api_cache_stats(request: Request):
 # Include routers
 app.include_router(health.router)
 app.include_router(bug_report.router)
+app.include_router(events.router)
 app.include_router(image.router)
 app.include_router(download.router)
 app.include_router(download_v2.router)
