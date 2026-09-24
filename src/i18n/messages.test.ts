@@ -15,6 +15,7 @@ describe('frontend message compatibility adapter', () => {
     ['Q and Z are very similar (distance: 2.5)', 'Q 与 Z 的颜色十分接近（距离：2.5）'],
     ['Too many requests. Please try again in 42 seconds.', '请求过于频繁，请在 42 秒后重试。'],
     ['Too many requests. Please try again shortly.', '请求过于频繁，请稍后重试。'],
+    ['This image has too much fine detail to export within the model size limit. Reduce the image size, raise the color merge threshold, or use fewer colors.', '图像细节过多，超出了可导出的模型规模。请缩小图像尺寸、提高颜色合并阈值或减少颜色数量。'],
   ])('adapts %s without changing the source message', (source, expected) => {
     setLocale('zh-CN');
     expect(localizeMessage(source, i18n)).toBe(expected);

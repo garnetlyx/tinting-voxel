@@ -507,3 +507,23 @@ def test_layer_limit_endpoint_reports_the_filament_set_maximum(client):
     response = client.post("/api/v2/layer-limit", json={"filamentPreset": "bambu_cmywk"})
     assert response.status_code == 200
     assert 1 <= response.json()["maxLayerCount"] <= MAX_COLOR_LAYERS
+
+
+@pytest.mark.parametrize("route", ["download-stl", "download-3mf"])
+def test_exports_over_the_box_budget_explain_the_limit(client, monkeypatch, route):
+    """Noise-like models fail fast with a message users can act on."""
+    from config.settings import settings
+    from services.mesh_optimizer import MeshTooComplexError
+
+    monkeypatch.setattr(settings, "stl_max_boxes", 10)
+    checker = [
+        {"r": 255 * (i % 2), "g": 0, "b": 0, "hex": "#ff0000" if i % 2 else "#000000",
+         "pixels": [{"x": x, "y": y} for y in range(6) for x in range(6) if (x + y) % 2 == i]}
+        for i in range(2)
+    ]
+    response = client.post(f"/api/v2/{route}", json={
+        **label_map_request(checker, 6, 6), "layerHeight": 0.08, "pixelSize": 0.1,
+        "layerCount": 4, "filamentPreset": "bambu_cmyw",
+    })
+    assert response.status_code == 422
+    assert response.json()["detail"] == str(MeshTooComplexError())

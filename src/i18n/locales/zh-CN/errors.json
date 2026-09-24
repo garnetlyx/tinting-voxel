@@ -45,5 +45,6 @@
   "invalidPreset": "第 {{index}} 项预设无效，已跳过",
   "similarColors": "{{first}} 与 {{second}} 的颜色十分接近（距离：{{distance}}）",
   "tooManyRequestsRetryIn": "请求过于频繁，请在 {{seconds}} 秒后重试。",
-  "tooManyRequestsTryAgainShortly": "请求过于频繁，请稍后重试。"
+  "tooManyRequestsTryAgainShortly": "请求过于频繁，请稍后重试。",
+  "meshTooComplex": "图像细节过多，超出了可导出的模型规模。请缩小图像尺寸、提高颜色合并阈值或减少颜色数量。"
 }

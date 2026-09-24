@@ -187,7 +187,7 @@ docker compose up --build  # Build and run
 # Backend (~770 tests)
 cd backend && pytest -v
 
-# Frontend (Vitest, 26 test files)
+# Frontend (Vitest, 27 test files)
 npm test
 
 # E2E (8 spec files, 49 tests)

@@ -760,10 +760,8 @@ def block_box_runs(
             boxes = boxes_from_rectangles(rectangles, pixel_size, z_min, z_max)
             total_boxes += len(boxes)
             if total_boxes > settings.stl_max_boxes:
-                raise MeshTooComplexError(
-                    f"Request too complex: {total_boxes:,} boxes after meshing "
-                    f"(budget {settings.stl_max_boxes:,}). Reduce image size or colors."
-                )
+                logger.warning("Meshing: %d boxes over the %d budget", total_boxes, settings.stl_max_boxes)
+                raise MeshTooComplexError()
             yield code_char, boxes, cells
 
 

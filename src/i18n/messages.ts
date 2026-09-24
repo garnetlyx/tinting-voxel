@@ -43,6 +43,7 @@ const exactMessages = new Map<string, keyof typeof errors>([
   ["Load failed", "loadFailed"],
   ["Screenshot is too large", "screenshotIsTooLarge"],
   ["Too many requests. Please try again shortly.", "tooManyRequestsTryAgainShortly"],
+  ["This image has too much fine detail to export within the model size limit. Reduce the image size, raise the color merge threshold, or use fewer colors.", "meshTooComplex"],
 ]);
 const patterns: readonly [RegExp, keyof typeof errors, readonly string[]][] = [
   [/^Search stopped after (\d+)s; (\d+) of (\d+) previews completed\.$/, 'searchStoppedAtLimit', ['seconds', 'completed', 'total']],

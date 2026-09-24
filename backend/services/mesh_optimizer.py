@@ -24,8 +24,14 @@ class FaceDirection(Enum):
 
 
 class MeshTooComplexError(ValueError):
-    """Raised when greedy meshing would produce more rectangles than the
-    memory budget (settings.stl_max_boxes) allows."""
+    """Raised when meshing would produce more boxes than the memory budget
+    (settings.stl_max_boxes) allows; the message is shown to users."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This image has too much fine detail to export within the model size limit. "
+            "Reduce the image size, raise the color merge threshold, or use fewer colors."
+        )
 
 
 def greedy_mesh_2d(
@@ -68,11 +74,8 @@ def greedy_mesh_2d(
     first = np.flatnonzero(opens)
     last = np.append(first[1:], len(run_y)) - 1
     if max_rectangles is not None and len(first) > max_rectangles:
-        raise MeshTooComplexError(
-            f"Greedy meshing exceeded {max_rectangles:,} rectangles; "
-            f"the image has too much fine detail to mesh within the "
-            f"memory budget. Reduce image size or increase color merge."
-        )
+        logger.warning("Greedy meshing: %d rectangles over the %d still allowed", len(first), max_rectangles)
+        raise MeshTooComplexError()
 
     rect_x, rect_y = run_x0[first] + x_off, run_y[first] + y_off
     rect_w, rect_h = run_x1[first] - run_x0[first], run_y[last] - run_y[first] + 1

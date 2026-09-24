@@ -45,5 +45,6 @@
   "invalidPreset": "Preset at index {{index}} is invalid and was skipped",
   "similarColors": "{{first}} and {{second}} are very similar (distance: {{distance}})",
   "tooManyRequestsRetryIn": "Too many requests. Please try again in {{seconds}} seconds.",
-  "tooManyRequestsTryAgainShortly": "Too many requests. Please try again shortly."
+  "tooManyRequestsTryAgainShortly": "Too many requests. Please try again shortly.",
+  "meshTooComplex": "This image has too much fine detail to export within the model size limit. Reduce the image size, raise the color merge threshold, or use fewer colors."
 }
