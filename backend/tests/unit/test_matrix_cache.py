@@ -21,7 +21,8 @@ def test_warmup_populates_real_matrices_for_each_requested_height():
     for height in [0.08, 0.12]:
         colors = Colors.from_configs(get_preset(preset))
         code_matrix, rgb_matrix = matrix_cache.get_cached_matrices(colors, 2, height)
-        assert code_matrix.size == 16
+        # Every two-layer code except white in front of a color.
+        assert set(code_matrix.values.flatten()) == {a + b for a in "CMYW" for b in "CMYW"} - {"WC", "WM", "WY"}
         assert rgb_matrix.shape == code_matrix.shape
         assert all(len(code) == 2 for code in code_matrix.values.flatten())
     assert matrix_cache.get_cache_stats()['size'] == 2

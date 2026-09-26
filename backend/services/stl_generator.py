@@ -56,6 +56,7 @@ def _distinct_reference_colors(
     suffix: str = '',
     boundary: Optional[tuple] = None,
     code_list: Optional[list[str]] = None,
+    back_only: Optional[str] = None,
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
     """One (code, 8-bit color) per distinct reference color.
 
@@ -65,12 +66,14 @@ def _distinct_reference_colors(
     representatives returns what matching over every code returns: equal
     colors have equal distances, and argmin keeps the earliest candidate.
     Blending runs on index arrays in parallel chunks; only representatives
-    become strings.
+    become strings. Codes where the ``back_only`` label lies in front of
+    another label are skipped.
     """
     labels, t_table, absorb_table = blend_tables(layer_height, colors_key(colors))
     n_labels = len(labels)
     label_idx = {label: i for i, label in enumerate(labels)}
     suffix_idx = np.array([label_idx[c] for c in suffix], dtype=np.int64)
+    back_idx = label_idx.get(back_only, -1)
     if code_list is None:
         total = n_labels ** layer_count
     else:
@@ -81,7 +84,7 @@ def _distinct_reference_colors(
         encoded = encoded.reshape(len(code_list), layer_count)
         total = len(code_list)
 
-    def chunk_keys(start: int) -> np.ndarray:
+    def chunk_keys(start: int) -> tuple[np.ndarray, np.ndarray]:
         stop = min(start + _ENUMERATION_CHUNK_CODES, total)
         if code_list is None:
             flat = np.arange(start, stop, dtype=np.int64)
@@ -91,24 +94,30 @@ def _distinct_reference_colors(
                 flat //= n_labels
         else:
             digits = lookup[encoded[start:stop]]
+        rows = np.arange(start, stop, dtype=np.int64)
+        if back_idx >= 0:
+            # Once the back-only label appears, every later layer is it too.
+            at_back = digits == back_idx
+            keep = np.all(at_back[:, :-1] <= at_back[:, 1:], axis=1)
+            digits, rows = digits[keep], rows[keep]
         if len(suffix_idx):
             digits = np.concatenate(
                 [digits, np.broadcast_to(suffix_idx, (len(digits), len(suffix_idx)))], axis=1,
             )
         rgb = np.round(rgb_from_indices(digits, t_table, absorb_table, boundary)).astype(np.uint32)
-        return (rgb[:, 0] << 16) | (rgb[:, 1] << 8) | rgb[:, 2]
+        return rows, (rgb[:, 0] << 16) | (rgb[:, 1] << 8) | rgb[:, 2]
 
     seen = np.zeros(1 << 24, dtype=bool)
     rep_index: list[np.ndarray] = []
     rep_key: list[np.ndarray] = []
 
-    def keep_first_occurrences(start: int, keys: np.ndarray) -> None:
+    def keep_first_occurrences(rows: np.ndarray, keys: np.ndarray) -> None:
         unique, first = np.unique(keys, return_index=True)
         fresh = ~seen[unique]
         unique, first = unique[fresh], first[fresh]
         order = np.argsort(first, kind='stable')
         seen[unique] = True
-        rep_index.append(start + first[order])
+        rep_index.append(rows[first[order]])
         rep_key.append(unique[order])
 
     starts = range(0, total, _ENUMERATION_CHUNK_CODES)
@@ -118,13 +127,11 @@ def _distinct_reference_colors(
         # chunks are consumed in order so first occurrences stay first.
         pending: deque = deque()
         for start in starts:
-            pending.append((start, pool.submit(chunk_keys, start)))
+            pending.append(pool.submit(chunk_keys, start))
             if len(pending) >= 2 * threads:
-                done_start, future = pending.popleft()
-                keep_first_occurrences(done_start, future.result())
+                keep_first_occurrences(*pending.popleft().result())
         while pending:
-            done_start, future = pending.popleft()
-            keep_first_occurrences(done_start, future.result())
+            keep_first_occurrences(*pending.popleft().result())
 
     index = np.concatenate(rep_index)
     keys = np.concatenate(rep_key)
@@ -326,7 +333,7 @@ def compute_reference_matrices(
     # every candidate color (paper setup, adapted: finite printed backing
     # instead of an infinite external one).
     from services.print_stack import (
-        PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
+        PRINT_BACKGROUND_RGB, backing_suffix, default_backing_label, resolve_backing_label,
     )
     b_label = resolve_backing_label(colors, backing_layers, backing_filament)
     b_suffix = backing_suffix(b_label, backing_layers)
@@ -350,6 +357,11 @@ def compute_reference_matrices(
     budget = settings.full_enumeration_budget_seconds
     targets = n_targets or 10
     cache_args = dict(backing_suffix=b_suffix, background_rgb=b_boundary)
+    # A thin layer of an opaque set's white-like filament is predicted to hide
+    # the colored layers behind it, but they show through in prints (research
+    # layer-order plates: white-first stacks had 1.5x the error of white-last),
+    # so that filament only forms a block at the back of the color stack.
+    back_only = None if is_translucent_set(colors) else default_backing_label(colors)
 
     # Full enumeration: every ordered code, reduced to its distinct colors.
     # The matrix cache serves every caller (process, downloads, batch,
@@ -357,7 +369,9 @@ def compute_reference_matrices(
     full = get_cached_matrices(colors, layer_count, layer_height, pruned=False, **cache_args)
     estimated = 0.0 if full is not None else _estimate_build_seconds(permutation_count)
     if full is None and (estimated <= budget or prune is False):
-        codes, rgbs = _distinct_reference_colors(colors, layer_count, layer_height, b_suffix, b_boundary)
+        codes, rgbs = _distinct_reference_colors(
+            colors, layer_count, layer_height, b_suffix, b_boundary, back_only=back_only,
+        )
         full = _as_matrices(codes, rgbs)
         set_cached_matrices(colors, layer_count, layer_height, *full, pruned=False, **cache_args)
         logger.info(

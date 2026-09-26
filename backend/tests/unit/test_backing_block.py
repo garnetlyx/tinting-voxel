@@ -156,6 +156,27 @@ def test_zero_backing_has_no_hidden_filament_dependent_background():
         np.testing.assert_array_equal(cell, np.round(expected))
 
 
+def test_opaque_sets_keep_white_behind_colored_layers():
+    codes = set(compute_reference_matrices(4, 0.08, BAMBU, n_targets=3, prune=False)[0].values.flatten())
+    assert codes and all('W' not in code.rstrip('W') for code in codes)
+    assert {'WWWW', 'CWWW', 'CMYW'} <= codes
+
+
+def test_translucent_sets_keep_every_order():
+    clear = Colors.from_configs(get_preset("clear_cmyw"))
+    codes = set(compute_reference_matrices(2, 0.84, clear, n_targets=3, prune=False)[0].values.flatten())
+    assert {'WC', 'CW'} <= codes
+
+
+def test_light_grey_prints_from_white_layers_not_a_white_skin():
+    """Local-photo's armor (#D3D1BF) in Bambu CMYW printed mint green as one white
+    layer over cyan and yellow layers."""
+    codes, _ = _map_source_colors_to_blends(
+        [(0xD3, 0xD1, 0xBF)], BAMBU, 10, 0.08, backing_layers=3, backing_filament='W',
+    )
+    assert codes[0] == 'W' * 13
+
+
 def test_normalize_backing_layers():
     assert normalize_backing_layers(None) == 3
     assert normalize_backing_layers(0) == 0
