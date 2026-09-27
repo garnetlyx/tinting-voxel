@@ -11,16 +11,15 @@
  * already-present image. Requests cannot leak between tests: every layer
  * change awaits its own response.
  *
- * Requires backend/tests/fixtures/images-local/local-photo.JPG (gitignored local
- * fixture); the suite skips gracefully when it is absent.
+ * Requires a photo in backend/tests/fixtures/images-local/ (gitignored local
+ * fixture); the suite skips gracefully when there is none.
  */
 import { test, expect, Page } from '@playwright/test';
-import path from 'path';
-import fs from 'fs';
+import { localPhoto } from './helpers';
 
-const LOCAL_PHOTO_IMAGE = path.join(__dirname, '../backend/tests/fixtures/images-local/local-photo.JPG');
+const PHOTO = localPhoto();
 
-test.skip(!fs.existsSync(LOCAL_PHOTO_IMAGE), 'local-photo.JPG local fixture not present');
+test.skip(PHOTO === undefined, 'no photo in the local fixture folder');
 
 /**
  * Set the layer-count slider and wait for the /api/simulate-preview response
@@ -89,7 +88,7 @@ for (const layerCount of [6, 8]) {
     // Upload the real photo and process (default 4 layers).
     const chooserP = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: /Click or drag image here/ }).click();
-    (await chooserP).setFiles([LOCAL_PHOTO_IMAGE]);
+    (await chooserP).setFiles([PHOTO!]);
     await page.waitForTimeout(1500);
     await page.getByRole('button', { name: 'Apply & Process' }).click();
     await page.waitForFunction(() => document.body.innerText.includes('Simulated Print'), null, {

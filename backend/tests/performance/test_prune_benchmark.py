@@ -12,6 +12,7 @@ between the paths. Metrics are written to the OS temp dir, never the tree.
 import os
 import tempfile
 import time
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -22,9 +23,11 @@ from core.color_config import get_preset
 from core.color_materials import Colors
 from services.image_processor import process_image
 
-LOCAL_PHOTO = os.path.join(
-    os.path.dirname(__file__), "..", "..", "tests", "fixtures", "images-local", "local-photo.JPG"
-)
+# The first photo in the gitignored local fixture folder, if any.
+LOCAL_PHOTO = next((
+    path for path in sorted(Path(__file__).parents[1].joinpath("fixtures", "images-local").glob("*"))
+    if path.suffix.lower() in settings.allowed_extensions
+), None)
 # Committed synthetic fixture: the CMYWK performance gate runs everywhere.
 PERF_FIXTURE = os.path.join(
     os.path.dirname(__file__), "..", "fixtures", "images", "perf_cmywk.jpg"
@@ -78,10 +81,10 @@ def _translucent_colors() -> Colors:
     })
 
 
-@pytest.mark.skipif(not os.path.exists(LOCAL_PHOTO), reason="local-photo.JPG local fixture not present")
+@pytest.mark.skipif(LOCAL_PHOTO is None, reason="no photo in tests/fixtures/images-local")
 def test_clear_8l_process_image_pruned_vs_full_enumeration_benchmark():
     colors = _translucent_colors()
-    image_bytes = open(LOCAL_PHOTO, "rb").read()
+    image_bytes = LOCAL_PHOTO.read_bytes()
     common = dict(
         image_bytes=image_bytes,
         max_colors=16,

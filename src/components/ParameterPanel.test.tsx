@@ -110,7 +110,7 @@ describe('ParameterPanel', () => {
     expect(buttons.every(button => button.hasAttribute('disabled'))).toBe(true);
   });
 
-  it('keeps the Local-photo 200 mm pixel pitch selectable without rounding it', () => {
+  it('keeps a 200 mm model of a 1270 px image selectable without rounding its pitch', () => {
     const pixelSize = 200 / 1270;
     const { container } = render(<ParameterPanel {...defaultProps} pixelSize={pixelSize} />);
     const slider = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="range"]'))

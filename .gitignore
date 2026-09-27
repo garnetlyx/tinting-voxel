@@ -55,6 +55,8 @@ test-results/
 
 # Large local test images (not committed)
 backend/tests/fixtures/images-local/
+# Local-only specs that use those images
+e2e/local/
 
 # Temporary script reports
 *_RESULTS.md

@@ -169,8 +169,8 @@ def test_translucent_sets_keep_every_order():
 
 
 def test_light_grey_prints_from_white_layers_not_a_white_skin():
-    """Local-photo's armor (#D3D1BF) in Bambu CMYW printed mint green as one white
-    layer over cyan and yellow layers."""
+    """A warm light grey (#D3D1BF) in Bambu CMYW printed mint green as one
+    white layer over cyan and yellow layers."""
     codes, _ = _map_source_colors_to_blends(
         [(0xD3, 0xD1, 0xBF)], BAMBU, 10, 0.08, backing_layers=3, backing_filament='W',
     )

@@ -38,18 +38,18 @@ const firstPreview = {
 describe('useParamSearch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(startParamSearch).mockResolvedValue({ jobId: 'local-photo-job', completed: 0, total: 21, status: 'running', settled: false });
+    vi.mocked(startParamSearch).mockResolvedValue({ jobId: 'search-job', completed: 0, total: 21, status: 'running', settled: false });
     vi.mocked(cancelParamSearch).mockResolvedValue();
     vi.mocked(isParamSearchAvailable).mockResolvedValue(true);
   });
 
   it('keeps the first full-size preview visible while the remaining candidates run', async () => {
     vi.mocked(getParamSearchProgress)
-      .mockResolvedValueOnce({ jobId: 'local-photo-job', completed: 1, total: 21, status: 'running', settled: false, results: [firstPreview] })
-      .mockResolvedValueOnce({ jobId: 'local-photo-job', completed: 1, total: 21, status: 'complete', settled: true, results: [] });
+      .mockResolvedValueOnce({ jobId: 'search-job', completed: 1, total: 21, status: 'running', settled: false, results: [firstPreview] })
+      .mockResolvedValueOnce({ jobId: 'search-job', completed: 1, total: 21, status: 'complete', settled: true, results: [] });
 
     const { result } = renderHook(() => useParamSearch());
-    act(() => { void result.current.startSearch(new File(['x'], 'local-photo.JPG'), config, { width: 953, height: 1270 }); });
+    act(() => { void result.current.startSearch(new File(['x'], 'photo.jpg'), config, { width: 953, height: 1270 }); });
 
     await waitFor(() => expect(result.current.results).toEqual([firstPreview]));
     expect(result.current.phase).toBe('running');
@@ -59,29 +59,29 @@ describe('useParamSearch', () => {
 
   it('cancels the server job when the dialog closes', async () => {
     vi.mocked(getParamSearchProgress).mockImplementation(async () => ({
-      jobId: 'local-photo-job', completed: 1, total: 21,
+      jobId: 'search-job', completed: 1, total: 21,
       status: vi.mocked(cancelParamSearch).mock.calls.length ? 'cancelled' : 'running',
       settled: vi.mocked(cancelParamSearch).mock.calls.length > 0,
       results: vi.mocked(cancelParamSearch).mock.calls.length ? [] : [firstPreview],
     }));
 
     const { result } = renderHook(() => useParamSearch());
-    act(() => { void result.current.startSearch(new File(['x'], 'local-photo.JPG'), config, { width: 953, height: 1270 }); });
+    act(() => { void result.current.startSearch(new File(['x'], 'photo.jpg'), config, { width: 953, height: 1270 }); });
     await waitFor(() => expect(result.current.results).toHaveLength(1));
     act(() => result.current.reset());
     expect(result.current.phase).toBe('waiting');
-    expect(cancelParamSearch).toHaveBeenCalledWith('local-photo-job');
+    expect(cancelParamSearch).toHaveBeenCalledWith('search-job');
     await waitFor(() => expect(result.current.phase).toBe('idle'));
   });
 
   it('continues the same job after a temporary progress-read failure', async () => {
     vi.mocked(getParamSearchProgress)
-      .mockResolvedValueOnce({ jobId: 'local-photo-job', completed: 1, total: 2, status: 'running', settled: false, results: [firstPreview] })
+      .mockResolvedValueOnce({ jobId: 'search-job', completed: 1, total: 2, status: 'running', settled: false, results: [firstPreview] })
       .mockRejectedValueOnce(new Error('Failed to fetch'))
-      .mockResolvedValueOnce({ jobId: 'local-photo-job', completed: 2, total: 2, status: 'complete', settled: true, results: [{ ...firstPreview, candidateId: 2, isBaseline: false }] });
+      .mockResolvedValueOnce({ jobId: 'search-job', completed: 2, total: 2, status: 'complete', settled: true, results: [{ ...firstPreview, candidateId: 2, isBaseline: false }] });
 
     const { result } = renderHook(() => useParamSearch());
-    act(() => { void result.current.startSearch(new File(['x'], 'local-photo.JPG'), config, { width: 953, height: 1270 }); });
+    act(() => { void result.current.startSearch(new File(['x'], 'photo.jpg'), config, { width: 953, height: 1270 }); });
     await waitFor(() => expect(result.current.results).toHaveLength(2), { timeout: 5000 });
     expect(result.current.phase).toBe('results');
     expect(cancelParamSearch).not.toHaveBeenCalled();
@@ -90,7 +90,7 @@ describe('useParamSearch', () => {
 
   it('retries a temporary cancellation failure after closing', async () => {
     vi.mocked(getParamSearchProgress).mockImplementation(async () => ({
-      jobId: 'local-photo-job', completed: 1, total: 21,
+      jobId: 'search-job', completed: 1, total: 21,
       status: vi.mocked(cancelParamSearch).mock.calls.length > 1 ? 'cancelled' : 'running',
       settled: vi.mocked(cancelParamSearch).mock.calls.length > 1,
       results: vi.mocked(cancelParamSearch).mock.calls.length > 1 ? [] : [firstPreview],
@@ -98,7 +98,7 @@ describe('useParamSearch', () => {
     vi.mocked(cancelParamSearch).mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValueOnce();
 
     const { result } = renderHook(() => useParamSearch());
-    act(() => { void result.current.startSearch(new File(['x'], 'local-photo.JPG'), config, { width: 953, height: 1270 }); });
+    act(() => { void result.current.startSearch(new File(['x'], 'photo.jpg'), config, { width: 953, height: 1270 }); });
     await waitFor(() => expect(result.current.results).toHaveLength(1));
     act(() => result.current.reset());
     await waitFor(() => expect(cancelParamSearch).toHaveBeenCalledTimes(2), { timeout: 3000 });
@@ -119,14 +119,14 @@ describe('useParamSearch', () => {
     });
 
     const { result } = renderHook(() => useParamSearch());
-    act(() => { void result.current.startSearch(new File(['x'], 'local-photo.JPG'), config, { width: 953, height: 1270 }); });
+    act(() => { void result.current.startSearch(new File(['x'], 'photo.jpg'), config, { width: 953, height: 1270 }); });
     await waitFor(() => expect(startParamSearch).toHaveBeenCalledTimes(1));
     act(() => { result.current.reset(); result.current.openConfig(); });
     expect(result.current.phase).toBe('waiting');
     expect(startParamSearch).toHaveBeenCalledTimes(1);
     released = true;
     await waitFor(() => expect(result.current.phase).toBe('idle'), { timeout: 3000 });
-    act(() => { result.current.openConfig(); void result.current.startSearch(new File(['x'], 'local-photo.JPG'), config, { width: 953, height: 1270 }); });
+    act(() => { result.current.openConfig(); void result.current.startSearch(new File(['x'], 'photo.jpg'), config, { width: 953, height: 1270 }); });
     await waitFor(() => expect(startParamSearch).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(result.current.phase).toBe('results'));
   });
@@ -139,7 +139,7 @@ describe('useParamSearch', () => {
       jobId: 'next-job', completed: 1, total: 1, status: 'complete', settled: true, results: [firstPreview],
     });
     const { result } = renderHook(() => useParamSearch());
-    act(() => { void result.current.startSearch(new File(['x'], 'local-photo.JPG'), config, { width: 953, height: 1270 }); });
+    act(() => { void result.current.startSearch(new File(['x'], 'photo.jpg'), config, { width: 953, height: 1270 }); });
     await waitFor(() => expect(result.current.phase).toBe('waiting'));
     await waitFor(() => expect(result.current.phase).toBe('results'));
     expect(startParamSearch).toHaveBeenCalledTimes(2);
@@ -154,7 +154,7 @@ describe('useParamSearch', () => {
       jobId: 'next-job', completed: 1, total: 1, status: 'complete', settled: true, results: [firstPreview],
     });
     const { result } = renderHook(() => useParamSearch());
-    act(() => { void result.current.startSearch(new File(['x'], 'local-photo.JPG'), config, { width: 953, height: 1270 }); });
+    act(() => { void result.current.startSearch(new File(['x'], 'photo.jpg'), config, { width: 953, height: 1270 }); });
     await waitFor(() => expect(result.current.phase).toBe('results'));
     expect(isParamSearchAvailable).toHaveBeenCalledOnce();
     expect(startParamSearch).toHaveBeenCalledTimes(2);

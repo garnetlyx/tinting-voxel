@@ -1,13 +1,12 @@
-from pathlib import Path
 
 import numpy as np
 import pytest
-from PIL import Image
 
 from services.mesh_optimizer import boxes_from_rectangles, greedy_mesh_2d
 from services.raster_cleanup import regularize_printable_regions, unprintable_pixels
 
-LOCAL_PHOTO_PIXEL_SIZE = 200 / 1270
+# A 200 mm model of a 1270 px image: detail cleanup works across several cells.
+PIXEL_SIZE = 200 / 1270
 
 
 def _radius(pixel_size, detail_size=0.42):
@@ -69,11 +68,11 @@ def test_diagonal_one_pixel_line_is_widened_not_erased():
         labels[index, index] = 1
 
     cleaned = regularize_printable_regions(
-        labels, [(255, 255, 255), (0, 0, 0)], LOCAL_PHOTO_PIXEL_SIZE, 0.42,
+        labels, [(255, 255, 255), (0, 0, 0)], PIXEL_SIZE, 0.42,
     )
 
     assert all(cleaned[index, index] == 1 for index in range(12, 68))
-    assert not unprintable_pixels(cleaned, _radius(LOCAL_PHOTO_PIXEL_SIZE)).any()
+    assert not unprintable_pixels(cleaned, _radius(PIXEL_SIZE)).any()
 
 
 def test_three_pixel_line_already_meets_the_detail_width():
@@ -81,7 +80,7 @@ def test_three_pixel_line_already_meets_the_detail_width():
     labels[18:21, 5:35] = 1
 
     cleaned = regularize_printable_regions(
-        labels, [(255, 255, 255), (0, 0, 0)], LOCAL_PHOTO_PIXEL_SIZE, 0.42,
+        labels, [(255, 255, 255), (0, 0, 0)], PIXEL_SIZE, 0.42,
     )
 
     assert np.array_equal(cleaned, labels)
@@ -94,10 +93,10 @@ def test_random_texture_becomes_printable_everywhere():
     labels[rng.integers(0, 60, 200), rng.integers(0, 72, 200)] = rng.integers(0, 5, 200)
     colors = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0), (0, 0, 0)]
 
-    cleaned = regularize_printable_regions(labels, colors, LOCAL_PHOTO_PIXEL_SIZE, 0.42)
+    cleaned = regularize_printable_regions(labels, colors, PIXEL_SIZE, 0.42)
 
     assert cleaned.shape == labels.shape
-    assert unprintable_pixels(cleaned, _radius(LOCAL_PHOTO_PIXEL_SIZE)).sum() <= 0.01 * cleaned.size
+    assert unprintable_pixels(cleaned, _radius(PIXEL_SIZE)).sum() <= 0.01 * cleaned.size
 
 
 def test_pixels_at_least_as_large_as_the_detail_width_are_left_unchanged():
@@ -155,37 +154,31 @@ def test_thin_bridge_between_printable_regions_gets_real_width():
     assert cleaned.shape == labels.shape
 
 
-def test_real_local-photo_detail_survives_as_printable_export_geometry():
-    # Paletted crop from the actual 953x1270 Local-photo source after 10-color,
-    # threshold-50 quantization; original coordinates x=912:938, y=10:32.
-    image_path = Path(__file__).parents[1] / 'fixtures/images/local-photo_quantized_detail_crop.png'
-    source = Image.open(image_path)
-    labels = np.asarray(source).astype(np.int32)
-    palette = source.getpalette()
-    source_colors = [tuple(palette[index * 3:index * 3 + 3]) for index in (0, 5)]
-    color_blocks = [{'r': color[0], 'g': color[1], 'b': color[2]} for color in source_colors]
-    block_labels = np.where(labels == 5, 1, 0).astype(np.uint8)
-
+def test_thin_line_detail_exports_as_printable_geometry():
+    """A one-cell dark line across a light field is widened to the detail width,
+    and the exported boxes cover every cell once with the cleaned colors."""
     from services.image_processor import merge_small_pixels_to_neighbors
 
-    pixel_size = 200 / 1270
+    labels = np.ones((22, 26), dtype=np.uint8)
+    labels[:4] = 0  # dark border region
+    labels[4:9, 16] = 0  # one-cell line down from the border...
+    labels[8, 6:17] = 0  # ...joining a one-cell line across the field
+    color_blocks = [{'r': 20, 'g': 20, 'b': 20}, {'r': 230, 'g': 220, 'b': 200}]
+    assert labels[7, 10] == 1 and labels[8, 10] == 0 and labels[9, 10] == 1
+
     processed, processed_labels = merge_small_pixels_to_neighbors(
-        color_blocks, block_labels, pixel_size, 0.42,
+        color_blocks, labels, PIXEL_SIZE, 0.42,
     )
-    assert labels[7, 10] == 5 and labels[8, 10] == 0 and labels[9, 10] == 5
 
-    exported_occupancy = np.zeros(labels.shape, dtype=np.uint8)
-    for index, block in enumerate(processed):
-        boxes = boxes_from_rectangles(greedy_mesh_2d(processed_labels == index), pixel_size, 0, 0.08)
-        block_value = 1 if (block['r'], block['g'], block['b']) == source_colors[0] else 2
+    exported = np.full(labels.shape, -1)
+    for index in range(len(processed)):
+        boxes = boxes_from_rectangles(greedy_mesh_2d(processed_labels == index), PIXEL_SIZE, 0, 0.08)
         for (x0, x1), (y0, y1), (z0, z1) in boxes:
-            assert (z0, z1) == (0, 0.08)
-            x_start, x_end = round(x0 / pixel_size), round(x1 / pixel_size)
-            y_start, y_end = round(y0 / pixel_size), round(y1 / pixel_size)
-            assert x1 - x0 > 0 and y1 - y0 > 0
-            exported_occupancy[y_start:y_end, x_start:x_end] = block_value
-
-    assert np.all(exported_occupancy[7:10, 10] == 1)
-    assert np.count_nonzero(exported_occupancy == 0) == 0
-    assert source.width * pixel_size == 26 * pixel_size
-    assert source.height * pixel_size == 22 * pixel_size
+            assert (z0, z1) == (0, 0.08) and x1 > x0 and y1 > y0
+            rows = slice(round(y0 / PIXEL_SIZE), round(y1 / PIXEL_SIZE))
+            cols = slice(round(x0 / PIXEL_SIZE), round(x1 / PIXEL_SIZE))
+            assert np.all(exported[rows, cols] == -1)
+            exported[rows, cols] = index
+    assert np.array_equal(exported, processed_labels)
+    dark = next(i for i, block in enumerate(processed) if block['r'] == 20)
+    assert np.all(exported[7:10, 10] == dark)

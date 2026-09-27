@@ -82,7 +82,7 @@ tinting-voxel/
 │   ├── utils/            # Shared helpers (model grid, telemetry, bug reports)
 │   ├── i18n/             # Locale runtime and feature translations (en, zh-CN)
 │   └── api/              # API client + types
-├── e2e/                  # Playwright E2E tests (8 spec files, 49 tests)
+├── e2e/                  # Playwright E2E tests (7 spec files, 39 tests)
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose config
 ├── fly.toml              # Fly.io deploy config
@@ -191,7 +191,7 @@ cd backend && pytest -v
 # Frontend (Vitest, 27 test files)
 npm test
 
-# E2E (8 spec files, 49 tests)
+# E2E (7 spec files, 39 tests)
 npx playwright test
 ```
 
@@ -199,7 +199,12 @@ npx playwright test
   `RATE_LIMIT_ENABLED=false`) and Vite (port 5183), so it never reuses the dev
   servers. Override with `E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT`.
 - CI runs backend pytest, the frontend type check, Vitest, build, and E2E.
-  Specs that need `backend/tests/fixtures/images-local/` skip without it.
+  Specs that need a photo in `backend/tests/fixtures/images-local/` use the
+  first one there and skip without it.
+- Local photos are private test inputs. Nothing derived from them goes in the
+  repository: no crops, recorded scores or colors, file names, or subject
+  names in code, fixtures, docs, or commit messages. Specs written for one
+  local photo live in the gitignored `e2e/local/`.
 
 - Unit tests: `backend/tests/unit/`
 - Integration tests: `backend/tests/integration/`

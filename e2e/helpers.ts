@@ -1,10 +1,20 @@
 import { Page, expect } from '@playwright/test';
+import fs from 'fs';
 import path from 'path';
 
 export const FIXTURES_DIR = path.join(__dirname, 'fixtures');
 export const TEST_IMAGE = path.join(FIXTURES_DIR, 'test-image.png');
 export const TEST_IMAGE_2 = path.join(FIXTURES_DIR, 'test-image-2.png');
 export const TEST_IMAGE_LARGE = path.join(FIXTURES_DIR, 'test-image-large.png');
+// Gitignored folder for large local photos; specs that need one skip without it.
+const LOCAL_IMAGES_DIR = path.join(__dirname, '../backend/tests/fixtures/images-local');
+
+/** The first photo in the local fixture folder, or undefined when it holds none. */
+export function localPhoto(): string | undefined {
+  const names = fs.existsSync(LOCAL_IMAGES_DIR) ? fs.readdirSync(LOCAL_IMAGES_DIR).sort() : [];
+  const name = names.find(file => !file.startsWith('.'));
+  return name === undefined ? undefined : path.join(LOCAL_IMAGES_DIR, name);
+}
 
 /**
  * Upload a single image by setting files directly on the hidden input.

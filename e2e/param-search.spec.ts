@@ -2,7 +2,7 @@
  * E2E tests for the param search (Compare settings) modal.
  * Covers: button visibility, modal open/close, config phase UI.
  * The modal state test mocks the API; full-size search is verified separately
- * with the Local-photo image against the running service.
+ * with a local photo against the running service.
  */
 import { test, expect } from '@playwright/test';
 import { uploadAndProcess } from './helpers';
