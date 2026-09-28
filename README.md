@@ -2,6 +2,8 @@
 
 Transform images into physically accurate, multi-color 3D-printable files using N-color filament separation and optical color mixing (Beer-Lambert law). Supports 4–16 configurable filament colors, STL/3MF/SVG output, batch processing, and parameter auto-search.
 
+**Live demo:** https://tintingvoxel.com/
+
 ## Features
 
 - **Optical Color Mixing** - One transmission formula for every filament: `T_ch = 10^(-d / TD_ch)`, composed by light-loss allocation using the filament hex color
