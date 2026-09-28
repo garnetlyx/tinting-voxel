@@ -40,7 +40,8 @@ tinting-voxel/
 │   │   ├── color_config.py   # Filament presets (single source of truth)
 │   │   ├── color_materials.py # Material properties (hex + scalar or RGB TD)
 │   │   ├── grid_sampling.py  # Code-grid RGB assembly for blend fitting
-│   │   └── palette_library.py # Supported filament palettes
+│   │   ├── palette_library.py # Supported filament palettes
+│   │   └── white_point.py    # Colors seen against the image's white
 │   ├── services/         # Business logic
 │   │   ├── analytics.py         # In-memory usage analytics
 │   │   ├── telemetry.py         # Structured usage/operations events
@@ -216,9 +217,20 @@ npx playwright test
 
 ### Color Processing Pipeline
 1. Image upload → color extraction (K-means clustering)
-2. Map colors to N configurable filament primaries
-3. Calculate color mixing using `T_ch = 10^(-d / TD_ch)` and light-loss allocation
-4. Generate layered output (STL/3MF) with greedy meshing optimization
+2. See the extracted colors against the image's white
+3. Map colors to N configurable filament primaries
+4. Calculate color mixing using `T_ch = 10^(-d / TD_ch)` and light-loss allocation
+5. Generate layered output (STL/3MF) with greedy meshing optimization
+
+Photos rarely contain pure white, and an off-white matched as it is lands on a
+tinted, darker stack. `core/white_point.py` takes the mean of the image's
+whitest pixels (`white_point_share`, closest to white by CIEDE2000) as its
+white. When that white is within `white_point_max_delta_e` of white and at
+least `white_point_min_contrast` times as bright as the darkest share, the
+extracted colors (pixel blocks, SVG colors) and the Compare settings scoring
+target are adapted from it to print white with the Bradford transform.
+Low-contrast images keep their colors. Clustering runs on the unadapted image,
+so the white point never changes which colors are extracted.
 
 Stack search (`compute_reference_matrices`) blends every ordered code on index
 arrays in parallel and keeps one code per distinct 8-bit color (the first in

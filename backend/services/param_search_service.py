@@ -26,6 +26,7 @@ from PIL import Image
 from config.settings import settings
 from core.blend_color import Colors
 from core.color_materials import mean_ciede2000
+from core.white_point import adapt_to_image_white
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,7 @@ class Evaluator:
         self._colors = colors
         self._fixed = fixed
         self._grid: Optional[tuple[np.ndarray, float]] = None
+        self._target: Optional[np.ndarray] = None
 
     def model_grid(self) -> tuple[np.ndarray, float]:
         """The image on its model grid (read-only RGB) and the grid pitch in mm."""
@@ -189,6 +191,15 @@ class Evaluator:
             self._grid = pixels, pitch
         return self._grid
 
+    def target(self) -> np.ndarray:
+        """The model grid as seen against its white (read-only RGB): what prints aim for."""
+        if self._target is None:
+            pixels = self.model_grid()[0]
+            target = adapt_to_image_white(pixels, pixels)
+            target.setflags(write=False)
+            self._target = target
+        return self._target
+
     def evaluate(self, params: dict, mode: str) -> SearchResult:
         if mode == "pixel":
             preview_data_url = self._run_pixel(params)
@@ -196,7 +207,7 @@ class Evaluator:
             preview_data_url = self._run_svg(params)
         else:
             raise ValueError(f"Unknown mode: {mode}")
-        score = mean_ciede2000(self.model_grid()[0], _decode_preview(preview_data_url))
+        score = mean_ciede2000(self.target(), _decode_preview(preview_data_url))
         return SearchResult(
             candidate_id=0, is_baseline=False, mode=mode,
             params=dict(params), preview_data_url=preview_data_url, score=score,

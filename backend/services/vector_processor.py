@@ -13,6 +13,7 @@ from typing import Optional
 import cv2
 import numpy as np
 
+from core.white_point import adapt_to_image_white
 from services.raster_cleanup import regularize_printable_regions
 
 logger = logging.getLogger(__name__)
@@ -597,6 +598,8 @@ def process_image_vector_with_preview(
         pixel_size=config.pixel_size,
         detail_size=config.detail_size,
     )
+    # Colors as seen against the image's white (core/white_point.py)
+    colors = [tuple(rgb) for rgb in adapt_to_image_white(image, colors).tolist()]
     quantized = render_quantized_labels(cleaned_labels, colors)
 
     results = []

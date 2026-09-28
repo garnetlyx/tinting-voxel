@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     default_pixel_size: float = 0.08
     default_max_colors: int = 10
     default_color_threshold: float = 50.0
+    # An image's white is the mean of this share of its pixels closest to
+    # white. It becomes print white (core/white_point.py) when it is within
+    # white_point_max_delta_e (CIEDE2000) of white and at least
+    # white_point_min_contrast times as bright as the same share of darkest
+    # pixels; low-contrast images keep their colors.
+    white_point_share: float = 0.01
+    white_point_max_delta_e: float = 15.0
+    white_point_min_contrast: float = 8.0
 
     # Parameter search runs after the request returns. It scores the current
     # settings and then this many other settings (services/param_search_service.py).

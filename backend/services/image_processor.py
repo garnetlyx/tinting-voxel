@@ -18,6 +18,7 @@ from PIL import Image
 
 from core.blend_color import Colors, colors_key
 from core.color_materials import Color
+from core.white_point import adapt_to_image_white
 from services.print_stack import build_print_stack, resolve_backing_label
 from services.label_map import EMPTY, block_cell_counts, block_pixels
 from services.raster_cleanup import color_distance, regularize_printable_regions
@@ -669,6 +670,11 @@ def process_image(
     else:
         counts = block_cell_counts(labels, len(color_blocks))
         color_blocks, labels = _keep_blocks(color_blocks, labels, [i for i in range(len(color_blocks)) if counts[i] > 0])
+
+    # Colors as seen against the image's white (core/white_point.py)
+    block_rgbs = adapt_to_image_white(img_array, [[color['r'], color['g'], color['b']] for color in color_blocks])
+    for color, rgb in zip(color_blocks, block_rgbs.tolist()):
+        color['r'], color['g'], color['b'] = rgb
 
     # Counts, pixel lists (for the response) and hex values
     counts = block_cell_counts(labels, len(color_blocks))
