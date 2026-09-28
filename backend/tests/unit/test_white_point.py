@@ -35,6 +35,9 @@ def _png(pixels: np.ndarray) -> bytes:
 # Photo-like: the image's white is an off-white (#EAE6DA), next to a warm light
 # grey (#CEC6B6), a near-black and a blue.
 PHOTO = _bands(("EAE6DA", 5), ("CEC6B6", 20), ("20202A", 40), ("3050A0", 35))
+# Pure white next to a pale green-grey (#D4DAC3), which matches a yellow-cyan
+# stack by CIEDE2000, a near-black and a blue.
+PALE = _bands(("FFFFFF", 10), ("D4DAC3", 20), ("20202A", 40), ("3050A0", 30))
 
 
 def _codes_at(pixels: np.ndarray, columns: list[int]) -> list[str]:
@@ -55,6 +58,18 @@ def test_off_whites_print_white_against_the_image_white(monkeypatch):
     assert _codes_at(PHOTO, [10]) != [ALL_WHITE]
 
 
+def test_off_whites_print_white_rather_than_a_darker_tinted_stack(monkeypatch):
+    assert _codes_at(PALE, [15]) == [ALL_WHITE]
+    monkeypatch.setattr(settings, "white_point_min_contrast", math.inf)
+    assert _codes_at(PALE, [15]) != [ALL_WHITE]
+
+
+def test_only_off_whites_change_in_an_image_with_pure_white():
+    seen = adapt_to_image_white(PALE, PALE)
+    assert np.all(seen[:, :30] == 255)
+    np.testing.assert_array_equal(seen[:, 30:], PALE[:, 30:])
+
+
 def test_the_image_white_becomes_print_white():
     assert adapt_to_white([0xEA, 0xE6, 0xDA], image_white(PHOTO)).tolist() == [255, 255, 255]
 
@@ -72,12 +87,9 @@ def test_low_contrast_images_keep_their_colors():
 
 
 def test_images_without_an_off_white_keep_their_colors():
-    assert image_white(_bands(("F0D020", 30), ("B03020", 40), ("202020", 30))) is None
-
-
-def test_pure_white_is_already_print_white():
-    pixels = _bands(("FFFFFF", 10), ("CEC6B6", 20), ("20202A", 70))
-    np.testing.assert_array_equal(adapt_to_image_white(pixels, pixels), pixels)
+    vivid = _bands(("F0D020", 30), ("B03020", 40), ("202020", 30))
+    assert image_white(vivid) is None
+    np.testing.assert_array_equal(adapt_to_image_white(vivid, vivid), vivid)
 
 
 def test_svg_mode_sees_colors_against_the_image_white():

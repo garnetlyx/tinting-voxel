@@ -225,12 +225,14 @@ npx playwright test
 Photos rarely contain pure white, and an off-white matched as it is lands on a
 tinted, darker stack. `core/white_point.py` takes the mean of the image's
 whitest pixels (`white_point_share`, closest to white by CIEDE2000) as its
-white. When that white is within `white_point_max_delta_e` of white and at
-least `white_point_min_contrast` times as bright as the darkest share, the
-extracted colors (pixel blocks, SVG colors) and the Compare settings scoring
-target are adapted from it to print white with the Bradford transform.
-Low-contrast images keep their colors. Clustering runs on the unadapted image,
-so the white point never changes which colors are extracted.
+white. When that white is an off-white (within `off_white_max_delta_e` of
+white) at least `white_point_min_contrast` times as bright as the darkest
+share, the extracted colors (pixel blocks, SVG colors) and the Compare settings
+scoring target are adapted from it to print white with the Bradford transform,
+and colors that are then off-whites become white: white prints closer to what
+the eye sees than a darker, tinted stack. Low-contrast images keep their
+colors. Clustering runs on the unadapted image, so the white point never
+changes which colors are extracted.
 
 Stack search (`compute_reference_matrices`) blends every ordered code on index
 arrays in parallel and keeps one code per distinct 8-bit color (the first in

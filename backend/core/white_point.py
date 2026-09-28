@@ -1,19 +1,20 @@
-"""Map an image's white to print white, as the eye judges a scene by its white.
+"""See an image's colors against its white, as the eye sees a scene.
 
 Photos rarely contain pure white: white objects come out as off-whites with a
-slight cast. Matched as they are, off-whites land on tinted, darker stacks and
-the print loses its whites. An image's white is the mean of its whitest pixels
-(closest to white by CIEDE2000); when it is an off-white and the image has
-contrast, colors are adapted from it to print white with the Bradford
-transform. Low-contrast images keep their colors: their light tones are not
-whites.
+slight cast. Matched as they are, off-whites land on tinted, darker stacks,
+and the print loses its whites and its contrast. An image's white is the mean
+of its whitest pixels (closest to white by CIEDE2000). When it is an off-white
+and the image has contrast, colors are adapted from it to print white with the
+Bradford transform, and every color that is then an off-white is white.
+Low-contrast images keep their colors: their light tones are not whites.
 """
 from typing import Optional
 
 import numpy as np
-from skimage.color import deltaE_ciede2000, rgb2lab, rgb2xyz, xyz2lab, xyz2rgb
+from skimage.color import deltaE_ciede2000, rgb2lab, rgb2xyz, xyz2rgb
 
 from config.settings import settings
+from core.color_materials import DISTANCE_CHUNK
 
 # Bradford cone-response matrix, the chromatic adaptation transform of ICC profiles.
 BRADFORD = np.array([
@@ -28,23 +29,32 @@ WHITE_LAB = np.array([[100.0, 0.0, 0.0]])
 LEVEL_SAMPLE = 100_000
 
 
+def _distance_to_white(rgb: np.ndarray) -> np.ndarray:
+    """CIEDE2000 from white of 8-bit RGB colors, shape (n, 3)."""
+    distance = np.empty(len(rgb))
+    for start in range(0, len(rgb), DISTANCE_CHUNK):
+        lab = rgb2lab(rgb[start:start + DISTANCE_CHUNK].reshape(-1, 1, 3) / 255.0).reshape(-1, 3)
+        distance[start:start + DISTANCE_CHUNK] = deltaE_ciede2000(lab, WHITE_LAB)
+    return distance
+
+
 def image_white(pixels: np.ndarray) -> Optional[np.ndarray]:
     """XYZ of an 8-bit RGB image's white, or None when colors should stay as they are.
 
     The white is the mean of the settings.white_point_share of pixels closest
-    to white. It is kept when it lies within settings.white_point_max_delta_e
-    of white and is at least settings.white_point_min_contrast times as bright
-    as the darkest share of pixels.
+    to white. It is kept when it is an off-white (within
+    settings.off_white_max_delta_e of white) at least
+    settings.white_point_min_contrast times as bright as the darkest share.
     """
     rgb = pixels.reshape(-1, 3)
-    rgb = rgb[::max(1, len(rgb) // LEVEL_SAMPLE)].reshape(-1, 1, 3) / 255.0
-    xyz = rgb2xyz(rgb).reshape(-1, 3)
-    distance = deltaE_ciede2000(rgb2lab(rgb).reshape(-1, 3), WHITE_LAB)
-    count = max(1, round(len(xyz) * settings.white_point_share))
-    white = xyz[np.argpartition(distance, count - 1)[:count]].mean(axis=0)
+    rgb = rgb[::max(1, len(rgb) // LEVEL_SAMPLE)]
+    xyz = rgb2xyz(rgb.reshape(-1, 1, 3) / 255.0).reshape(-1, 3)
+    count = max(1, round(len(rgb) * settings.white_point_share))
+    whitest = np.argpartition(_distance_to_white(rgb), count - 1)[:count]
+    white = xyz[whitest].mean(axis=0)
     dark = np.partition(xyz[:, 1], count - 1)[:count].mean()
-    white_distance = deltaE_ciede2000(xyz2lab(white.reshape(1, 3)), WHITE_LAB)[0]
-    if white_distance > settings.white_point_max_delta_e:
+    white_rgb = np.round(xyz2rgb(white.reshape(1, 1, 3)) * 255).reshape(1, 3)
+    if _distance_to_white(white_rgb)[0] > settings.off_white_max_delta_e:
         return None
     if white[1] < settings.white_point_min_contrast * dark:
         return None
@@ -61,7 +71,16 @@ def adapt_to_white(rgb, white: np.ndarray) -> np.ndarray:
 
 
 def adapt_to_image_white(pixels: np.ndarray, rgb) -> np.ndarray:
-    """8-bit RGB colors as seen against the white of the image `pixels`
-    (unchanged when image_white finds none)."""
+    """8-bit RGB colors as seen against the white of the image `pixels`.
+
+    Colors are adapted from the image's white to print white, and off-whites
+    become white; they are unchanged when image_white finds no white.
+    """
+    rgb = np.asarray(rgb, dtype=np.uint8)
     white = image_white(pixels)
-    return np.asarray(rgb, dtype=np.uint8) if white is None else adapt_to_white(rgb, white)
+    if white is None:
+        return rgb
+    adapted = adapt_to_white(rgb, white)
+    flat = adapted.reshape(-1, 3)
+    flat[_distance_to_white(flat) <= settings.off_white_max_delta_e] = 255
+    return adapted
