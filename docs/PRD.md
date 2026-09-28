@@ -132,7 +132,7 @@ tinting-voxel solves these by:
 3. Previews rank closest first as they finish; the user picks one at any time,
    which applies it and stops the search, and proceeds to export.
 
-> Material measurements belong to the companion research repository. Production
+> Material measurements belong to the published research analysis. Production
 > material inputs are limited to hex color and scalar or RGB transmission distance.
 
 ---

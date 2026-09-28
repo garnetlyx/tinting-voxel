@@ -56,13 +56,13 @@ src/
 ## Prerequisites
 
 ### Windows
-- Python 3.8+ ([Download](https://www.python.org/downloads/))
+- Python 3.12+ ([Download](https://www.python.org/downloads/))
 - Node.js 18+ ([Download](https://nodejs.org/))
 - Git ([Download](https://git-scm.com/download/win))
 - PowerShell or Command Prompt
 
 ### macOS
-- Python 3.8+ (pre-installed or via [Homebrew](https://brew.sh/): `brew install python`)
+- Python 3.12+ (pre-installed or via [Homebrew](https://brew.sh/): `brew install python`)
 - Node.js 18+ (via Homebrew: `brew install node` or [Download](https://nodejs.org/))
 - Git (pre-installed with Xcode Command Line Tools)
 
@@ -431,4 +431,4 @@ When writing code that handles file paths, use:
 
 ## License
 
-ISC
+Apache-2.0

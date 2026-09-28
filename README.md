@@ -54,7 +54,7 @@ tinting-voxel/
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.12+
 - Node.js 18+
 
 ### Installation
@@ -154,7 +154,7 @@ To also receive email, set these **backend-only** environment variables:
 - `RESEND_FROM`: a sender on your verified Resend domain.
 - `BUG_REPORT_EMAIL_TO`: the recipient inbox.
 
-These are the same email settings used by `ai-judge`. Emails include the description,
+Emails include the description,
 converter/browser details, up to 50 recent application log lines, and the optional
 screenshot attachment. Failed or unconfigured email delivery leaves the saved report
 available locally. Common credential patterns, URL query strings,
@@ -209,13 +209,12 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 contains `name`, `hex`, and `transmission_distance`: a positive number in mm or
 three positive numbers in RGB order. A single value applies equally to all three
 channels. All built-in presets contain channel-specific TD values. Bambu CMYW/CMYWK
-share the effective RGB TD estimates from the existing Bambu staircase photographs
-(`tinting-voxel-research/data/results/bambu-cmywk-td-recovery/`).
-Photo-specific calibration terms stay in the research analysis.
+share the effective RGB TD estimates measured from the published Bambu staircase
+photographs; photo-specific calibration terms stay in the published research analysis.
 
 Production uses these material values directly. Photograph exposure, white-balance
-adjustments, and fitted capture corrections belong to the companion research
-repository and are not product material inputs.
+adjustments, and fitted capture corrections belong to the published research analysis
+and are not product material inputs.
 
 The related measurement and modeling research is published as:
 

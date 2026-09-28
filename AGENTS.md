@@ -225,7 +225,7 @@ arrays in parallel and keeps one code per distinct 8-bit color (the first in
 enumeration order), which matches exactly what matching every code returns.
 In opaque sets the filament closest to white only forms a block at the back of
 a code: a thin white layer is predicted to hide the colored layers behind it,
-but they show through in prints (the research repository's layer-order plates
+but they show through in prints (published layer-order plates
 measured white-first stacks at 1.5x the error of white-last ones).
 Enumeration plus matching must fit `full_enumeration_budget_seconds`; over
 budget, translucent sets use composition pruning and opaque sets are rejected,
@@ -315,8 +315,8 @@ print stack stay at the user's values. The job reports candidates in
 evaluation order, the dialog ranks them by score as they arrive, and choosing
 one applies it and cancels the rest.
 
-Material measurements and photograph calibration belong to the research
-repository. Production uses the material fields directly. Bambu and clear presets use
+Material measurements and photograph calibration belong to the published
+research analysis. Production uses the material fields directly. Bambu and clear presets use
 RGB-channel TD values; a custom material may use one TD or expand to RGB TD.
 
 ## Common Tasks
