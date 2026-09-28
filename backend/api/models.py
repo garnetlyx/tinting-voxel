@@ -121,6 +121,20 @@ class ColorBlock(ColorBlockSummary):
         return self
 
 
+# XYZ of the image white colors print against (core/white_point.py), as
+# processing reports it.
+WhitePointXYZ = Annotated[float, Field(gt=0, allow_inf_nan=False)]
+WhitePoint = tuple[WhitePointXYZ, WhitePointXYZ, WhitePointXYZ]
+
+
+class WhitePointMixin(BaseModel):
+    """The image white its colors print against, from processing."""
+    whitePoint: Optional[WhitePoint] = Field(
+        None,
+        description="XYZ of the image's white reported by processing; omitted: colors are matched as they are",
+    )
+
+
 class ImageDimensions(BaseModel):
     """Image dimensions in pixels"""
     width: int = Field(..., gt=0, le=10000)
@@ -150,7 +164,7 @@ class LabelMapMixin(BaseModel):
         return self._labels
 
 
-class ProcessImageResponse(BaseModel):
+class ProcessImageResponse(WhitePointMixin):
     """Response model for /api/process-image endpoint"""
     colorBlocks: List[ColorBlock]
     processedImage: str  # base64 encoded simulated print preview
@@ -183,7 +197,7 @@ class VectorColorResult(BaseModel):
     polygon_points: int = Field(..., ge=0)
 
 
-class SVGProcessImageResponse(BaseModel):
+class SVGProcessImageResponse(WhitePointMixin):
     """Response model for /api/process-image endpoint in SVG mode."""
     vectorResults: List[VectorColorResult]
     processedImage: str  # base64 encoded simulated print preview
@@ -271,7 +285,7 @@ class WhiteBackingMixin(BaseModel):
 
 
 # V2 API Models with configurable colors
-class DownloadSTLRequestV2(LabelMapMixin, PrintConfigMixin, WhiteBackingMixin):
+class DownloadSTLRequestV2(LabelMapMixin, PrintConfigMixin, WhiteBackingMixin, WhitePointMixin):
     """Request model for /api/v2/download-stl and /api/v2/download-3mf."""
     pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=MAX_COLOR_LAYERS)
@@ -285,7 +299,7 @@ class DownloadSTLRequestV2(LabelMapMixin, PrintConfigMixin, WhiteBackingMixin):
     # Small pixels will be merged at the backend level
 
 
-class DownloadSVGSTLRequestV2(PrintConfigMixin, WhiteBackingMixin):
+class DownloadSVGSTLRequestV2(PrintConfigMixin, WhiteBackingMixin, WhitePointMixin):
     """Request model for /api/v2/download-svg-stl endpoint with configurable colors."""
     vectorResults: List[VectorColorResult] = Field(..., min_length=1)
     pixelSize: float = Field(..., gt=0, le=10)
@@ -417,7 +431,7 @@ class FilamentPreviewResponse(BaseModel):
     pagination: Optional[PaginationInfo] = None
 
 
-class SimulatePreviewRequest(LabelMapMixin, PrintConfigMixin):
+class SimulatePreviewRequest(LabelMapMixin, PrintConfigMixin, WhitePointMixin):
     """Request model for print-simulation preview generation."""
     layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
     whiteBackingLayers: int = Field(DEFAULT_BACKING_LAYERS, ge=0, le=5)

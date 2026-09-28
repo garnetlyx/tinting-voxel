@@ -12,7 +12,7 @@ import zipfile
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -425,12 +425,14 @@ def map_color_blocks_to_blend_results(
     colors: Colors,
     backing_layers: Optional[int] = None,
     backing_filament: Optional[str] = None,
+    white_point: Optional[Sequence[float]] = None,
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
     """
     Map source RGB blocks to nearest printable blend codes and RGBs.
 
     Uses the same reference matrices and matching as the processing preview
-    (and reuses its results). The printed backing block participates in the
+    (and reuses its results), seeing the blocks against the image's white
+    (`white_point`). The printed backing block participates in the
     simulation (backing-aware matrices); returned codes carry the backing as a
     trailing suffix.
     """
@@ -439,6 +441,7 @@ def map_color_blocks_to_blend_results(
         [(block['r'], block['g'], block['b']) for block in color_blocks],
         colors, layer_count, layer_height,
         backing_layers=backing_layers, backing_filament=backing_filament,
+        white_point=white_point,
     )
 
 
@@ -794,6 +797,7 @@ def generate_stl_zip(
     colors: Optional[Colors] = None,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_filament: Optional[str] = None,
+    white_point: Optional[Sequence[float]] = None,
 ) -> bytes:
     """
     Generate ZIP file containing merged STL files by primary color
@@ -839,6 +843,7 @@ def generate_stl_zip(
         colors=active_colors,
         backing_layers=white_backing_layers,
         backing_filament=backing_filament,
+        white_point=white_point,
     )
 
     _log_input_color_brightness(input_colors, "STL")

@@ -15,6 +15,7 @@ import type {
   FilamentColorConfig,
   FilamentPresetsResponse,
   FilamentSetInfo,
+  WhitePoint,
 } from '../api/types';
 import { filamentLabel, isAllTransparentFilaments, isFilamentColorConfig } from '../utils/filaments';
 import type { ProcessingStage } from '../components/LoadingSpinner';
@@ -92,6 +93,8 @@ export const useImageProcessor = () => {
   const [segmentationImageUrl, setSegmentationImageUrl] = useState<string | null>(null);
   const [mappedBlockColors, setMappedBlockColors] = useState<MappedBlockColor[]>([]);
   const [mappedBlendPalette, setMappedBlendPalette] = useState<MappedBlendPaletteEntry[]>([]);
+  // The image white processing reported; previews and exports print against it.
+  const [whitePoint, setWhitePoint] = useState<WhitePoint | null>(null);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [layerHeight, setLayerHeightValue] = useState(0);
   const layerHeightIsManualRef = useRef(false);
@@ -405,6 +408,7 @@ export const useImageProcessor = () => {
       if (result.detailSize !== undefined && result.detailSize !== null) {
         setDetailSize(result.detailSize);
       }
+      setWhitePoint(result.whitePoint ?? null);
 
       if (processingMode === 'pixel') {
         const pixelResult = result as ProcessImageResponse;
@@ -594,6 +598,7 @@ export const useImageProcessor = () => {
         backingFilament,
         imageDimensions,
         detailSize,
+        whitePoint,
         ...filamentRequestPayload,
       };
 
@@ -631,6 +636,7 @@ export const useImageProcessor = () => {
         backingFilament,
         imageDimensions,
         detailSize,
+        whitePoint,
         ...filamentRequestPayload,
       };
 
@@ -698,6 +704,7 @@ export const useImageProcessor = () => {
         layerCount,
         whiteBackingLayers,
         backingFilament,
+        whitePoint,
         ...filamentRequestPayload,
       }, controller.signal);
       if (controller.signal.aborted) return;
@@ -719,6 +726,7 @@ export const useImageProcessor = () => {
     filamentRequestPayload,
     whiteBackingLayers,
     backingFilament,
+    whitePoint,
   ]);
 
   // Keep the simulated print preview in sync with manual edits and filament changes.

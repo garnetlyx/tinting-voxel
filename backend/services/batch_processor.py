@@ -68,6 +68,7 @@ def process_batch_images(
                 'processedImage': result['processedImage'],
                 'imageDimensions': result['imageDimensions'],
                 'pixelSize': result['pixelSize'],
+                'whitePoint': result['whitePoint'],
             })
             success_count += 1
             logger.info("Batch: processed '%s' successfully", filename)
@@ -139,6 +140,7 @@ def generate_batch_stl_zip(
                     colors=colors,
                     white_backing_layers=white_backing_layers,
                     backing_filament=backing_filament,
+                    white_point=result['whitePoint'],
                 )
                 outer_zip.writestr(f"{base_name}.zip", inner_zip_bytes)
                 stl_success_count += 1

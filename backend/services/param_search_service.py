@@ -26,7 +26,7 @@ from PIL import Image
 from config.settings import settings
 from core.blend_color import Colors
 from core.color_materials import mean_ciede2000
-from core.white_point import adapt_to_image_white
+from core.white_point import image_white, seen_against
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +179,7 @@ class Evaluator:
         self._colors = colors
         self._fixed = fixed
         self._grid: Optional[tuple[np.ndarray, float]] = None
-        self._target: Optional[np.ndarray] = None
+        self._seen: Optional[tuple[Optional[np.ndarray], np.ndarray]] = None
 
     def model_grid(self) -> tuple[np.ndarray, float]:
         """The image on its model grid (read-only RGB) and the grid pitch in mm."""
@@ -191,14 +191,22 @@ class Evaluator:
             self._grid = pixels, pitch
         return self._grid
 
+    def _seen_against_white(self) -> tuple[Optional[np.ndarray], np.ndarray]:
+        if self._seen is None:
+            pixels = self.model_grid()[0]
+            white = image_white(pixels)
+            target = seen_against(pixels, white)
+            target.setflags(write=False)
+            self._seen = white, target
+        return self._seen
+
+    def white(self) -> Optional[np.ndarray]:
+        """XYZ of the model grid's white (core/white_point.py), or None."""
+        return self._seen_against_white()[0]
+
     def target(self) -> np.ndarray:
         """The model grid as seen against its white (read-only RGB): what prints aim for."""
-        if self._target is None:
-            pixels = self.model_grid()[0]
-            target = adapt_to_image_white(pixels, pixels)
-            target.setflags(write=False)
-            self._target = target
-        return self._target
+        return self._seen_against_white()[1]
 
     def evaluate(self, params: dict, mode: str) -> SearchResult:
         if mode == "pixel":
@@ -260,6 +268,7 @@ class Evaluator:
             white_backing_layers=self._fixed.white_backing_layers,
             backing_filament=self._fixed.backing_filament,
             ref_matrices=ref_matrices,
+            white_point=self.white(),
         )
         return preview["processedImage"]
 

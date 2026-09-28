@@ -30,6 +30,7 @@ from api.rate_limiter import limiter
 from api.responses import json_response
 from api.validators import validate_image_upload
 from core.stack_prune import is_translucent_set
+from core.white_point import image_white
 from services.image_processor import (
     load_model_grid,
     _image_to_data_url,
@@ -225,6 +226,7 @@ def _svg_mode_response(
     )
 
     # Pass pre-computed reference matrices to avoid recomputation
+    white = image_white(img_array)
     simulated_preview = build_vector_simulated_preview(
         quantized_image=quantized,
         vector_results=vector_results,
@@ -236,6 +238,7 @@ def _svg_mode_response(
         white_backing_layers=whiteBackingLayers,
         backing_filament=backingFilament,
         ref_matrices=(ref_code_matrix, ref_rgb_matrix),  # Pass pre-computed matrices
+        white_point=white,
     )
 
     _record_processing(
@@ -251,6 +254,7 @@ def _svg_mode_response(
         pixelSize=pixelSize,
         detailSize=detailSize,
         printStack=simulated_preview["printStack"],
+        whitePoint=None if white is None else white.tolist(),
     ))
 
 
@@ -270,6 +274,7 @@ async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
             layer_height=body.layerHeight,
             white_backing_layers=body.whiteBackingLayers,
             backing_filament=body.backingFilament,
+            white_point=body.whitePoint,
         )
         return json_response(SimulatedPrintPreviewResponse(**result))
 

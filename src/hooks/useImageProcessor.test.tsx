@@ -299,6 +299,29 @@ describe('useImageProcessor', () => {
     ));
   });
 
+  it('prints previews and exports against the image white processing reports', async () => {
+    const whitePoint: [number, number, number] = [0.75, 0.79, 0.78];
+    mockedProcessImage.mockResolvedValueOnce({
+      colorBlocks: [{ r: 206, g: 198, b: 182, hex: '#CEC6B6', count: 1, pixels: [{ x: 0, y: 0 }] }],
+      processedImage: 'data:image/png;base64,mock', segmentationImage: 'data:image/png;base64,seg',
+      mappedBlockColors: [], mappedBlendPalette: [], imageDimensions: { width: 8, height: 6 },
+      printStack: { opticalLayerCount: 4, whiteBackingLayers: 3, backingFilament: 'W', totalLayerCount: 7, totalHeightMm: 0.56 },
+      whitePoint,
+    });
+    const { result } = await renderProcessor();
+    const img = new globalThis.Image() as unknown as HTMLImageElement;
+    await act(async () => { result.current.handleApplyEdit(img); });
+    mockedSimulatePrintPreview.mockClear();
+    act(() => result.current.setBackingFilament('K'));
+    await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ whitePoint }), expect.any(AbortSignal),
+    ));
+    await act(async () => result.current.handleDownloadSTL());
+    expect(mockedDownloadSTLV2).toHaveBeenLastCalledWith(expect.objectContaining({ whitePoint }));
+    await act(async () => result.current.handleDownload3MF());
+    expect(mockedDownload3MFV2).toHaveBeenLastCalledWith(expect.objectContaining({ whitePoint }));
+  });
+
   it('classifies from API material measurements and threshold', async () => {
     const { result } = await renderProcessor();
 

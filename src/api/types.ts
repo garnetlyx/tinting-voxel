@@ -35,6 +35,9 @@ export interface ImageDimensions {
   height: number;
 }
 
+/** XYZ of the image white colors print against, as processing reports it. */
+export type WhitePoint = [number, number, number];
+
 export interface ProcessImageResponse {
   colorBlocks: ColorBlock[];
   processedImage: string;  // simulated printable image
@@ -45,6 +48,7 @@ export interface ProcessImageResponse {
   pixelSize?: number;
   detailSize?: number;
   printStack: PrintStackInfo;
+  whitePoint?: WhitePoint | null;
 }
 
 export interface SVGProcessImageResponse {
@@ -56,6 +60,7 @@ export interface SVGProcessImageResponse {
   pixelSize?: number;
   detailSize?: number;
   printStack: PrintStackInfo;
+  whitePoint?: WhitePoint | null;
 }
 
 export interface PixelModeParams {
@@ -143,6 +148,7 @@ export interface DownloadSTLParamsV2 extends DownloadSTLParams {
   whiteBackingLayers?: number;
   backingFilament?: FilamentLabel;
   detailSize?: number;
+  whitePoint?: WhitePoint | null;
 }
 
 export interface DownloadSVGSTLParamsV2 extends DownloadSVGSTLParams {
@@ -151,6 +157,7 @@ export interface DownloadSVGSTLParamsV2 extends DownloadSVGSTLParams {
   whiteBackingLayers?: number;
   backingFilament?: FilamentLabel;
   detailSize?: number;
+  whitePoint?: WhitePoint | null;
 }
 
 export interface PrintSettingsParams {
@@ -212,6 +219,7 @@ export interface SimulatedPrintPreviewParams {
   backingFilament?: FilamentLabel;
   filamentPreset?: FilamentPreset;
   filamentColors?: FilamentColorConfig[];
+  whitePoint?: WhitePoint | null;
 }
 
 export interface SimulatedPrintPreviewResponse {

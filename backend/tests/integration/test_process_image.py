@@ -280,3 +280,33 @@ def test_simulate_preview_success(client, tiny_png_bytes):
     assert "mappedBlockColors" in data
     assert "mappedBlendPalette" in data
     assert len(data["mappedBlendPalette"]) > 0
+
+
+def test_previews_print_against_the_white_processing_reports(client):
+    """Processing keeps the image's colors and reports its white; a preview
+    refresh sent that white prints the pale off-white white again."""
+    bands = [("FFFFFF", 10), ("D4DAC3", 20), ("20202A", 40), ("3050A0", 30)]
+    pixels = np.concatenate([
+        np.tile(np.frombuffer(bytes.fromhex(color), dtype=np.uint8), (60, width, 1)) for color, width in bands
+    ], axis=1)
+    buffer = io.BytesIO()
+    Image.fromarray(pixels).save(buffer, format="PNG")
+    print_stack = {"layerHeight": 0.08, "layerCount": 10, "filamentPreset": "bambu_cmyw", "whiteBackingLayers": 3}
+    processed = client.post(
+        "/api/process-image",
+        files={"image": ("bands.png", buffer.getvalue(), "image/png")},
+        data={"mode": "pixel", "maxColors": "4", "colorThreshold": "10", "pixelSize": "0.42",
+              **{key: str(value) for key, value in print_stack.items()}},
+    ).json()
+    assert processed["whitePoint"] is not None
+    assert "#d4dac3" in [block["hex"] for block in processed["colorBlocks"]]
+
+    def pale_code(**white) -> str:
+        preview = client.post("/api/simulate-preview", json={
+            **label_map_request(processed["colorBlocks"], **processed["imageDimensions"]), **print_stack, **white,
+        })
+        assert preview.status_code == 200
+        return next(entry["code"] for entry in preview.json()["mappedBlendPalette"] if entry["sourceHex"] == "#D4DAC3")
+
+    assert pale_code(whitePoint=processed["whitePoint"]) == "W" * 13
+    assert pale_code() != "W" * 13

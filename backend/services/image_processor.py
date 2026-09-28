@@ -10,7 +10,7 @@ import threading
 import weakref
 from collections import OrderedDict
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 import cv2
@@ -18,7 +18,7 @@ from PIL import Image
 
 from core.blend_color import Colors, colors_key
 from core.color_materials import Color
-from core.white_point import adapt_to_image_white
+from core.white_point import image_white, seen_against
 from services.print_stack import build_print_stack, resolve_backing_label
 from services.label_map import EMPTY, block_cell_counts, block_pixels
 from services.raster_cleanup import color_distance, regularize_printable_regions
@@ -70,18 +70,25 @@ def _map_and_refine(
     layer_height: float,
     backing_suffix: str = '',
     background_rgb: Optional[tuple] = None,
+    white_point: Optional[Sequence[float]] = None,
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
     """Nearest-code mapping plus order refinement for pruned (translucent) sets.
 
-    The matrices must already be backing-aware when a printed backing block is
-    configured (same suffix/boundary); the returned codes carry the backing
-    as a trailing suffix — the physical stack that actually prints."""
+    Colors are matched as seen against the image's white (`white_point`, see
+    core/white_point.py). The matrices must already be backing-aware when a
+    printed backing block is configured (same suffix/boundary); the returned
+    codes carry the backing as a trailing suffix — the physical stack that
+    actually prints."""
     from core.stack_prune import refine_matches
     from services.stl_generator import _build_codes_to_rgb
 
+    source_colors = [
+        tuple(rgb) for rgb in
+        seen_against(np.asarray(source_colors, dtype=np.uint8).reshape(-1, 3), white_point).tolist()
+    ]
     mappings = _matrix_mappings(ref_code_matrix)
     key = (
-        tuple(tuple(int(channel) for channel in rgb) for rgb in source_colors),
+        tuple(source_colors),
         colors_key(colors), layer_count, layer_height, backing_suffix,
         None if background_rgb is None else tuple(background_rgb),
     )
@@ -139,6 +146,7 @@ def _map_source_colors_to_blends(
     layer_height: float,
     backing_layers: Optional[int] = None,
     backing_filament: Optional[str] = None,
+    white_point: Optional[Sequence[float]] = None,
 ) -> tuple[list[str], list[tuple[int, int, int]]]:
     from services.print_stack import (
         PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
@@ -156,7 +164,7 @@ def _map_source_colors_to_blends(
     )
     return _map_and_refine(
         source_colors, ref_code_matrix, ref_rgb_matrix, colors, layer_count, layer_height,
-        backing_suffix=b_suffix, background_rgb=b_boundary,
+        backing_suffix=b_suffix, background_rgb=b_boundary, white_point=white_point,
     )
 
 
@@ -198,12 +206,14 @@ def build_simulated_print_preview(
     layer_height: float = 0.08,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_filament: Optional[str] = None,
+    white_point: Optional[Sequence[float]] = None,
 ) -> dict:
     """
     Build an image-specific print preview from current color blocks
     (block i covers the cells where labels == i).
 
-    The preview uses the same nearest printable blend mapping as STL export.
+    The preview uses the same nearest printable blend mapping as STL export,
+    seeing the block colors against the image's white (`white_point`).
     """
     if not color_blocks:
         raise ValueError("No color blocks provided")
@@ -234,6 +244,7 @@ def build_simulated_print_preview(
         layer_count=layer_count,
         backing_layers=white_backing_layers,
         backing_filament=backing_filament,
+        white_point=white_point,
     )
 
     processed_image = _render_labels(labels, result_rgbs)
@@ -275,8 +286,10 @@ def build_vector_simulated_preview(
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_filament: Optional[str] = None,
     ref_matrices: Optional[tuple] = None,  # Pre-computed (ref_code_matrix, ref_rgb_matrix)
+    white_point: Optional[Sequence[float]] = None,
 ) -> dict:
-    """Build an image-specific print preview for SVG mode from vectorized regions."""
+    """Build an image-specific print preview for SVG mode from vectorized regions,
+    seeing their colors against the image's white (`white_point`)."""
     active_colors = colors or Colors()
     from services.print_stack import (
         PRINT_BACKGROUND_RGB, backing_suffix, resolve_backing_label,
@@ -315,7 +328,7 @@ def build_vector_simulated_preview(
         result_codes, result_rgbs = _map_and_refine(
             source_colors, ref_code_matrix, ref_rgb_matrix,
             active_colors, layer_count, layer_height,
-            backing_suffix=b_suffix, background_rgb=b_boundary,
+            backing_suffix=b_suffix, background_rgb=b_boundary, white_point=white_point,
         )
     else:
         result_codes, result_rgbs = _map_source_colors_to_blends(
@@ -325,6 +338,7 @@ def build_vector_simulated_preview(
             layer_height=layer_height,
             backing_layers=white_backing_layers,
             backing_filament=backing_filament,
+            white_point=white_point,
         )
     
     simulated = np.asarray(result_rgbs, dtype=np.uint8)[partition]
@@ -593,7 +607,8 @@ def process_image(
 
     Returns:
         Dictionary containing colorBlocks, processedImage, segmentationImage,
-        mappedBlendPalette, and imageDimensions
+        mappedBlendPalette, imageDimensions and whitePoint (the XYZ image
+        white the blocks print against, or None)
     """
     img, pixel_size = load_model_grid(image_bytes, pixel_size, detail_size)
     width, height = img.size
@@ -671,11 +686,6 @@ def process_image(
         counts = block_cell_counts(labels, len(color_blocks))
         color_blocks, labels = _keep_blocks(color_blocks, labels, [i for i in range(len(color_blocks)) if counts[i] > 0])
 
-    # Colors as seen against the image's white (core/white_point.py)
-    block_rgbs = adapt_to_image_white(img_array, [[color['r'], color['g'], color['b']] for color in color_blocks])
-    for color, rgb in zip(color_blocks, block_rgbs.tolist()):
-        color['r'], color['g'], color['b'] = rgb
-
     # Counts, pixel lists (for the response) and hex values
     counts = block_cell_counts(labels, len(color_blocks))
     for color, count, block_cells in zip(color_blocks, counts.tolist(), block_pixels(labels, len(color_blocks))):
@@ -686,6 +696,8 @@ def process_image(
     segmentation_image = _render_labels(
         labels, [(int(color['r']), int(color['g']), int(color['b'])) for color in color_blocks],
     )
+    # The grouped colors print as seen against the image's white.
+    white = image_white(img_array)
     simulated_preview = build_simulated_print_preview(
         color_blocks=color_blocks,
         labels=labels,
@@ -694,6 +706,7 @@ def process_image(
         layer_height=layer_height,
         white_backing_layers=white_backing_layers,
         backing_filament=backing_filament,
+        white_point=white,
     )
 
     return {
@@ -709,4 +722,5 @@ def process_image(
         },
         'pixelSize': pixel_size,
         'printStack': simulated_preview['printStack'],
+        'whitePoint': None if white is None else white.tolist(),
     }

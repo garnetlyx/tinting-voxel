@@ -3,7 +3,7 @@ from config.print_defaults import DEFAULT_BACKING_LAYERS
 import logging
 import zipfile
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Sequence
 
 from core.blend_color import Colors
 from config.settings import settings
@@ -41,6 +41,7 @@ def generate_svg_stl_zip(
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_filament: Optional[str] = None,
     detail_size: Optional[float] = None,
+    white_point: Optional[Sequence[float]] = None,
 ) -> bytes:
     """
     Generate ZIP file containing STL files from vector contours.
@@ -87,7 +88,7 @@ def generate_svg_stl_zip(
     result_codes, _ = _map_and_refine(
         input_colors, ref_code_matrix, ref_rgb_matrix,
         active_colors, layer_count, layer_height,
-        backing_suffix=_b_suffix, background_rgb=_b_boundary,
+        backing_suffix=_b_suffix, background_rgb=_b_boundary, white_point=white_point,
     )
 
     _log_input_color_brightness(input_colors, "SVG-STL")

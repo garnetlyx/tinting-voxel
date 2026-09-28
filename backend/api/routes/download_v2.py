@@ -121,6 +121,7 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
         colors=colors,
         white_backing_layers=body.whiteBackingLayers,
         backing_filament=body.backingFilament,
+        white_point=body.whitePoint,
     )
 
     _record_export("stl", started, body.layerCount, len(color_blocks), zip_content)
@@ -157,6 +158,7 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
         colors=colors,
         white_backing_layers=body.whiteBackingLayers,
         backing_filament=body.backingFilament,
+        white_point=body.whitePoint,
         detail_size=body.detailSize,
     )
 
@@ -204,6 +206,7 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
         color_hex_map=color_hex_map,
         white_backing_layers=body.whiteBackingLayers,
         backing_filament=body.backingFilament,
+        white_point=body.whitePoint,
     )
 
     _record_export("3mf", started, body.layerCount, len(color_blocks), threemf_content)
@@ -248,6 +251,7 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
         color_hex_map=color_hex_map,
         white_backing_layers=body.whiteBackingLayers,
         backing_filament=body.backingFilament,
+        white_point=body.whitePoint,
         detail_size=body.detailSize,
     )
 

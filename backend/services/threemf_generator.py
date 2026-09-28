@@ -8,7 +8,7 @@ filament slots.
 from config.print_defaults import DEFAULT_BACKING_LAYERS
 import logging
 import re
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 
@@ -64,6 +64,7 @@ def generate_3mf(
     color_hex_map: Optional[dict] = None,
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_filament: Optional[str] = None,
+    white_point: Optional[Sequence[float]] = None,
 ) -> bytes:
     """
     Generate a single 3MF file with color-separated objects.
@@ -111,6 +112,7 @@ def generate_3mf(
         colors=colors,
         backing_layers=white_backing_layers,
         backing_filament=backing_filament,
+        white_point=white_point,
     )
 
     _log_input_color_brightness(input_colors, "3MF")
@@ -162,6 +164,7 @@ def generate_svg_3mf(
     white_backing_layers: int = DEFAULT_BACKING_LAYERS,
     backing_filament: Optional[str] = None,
     detail_size: Optional[float] = None,
+    white_point: Optional[Sequence[float]] = None,
 ) -> bytes:
     """
     Generate a single 3MF file from SVG vector contours with color-separated objects.
@@ -210,7 +213,7 @@ def generate_svg_3mf(
     result_codes, _ = _map_and_refine(
         input_colors, ref_code_matrix, ref_rgb_matrix,
         colors, layer_count, layer_height,
-        backing_suffix=_b_suffix, background_rgb=_b_boundary,
+        backing_suffix=_b_suffix, background_rgb=_b_boundary, white_point=white_point,
     )
 
     _log_input_color_brightness(input_colors, "SVG-3MF")

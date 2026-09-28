@@ -4,9 +4,11 @@ Photos rarely contain pure white: white objects come out as off-whites with a
 slight cast. Matched as they are, off-whites land on tinted, darker stacks,
 and the print loses its whites and its contrast. An image's white is the mean
 of its whitest pixels (closest to white by CIEDE2000). When it is an off-white
-and the image has contrast, colors are adapted from it to print white with the
-Bradford transform, and every color that is then an off-white is white.
-Low-contrast images keep their colors: their light tones are not whites.
+and the image has contrast, colors are matched to print stacks as seen against
+it: adapted from it to print white with the Bradford transform, with every
+color that is then an off-white matched as white. The extracted colors
+themselves stay as they are. Low-contrast images keep their colors: their
+light tones are not whites.
 """
 from typing import Optional
 
@@ -70,17 +72,16 @@ def adapt_to_white(rgb, white: np.ndarray) -> np.ndarray:
     return np.round(adapted * 255).astype(np.uint8).reshape(rgb.shape)
 
 
-def adapt_to_image_white(pixels: np.ndarray, rgb) -> np.ndarray:
-    """8-bit RGB colors as seen against the white of the image `pixels`.
+def seen_against(rgb, white) -> np.ndarray:
+    """8-bit RGB colors (any shape ending in 3) as seen against an image's white.
 
-    Colors are adapted from the image's white to print white, and off-whites
-    become white; they are unchanged when image_white finds no white.
+    `white` is the XYZ image_white found; colors are adapted from it to print
+    white and off-whites become white. With no white (None) they are unchanged.
     """
     rgb = np.asarray(rgb, dtype=np.uint8)
-    white = image_white(pixels)
     if white is None:
         return rgb
-    adapted = adapt_to_white(rgb, white)
+    adapted = adapt_to_white(rgb, np.asarray(white, dtype=np.float64))
     flat = adapted.reshape(-1, 3)
     flat[_distance_to_white(flat) <= settings.off_white_max_delta_e] = 255
     return adapted
