@@ -1,7 +1,6 @@
 """Colors print as seen against the image's white (core/white_point.py), while
 the grouped colors stay the image's own."""
 import base64
-import math
 from io import BytesIO
 
 import numpy as np
@@ -64,13 +63,13 @@ def test_off_whites_print_white_against_the_image_white(monkeypatch):
     """Matched as it is, the warm light grey lands on colored layers; against
     the image's off-white it prints white like the off-white itself."""
     assert _codes_at(_process(PHOTO), [2, 10]) == [ALL_WHITE, ALL_WHITE]
-    monkeypatch.setattr(settings, "white_point_min_contrast", math.inf)
+    monkeypatch.setattr(settings, "low_contrast_shadow_lightness", 0.0)
     assert _codes_at(_process(PHOTO), [10]) != [ALL_WHITE]
 
 
 def test_off_whites_print_white_rather_than_a_darker_tinted_stack(monkeypatch):
     assert _codes_at(_process(PALE), [15]) == [ALL_WHITE]
-    monkeypatch.setattr(settings, "white_point_min_contrast", math.inf)
+    monkeypatch.setattr(settings, "low_contrast_shadow_lightness", 0.0)
     assert _codes_at(_process(PALE), [15]) != [ALL_WHITE]
 
 
@@ -110,6 +109,14 @@ def test_the_white_is_the_mean_of_the_whitest_share(monkeypatch):
     monkeypatch.setattr(settings, "white_point_share", 0.05)
     pixels = _bands(("E8E8E8", 5), ("DDDDDD", 5), ("202020", 90))
     np.testing.assert_allclose(image_white(pixels), rgb2xyz(np.full((1, 1, 3), 0xE8 / 255)).reshape(3))
+
+
+def test_muted_palettes_with_a_small_dark_accent_keep_their_colors():
+    """A Morandi-like palette stays light across its darkest 5% even with a
+    dark accent, so its light tones are the palette, not whites."""
+    muted = _bands(("EDE0D7", 20), ("C9B8AE", 40), ("A89A92", 36), ("2A2622", 4))
+    assert image_white(muted) is None
+    assert _process(muted)["whitePoint"] is None
 
 
 def test_low_contrast_images_and_images_without_an_off_white_have_no_white():

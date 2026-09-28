@@ -226,11 +226,14 @@ Photos rarely contain pure white, and an off-white matched as it is lands on a
 tinted, darker stack. `core/white_point.py` takes the mean of the image's
 whitest pixels (`white_point_share`, closest to white by CIEDE2000) as its
 white. When that white is an off-white (within `off_white_max_delta_e` of
-white) at least `white_point_min_contrast` times as bright as the darkest
-share, colors are matched to stacks as seen against it: adapted from it to
-print white with the Bradford transform, with colors that are then off-whites
-matched as white, since white prints closer to what the eye sees than a
-darker, tinted stack. Low-contrast images keep their colors. The extracted
+white) and the image reaches deep shadows (its darkest
+`low_contrast_shadow_share` of pixels darker than L*
+`low_contrast_shadow_lightness`), colors are matched to stacks as seen against
+it: adapted from it to print white with the Bradford transform, with colors
+that are then off-whites matched as white, since white prints closer to what
+the eye sees than a darker, tinted stack. Low-contrast images, whose shadows
+stay light (faded, high-key or Morandi palettes, even with small dark
+accents), keep their colors: their light tones are the palette. The extracted
 colors (Grouped Colors, color blocks, CSV) stay the image's own: processing
 reports the white as `whitePoint` (XYZ), and preview refreshes and exports send
 it back so they map exactly as processing did. Compare settings scores against

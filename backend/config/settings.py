@@ -41,13 +41,17 @@ class Settings(BaseSettings):
     default_color_threshold: float = 50.0
     # Colors are seen against the image's white (core/white_point.py): the
     # mean of this share of its pixels closest to white. When that white is an
-    # off-white (within off_white_max_delta_e CIEDE2000 of white) and at least
-    # white_point_min_contrast times as bright as the same share of darkest
-    # pixels, colors are adapted from it to print white and off-whites become
-    # white. Low-contrast images keep their colors.
+    # off-white (within off_white_max_delta_e CIEDE2000 of white) and the image
+    # reaches deep shadows, colors are adapted from it to print white and
+    # off-whites become white.
     white_point_share: float = 0.01
     off_white_max_delta_e: float = 15.0
-    white_point_min_contrast: float = 8.0
+    # Deep shadows: the darkest low_contrast_shadow_share of pixels are darker
+    # than L* low_contrast_shadow_lightness. Faded, high-key and Morandi-palette
+    # images stop above it and keep their colors (the darkest 5% measured L*
+    # 0-27 in normal photos, 30-78 in muted palettes).
+    low_contrast_shadow_share: float = 0.05
+    low_contrast_shadow_lightness: float = 28.0
 
     # Parameter search runs after the request returns. It scores the current
     # settings and then this many other settings (services/param_search_service.py).

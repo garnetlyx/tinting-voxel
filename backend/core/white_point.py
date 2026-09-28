@@ -4,11 +4,12 @@ Photos rarely contain pure white: white objects come out as off-whites with a
 slight cast. Matched as they are, off-whites land on tinted, darker stacks,
 and the print loses its whites and its contrast. An image's white is the mean
 of its whitest pixels (closest to white by CIEDE2000). When it is an off-white
-and the image has contrast, colors are matched to print stacks as seen against
-it: adapted from it to print white with the Bradford transform, with every
-color that is then an off-white matched as white. The extracted colors
-themselves stay as they are. Low-contrast images keep their colors: their
-light tones are not whites.
+and the image reaches deep shadows, colors are matched to print stacks as seen
+against it: adapted from it to print white with the Bradford transform, with
+every color that is then an off-white matched as white. The extracted colors
+themselves stay as they are. Low-contrast images, whose shadows stay light
+(faded, high-key or Morandi palettes), keep their colors: their light tones
+are the palette, not whites.
 """
 from typing import Optional
 
@@ -45,20 +46,21 @@ def image_white(pixels: np.ndarray) -> Optional[np.ndarray]:
 
     The white is the mean of the settings.white_point_share of pixels closest
     to white. It is kept when it is an off-white (within
-    settings.off_white_max_delta_e of white) at least
-    settings.white_point_min_contrast times as bright as the darkest share.
+    settings.off_white_max_delta_e of white) and the image reaches deep
+    shadows: its darkest settings.low_contrast_shadow_share of pixels are
+    darker than L* settings.low_contrast_shadow_lightness.
     """
     rgb = pixels.reshape(-1, 3)
     rgb = rgb[::max(1, len(rgb) // LEVEL_SAMPLE)]
+    shadows = np.percentile(rgb2lab(rgb.reshape(-1, 1, 3) / 255.0)[..., 0], 100 * settings.low_contrast_shadow_share)
+    if shadows > settings.low_contrast_shadow_lightness:
+        return None
     xyz = rgb2xyz(rgb.reshape(-1, 1, 3) / 255.0).reshape(-1, 3)
     count = max(1, round(len(rgb) * settings.white_point_share))
     whitest = np.argpartition(_distance_to_white(rgb), count - 1)[:count]
     white = xyz[whitest].mean(axis=0)
-    dark = np.partition(xyz[:, 1], count - 1)[:count].mean()
     white_rgb = np.round(xyz2rgb(white.reshape(1, 1, 3)) * 255).reshape(1, 3)
     if _distance_to_white(white_rgb)[0] > settings.off_white_max_delta_e:
-        return None
-    if white[1] < settings.white_point_min_contrast * dark:
         return None
     return white
 
