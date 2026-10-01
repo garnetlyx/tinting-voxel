@@ -156,25 +156,12 @@ def test_zero_backing_has_no_hidden_filament_dependent_background():
         np.testing.assert_array_equal(cell, np.round(expected))
 
 
-def test_opaque_sets_keep_white_behind_colored_layers():
-    codes = set(compute_reference_matrices(4, 0.08, BAMBU, n_targets=3, prune=False)[0].values.flatten())
-    assert codes and all('W' not in code.rstrip('W') for code in codes)
-    assert {'WWWW', 'CWWW', 'CMYW'} <= codes
-
-
-def test_translucent_sets_keep_every_order():
-    clear = Colors.from_configs(get_preset("clear_cmyw"))
-    codes = set(compute_reference_matrices(2, 0.84, clear, n_targets=3, prune=False)[0].values.flatten())
-    assert {'WC', 'CW'} <= codes
-
-
-def test_light_grey_prints_from_white_layers_not_a_white_skin():
-    """A warm light grey (L* 85, C* 8) is not a thin white layer over colored
-    layers: the colors show through such a skin in prints."""
-    codes, _ = _map_source_colors_to_blends(
-        [(0xDB, 0xD4, 0xC5)], BAMBU, 10, 0.08, backing_layers=3, backing_filament='W',
-    )
-    assert codes[0] == 'W' * 13
+@pytest.mark.parametrize("preset, layer_height", [("bambu_cmyw", 0.08), ("clear_cmyw", 0.84)])
+def test_every_layer_order_is_a_candidate(preset, layer_height):
+    """White over a color prints a pale tint of it, so the search keeps it."""
+    colors = Colors.from_configs(get_preset(preset))
+    codes = set(compute_reference_matrices(2, layer_height, colors, n_targets=3, prune=False)[0].values.flatten())
+    assert {'WC', 'CW', 'WY', 'YW'} <= codes
 
 
 def test_normalize_backing_layers():

@@ -151,6 +151,9 @@ tinting-voxel solves these by:
 - K-means clustering (vectorized, CIELAB distance) for color extraction
 - N-color mapping via one transmission formula, `T_ch = 10^(-d / TD_ch)`
 - CIEDE2000 perceptual matching with hue-preservation for dark chromatic colors
+- Colors matched as seen against the image's white: off-whites print white in
+  images with deep shadows; faded, high-key and Morandi palettes keep their colors
+- Every layer order is a candidate, so white layers over a color print its pale tints
 - Four built-in filament presets: Bambu CMYWK (default), Bambu CMYW, Clear CMYG, and Clear CMYW.
   Custom configurations remain supported; removed preset IDs are rejected.
 - Palette browser for the four supported filament configurations

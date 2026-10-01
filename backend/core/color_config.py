@@ -63,7 +63,10 @@ BAMBU_CMYWK_PRESET: List[ColorConfig] = [
     ColorConfig(name='Cyan', hex='#3D79C6', transmission_distance=(0.14985206885995866, 0.2158019588968432, 0.34470002110761544)),
     ColorConfig(name='Magenta', hex='#B3356E', transmission_distance=(0.25394517301625485, 0.11741231747797068, 0.16740952089338004)),
     ColorConfig(name='Yellow', hex='#FFE665', transmission_distance=(0.24453692139115935, 0.4161395063139576, 0.11645416645362061)),
-    ColorConfig(name='White', hex='#FFFFFF', transmission_distance=(0.18080214399292235, 0.18110183709219985, 0.17340438182840498)),
+    # Fitted on the published PLATE-06 H2C samples A-D (white and black
+    # backing) with the other filaments fixed: thin white layers over a color
+    # let it show through as a pale tint.
+    ColorConfig(name='White', hex='#FFFFFF', transmission_distance=(0.7688190294497038, 0.5368579922753799, 0.426099846917962)),
     ColorConfig(name='Key', hex='#0B0F0C', transmission_distance=(0.11902961051255159, 0.09501141308426139, 0.09724992232345757)),
 ]
 

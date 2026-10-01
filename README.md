@@ -7,6 +7,7 @@ Transform images into physically accurate, multi-color 3D-printable files using 
 ## Features
 
 - **Optical Color Mixing** - One transmission formula for every filament: `T_ch = 10^(-d / TD_ch)`, composed by light-loss allocation using the filament hex color
+- **Seen Against the Image's White** - Off-whites print white in images with deep shadows, while faded, high-key and Morandi palettes keep their colors; white layers over a color print its pale tints
 - **N-Color Support (4–16 colors)** - Arbitrary color codes with custom hex values and a single transmission-distance field, accepting one number or three RGB values
 - **Multiple Output Formats** - STL ZIP, SVG-STL, **3MF** (one object with a named, colored part per filament), SVG-3MF, CSV, and slicer print-settings JSON
 - **Batch Processing** - Process up to 20 images in one run

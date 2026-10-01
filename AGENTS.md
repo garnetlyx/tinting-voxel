@@ -63,7 +63,7 @@ tinting-voxel/
 │   │   ├── threemf_writer.py     # 3MF packaging (streamed XML, shared vertices)
 │   │   └── vector_processor.py   # Vector/contour processing
 │   ├── config/           # Configuration (settings, constants, logging_setup)
-│   └── tests/            # Test suite (~770 tests)
+│   └── tests/            # Test suite (~830 tests)
 │       ├── unit/             # Unit tests
 │       ├── integration/      # Integration tests
 │       ├── performance/      # Performance tests
@@ -186,7 +186,7 @@ docker compose up --build  # Build and run
 ## Testing
 
 ```bash
-# Backend (~770 tests)
+# Backend (~830 tests)
 cd backend && pytest -v
 
 # Frontend (Vitest, 27 test files)
@@ -242,10 +242,9 @@ the model grid seen against its white.
 Stack search (`compute_reference_matrices`) blends every ordered code on index
 arrays in parallel and keeps one code per distinct 8-bit color (the first in
 enumeration order), which matches exactly what matching every code returns.
-In opaque sets the filament closest to white only forms a block at the back of
-a code: a thin white layer is predicted to hide the colored layers behind it,
-but they show through in prints (published layer-order plates
-measured white-first stacks at 1.5x the error of white-last ones).
+Every layer order is a candidate: white layers over a color print its pale
+tints, the only printable colors between white and one color layer on the
+viewing face.
 Enumeration plus matching must fit `full_enumeration_budget_seconds`; over
 budget, translucent sets use composition pruning and opaque sets are rejected,
 as are pruned searches estimated over `stack_search_limit_seconds`.

@@ -307,11 +307,21 @@ requests. `npm test` and `npm run build` validate this boundary.
    ┌──────────────────────────────────────────────────────────┐
    │ {                                                         │
    │   colorBlocks: [{ r, g, b, count, pixels, hex }, ...],   │
-   │   processedImage: "data:image/png;base64,...",           │
-   │   imageDimensions: { width, height }                     │
+   │   processedImage, segmentationImage: PNG data URLs,      │
+   │   mappedBlockColors, mappedBlendPalette, printStack,     │
+   │   imageDimensions, pixelSize, detailSize,                │
+   │   whitePoint: [X, Y, Z] or null                          │
    │ }                                                         │
    └──────────────────────────────────────────────────────────┘
 ```
+
+The extracted colors stay the image's own (Grouped Colors, color blocks, CSV).
+Matching them to stacks sees them against the image's white
+(`core/white_point.py`): when the image's whitest pixels are an off-white and
+the image reaches deep shadows, colors are adapted from that white to print
+white and off-whites match pure white; faded, high-key and Morandi palettes,
+whose shadows stay light, are matched as they are. The response reports the
+white as `whitePoint`, and preview refreshes and exports send it back.
 
 ### STL Generation Flow
 
@@ -363,7 +373,7 @@ requests. `npm test` and `npm run build` validate this boundary.
 
 | Endpoint | Method | Input | Output |
 |----------|--------|-------|--------|
-| `/api/process-image` | POST | `multipart/form-data` (image + params) | JSON (colorBlocks, processedImage) |
+| `/api/process-image` | POST | `multipart/form-data` (image + params) | JSON (colorBlocks, previews, mapping, whitePoint) |
 | `/api/download-csv` | POST | JSON (colorBlocks) | `text/csv` file |
 | `/api/health` | GET | None | JSON (status, version) |
 
@@ -386,17 +396,26 @@ requests. `npm test` and `npm run build` validate this boundary.
       "hex": "#8040c8"
     }
   ],
-  "processedImage": "data:image/png;base64,...",
-  "imageDimensions": {"width": 208, "height": 208}
+  "processedImage": "data:image/png;base64,...",     # simulated print
+  "segmentationImage": "data:image/png;base64,...",  # grouped colors
+  "mappedBlockColors": [{"code": "CMWWWWWWWWWWW", "rgb": [...], "hex": "..."}],
+  "mappedBlendPalette": [...],
+  "imageDimensions": {"width": 208, "height": 208},
+  "pixelSize": 0.08,
+  "printStack": {...},
+  "whitePoint": [0.75, 0.79, 0.78]                   # XYZ, or null
 }
 
-# STL Download Request
+# STL / 3MF Download Request (pixel mode)
 {
-  "colorBlocks": [...],
+  "colorBlocks": [{"r": 128, "g": 64, "b": 200, "hex": "#8040c8"}],
+  "labelMap": "<base64, one byte per cell: its block index>",
+  "imageDimensions": {"width": 208, "height": 208},
   "layerHeight": 0.08,
   "pixelSize": 0.08,
   "layerCount": 4,
-  "imageDimensions": {"width": 208, "height": 208}
+  "whiteBackingLayers": 3,
+  "whitePoint": [0.75, 0.79, 0.78]                   # from processing
 }
 ```
 
@@ -430,6 +449,13 @@ A_ch = 1 - hex_ch / 255
 transmission calculation; `blend_models.py` composes layer transmission and
 hex-derived absorption with one light-loss allocation rule. The batch path and
 single-code path use the same material values.
+
+Stack search keeps every layer order: white layers over a color print its pale
+tints, the only printable colors between white and one color layer on the
+viewing face. The Bambu white filament's RGB TD is fitted on the published
+PLATE-06 measurements (white and black backing) with the other filaments
+fixed, so a thin white layer over a color lets it show through as it does in
+prints.
 
 The TD mean across all materials and RGB channels determines transparency;
 each material has equal weight and a scalar contributes three equal channels.
