@@ -143,6 +143,7 @@ tinting-voxel solves these by:
 
 **Image input**
 - PNG / JPG / JPEG / BMP / GIF / WebP upload with magic-byte validation
+- SVG upload (single image): rasterized in the browser at 2048px on the long side, then handled like any raster
 - Resample to the model grid: at most `max_model_cells` cells and `MAX_PROCESSING_DIMENSION` (4096px) per side
 - Canvas crop/resize editor (frontend)
 - Drag-and-drop + click upload
@@ -267,7 +268,7 @@ defaults. Bambu and clear presets use RGB-channel TD; custom materials accept a 
   Safari 14+, Edge 90+).
 - **Backend**: Python 3.8+ runtime (type hints throughout).
 - **Deployment**: Docker, Railway, Fly.io, or self-hosted.
-- **File support**: PNG, JPG, JPEG, BMP, GIF, WebP (≤10MB; resampled to at
+- **File support**: PNG, JPG, JPEG, BMP, GIF, WebP, plus SVG in single-image mode (≤10MB; resampled to at
   most 2M cells and 4096px per side, keeping the physical size).
 
 ### 6.2 Performance Requirements

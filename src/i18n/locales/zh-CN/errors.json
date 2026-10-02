@@ -37,7 +37,7 @@
   "networkerrorWhenAttemptingToFetchResource": "网络请求失败，请检查网络后重试。",
   "loadFailed": "加载失败，请重试。",
   "screenshotIsTooLarge": "截图过大",
-  "unsupportedType": "不支持此文件类型：{{type}}。请上传 PNG、JPEG、GIF、WebP 或 BMP 图片。",
+  "unsupportedType": "不支持此文件类型：{{type}}。请上传 PNG、JPEG、GIF、WebP、BMP 或 SVG 图片。",
   "skippedFiles": "已跳过 {{count}} 个不支持格式的文件",
   "tooManyImages": "最多允许 {{max}} 张图片，已忽略多余文件。",
   "imported": "成功导入 {{count}} 个预设",

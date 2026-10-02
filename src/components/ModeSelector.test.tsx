@@ -4,21 +4,21 @@ import userEvent from '@testing-library/user-event';
 import { ModeSelector } from './ModeSelector';
 
 describe('ModeSelector', () => {
-  it('renders pixel and svg mode buttons', () => {
+  it('renders pixel and vector mode buttons', () => {
     render(<ModeSelector mode="pixel" onModeChange={() => {}} />);
     expect(screen.getByText('Pixel')).toBeInTheDocument();
-    expect(screen.getByText('SVG')).toBeInTheDocument();
+    expect(screen.getByText('Vector')).toBeInTheDocument();
   });
 
   it('marks the active mode as pressed (pixel)', () => {
     render(<ModeSelector mode="pixel" onModeChange={() => {}} />);
     expect(screen.getByText('Pixel').closest('button')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('SVG').closest('button')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('Vector').closest('button')).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('marks the active mode as pressed (svg)', () => {
     render(<ModeSelector mode="svg" onModeChange={() => {}} />);
-    expect(screen.getByText('SVG').closest('button')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Vector').closest('button')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Pixel').closest('button')).toHaveAttribute('aria-pressed', 'false');
   });
 
@@ -27,7 +27,7 @@ describe('ModeSelector', () => {
     const user = userEvent.setup();
 
     render(<ModeSelector mode="pixel" onModeChange={onModeChange} />);
-    await user.click(screen.getByText('SVG').closest('button')!);
+    await user.click(screen.getByText('Vector').closest('button')!);
 
     expect(onModeChange).toHaveBeenCalledWith('svg');
   });
@@ -43,7 +43,7 @@ describe('ModeSelector', () => {
     const user = userEvent.setup();
 
     render(<ModeSelector mode="pixel" onModeChange={onModeChange} disabled />);
-    await user.click(screen.getByText('SVG').closest('button')!);
+    await user.click(screen.getByText('Vector').closest('button')!);
 
     expect(onModeChange).not.toHaveBeenCalled();
   });

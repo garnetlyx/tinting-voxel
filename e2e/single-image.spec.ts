@@ -81,7 +81,7 @@ test.describe('Single Image Processing', () => {
     await expect(page.getByRole('slider', { name: 'Max Colors' })).toBeVisible();
 
     // Switch to SVG mode
-    await page.getByRole('button', { name: /SVG/i }).first().click();
+    await page.getByRole('button', { name: /Vector/i }).first().click();
 
     // SVG-specific params should appear
     await expect(page.getByRole('slider', { name: 'Number of Colors' })).toBeVisible();

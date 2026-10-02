@@ -1,6 +1,6 @@
 import { useTranslation } from '../i18n';
 /**
- * Mode selector component for switching between Pixel and SVG processing modes
+ * Mode selector component for switching between Pixel and Vector (SVG) processing modes
  */
 import React from 'react';
 import { Grid3x3, Spline } from 'lucide-react';
@@ -20,7 +20,7 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
   const { t } = useTranslation();
   const options = [
     { value: 'pixel' as const, label: t('parameters:pixel'), description: t('parameters:bestForPixelArtFineDetails'), Icon: Grid3x3 },
-    { value: 'svg' as const, label: 'SVG', description: t('parameters:bestForLogosSimpleShapes'), Icon: Spline },
+    { value: 'svg' as const, label: t('parameters:vector'), description: t('parameters:bestForLogosSimpleShapes'), Icon: Spline },
   ];
   return (
     <div role="group" aria-label={t('parameters:processingMode')} className="grid grid-cols-2 gap-2">

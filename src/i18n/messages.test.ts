@@ -7,7 +7,7 @@ afterEach(() => setLocale('en'));
 describe('frontend message compatibility adapter', () => {
   it.each([
     ['Failed to download STL', 'STL 下载失败'],
-    ['Unsupported file type: image/avif. Please upload a PNG, JPEG, GIF, WebP, or BMP image.', '不支持此文件类型：image/avif。请上传 PNG、JPEG、GIF、WebP 或 BMP 图片。'],
+    ['Unsupported file type: image/avif. Please upload a PNG, JPEG, GIF, WebP, BMP, or SVG image.', '不支持此文件类型：image/avif。请上传 PNG、JPEG、GIF、WebP、BMP 或 SVG 图片。'],
     ['3 file(s) skipped (unsupported format)', '已跳过 3 个不支持格式的文件'],
     ['Maximum 20 images allowed. Extra files were dropped.', '最多允许 20 张图片，已忽略多余文件。'],
     ['Imported 7 preset(s) successfully', '成功导入 7 个预设'],

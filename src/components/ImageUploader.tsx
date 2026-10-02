@@ -51,7 +51,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onF
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp,image/bmp"
+        accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml,.svg"
         onChange={onImageUpload}
         className="hidden"
       />
@@ -69,7 +69,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onF
           <>
             <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="text-sm font-semibold">{label}</span>
-            <span className="ml-auto hidden font-mono text-xs text-ink-muted sm:inline">PNG, JPEG, GIF, WebP, BMP</span>
+            <span className="ml-auto hidden font-mono text-xs text-ink-muted sm:inline">PNG, JPEG, GIF, WebP, BMP, SVG</span>
           </>
         ) : (
           <>
@@ -78,7 +78,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, onF
               <Upload className={`h-4 w-4 ${isDragging ? 'animate-bounce' : ''}`} aria-hidden="true" />
               {label}
             </span>
-            <span className="font-mono text-xs text-ink-muted">PNG, JPEG, GIF, WebP, BMP</span>
+            <span className="font-mono text-xs text-ink-muted">PNG, JPEG, GIF, WebP, BMP, SVG</span>
           </>
         )}
       </button>

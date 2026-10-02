@@ -37,7 +37,7 @@
   "networkerrorWhenAttemptingToFetchResource": "NetworkError when attempting to fetch resource.",
   "loadFailed": "Load failed",
   "screenshotIsTooLarge": "Screenshot is too large",
-  "unsupportedType": "Unsupported file type: {{type}}. Please upload a PNG, JPEG, GIF, WebP, or BMP image.",
+  "unsupportedType": "Unsupported file type: {{type}}. Please upload a PNG, JPEG, GIF, WebP, BMP, or SVG image.",
   "skippedFiles": "{{count}} file(s) skipped (unsupported format)",
   "tooManyImages": "Maximum {{max}} images allowed. Extra files were dropped.",
   "imported": "Imported {{count}} preset(s) successfully",

@@ -8,7 +8,7 @@
   "progress": "进度",
   "results": "共 {{count}} 个方案，最接近的排在最前。选择预览即可应用。",
   "modePixel": "像素",
-  "modeSvg": "SVG",
+  "modeSvg": "矢量",
   "max_colors": "最多颜色数",
   "color_threshold": "合并阈值",
   "num_colors": "颜色数量",

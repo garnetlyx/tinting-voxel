@@ -1,8 +1,9 @@
 {
   "processingMode": "处理模式",
   "pixel": "像素",
+  "vector": "矢量",
   "bestForPixelArtFineDetails": "适合像素画和精细细节",
-  "bestForLogosSimpleShapes": "适合标志和简单形状",
+  "bestForLogosSimpleShapes": "平滑轮廓，适合标志和简单形状",
   "maxColors": "最多颜色数",
   "colorMergeThreshold": "颜色合并阈值",
   "numberOfColors": "颜色数量",

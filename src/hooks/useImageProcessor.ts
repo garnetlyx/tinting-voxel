@@ -36,6 +36,7 @@ import { buildPrintStack } from '../utils/printStack';
 import { modelGridSize, modelPitch } from '../utils/modelGrid';
 import { sanitizeDiagnostic } from '../utils/bugReport';
 import { track } from '../utils/telemetry';
+import { SVG_RASTER_SIDE_PX, isSvgFile, rasterizeSvg } from '../utils/rasterizeSvg';
 
 const MIN_FILAMENT_COLORS = 4;
 const MAX_FILAMENT_COLORS = 16;
@@ -477,22 +478,32 @@ export const useImageProcessor = () => {
 
   // Load a File into editing mode
   const handleFile = (file: File) => {
+    const showInEditor = (img: HTMLImageElement, type: string) => {
+      track('image_selected', {
+        type, sizeMb: Math.round(file.size / 1e5) / 10, width: img.naturalWidth, height: img.naturalHeight,
+      });
+      setRawImage(img);
+      setIsEditing(true);
+    };
+
+    if (isSvgFile(file)) {
+      const longestSide = Math.min(SVG_RASTER_SIDE_PX, filamentCatalog?.defaults.max_model_side_px ?? SVG_RASTER_SIDE_PX);
+      rasterizeSvg(file, longestSide)
+        .then(img => showInEditor(img, 'image/svg+xml'))
+        .catch(() => setError('Failed to load image. The file may be corrupted or not a valid image.'));
+      return;
+    }
+
     const validTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp'];
     if (!validTypes.includes(file.type)) {
-      setError(`Unsupported file type: ${file.type}. Please upload a PNG, JPEG, GIF, WebP, or BMP image.`);
+      setError(`Unsupported file type: ${file.type}. Please upload a PNG, JPEG, GIF, WebP, BMP, or SVG image.`);
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
-      img.onload = () => {
-        track('image_selected', {
-          type: file.type, sizeMb: Math.round(file.size / 1e5) / 10, width: img.naturalWidth, height: img.naturalHeight,
-        });
-        setRawImage(img);
-        setIsEditing(true);
-      };
+      img.onload = () => showInEditor(img, file.type);
       img.onerror = () => {
         setError('Failed to load image. The file may be corrupted or not a valid image.');
       };

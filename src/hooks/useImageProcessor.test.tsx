@@ -570,6 +570,63 @@ describe('useImageProcessor', () => {
     expect(result.current.maxDimension).toBeCloseTo(200);
   });
 
+  it('rasterizes an uploaded SVG at full size and opens it in the editor', async () => {
+    const drawImage = vi.fn();
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      configurable: true,
+      value: vi.fn(() => ({ drawImage })),
+    });
+    Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
+      configurable: true,
+      value: () => 'data:image/png;base64,raster',
+    });
+    const { result } = await renderProcessor();
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M0 0h64v64z"/></svg>';
+
+    act(() => {
+      result.current.handleFile(new File([svg], 'logo.svg', { type: 'image/svg+xml' }));
+    });
+
+    await waitFor(() => expect(createdImages).toHaveLength(1));
+    expect(createdImages[0].src).toMatch(/^data:image\/svg\+xml/);
+    expect(decodeURIComponent(createdImages[0].src)).toContain('width="2048"');
+    act(() => createdImages[0].triggerLoad());
+
+    await waitFor(() => expect(createdImages).toHaveLength(2));
+    expect(drawImage).toHaveBeenCalledWith(createdImages[0], 0, 0, 2048, 2048);
+    expect(createdImages[1].src).toBe('data:image/png;base64,raster');
+    act(() => createdImages[1].triggerLoad());
+
+    await waitFor(() => expect(result.current.isEditing).toBe(true));
+    expect(result.current.rawImage).toBe(createdImages[1]);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('reports an unreadable SVG instead of opening the editor', async () => {
+    const { result } = await renderProcessor();
+
+    act(() => {
+      result.current.handleFile(new File(['<svg'], 'broken.svg', { type: 'image/svg+xml' }));
+    });
+
+    await waitFor(() => expect(result.current.error).toBe(
+      'Failed to load image. The file may be corrupted or not a valid image.',
+    ));
+    expect(result.current.isEditing).toBe(false);
+  });
+
+  it('still rejects file types it cannot read', async () => {
+    const { result } = await renderProcessor();
+
+    act(() => {
+      result.current.handleFile(new File([''], 'photo.avif', { type: 'image/avif' }));
+    });
+
+    expect(result.current.error).toBe(
+      'Unsupported file type: image/avif. Please upload a PNG, JPEG, GIF, WebP, BMP, or SVG image.',
+    );
+  });
+
   it('resamples a large photo to the model grid instead of rejecting it', async () => {
     const { result } = await renderProcessor();
     const img = new globalThis.Image() as unknown as HTMLImageElement;

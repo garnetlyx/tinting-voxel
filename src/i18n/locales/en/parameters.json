@@ -1,8 +1,9 @@
 {
   "processingMode": "Processing Mode",
   "pixel": "Pixel",
+  "vector": "Vector",
   "bestForPixelArtFineDetails": "Best for pixel art, fine details",
-  "bestForLogosSimpleShapes": "Best for logos, simple shapes",
+  "bestForLogosSimpleShapes": "Smooth outlines for logos, simple shapes",
   "maxColors": "Max Colors",
   "colorMergeThreshold": "Color Merge Threshold",
   "numberOfColors": "Number of Colors",

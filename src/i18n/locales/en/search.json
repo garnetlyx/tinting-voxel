@@ -8,7 +8,7 @@
   "progress": "Progress",
   "results": "{{count}} previews, closest match first. Select one to apply its settings.",
   "modePixel": "Pixel",
-  "modeSvg": "SVG",
+  "modeSvg": "Vector",
   "max_colors": "Max colors",
   "color_threshold": "Merge threshold",
   "num_colors": "Color count",

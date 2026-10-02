@@ -55,7 +55,7 @@ test.describe('Download Flows - SVG Mode', () => {
     await expect(page.getByRole('button', { name: /Download 3MF/ })).toBeVisible();
 
     // Switch to SVG mode
-    await page.getByRole('button', { name: /SVG/i }).first().click();
+    await page.getByRole('button', { name: /Vector/i }).first().click();
 
     // Click Reprocess to process in SVG mode
     await page.getByRole('button', { name: 'Reprocess' }).click();
