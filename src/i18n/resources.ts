@@ -20,8 +20,10 @@ import searchEn from './locales/en/search.json';
 import searchZh from './locales/zh-CN/search.json';
 import errorsEn from './locales/en/errors.json';
 import errorsZh from './locales/zh-CN/errors.json';
+import jobsEn from './locales/en/jobs.json';
+import jobsZh from './locales/zh-CN/jobs.json';
 
-export const english = { batch: batchEn, common: commonEn, feedback: feedbackEn, preview: previewEn, converter: converterEn, filaments: filamentsEn, editor: editorEn, parameters: parametersEn, palettes: palettesEn, search: searchEn, errors: errorsEn };
+export const english = { batch: batchEn, common: commonEn, feedback: feedbackEn, preview: previewEn, converter: converterEn, filaments: filamentsEn, editor: editorEn, parameters: parametersEn, palettes: palettesEn, search: searchEn, errors: errorsEn, jobs: jobsEn };
 type TranslationResources = { [N in keyof typeof english]: Record<keyof typeof english[N], string> };
-export const chinese = { batch: batchZh, common: commonZh, feedback: feedbackZh, preview: previewZh, converter: converterZh, filaments: filamentsZh, editor: editorZh, parameters: parametersZh, palettes: palettesZh, search: searchZh, errors: errorsZh } satisfies TranslationResources;
+export const chinese = { batch: batchZh, common: commonZh, feedback: feedbackZh, preview: previewZh, converter: converterZh, filaments: filamentsZh, editor: editorZh, parameters: parametersZh, palettes: palettesZh, search: searchZh, errors: errorsZh, jobs: jobsZh } satisfies TranslationResources;
 export const resources = { en: english, 'zh-CN': chinese };

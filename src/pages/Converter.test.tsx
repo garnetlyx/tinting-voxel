@@ -36,9 +36,9 @@ describe('converter backing configuration', () => {
     const file = new File(['image'], 'sample.png', { type: 'image/png' });
     fireEvent.change(picker, { target: { files: [file] } });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Download All STLs' })));
-    expect(batchDownloadSTL).toHaveBeenLastCalledWith([file], expect.objectContaining({ backingFilament: 'K', whiteBackingLayers: 3 }), expect.any(AbortSignal));
+    expect(batchDownloadSTL).toHaveBeenLastCalledWith([file], expect.objectContaining({ backingFilament: 'K', whiteBackingLayers: 3 }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     fireEvent.click(within(screen.getByRole('group', { name: 'Backing filament' })).getByRole('button', { name: 'White' }));
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Download All STLs' })));
-    expect(batchDownloadSTL).toHaveBeenLastCalledWith([file], expect.objectContaining({ backingFilament: 'W', whiteBackingLayers: 3 }), expect.any(AbortSignal));
+    expect(batchDownloadSTL).toHaveBeenLastCalledWith([file], expect.objectContaining({ backingFilament: 'W', whiteBackingLayers: 3 }), expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 });

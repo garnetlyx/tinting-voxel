@@ -153,7 +153,7 @@ describe('processImage', () => {
 
     const controller = new AbortController();
     const file = new File(['test'], 'test.png', { type: 'image/png' });
-    await processImage(file, { mode: 'pixel', pixelSize: 0.08 }, controller.signal);
+    await processImage(file, { mode: 'pixel', pixelSize: 0.08 }, { signal: controller.signal });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       '/api/process-image',

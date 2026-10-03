@@ -31,6 +31,7 @@ import {
   downloadPrintSettings,
   getFilamentSet,
 } from '../api/client';
+import { oversizeAsk } from '../components/OversizeDialog';
 import { useFilamentStorage } from './useFilamentStorage';
 import { buildPrintStack } from '../utils/printStack';
 import { modelGridSize, modelPitch } from '../utils/modelGrid';
@@ -389,11 +390,30 @@ export const useImageProcessor = () => {
 
       setProcessingStage('processing');
 
-      const result = await processImage(file, requestParams, controller.signal);
+      let appliedLayerCount: number | null = null;
+      const result = await processImage(file, requestParams, {
+        signal: controller.signal,
+        labelKey: 'jobs:labelProcess',
+        onOversize: oversizeAsk.ask,
+        // Keep state AND the request key in step with a chosen downscale, so
+        // the retry converges instead of the auto-reprocess effect submitting
+        // the over-budget original again (review F6).
+        onSuggestionApplied: suggestion => {
+          if (suggestion.layerCount !== undefined) {
+            appliedLayerCount = Math.max(MIN_COLOR_LAYERS, suggestion.layerCount);
+            setLayerCount(appliedLayerCount);
+            requestedRenderKeyRef.current = printableRenderKey({
+              ...requestParams, layerCount: appliedLayerCount,
+            });
+          }
+        },
+      });
 
       // Only update state if this request wasn't aborted
       if (controller.signal.aborted) return;
-      completedRenderKeyRef.current = requestKey;
+      // The retried request carried the suggested layers; the completed key
+      // must describe exactly what ran (requestKey was captured pre-suggestion).
+      completedRenderKeyRef.current = requestedRenderKeyRef.current;
       // Upload, compute and download together, as the user waits for them.
       track('processing_completed', {
         mode: processingMode, ms: Math.round(performance.now() - startedAt), width: grid.width, height: grid.height,
@@ -613,10 +633,17 @@ export const useImageProcessor = () => {
         ...filamentRequestPayload,
       };
 
+      const exportOpts = {
+        labelKey: 'jobs:labelExport',
+        onOversize: oversizeAsk.ask,
+        onSuggestionApplied: (suggestion: { layerCount?: number }) => {
+          if (suggestion.layerCount !== undefined) setLayerCount(suggestion.layerCount);
+        },
+      };
       if (mode === 'pixel') {
-        await downloadSTLV2({ colorBlocks, ...commonParams });
+        await downloadSTLV2({ colorBlocks, ...commonParams }, exportOpts);
       } else {
-        await downloadSVGSTLV2({ vectorResults, ...commonParams });
+        await downloadSVGSTLV2({ vectorResults, ...commonParams }, exportOpts);
       }
     } catch (err) {
       console.error('Error downloading STL:', err);
@@ -651,10 +678,17 @@ export const useImageProcessor = () => {
         ...filamentRequestPayload,
       };
 
+      const exportOpts = {
+        labelKey: 'jobs:labelExport',
+        onOversize: oversizeAsk.ask,
+        onSuggestionApplied: (suggestion: { layerCount?: number }) => {
+          if (suggestion.layerCount !== undefined) setLayerCount(suggestion.layerCount);
+        },
+      };
       if (mode === 'pixel') {
-        await download3MFV2({ colorBlocks, ...commonParams });
+        await download3MFV2({ colorBlocks, ...commonParams }, exportOpts);
       } else {
-        await downloadSVG3MFV2({ vectorResults, ...commonParams });
+        await downloadSVG3MFV2({ vectorResults, ...commonParams }, exportOpts);
       }
     } catch (err) {
       console.error('Error downloading 3MF:', err);
@@ -717,7 +751,11 @@ export const useImageProcessor = () => {
         backingFilament,
         whitePoint,
         ...filamentRequestPayload,
-      }, controller.signal);
+      }, {
+        signal: controller.signal,
+        labelKey: 'jobs:labelSimulate',
+        onOversize: oversizeAsk.ask,
+      });
       if (controller.signal.aborted) return;
       setProcessedImageUrl(result.processedImage);
       setMappedBlockColors(result.mappedBlockColors);

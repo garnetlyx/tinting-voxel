@@ -11,7 +11,7 @@ from services.analytics import AnalyticsCollector
 
 
 # -- QA-149: getErrorDetail returns array for FastAPI validation errors --------
-# File: src/api/client.ts:26-33
+# File: src/api/errors.ts (moved from client.ts)
 # getErrorDetail does `body.detail || fallback`. FastAPI validation errors return
 # detail as an ARRAY of objects [{type, loc, msg, ...}], not a string.
 # `new Error(array)` produces message "[object Object]" displayed in the UI.
@@ -23,7 +23,7 @@ class TestQA149GetErrorDetailArrayHandling:
     def test_get_error_detail_handles_array_detail(self):
         """getErrorDetail should extract message from array detail, not return raw array."""
         src_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "..", "src", "api", "client.ts"
+            os.path.dirname(__file__), "..", "..", "..", "src", "api", "errors.ts"
         )
         with open(src_path) as f:
             source = f.read()
@@ -43,7 +43,7 @@ class TestQA149GetErrorDetailArrayHandling:
         )
 
         assert has_array_handling, (
-            "BUG QA-149: getErrorDetail in client.ts does `body.detail || fallback` "
+            "BUG QA-149: getErrorDetail in errors.ts does `body.detail || fallback` "
             "but FastAPI validation errors return detail as an ARRAY of objects, not "
             "a string. `new Error(array)` produces message '[object Object]'. "
             "Fix: check if detail is an array and extract the message(s)."

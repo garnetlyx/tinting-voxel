@@ -148,8 +148,16 @@ docker compose up --build  # Build and run
 | POST | `/api/v2/download-3mf` | 3MF: one object with a named, colored part per filament |
 | POST | `/api/v2/download-svg-3mf` | SVG-mode 3MF with configurable colors |
 | POST | `/api/v2/print-settings` | JSON print settings for slicers |
+| POST | `/api/v2/estimate-job` | Pre-flight peak-memory estimate + scale-down suggestion |
 | GET | `/api/v2/filament-presets` | List available filament presets |
 | POST | `/api/v2/filament-set` | A filament set's color-layer maximum and default backing filament |
+
+### Heavy Jobs
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/jobs/{job_id}` | Poll an admitted heavy job (position, running, outcome) |
+| GET | `/api/jobs/{job_id}/result` | Fetch a finished job's response (JSON or file) |
+| DELETE | `/api/jobs/{job_id}` | Cancel a queued job (409 once running: threads run to completion) |
 
 ### Other
 | Method | Endpoint | Description |
@@ -282,10 +290,15 @@ Production writes one JSON object per log line (`LOG_FORMAT=json`,
 `services/telemetry.emit` records named events: `api_request` (route template,
 status, duration) for every API call, `api_error`, `image_processed`,
 `model_exported`, `param_search_started`/`param_search_finished`,
-`batch_processed`, and `bug_report_submitted`; counts since startup appear in
+`batch_processed`, `bug_report_submitted`,
+`heavy_job_queued`/`heavy_job_started`/`heavy_job_finished`/`heavy_job_cancelled`/`heavy_job_rejected`,
+and `memory_estimate` (kind, estimated/budget MB, verdict ok/oversize/forced);
+counts since startup appear in
 `/api/analytics`. The browser (`src/utils/telemetry.ts`) batches page views,
 client errors, failed API responses (including edge failures the origin never
-sees), user-visible errors, and funnel steps to `/api/events`, logged as
+sees), user-visible errors, funnel steps, queue events (`job_queued`,
+`job_cancelled`), and oversize choices (`oversize_prompt`, `oversize_choice`)
+to `/api/events`, logged as
 `client.<name>`. There are no cookies or stored IDs: a random ID groups one page
 load, visitors are counted with a salted hash that rotates daily, and browsers
 sending Global Privacy Control or Do Not Track send nothing. Event property
@@ -297,9 +310,25 @@ whole batch. Railway log filters, for example:
 ### Key Patterns
 - `FilamentConfigMixin` in `models.py` provides shared filament validation
 - `@handle_api_errors` decorator in `error_handlers.py` standardizes error handling
-- Handlers are `async`; CPU-heavy work (processing, previews, exports, batch)
-  runs through `run_in_threadpool`, and large JSON responses are serialized in
-  that thread with `api/responses.py`, so the single worker keeps serving
+- **Heavy-job gate** (`api/concurrency.py`): every memory-heavy endpoint
+  (process-image, simulate-preview, filament-preview, the v2 downloads,
+  batch) runs through `run_heavy`, which keeps at most
+  `heavy_job_concurrency` jobs running (default 1). A request arriving while
+  all slots are busy is answered with 202 `{jobId, position}` and its client
+  polls `/api/jobs/{id}` (`src/api/heavyJob.ts`); the browser shows a queue
+  banner with a cancel button (`HeavyJobBanner`). Slots outlive request
+  cancellation (`run_in_threadpool` waits for the thread), so two heavy jobs
+  never overlap - the single-slot peak is what `heavy_memory_budget_mb` sizes.
+- **Memory budget** (`services/memory_estimate.py` + `api/budget_guard.py`):
+  before a job is admitted its estimated peak allocation is checked against
+  `heavy_memory_budget_mb`; over-budget jobs are refused with a structured
+  422 `job_too_large` carrying a scale-down suggestion, which the browser
+  turns into a confirmation dialog (`OversizeDialog`: apply suggestion / run
+  anyway via `forceOversize` / cancel). Constants are calibrated by
+  `backend/tests/performance/calibrate_memory_estimate.py`.
+- Handlers are `async`; CPU-heavy work runs through the heavy gate into
+  `run_in_threadpool`, and large JSON responses are serialized in that thread
+  with `api/responses.py`, so the single worker keeps serving
 - Rate limiting via `slowapi` on all endpoints, keyed on the visitor address from
   `api/client_ip.py` (Railway's `X-Real-IP`; `CF-Connecting-IP` only from
   Cloudflare's published ranges)

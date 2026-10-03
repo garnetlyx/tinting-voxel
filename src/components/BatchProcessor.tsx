@@ -11,6 +11,7 @@ import type {
   FilamentPreset,
 } from '../api/types';
 import { batchProcessImages, batchDownloadSTL } from '../api/client';
+import { oversizeAsk } from './OversizeDialog';
 
 const MAX_FILES = 20;
 const VALID_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp'];
@@ -104,7 +105,11 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
       const result = await batchProcessImages(
         files,
         { maxColors, colorThreshold, pixelSize, detailSize },
-        controller.signal,
+        {
+          signal: controller.signal,
+          labelKey: 'jobs:labelBatch',
+          onOversize: oversizeAsk.ask,
+        },
       );
       if (!controller.signal.aborted) {
         setResults(result);
@@ -146,7 +151,11 @@ export const BatchProcessor: React.FC<BatchProcessorProps> = ({
         filamentPreset: filamentPreset,
         filamentColors,
         detailSize,
-      }, controller.signal);
+      }, {
+        signal: controller.signal,
+        labelKey: 'jobs:labelBatch',
+        onOversize: oversizeAsk.ask,
+      });
     } catch (err) {
       // Don't show error if aborted
       if (controller.signal.aborted) return;

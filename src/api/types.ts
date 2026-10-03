@@ -344,3 +344,43 @@ export interface BugReportResponse {
   reportId: string;
   delivery: 'email' | 'stored';
 }
+
+/** Server-suggested parameter reductions that fit a job in the memory budget. */
+export interface OversizeSuggestion {
+  layerCount?: number;
+  pageSize?: number;
+  pixelSize?: number;
+}
+
+/** The over-budget refusal the browser turns into a confirmation dialog. */
+export interface OversizeInfo {
+  estimatedMb: number;
+  budgetMb: number;
+  suggestion?: OversizeSuggestion;
+}
+
+export type OversizeChoice = 'downscale' | 'force' | 'cancel';
+
+/** Options shared by every queue-aware heavy endpoint call. */
+export interface HeavyCallOptions {
+  signal?: AbortSignal;
+  /** i18n key naming this job in the queue banner. */
+  labelKey?: string;
+  /** Resolve the user's answer to an over-budget refusal. */
+  onOversize?: (info: OversizeInfo) => Promise<OversizeChoice>;
+  /** State-side application of a chosen suggestion (before the retry lands). */
+  onSuggestionApplied?: (suggestion: OversizeSuggestion) => void;
+}
+
+/** Server snapshot of one admitted heavy job. */
+export interface HeavyJobStatus {
+  jobId: string;
+  kind: string;
+  status: 'queued' | 'running' | 'done' | 'error' | 'cancelled';
+  position?: number;
+  queueDepth?: number;
+  runningMs?: number;
+  resultKind?: 'json' | 'file';
+  error?: string;
+  errorStatus?: number;
+}

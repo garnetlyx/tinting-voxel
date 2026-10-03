@@ -2,6 +2,8 @@
  * Component exports
  */
 export { ErrorMessage } from './ErrorMessage';
+export { HeavyJobBanner } from './HeavyJobBanner';
+export { OversizeDialog, oversizeAsk } from './OversizeDialog';
 export { LoadingSpinner } from './LoadingSpinner';
 export { ImageUploader } from './ImageUploader';
 export { ModeSelector } from './ModeSelector';

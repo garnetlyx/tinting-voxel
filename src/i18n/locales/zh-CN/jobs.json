@@ -1,0 +1,20 @@
+{
+  "labelJob": "任务",
+  "labelProcess": "处理图片",
+  "labelPreview": "生成配色预览",
+  "labelExport": "导出模型",
+  "labelSimulate": "刷新打印预览",
+  "labelBatch": "批量处理",
+  "queued": "排队中(第 {{position}} 位)",
+  "running": "服务器处理中…",
+  "cancelQueued": "取消此排队任务",
+  "oversizeTitle": "此任务可能超出服务器承载",
+  "oversizeBody": "预计需要 {{estimated}} GB 内存,超过服务器 {{budget}} GB 上限,可能让服务崩溃影响所有人。",
+  "oversizeSuggestionLabel": "建议:",
+  "suggestPage": "仅显示前 {{count, number}} 个颜色组合",
+  "suggestLayers": "颜色层数减少到 {{count}}",
+  "suggestPitch": "模型网格加粗到 {{size}} mm",
+  "suggestJoin": ";",
+  "downscale": "按建议缩小",
+  "force": "仍然尝试"
+}

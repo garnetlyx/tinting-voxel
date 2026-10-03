@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import type { FilamentColorConfig, FilamentPreset } from '../api/types';
 import { getFilamentPreview } from '../api/client';
+import { oversizeAsk } from './OversizeDialog';
 
 interface ColorMatrixEntry {
   code: string;
@@ -68,7 +69,11 @@ export const FilamentPreview: React.FC<FilamentPreviewProps> = ({
       const requestBody = filamentPreset
         ? { filamentPreset, layerCount, layerHeight, whiteBackingLayers, backingFilament }
         : { filamentColors, layerCount, layerHeight, whiteBackingLayers, backingFilament };
-      const result = await getFilamentPreview(requestBody, controller.signal);
+      const result = await getFilamentPreview(requestBody, {
+        signal: controller.signal,
+        labelKey: 'jobs:labelPreview',
+        onOversize: oversizeAsk.ask,
+      });
       if (!controller.signal.aborted) {
         setPreview(result);
       }

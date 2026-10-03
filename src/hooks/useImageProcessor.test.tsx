@@ -285,17 +285,17 @@ describe('useImageProcessor', () => {
     mockedSimulatePrintPreview.mockClear();
     act(() => result.current.setBackingFilament('K'));
     await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
-      expect.objectContaining({ backingFilament: 'K', whiteBackingLayers: 3 }), expect.any(AbortSignal),
+      expect.objectContaining({ backingFilament: 'K', whiteBackingLayers: 3 }), expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ));
     act(() => result.current.updateFilamentColor(0, { ...result.current.filamentColors[0], transmission_distance: 3.25 }));
     await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
-      expect.objectContaining({ backingFilament: 'K', filamentColors: expect.arrayContaining([expect.objectContaining({ transmission_distance: 3.25 })]) }), expect.any(AbortSignal),
+      expect.objectContaining({ backingFilament: 'K', filamentColors: expect.arrayContaining([expect.objectContaining({ transmission_distance: 3.25 })]) }), expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ));
     await act(async () => result.current.handleDownloadPrintSettings());
     expect(mockedDownloadPrintSettings).toHaveBeenLastCalledWith(expect.objectContaining({ backingFilament: 'K', whiteBackingLayers: 3 }));
     act(() => result.current.setBackingFilament('W'));
     await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
-      expect.objectContaining({ backingFilament: 'W', whiteBackingLayers: 3 }), expect.any(AbortSignal),
+      expect.objectContaining({ backingFilament: 'W', whiteBackingLayers: 3 }), expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ));
   });
 
@@ -314,12 +314,16 @@ describe('useImageProcessor', () => {
     mockedSimulatePrintPreview.mockClear();
     act(() => result.current.setBackingFilament('K'));
     await waitFor(() => expect(mockedSimulatePrintPreview).toHaveBeenLastCalledWith(
-      expect.objectContaining({ whitePoint }), expect.any(AbortSignal),
+      expect.objectContaining({ whitePoint }), expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ));
     await act(async () => result.current.handleDownloadSTL());
-    expect(mockedDownloadSTLV2).toHaveBeenLastCalledWith(expect.objectContaining({ whitePoint }));
+    expect(mockedDownloadSTLV2).toHaveBeenLastCalledWith(
+      expect.objectContaining({ whitePoint }), expect.anything(),
+    );
     await act(async () => result.current.handleDownload3MF());
-    expect(mockedDownload3MFV2).toHaveBeenLastCalledWith(expect.objectContaining({ whitePoint }));
+    expect(mockedDownload3MFV2).toHaveBeenLastCalledWith(
+      expect.objectContaining({ whitePoint }), expect.anything(),
+    );
   });
 
   it('classifies from API material measurements and threshold', async () => {
@@ -350,7 +354,7 @@ describe('useImageProcessor', () => {
         whiteBackingLayers: 3,
         filamentPreset: 'bambu_cmywk',
       }),
-      expect.any(AbortSignal)
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -437,7 +441,7 @@ describe('useImageProcessor', () => {
     act(() => result.current.setDetailSize(0.62));
     expect(result.current.renderReady).toBe(false);
     await waitFor(() => expect(mockedProcessImage).toHaveBeenCalledWith(
-      expect.any(File), expect.objectContaining({ mode: 'pixel', detailSize: 0.62 }), expect.any(AbortSignal),
+      expect.any(File), expect.objectContaining({ mode: 'pixel', detailSize: 0.62 }), expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ));
     await waitFor(() => expect(result.current.renderReady).toBe(true));
   });
@@ -461,7 +465,7 @@ describe('useImageProcessor', () => {
     act(() => result.current.setBackingFilament('K'));
     expect(result.current.renderReady).toBe(false);
     await waitFor(() => expect(mockedProcessImage).toHaveBeenCalledWith(
-      expect.any(File), expect.objectContaining({ mode: 'svg', backingFilament: 'K' }), expect.any(AbortSignal),
+      expect.any(File), expect.objectContaining({ mode: 'svg', backingFilament: 'K' }), expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ));
     await waitFor(() => expect(result.current.renderReady).toBe(true));
   });
@@ -476,12 +480,14 @@ describe('useImageProcessor', () => {
     expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
       expect.objectContaining({
         filamentPreset: 'bambu_cmywk',
-      })
+      }),
+    expect.anything(),
     );
     expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
       expect.not.objectContaining({
         filamentColors: expect.anything(),
-      })
+      }),
+      expect.anything(),
     );
   });
 
@@ -496,7 +502,8 @@ describe('useImageProcessor', () => {
     expect(mockedDownload3MFV2).toHaveBeenCalledWith(
       expect.objectContaining({
         filamentPreset: 'bambu_cmywk',
-      })
+      }),
+    expect.anything(),
     );
     expect(mockedDownloadPrintSettings).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -666,12 +673,15 @@ describe('useImageProcessor', () => {
             transmission_distance: 3.25,
           }),
         ]),
-      })
+      }),
+      expect.anything(),
     );
+    expect.anything(),
     expect(mockedDownloadSTLV2).toHaveBeenCalledWith(
       expect.not.objectContaining({
         filamentPreset: expect.anything(),
-      })
+      }),
+      expect.anything(),
     );
   });
 
@@ -714,7 +724,8 @@ describe('useImageProcessor', () => {
             transmission_distance: 2.1,
           }),
         ]),
-      })
+      }),
+      expect.anything(),
     );
   });
 });

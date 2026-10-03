@@ -1,0 +1,20 @@
+{
+  "labelJob": "Task",
+  "labelProcess": "Processing image",
+  "labelPreview": "Generating filament preview",
+  "labelExport": "Exporting model",
+  "labelSimulate": "Refreshing print preview",
+  "labelBatch": "Batch processing",
+  "queued": "queued (position {{position}})",
+  "running": "running on the server…",
+  "cancelQueued": "Cancel this queued task",
+  "oversizeTitle": "This task may be too large for the server",
+  "oversizeBody": "It is estimated to need {{estimated}} GB of memory, over the server's {{budget}} GB budget, and could crash it for everyone.",
+  "oversizeSuggestionLabel": "Suggestion:",
+  "suggestPage": "show the first {{count, number}} combinations",
+  "suggestLayers": "reduce color layers to {{count}}",
+  "suggestPitch": "coarsen the model grid to {{size}} mm",
+  "suggestJoin": "; ",
+  "downscale": "Apply suggestion",
+  "force": "Run anyway"
+}

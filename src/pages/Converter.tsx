@@ -13,6 +13,8 @@ import {
   InkStrip,
   RailSection,
   ErrorMessage,
+  HeavyJobBanner,
+  OversizeDialog,
   LoadingSpinner,
   ImageUploader,
   ImageEditor,
@@ -205,6 +207,10 @@ const Converter: React.FC = () => {
               >
                 <Layers className="h-4 w-4" aria-hidden="true" />{t('converter:batchProcessing')}</button>
             </div>
+
+            {/* Heavy-job queue and oversize confirmations: shared by both modes */}
+            <HeavyJobBanner />
+            <OversizeDialog />
 
             {/* Single Image Mode */}
             {appMode === 'single' && (

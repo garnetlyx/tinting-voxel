@@ -1,8 +1,8 @@
 /**
  * API client for backend communication
  */
-import { recordBugReportLog } from '../utils/bugReport';
-import { track } from '../utils/telemetry';
+import { runHeavy } from './heavyJob';
+import { getErrorDetail } from './errors';
 import { withLabelMap } from '../utils/labelMap';
 import type {
   BugReportRequest,
@@ -24,65 +24,11 @@ import type {
   BatchProcessParams,
   BatchDownloadSTLParams,
   PaletteLibraryResponse,
+  HeavyCallOptions,
 } from './types';
 
 const API_BASE_URL = '/api';
 
-/** Milliseconds to wait from a Retry-After header (seconds or HTTP date). */
-export function retryAfterMs(value: string | null): number | undefined {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
-  return Number.isFinite(delay) && delay > 0 ? delay : undefined;
-}
-
-/** Canonical rate-limit message; the i18n adapter localizes it. */
-function rateLimitMessage(retryAfter: string | null): string {
-  const delay = retryAfterMs(retryAfter);
-  return delay === undefined
-    ? 'Too many requests. Please try again shortly.'
-    : `Too many requests. Please try again in ${Math.ceil(delay / 1000)} seconds.`;
-}
-
-/** Request path with generated IDs masked, so failures group by endpoint. */
-function apiPath(url: string): string {
-  try {
-    return new URL(url).pathname.replace(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi, '{id}');
-  } catch {
-    return '';
-  }
-}
-
-/**
- * Safely extract error detail from a response that may not be JSON
- * FastAPI validation errors return detail as an array of objects
- */
-async function getErrorDetail(response: Response, fallback: string): Promise<string> {
-  recordBugReportLog('error', `API request failed (${response.status}): ${response.url || fallback}`);
-  // Edge failures (for example a proxy timeout) never reach the backend's logs.
-  track('api_failed', { status: response.status, path: apiPath(response.url) });
-  if (response.status === 429) return rateLimitMessage(response.headers?.get('Retry-After') ?? null);
-  try {
-    const body = await response.json();
-    const detail = body.detail;
-
-    // FastAPI validation errors return detail as an array: [{type, loc, msg, ...}]
-    if (Array.isArray(detail)) {
-      // Extract the first error message, or join all messages
-      const messages = detail.map((d: { msg?: string }) => d.msg || JSON.stringify(d)).filter(Boolean);
-      return messages.length > 0 ? messages.join('; ') : fallback;
-    }
-
-    // String detail
-    if (typeof detail === 'string') {
-      return detail;
-    }
-
-    return fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 /**
  * Process uploaded image to extract color blocks (pixel mode) or vector contours (SVG mode)
@@ -90,47 +36,59 @@ async function getErrorDetail(response: Response, fallback: string): Promise<str
 export async function processImage(
   file: File,
   params: ProcessImageParams,
-  signal?: AbortSignal
+  opts: HeavyCallOptions = {},
 ): Promise<ProcessImageResponse | SVGProcessImageResponse> {
-  const formData = new FormData();
-  formData.append('image', file);
-  formData.append('mode', params.mode);
-  formData.append('pixelSize', params.pixelSize.toString());
-  if (params.layerHeight !== undefined) formData.append('layerHeight', params.layerHeight.toString());
-  if (params.layerCount !== undefined) formData.append('layerCount', params.layerCount.toString());
-  if (params.whiteBackingLayers !== undefined) formData.append('whiteBackingLayers', params.whiteBackingLayers.toString());
-  if (params.backingFilament !== undefined) formData.append('backingFilament', params.backingFilament);
+  let effective = params;
+  const submit = (forced: boolean): Promise<Response> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('mode', effective.mode);
+    formData.append('pixelSize', effective.pixelSize.toString());
+    if (effective.layerHeight !== undefined) formData.append('layerHeight', effective.layerHeight.toString());
+    if (effective.layerCount !== undefined) formData.append('layerCount', effective.layerCount.toString());
+    if (effective.whiteBackingLayers !== undefined) formData.append('whiteBackingLayers', effective.whiteBackingLayers.toString());
+    if (effective.backingFilament !== undefined) formData.append('backingFilament', effective.backingFilament);
+    if (forced) formData.append('forceOversize', 'true');
 
-  if (params.filamentPreset) {
-    formData.append('filamentPreset', params.filamentPreset);
-  } else if (params.filamentColors) {
-    formData.append('filamentColors', JSON.stringify(params.filamentColors));
-  }
+    if (effective.filamentPreset) {
+      formData.append('filamentPreset', effective.filamentPreset);
+    } else if (effective.filamentColors) {
+      formData.append('filamentColors', JSON.stringify(effective.filamentColors));
+    }
 
-  if (params.detailSize !== undefined) {
-    formData.append('detailSize', params.detailSize.toString());
-  }
+    if (effective.detailSize !== undefined) {
+      formData.append('detailSize', effective.detailSize.toString());
+    }
 
-  if (params.mode === 'pixel' && params.pixelParams) {
-    formData.append('maxColors', params.pixelParams.maxColors.toString());
-    formData.append('colorThreshold', params.pixelParams.colorThreshold.toString());
-  } else if (params.mode === 'svg' && params.svgParams) {
-    formData.append('epsilon', params.svgParams.epsilon.toString());
-    formData.append('minArea', params.svgParams.minArea.toString());
-    formData.append('numColors', params.svgParams.numColors.toString());
-  }
+    if (effective.mode === 'pixel' && effective.pixelParams) {
+      formData.append('maxColors', effective.pixelParams.maxColors.toString());
+      formData.append('colorThreshold', effective.pixelParams.colorThreshold.toString());
+    } else if (effective.mode === 'svg' && effective.svgParams) {
+      formData.append('epsilon', effective.svgParams.epsilon.toString());
+      formData.append('minArea', effective.svgParams.minArea.toString());
+      formData.append('numColors', effective.svgParams.numColors.toString());
+    }
 
-  const response = await fetch(`${API_BASE_URL}/process-image`, {
-    method: 'POST',
-    body: formData,
-    signal,
-  });
+    return fetch(`${API_BASE_URL}/process-image`, {
+      method: 'POST',
+      body: formData,
+      signal: opts.signal,
+    });
+  };
 
-  if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to process image'));
-  }
-
-  return response.json();
+  return runHeavy(
+    submit,
+    response => response.json(),
+    opts,
+    suggestion => {
+      effective = {
+        ...effective,
+        pixelSize: suggestion.pixelSize ?? effective.pixelSize,
+        layerCount: suggestion.layerCount ?? effective.layerCount,
+      };
+    },
+    'Failed to process image',
+  );
 }
 
 /**
@@ -138,22 +96,24 @@ export async function processImage(
  */
 export async function simulatePrintPreview(
   params: SimulatedPrintPreviewParams,
-  signal?: AbortSignal
+  opts: HeavyCallOptions = {},
 ): Promise<SimulatedPrintPreviewResponse> {
-  const response = await fetch(`${API_BASE_URL}/simulate-preview`, {
+  let effective = params;
+  const submit = (forced: boolean): Promise<Response> => fetch(`${API_BASE_URL}/simulate-preview`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(withLabelMap(params)),
-    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(withLabelMap({ ...effective, forceOversize: forced })),
+    signal: opts.signal,
   });
-
-  if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to simulate print preview'));
-  }
-
-  return response.json();
+  return runHeavy(
+    submit,
+    response => response.json(),
+    opts,
+    suggestion => {
+      effective = { ...effective, layerCount: suggestion.layerCount ?? effective.layerCount };
+    },
+    'Failed to simulate print preview',
+  );
 }
 
 /**
@@ -213,21 +173,23 @@ export async function getFilamentPresets(signal?: AbortSignal): Promise<Filament
 /**
  * Download STL ZIP file with configurable colors (V2 API)
  */
-export async function downloadSTLV2(params: DownloadSTLParamsV2, signal?: AbortSignal): Promise<void> {
-  const response = await fetch(`${API_V2_BASE_URL}/download-stl`, {
+export async function downloadSTLV2(params: DownloadSTLParamsV2, opts: HeavyCallOptions = {}): Promise<void> {
+  let effective = params;
+  const submit = (forced: boolean): Promise<Response> => fetch(`${API_V2_BASE_URL}/download-stl`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(withLabelMap(params)),
-    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(withLabelMap({ ...effective, forceOversize: forced })),
+    signal: opts.signal,
   });
-
-  if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to download STL'));
-  }
-
-  downloadBlobAsFile(await response.blob(), 'all_color_blocks.zip');
+  await runHeavy(
+    submit,
+    async response => { downloadBlobAsFile(await response.blob(), 'all_color_blocks.zip'); },
+    opts,
+    suggestion => {
+      effective = { ...effective, layerCount: suggestion.layerCount ?? effective.layerCount };
+    },
+    'Failed to download STL',
+  );
 }
 
 /**
@@ -255,82 +217,94 @@ export async function getFilamentSet(
  */
 export async function getFilamentPreview(
   params: FilamentPreviewParams,
-  signal?: AbortSignal
+  opts: HeavyCallOptions = {},
 ): Promise<FilamentPreviewResponse> {
-  const response = await fetch(`${API_BASE_URL}/filament-preview`, {
+  let effective = params;
+  const submit = (forced: boolean): Promise<Response> => fetch(`${API_BASE_URL}/filament-preview`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
-    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...effective, forceOversize: forced }),
+    signal: opts.signal,
   });
-
-  if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to get filament preview'));
-  }
-
-  return response.json();
+  return runHeavy(
+    submit,
+    response => response.json(),
+    opts,
+    suggestion => {
+      effective = {
+        ...effective,
+        layerCount: suggestion.layerCount ?? effective.layerCount,
+        ...(suggestion.pageSize !== undefined ? { page: 1, pageSize: suggestion.pageSize } : {}),
+      };
+    },
+    'Failed to get filament preview',
+  );
 }
 
 /**
  * Download STL ZIP file with configurable colors (SVG mode, V2 API)
  */
-export async function downloadSVGSTLV2(params: DownloadSVGSTLParamsV2, signal?: AbortSignal): Promise<void> {
-  const response = await fetch(`${API_V2_BASE_URL}/download-svg-stl`, {
+export async function downloadSVGSTLV2(params: DownloadSVGSTLParamsV2, opts: HeavyCallOptions = {}): Promise<void> {
+  let effective = params;
+  const submit = (forced: boolean): Promise<Response> => fetch(`${API_V2_BASE_URL}/download-svg-stl`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
-    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...effective, forceOversize: forced }),
+    signal: opts.signal,
   });
-
-  if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to download STL'));
-  }
-
-  downloadBlobAsFile(await response.blob(), 'all_color_blocks.zip');
+  await runHeavy(
+    submit,
+    async response => { downloadBlobAsFile(await response.blob(), 'all_color_blocks.zip'); },
+    opts,
+    suggestion => {
+      effective = { ...effective, layerCount: suggestion.layerCount ?? effective.layerCount };
+    },
+    'Failed to download STL',
+  );
 }
 
 /**
  * Download 3MF file with color-separated objects (V2 API, pixel mode)
  */
-export async function download3MFV2(params: DownloadSTLParamsV2, signal?: AbortSignal): Promise<void> {
-  const response = await fetch(`${API_V2_BASE_URL}/download-3mf`, {
+export async function download3MFV2(params: DownloadSTLParamsV2, opts: HeavyCallOptions = {}): Promise<void> {
+  let effective = params;
+  const submit = (forced: boolean): Promise<Response> => fetch(`${API_V2_BASE_URL}/download-3mf`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(withLabelMap(params)),
-    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(withLabelMap({ ...effective, forceOversize: forced })),
+    signal: opts.signal,
   });
-
-  if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to download 3MF'));
-  }
-
-  downloadBlobAsFile(await response.blob(), 'color_blocks.3mf');
+  await runHeavy(
+    submit,
+    async response => { downloadBlobAsFile(await response.blob(), 'color_blocks.3mf'); },
+    opts,
+    suggestion => {
+      effective = { ...effective, layerCount: suggestion.layerCount ?? effective.layerCount };
+    },
+    'Failed to download 3MF',
+  );
 }
 
 /**
  * Download 3MF file from SVG vector contours (V2 API, SVG mode)
  */
-export async function downloadSVG3MFV2(params: DownloadSVGSTLParamsV2, signal?: AbortSignal): Promise<void> {
-  const response = await fetch(`${API_V2_BASE_URL}/download-svg-3mf`, {
+export async function downloadSVG3MFV2(params: DownloadSVGSTLParamsV2, opts: HeavyCallOptions = {}): Promise<void> {
+  let effective = params;
+  const submit = (forced: boolean): Promise<Response> => fetch(`${API_V2_BASE_URL}/download-svg-3mf`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(params),
-    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...effective, forceOversize: forced }),
+    signal: opts.signal,
   });
-
-  if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to download 3MF'));
-  }
-
-  downloadBlobAsFile(await response.blob(), 'color_blocks.3mf');
+  await runHeavy(
+    submit,
+    async response => { downloadBlobAsFile(await response.blob(), 'color_blocks.3mf'); },
+    opts,
+    suggestion => {
+      effective = { ...effective, layerCount: suggestion.layerCount ?? effective.layerCount };
+    },
+    'Failed to download 3MF',
+  );
 }
 
 /**
@@ -363,31 +337,38 @@ const API_BATCH_BASE_URL = '/api/batch';
 export async function batchProcessImages(
   files: File[],
   params: BatchProcessParams,
-  signal?: AbortSignal
+  opts: HeavyCallOptions = {},
 ): Promise<BatchProcessResponse> {
-  const formData = new FormData();
-  for (const file of files) {
-    formData.append('images', file);
-  }
-  formData.append('maxColors', params.maxColors.toString());
-  formData.append('colorThreshold', params.colorThreshold.toString());
-  formData.append('pixelSize', params.pixelSize.toString());
+  let effective = params;
+  const submit = (forced: boolean): Promise<Response> => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('images', file);
+    }
+    formData.append('maxColors', effective.maxColors.toString());
+    formData.append('colorThreshold', effective.colorThreshold.toString());
+    formData.append('pixelSize', effective.pixelSize.toString());
+    if (forced) formData.append('forceOversize', 'true');
 
-  if (params.detailSize !== undefined) {
-    formData.append('detailSize', params.detailSize.toString());
-  }
+    if (effective.detailSize !== undefined) {
+      formData.append('detailSize', effective.detailSize.toString());
+    }
 
-  const response = await fetch(`${API_BATCH_BASE_URL}/process`, {
-    method: 'POST',
-    body: formData,
-    signal,
-  });
-
-  if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to process batch'));
-  }
-
-  return response.json();
+    return fetch(`${API_BATCH_BASE_URL}/process`, {
+      method: 'POST',
+      body: formData,
+      signal: opts.signal,
+    });
+  };
+  return runHeavy(
+    submit,
+    response => response.json(),
+    opts,
+    suggestion => {
+      effective = { ...effective, pixelSize: suggestion.pixelSize ?? effective.pixelSize };
+    },
+    'Failed to process batch',
+  );
 }
 
 /**
@@ -396,40 +377,51 @@ export async function batchProcessImages(
 export async function batchDownloadSTL(
   files: File[],
   params: BatchDownloadSTLParams,
-  signal?: AbortSignal
+  opts: HeavyCallOptions = {},
 ): Promise<void> {
-  const formData = new FormData();
-  for (const file of files) {
-    formData.append('images', file);
-  }
-  formData.append('maxColors', params.maxColors.toString());
-  formData.append('colorThreshold', params.colorThreshold.toString());
-  formData.append('pixelSize', params.pixelSize.toString());
-  formData.append('layerHeight', params.layerHeight.toString());
-  formData.append('layerCount', params.layerCount.toString());
-  formData.append('whiteBackingLayers', params.whiteBackingLayers.toString());
-  if (params.backingFilament !== undefined) formData.append('backingFilament', params.backingFilament);
-  if (params.filamentPreset) {
-    formData.append('filamentPreset', params.filamentPreset);
-  }
-  if (params.filamentColors && params.filamentColors.length > 0) {
-    formData.append('filamentColors', JSON.stringify(params.filamentColors));
-  }
-  if (params.detailSize !== undefined) {
-    formData.append('detailSize', params.detailSize.toString());
-  }
+  let effective = params;
+  const submit = (forced: boolean): Promise<Response> => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('images', file);
+    }
+    formData.append('maxColors', effective.maxColors.toString());
+    formData.append('colorThreshold', effective.colorThreshold.toString());
+    formData.append('pixelSize', effective.pixelSize.toString());
+    formData.append('layerHeight', effective.layerHeight.toString());
+    formData.append('layerCount', effective.layerCount.toString());
+    formData.append('whiteBackingLayers', effective.whiteBackingLayers.toString());
+    if (forced) formData.append('forceOversize', 'true');
+    if (effective.backingFilament !== undefined) formData.append('backingFilament', effective.backingFilament);
+    if (effective.filamentPreset) {
+      formData.append('filamentPreset', effective.filamentPreset);
+    }
+    if (effective.filamentColors && effective.filamentColors.length > 0) {
+      formData.append('filamentColors', JSON.stringify(effective.filamentColors));
+    }
+    if (effective.detailSize !== undefined) {
+      formData.append('detailSize', effective.detailSize.toString());
+    }
 
-  const response = await fetch(`${API_BATCH_BASE_URL}/download-stl`, {
-    method: 'POST',
-    body: formData,
-    signal,
-  });
-
-  if (!response.ok) {
-    throw new Error(await getErrorDetail(response, 'Failed to download batch STL'));
-  }
-
-  downloadBlobAsFile(await response.blob(), 'batch_stl_output.zip');
+    return fetch(`${API_BATCH_BASE_URL}/download-stl`, {
+      method: 'POST',
+      body: formData,
+      signal: opts.signal,
+    });
+  };
+  await runHeavy(
+    submit,
+    async response => { downloadBlobAsFile(await response.blob(), 'batch_stl_output.zip'); },
+    opts,
+    suggestion => {
+      effective = {
+        ...effective,
+        pixelSize: suggestion.pixelSize ?? effective.pixelSize,
+        layerCount: suggestion.layerCount ?? effective.layerCount,
+      };
+    },
+    'Failed to download batch STL',
+  );
 }
 
 // Palette library endpoints

@@ -2,7 +2,7 @@
  * API client for parameter search optimization.
  */
 
-import { retryAfterMs } from './client';
+import { retryAfterMs } from './errors';
 import type { FilamentColorConfig } from './types';
 
 const API_BASE_URL = '/api';
