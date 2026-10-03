@@ -129,6 +129,10 @@ class HeavyGate:
         # Held so the loop never garbage-collects an in-flight dispatcher.
         self._dispatcher_task: Optional["asyncio.Task[None]"] = None
         self._retained_result_bytes = 0
+        # Every launched execution task, so tests can drain them before the
+        # event loop closes: a worker thread outliving its loop leaves a
+        # non-daemon anyio thread that hangs process exit.
+        self.executions: "set[asyncio.Task[None]]" = set()
 
     # -- submission ---------------------------------------------------------
 
@@ -201,6 +205,8 @@ class HeavyGate:
     def _launch(self, job: HeavyJob) -> "asyncio.Task[None]":
         """Start the job's execution task; it alone owns the slot."""
         job.execution_task = asyncio.get_running_loop().create_task(self._execute(job))
+        self.executions.add(job.execution_task)
+        job.execution_task.add_done_callback(self.executions.discard)
         return job.execution_task
 
     async def _execute(self, job: HeavyJob) -> None:

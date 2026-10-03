@@ -50,6 +50,26 @@ def gate(monkeypatch):
     monkeypatch.setattr(settings, "heavy_job_result_ttl_seconds", 600.0)
     return HeavyGate()
 
+async def drain_executions(gate: HeavyGate, timeout: float = 10.0) -> None:
+    """Keep the loop alive until every execution task finished its worker.
+
+    A thread that outlives its event loop cannot report its result or receive
+    anyio's shutdown sentinel, leaving a non-daemon thread that hangs process
+    exit (CI: the backend job idled 6h until cancelled).
+    """
+    import time as _time
+    deadline = _time.monotonic() + timeout
+    while gate.executions or gate.queue:
+        assert _time.monotonic() < deadline, "gate executions did not drain"
+        await asyncio.sleep(0.005)
+
+
+@pytest.fixture(autouse=True)
+async def drain_gate_after_test(gate):
+    """No worker thread may outlive the test's event loop."""
+    yield
+    await drain_executions(gate)
+
 
 @pytest.mark.asyncio
 async def test_idle_submission_runs_inline(gate):

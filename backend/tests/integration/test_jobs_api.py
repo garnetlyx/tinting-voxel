@@ -20,11 +20,19 @@ PREVIEW_BODY = {
 
 
 @pytest.fixture(autouse=True)
-def fresh_gate(monkeypatch):
-    """Isolate the app's heavy-job registry and budgets per test."""
+async def fresh_gate(monkeypatch):
+    """Isolate the app's heavy-job registry and budgets per test, and drain
+    every worker before the loop closes (non-daemon threads hang exit)."""
     monkeypatch.setattr(concurrency_module, "_gate", HeavyGate())
     monkeypatch.setattr(settings, "heavy_job_concurrency", 1)
     monkeypatch.setattr(settings, "heavy_job_max_queue", 8)
+    yield
+    import time as _time
+    gate = concurrency_module._gate
+    deadline = _time.monotonic() + 10
+    while gate.executions or gate.queue:
+        assert _time.monotonic() < deadline, "gate executions did not drain"
+        await asyncio.sleep(0.005)
 
 
 def test_small_preview_runs_inline(client):

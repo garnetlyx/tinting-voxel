@@ -15,6 +15,22 @@ from api.concurrency import HeavyGate
 from config.settings import settings
 
 
+
+
+async def drain_executions(gate: HeavyGate, timeout: float = 10.0) -> None:
+    """Keep the loop alive until every execution task finished its worker.
+
+    A thread that outlives its event loop cannot report its result or receive
+    anyio's shutdown sentinel, leaving a non-daemon thread that hangs process
+    exit (CI: the backend job idled 6h until cancelled).
+    """
+    import time as _time
+    deadline = _time.monotonic() + timeout
+    while gate.executions or gate.queue:
+        assert _time.monotonic() < deadline, "gate executions did not drain"
+        await asyncio.sleep(0.005)
+
+
 @pytest.mark.asyncio
 async def test_native_cancel_keeps_slot_until_thread_finishes(monkeypatch):
     monkeypatch.setattr(settings, "heavy_job_concurrency", 1)
@@ -49,7 +65,7 @@ async def test_native_cancel_keeps_slot_until_thread_finishes(monkeypatch):
     assert not gate._can_run_inline()
 
     release_thread.set()
-    await asyncio.sleep(0.2)
+    await drain_executions(gate)
     assert gate.running == 0
     # The cancelled inline job never entered the registry.
     assert not gate.jobs
