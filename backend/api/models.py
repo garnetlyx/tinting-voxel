@@ -285,7 +285,18 @@ class WhiteBackingMixin(BaseModel):
 
 
 # V2 API Models with configurable colors
-class DownloadSTLRequestV2(LabelMapMixin, PrintConfigMixin, WhiteBackingMixin, WhitePointMixin):
+class OversizeMixin(BaseModel):
+    """Client confirmed running despite an over-budget memory estimate.
+
+    Heavy endpoints refuse jobs whose estimated peak allocation exceeds
+    settings.heavy_memory_budget_mb with a structured 422 carrying a
+    scale-down suggestion; the browser asks first, so this flag only appears
+    when the user chose "run it anyway" (services/memory_estimate.py).
+    """
+    forceOversize: bool = False
+
+
+class DownloadSTLRequestV2(LabelMapMixin, PrintConfigMixin, WhiteBackingMixin, WhitePointMixin, OversizeMixin):
     """Request model for /api/v2/download-stl and /api/v2/download-3mf."""
     pixelSize: float = Field(..., gt=0, le=10)
     layerCount: int = Field(..., ge=1, le=MAX_COLOR_LAYERS)
@@ -299,7 +310,7 @@ class DownloadSTLRequestV2(LabelMapMixin, PrintConfigMixin, WhiteBackingMixin, W
     # Small pixels will be merged at the backend level
 
 
-class DownloadSVGSTLRequestV2(PrintConfigMixin, WhiteBackingMixin, WhitePointMixin):
+class DownloadSVGSTLRequestV2(PrintConfigMixin, WhiteBackingMixin, WhitePointMixin, OversizeMixin):
     """Request model for /api/v2/download-svg-stl endpoint with configurable colors."""
     vectorResults: List[VectorColorResult] = Field(..., min_length=1)
     pixelSize: float = Field(..., gt=0, le=10)
@@ -325,7 +336,7 @@ class FilamentPresetsResponse(BaseModel):
     transparency: dict
 
 
-class FilamentPreviewRequest(PrintConfigMixin, WhiteBackingMixin):
+class FilamentPreviewRequest(PrintConfigMixin, WhiteBackingMixin, OversizeMixin):
     """Request model for /api/filament-preview endpoint."""
     layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
     page: Optional[int] = Field(None, ge=1, description="Page number (1-based) for paginated results")
@@ -431,7 +442,7 @@ class FilamentPreviewResponse(BaseModel):
     pagination: Optional[PaginationInfo] = None
 
 
-class SimulatePreviewRequest(LabelMapMixin, PrintConfigMixin, WhitePointMixin):
+class SimulatePreviewRequest(LabelMapMixin, PrintConfigMixin, WhitePointMixin, OversizeMixin):
     """Request model for print-simulation preview generation."""
     layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
     whiteBackingLayers: int = Field(DEFAULT_BACKING_LAYERS, ge=0, le=5)
@@ -531,6 +542,51 @@ class BugReportRequest(BaseModel):
 
 
 TelemetryValue = Union[StrictBool, StrictInt, StrictFloat, Annotated[str, Field(max_length=200)]]
+
+
+class EstimateFilamentPreviewParams(PrintConfigMixin):
+    """Parameters for kind='filament_preview' estimates."""
+    layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
+    page: Optional[int] = Field(None, ge=1)
+    pageSize: Optional[int] = Field(None, ge=1, le=10000)
+
+
+class EstimateProcessImageParams(PrintConfigMixin):
+    """Parameters for kind='process_image' estimates; the grid is derived
+    from the image's dimensions and the model-grid policy."""
+    mode: ProcessingMode = ProcessingMode.PIXEL
+    imageWidth: int = Field(..., gt=0, le=10000)
+    imageHeight: int = Field(..., gt=0, le=10000)
+    pixelSize: float = Field(..., gt=0, le=10)
+    detailSize: Optional[float] = Field(None, ge=0.2, le=0.9)
+    layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
+    maxColors: int = Field(10, ge=1, le=settings.max_target_colors)
+    numColors: int = Field(8, ge=1, le=settings.max_target_colors)
+
+
+class EstimateDownloadParams(PrintConfigMixin):
+    """Parameters for kind='download' estimates over an existing label map."""
+    cells: int = Field(..., gt=0, le=settings.max_model_cells)
+    layerCount: int = Field(4, ge=1, le=MAX_COLOR_LAYERS)
+
+
+class EstimateBatchParams(BaseModel):
+    """Parameters for kind='batch' estimates."""
+    images: int = Field(..., ge=1, le=20)
+    imageWidth: int = Field(..., gt=0, le=10000)
+    imageHeight: int = Field(..., gt=0, le=10000)
+    pixelSize: float = Field(..., gt=0, le=10)
+    detailSize: Optional[float] = Field(None, ge=0.2, le=0.9)
+
+
+class EstimateJobRequest(BaseModel):
+    """Pre-flight memory estimate for a heavy job, before submitting it."""
+    model_config = ConfigDict(extra="forbid")
+    kind: str = Field(..., pattern=r'^(process_image|filament_preview|download|batch)$')
+    filamentPreview: Optional[EstimateFilamentPreviewParams] = None
+    processImage: Optional[EstimateProcessImageParams] = None
+    download: Optional[EstimateDownloadParams] = None
+    batch: Optional[EstimateBatchParams] = None
 
 
 class ClientEvent(BaseModel):

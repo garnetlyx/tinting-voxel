@@ -123,6 +123,24 @@ class Settings(BaseSettings):
     # ~5M boxes ≈ the memory budget measured when OOM kills were fixed (d480ddf).
     stl_max_boxes: int = 5_000_000
 
+    # Heavy-job gate (api/concurrency.py): memory-heavy request work runs
+    # at most this many jobs at once; extra requests queue as pollable jobs.
+    # One job's peak allocation is what the memory budget below sizes.
+    heavy_job_concurrency: int = 1
+    # Queued jobs beyond this are refused with 429 instead of piling up
+    # request payloads in memory.
+    heavy_job_max_queue: int = 8
+    # Finished job results stay fetchable for this long (mirrors the param
+    # search store); file results are dropped after their first fetch.
+    heavy_job_result_ttl_seconds: float = 600.0
+    # Total bytes of finished-job results kept for fetching before the oldest
+    # are dropped (queued-job answers are bounded by the queue cap).
+    heavy_job_result_max_bytes: int = 256 * 1024 * 1024
+    # Estimated peak allocation a heavy job may make before the client must
+    # confirm a scale-down (services/memory_estimate.py). Sized for the 8 GB
+    # container: base process ~0.6 GB plus headroom.
+    heavy_memory_budget_mb: float = 3072.0
+
     # Bug reports are saved locally before optional email delivery.
     bug_report_storage_dir: str = "bug-reports"
     resend_api_key: SecretStr = SecretStr("")

@@ -5,14 +5,16 @@ from config.settings import settings
 from config.print_defaults import DEFAULT_BACKING_LAYERS, MAX_COLOR_LAYERS
 import logging
 import time
+from io import BytesIO
 from typing import Optional
 
 import cv2
 import numpy as np
 from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
 from PIL import Image
-from starlette.concurrency import run_in_threadpool
 
+from api.budget_guard import check_memory_budget
+from api.concurrency import run_heavy
 from api.error_handlers import handle_api_errors
 from api.filament_payload import (
     get_colors_from_request,
@@ -38,6 +40,7 @@ from services.image_processor import (
     build_vector_simulated_preview,
     process_image,
 )
+from services import memory_estimate
 from services.telemetry import emit
 from services.vector_processor import (
     VectorProcessorConfig,
@@ -69,6 +72,7 @@ async def api_process_image(
     backingFilament: Optional[str] = Form(None, pattern=r'^[A-Z]$'),
     filamentPreset: Optional[str] = Form(None),
     filamentColors: Optional[str] = Form(None),
+    forceOversize: bool = Form(False),
 ):
     """Process uploaded image to extract color blocks or vector contours."""
     image_bytes = await image.read()
@@ -92,6 +96,34 @@ async def api_process_image(
     layerHeight = resolve_layer_height(layerHeight, colors)
 
     filament = getattr(parsed_preset, "value", parsed_preset) or "custom"
+
+    # Memory backstop: refuse over-budget grids before any work is queued,
+    # unless the client confirmed (services/memory_estimate.py). A header the
+    # PIL reader cannot parse is left to the job itself, which reports it.
+    try:
+        with Image.open(BytesIO(image_bytes)) as header:
+            header_width, header_height = header.size
+        n_labels = len(colors.get_labels())
+        translucent = is_translucent_set(colors)
+        cells = memory_estimate.grid_cells(header_width, header_height, pixelSize, detailSize)
+        targets = maxColors if processing_mode == ProcessingMode.PIXEL else numColors
+        check_memory_budget(
+            "process_image",
+            memory_estimate.process_image_mb(
+                processing_mode.value, cells, n_labels, layerCount, targets, translucent,
+                backing_layers=whiteBackingLayers,
+            ),
+            memory_estimate.suggest_process_image(
+                processing_mode.value, cells, pixelSize, n_labels, layerCount,
+                targets, translucent, settings.heavy_memory_budget_mb,
+            ),
+            forceOversize,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.debug("Skipping memory estimate: unreadable image header")
+
     if processing_mode == ProcessingMode.PIXEL:
         def build_pixel_response() -> Response:
             started = time.perf_counter()
@@ -125,11 +157,14 @@ async def api_process_image(
             )
             return json_response(ProcessImageResponse(**result, detailSize=detailSize))
 
-        return await run_in_threadpool(build_pixel_response)
+        return await run_heavy("process_image", build_pixel_response)
 
-    return await run_in_threadpool(
-        _svg_mode_response, image_bytes, epsilon, minArea, numColors, pixelSize, detailSize,
-        colors, layerCount, layerHeight, whiteBackingLayers, backingFilament, filament,
+    return await run_heavy(
+        "process_image",
+        lambda: _svg_mode_response(
+            image_bytes, epsilon, minArea, numColors, pixelSize, detailSize,
+            colors, layerCount, layerHeight, whiteBackingLayers, backingFilament, filament,
+        ),
     )
 
 
@@ -264,6 +299,15 @@ def _svg_mode_response(
 async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
     """Generate an image-specific simulated print preview from current color blocks."""
     colors = body.resolved_colors
+    check_memory_budget(
+        "simulate_preview",
+        memory_estimate.simulate_preview_mb(
+            body.imageDimensions.width * body.imageDimensions.height,
+            len(colors.get_labels()), body.layerCount, body.whiteBackingLayers,
+        ),
+        None,
+        body.forceOversize,
+    )
 
     def build_preview_response() -> Response:
         result = build_simulated_print_preview(
@@ -278,4 +322,4 @@ async def api_simulate_preview(request: Request, body: SimulatePreviewRequest):
         )
         return json_response(SimulatedPrintPreviewResponse(**result))
 
-    return await run_in_threadpool(build_preview_response)
+    return await run_heavy("simulate_preview", build_preview_response)

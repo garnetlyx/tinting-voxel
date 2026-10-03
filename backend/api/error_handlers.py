@@ -6,6 +6,7 @@ import logging
 
 from fastapi import HTTPException
 
+from api.concurrency import ServiceBusyError
 from services.telemetry import emit
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,14 @@ def handle_api_errors(operation: str):
                 emit("api_error", operation=operation, status=e.status_code, error="HTTPException",
                      detail=str(e.detail)[:200])
                 raise
+            except ServiceBusyError as e:
+                emit("api_error", operation=operation, status=429, error="ServiceBusyError",
+                     detail="heavy-job queue full")
+                raise HTTPException(
+                    status_code=429,
+                    detail="Server is busy with other jobs. Please retry shortly.",
+                    headers={"Retry-After": str(e.retry_after)},
+                ) from e
             except ValueError as e:
                 emit("api_error", operation=operation, status=422, error="ValueError", detail=str(e)[:200])
                 raise HTTPException(status_code=422, detail=str(e))

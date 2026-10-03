@@ -10,6 +10,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
+from api.budget_guard import check_memory_budget
+from api.concurrency import run_heavy
 from api.error_handlers import handle_api_errors
 from api.rate_limiter import limiter
 from api.models import (
@@ -34,8 +36,9 @@ from config.print_defaults import (
     REGULAR_LAYER_HEIGHT_MM, TRANSPARENT_LAYER_HEIGHT_MM,
     MAX_COLOR_LAYERS,
 )
-from core.stack_prune import TRANSPARENT_TD_THRESHOLD_MM
+from core.stack_prune import TRANSPARENT_TD_THRESHOLD_MM, is_translucent_set
 
+from services import memory_estimate
 from services.stl_generator import generate_stl_zip, max_color_layers
 from services.telemetry import emit
 from services.svg_stl_generator import generate_svg_stl_zip
@@ -50,6 +53,24 @@ def _record_export(fmt: str, started: float, layer_count: int, groups: int, cont
     emit(
         "model_exported", format=fmt, layer_count=layer_count, groups=groups,
         bytes=len(content), duration_ms=round((time.perf_counter() - started) * 1000),
+    )
+
+
+def _check_export_budget(kind: str, body) -> None:
+    """Shared export backstop: cells from the label map, layers from the request."""
+    colors = body.resolved_colors
+    cells = body.imageDimensions.width * body.imageDimensions.height
+    translucent = is_translucent_set(colors)
+    n_labels = len(colors.get_labels())
+    check_memory_budget(
+        kind,
+        memory_estimate.download_mb(
+            cells, body.layerCount, n_labels, translucent, body.whiteBackingLayers,
+        ),
+        memory_estimate.suggest_download(
+            cells, n_labels, body.layerCount, translucent, settings.heavy_memory_budget_mb,
+        ),
+        body.forceOversize,
     )
 
 
@@ -88,7 +109,6 @@ async def api_get_filament_presets(request: Request):
     )
 
 
-
 @router.post("/filament-set")
 @limiter.limit("60/minute")
 @handle_api_errors("describing the filament set")
@@ -101,6 +121,7 @@ async def api_filament_set(request: Request, body: FilamentSetRequest):
         "defaultBackingFilament": default_backing_label(colors),
     }
 
+
 @router.post("/download-stl")
 @limiter.limit("5/minute")
 @handle_api_errors("generating STL v2")
@@ -109,33 +130,34 @@ async def api_download_stl_v2(request: Request, body: DownloadSTLRequestV2):
     colors = body.resolved_colors
     color_blocks = [block.model_dump() for block in body.colorBlocks]
     image_dimensions = body.imageDimensions.model_dump()
+    _check_export_budget("download_stl", body)
 
-    started = time.perf_counter()
-    zip_content = await run_in_threadpool(
-        generate_stl_zip,
-        color_blocks=color_blocks,
-        labels=body.labels,
-        layer_height=body.layerHeight,
-        pixel_size=body.pixelSize,
-        layer_count=body.layerCount,
-        colors=colors,
-        white_backing_layers=body.whiteBackingLayers,
-        backing_filament=body.backingFilament,
-        white_point=body.whitePoint,
-    )
+    def build_stl_zip() -> Response:
+        started = time.perf_counter()
+        zip_content = generate_stl_zip(
+            color_blocks=color_blocks,
+            labels=body.labels,
+            layer_height=body.layerHeight,
+            pixel_size=body.pixelSize,
+            layer_count=body.layerCount,
+            colors=colors,
+            white_backing_layers=body.whiteBackingLayers,
+            backing_filament=body.backingFilament,
+            white_point=body.whitePoint,
+        )
+        _record_export("stl", started, body.layerCount, len(color_blocks), zip_content)
+        logger.info(
+            "Generated STL ZIP (v2, %d colors) for %d color blocks, %dx%d pixels",
+            len(colors), len(color_blocks),
+            image_dimensions['width'], image_dimensions['height']
+        )
+        return Response(
+            content=zip_content,
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=all_color_blocks.zip"},
+        )
 
-    _record_export("stl", started, body.layerCount, len(color_blocks), zip_content)
-    logger.info(
-        "Generated STL ZIP (v2, %d colors) for %d color blocks, %dx%d pixels",
-        len(colors), len(color_blocks),
-        image_dimensions['width'], image_dimensions['height']
-    )
-
-    return Response(
-        content=zip_content,
-        media_type="application/zip",
-        headers={"Content-Disposition": "attachment; filename=all_color_blocks.zip"}
-    )
+    return await run_heavy("download_stl", build_stl_zip)
 
 
 @router.post("/download-svg-stl")
@@ -146,34 +168,35 @@ async def api_download_svg_stl_v2(request: Request, body: DownloadSVGSTLRequestV
     colors = body.resolved_colors
     vector_results = [result.model_dump() for result in body.vectorResults]
     image_dimensions = body.imageDimensions.model_dump()
+    _check_export_budget("download_svg_stl", body)
 
-    started = time.perf_counter()
-    zip_content = await run_in_threadpool(
-        generate_svg_stl_zip,
-        vector_results=vector_results,
-        layer_height=body.layerHeight,
-        pixel_size=body.pixelSize,
-        layer_count=body.layerCount,
-        image_dimensions=image_dimensions,
-        colors=colors,
-        white_backing_layers=body.whiteBackingLayers,
-        backing_filament=body.backingFilament,
-        white_point=body.whitePoint,
-        detail_size=body.detailSize,
-    )
+    def build_svg_stl_zip() -> Response:
+        started = time.perf_counter()
+        zip_content = generate_svg_stl_zip(
+            vector_results=vector_results,
+            layer_height=body.layerHeight,
+            pixel_size=body.pixelSize,
+            layer_count=body.layerCount,
+            image_dimensions=image_dimensions,
+            colors=colors,
+            white_backing_layers=body.whiteBackingLayers,
+            backing_filament=body.backingFilament,
+            white_point=body.whitePoint,
+            detail_size=body.detailSize,
+        )
+        _record_export("svg-stl", started, body.layerCount, len(vector_results), zip_content)
+        logger.info(
+            "Generated STL ZIP (v2 SVG mode, %d colors) for %d color groups, %dx%d pixels",
+            len(colors), len(vector_results),
+            image_dimensions['width'], image_dimensions['height']
+        )
+        return Response(
+            content=zip_content,
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=all_color_blocks.zip"},
+        )
 
-    _record_export("svg-stl", started, body.layerCount, len(vector_results), zip_content)
-    logger.info(
-        "Generated STL ZIP (v2 SVG mode, %d colors) for %d color groups, %dx%d pixels",
-        len(colors), len(vector_results),
-        image_dimensions['width'], image_dimensions['height']
-    )
-
-    return Response(
-        content=zip_content,
-        media_type="application/zip",
-        headers={"Content-Disposition": "attachment; filename=all_color_blocks.zip"}
-    )
+    return await run_heavy("download_svg_stl", build_svg_stl_zip)
 
 
 @router.post("/download-3mf")
@@ -184,6 +207,7 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
     colors = body.resolved_colors
     color_blocks = [block.model_dump() for block in body.colorBlocks]
     image_dimensions = body.imageDimensions.model_dump()
+    _check_export_budget("download_3mf", body)
 
     # Build label -> hex color map for visual colors in 3MF
     color_hex_map = {}
@@ -194,32 +218,32 @@ async def api_download_3mf(request: Request, body: DownloadSTLRequestV2):
         for label in colors.get_labels():
             color_hex_map[label] = colors[label].hex
 
-    started = time.perf_counter()
-    threemf_content = await run_in_threadpool(
-        generate_3mf,
-        color_blocks=color_blocks,
-        labels=body.labels,
-        layer_height=body.layerHeight,
-        pixel_size=body.pixelSize,
-        layer_count=body.layerCount,
-        colors=colors,
-        color_hex_map=color_hex_map,
-        white_backing_layers=body.whiteBackingLayers,
-        backing_filament=body.backingFilament,
-        white_point=body.whitePoint,
-    )
+    def build_3mf() -> Response:
+        started = time.perf_counter()
+        threemf_content = generate_3mf(
+            color_blocks=color_blocks,
+            labels=body.labels,
+            layer_height=body.layerHeight,
+            pixel_size=body.pixelSize,
+            layer_count=body.layerCount,
+            colors=colors,
+            color_hex_map=color_hex_map,
+            white_backing_layers=body.whiteBackingLayers,
+            backing_filament=body.backingFilament,
+            white_point=body.whitePoint,
+        )
+        _record_export("3mf", started, body.layerCount, len(color_blocks), threemf_content)
+        logger.info(
+            "Generated 3MF for %d color blocks, %dx%d pixels",
+            len(color_blocks), image_dimensions['width'], image_dimensions['height']
+        )
+        return Response(
+            content=threemf_content,
+            media_type="application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+            headers={"Content-Disposition": "attachment; filename=color_blocks.3mf"},
+        )
 
-    _record_export("3mf", started, body.layerCount, len(color_blocks), threemf_content)
-    logger.info(
-        "Generated 3MF for %d color blocks, %dx%d pixels",
-        len(color_blocks), image_dimensions['width'], image_dimensions['height']
-    )
-
-    return Response(
-        content=threemf_content,
-        media_type="application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
-        headers={"Content-Disposition": "attachment; filename=color_blocks.3mf"}
-    )
+    return await run_heavy("download_3mf", build_3mf)
 
 
 @router.post("/download-svg-3mf")
@@ -230,6 +254,7 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
     colors = body.resolved_colors
     vector_results = [result.model_dump() for result in body.vectorResults]
     image_dimensions = body.imageDimensions.model_dump()
+    _check_export_budget("download_svg_3mf", body)
 
     color_hex_map = {}
     if body.filamentColors:
@@ -239,33 +264,33 @@ async def api_download_svg_3mf(request: Request, body: DownloadSVGSTLRequestV2):
         for label in colors.get_labels():
             color_hex_map[label] = colors[label].hex
 
-    started = time.perf_counter()
-    threemf_content = await run_in_threadpool(
-        generate_svg_3mf,
-        vector_results=vector_results,
-        layer_height=body.layerHeight,
-        pixel_size=body.pixelSize,
-        layer_count=body.layerCount,
-        image_dimensions=image_dimensions,
-        colors=colors,
-        color_hex_map=color_hex_map,
-        white_backing_layers=body.whiteBackingLayers,
-        backing_filament=body.backingFilament,
-        white_point=body.whitePoint,
-        detail_size=body.detailSize,
-    )
+    def build_svg_3mf() -> Response:
+        started = time.perf_counter()
+        threemf_content = generate_svg_3mf(
+            vector_results=vector_results,
+            layer_height=body.layerHeight,
+            pixel_size=body.pixelSize,
+            layer_count=body.layerCount,
+            image_dimensions=image_dimensions,
+            colors=colors,
+            color_hex_map=color_hex_map,
+            white_backing_layers=body.whiteBackingLayers,
+            backing_filament=body.backingFilament,
+            white_point=body.whitePoint,
+            detail_size=body.detailSize,
+        )
+        _record_export("svg-3mf", started, body.layerCount, len(vector_results), threemf_content)
+        logger.info(
+            "Generated SVG 3MF for %d color groups, %dx%d pixels",
+            len(vector_results), image_dimensions['width'], image_dimensions['height']
+        )
+        return Response(
+            content=threemf_content,
+            media_type="application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+            headers={"Content-Disposition": "attachment; filename=color_blocks.3mf"},
+        )
 
-    _record_export("svg-3mf", started, body.layerCount, len(vector_results), threemf_content)
-    logger.info(
-        "Generated SVG 3MF for %d color groups, %dx%d pixels",
-        len(vector_results), image_dimensions['width'], image_dimensions['height']
-    )
-
-    return Response(
-        content=threemf_content,
-        media_type="application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
-        headers={"Content-Disposition": "attachment; filename=color_blocks.3mf"}
-    )
+    return await run_heavy("download_svg_3mf", build_svg_3mf)
 
 
 @router.post("/print-settings")

@@ -16,7 +16,7 @@ from slowapi.errors import RateLimitExceeded
 
 from api.client_ip import load_cloudflare_networks
 from api.rate_limiter import limiter
-from api.routes import bug_report, batch, download, download_v2, events, filament, health, image, palette, param_search
+from api.routes import bug_report, batch, download, download_v2, estimate, events, filament, health, image, jobs, palette, param_search
 from config.logging_setup import configure_logging
 from config.settings import get_cors_origins, settings
 from services.analytics import analytics
@@ -145,6 +145,8 @@ app.include_router(filament.router)
 app.include_router(batch.router)
 app.include_router(palette.router)
 app.include_router(param_search.router)
+app.include_router(jobs.router)
+app.include_router(estimate.router)
 
 # Serve static frontend files in production (when ./static exists)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
