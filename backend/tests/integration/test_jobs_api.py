@@ -192,6 +192,29 @@ def test_oversize_backstop_refuses_then_forces(client, monkeypatch):
     assert "colorMatrix" in forced.json()
 
 
+def test_oversize_hard_cap_refuses_even_forced(client, monkeypatch):
+    """Above the hard cap even an explicit run-anyway gets a 422 refusal."""
+    monkeypatch.setattr(settings, "heavy_memory_budget_mb", 0.001)
+    monkeypatch.setattr(settings, "heavy_memory_hard_cap_mb", 1.0)
+
+    refused = client.post(
+        "/api/filament-preview", json={**PREVIEW_BODY, "forceOversize": True},
+    )
+    assert refused.status_code == 422
+    detail = refused.json()["detail"]
+    assert detail["code"] == "job_too_large"
+    assert detail["forceAllowed"] is False
+    assert "suggestion" in detail
+
+    # With the cap out of the way the same forced job runs.
+    monkeypatch.setattr(settings, "heavy_memory_hard_cap_mb", 1e9)
+    forced = client.post(
+        "/api/filament-preview", json={**PREVIEW_BODY, "forceOversize": True},
+    )
+    assert forced.status_code == 200
+    assert "colorMatrix" in forced.json()
+
+
 def test_estimate_endpoint_shapes(client):
     response = client.post("/api/v2/estimate-job", json={
         "kind": "filament_preview",

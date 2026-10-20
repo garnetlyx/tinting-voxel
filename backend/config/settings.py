@@ -140,6 +140,10 @@ class Settings(BaseSettings):
     # confirm a scale-down (services/memory_estimate.py). Sized for the 8 GB
     # container: base process ~0.6 GB plus headroom.
     heavy_memory_budget_mb: float = 3072.0
+    # Even an explicit "run anyway" refuses above this ceiling: past it the
+    # job can OOM-kill the whole container and drop every queued job
+    # (2026-10-20 crash: a forced 7.2 GB estimate on the 8 GB box).
+    heavy_memory_hard_cap_mb: float = 6144.0
 
     # Bug reports are saved locally before optional email delivery.
     bug_report_storage_dir: str = "bug-reports"

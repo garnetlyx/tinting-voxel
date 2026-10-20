@@ -21,6 +21,7 @@ export class ApiError extends Error {
   readonly code?: string;
   readonly estimatedMb?: number;
   readonly budgetMb?: number;
+  readonly forceAllowed?: boolean;
   readonly suggestion?: OversizeSuggestion;
 
   constructor(message: string, status: number, extra: Partial<OversizeInfo & { code: string }> = {}) {
@@ -30,6 +31,7 @@ export class ApiError extends Error {
     this.code = extra.code;
     this.estimatedMb = extra.estimatedMb;
     this.budgetMb = extra.budgetMb;
+    this.forceAllowed = extra.forceAllowed;
     this.suggestion = extra.suggestion;
   }
 }
@@ -93,6 +95,7 @@ export async function runHeavy<T>(
       const choice = await opts.onOversize({
         estimatedMb: error.estimatedMb ?? 0,
         budgetMb: error.budgetMb ?? 0,
+        forceAllowed: error.forceAllowed !== false,
         suggestion: error.suggestion,
       });
       track('oversize_choice', { choice });
@@ -100,6 +103,10 @@ export async function runHeavy<T>(
       if (choice === 'downscale' && error.suggestion) {
         applySuggestion?.(error.suggestion);
         opts.onSuggestionApplied?.(error.suggestion);
+      }
+      if (choice === 'force' && error.forceAllowed === false) {
+        // The server refused to run it regardless; surface the refusal.
+        throw error;
       }
       response = await start(choice === 'force');
     } else if (error) {

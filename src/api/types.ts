@@ -356,6 +356,8 @@ export interface OversizeSuggestion {
 export interface OversizeInfo {
   estimatedMb: number;
   budgetMb: number;
+  /** False when the server refuses the job even with explicit confirmation. */
+  forceAllowed?: boolean;
   suggestion?: OversizeSuggestion;
 }
 

@@ -89,10 +89,14 @@ export function OversizeDialog() {
           {t('oversizeTitle')}
         </h2>
         <p className="mb-4 text-sm text-ink-muted">
-          {t('oversizeBody', {
-            estimated: (info.estimatedMb / 1024).toFixed(1),
-            budget: (info.budgetMb / 1024).toFixed(1),
-          })}
+          {info.forceAllowed === false
+            ? t('oversizeHardBody', {
+                estimated: (info.estimatedMb / 1024).toFixed(1),
+              })
+            : t('oversizeBody', {
+                estimated: (info.estimatedMb / 1024).toFixed(1),
+                budget: (info.budgetMb / 1024).toFixed(1),
+              })}
         </p>
         {summary && (
           <p className="mb-4 text-sm text-ink">
@@ -103,9 +107,11 @@ export function OversizeDialog() {
           <button type="button" className="tv-btn tv-btn-ghost" onClick={() => choose('cancel')}>
             {tCommon('cancel')}
           </button>
-          <button type="button" className="tv-btn tv-btn-ghost" onClick={() => choose('force')}>
-            {t('force')}
-          </button>
+          {info.forceAllowed !== false && (
+            <button type="button" className="tv-btn tv-btn-ghost" onClick={() => choose('force')}>
+              {t('force')}
+            </button>
+          )}
           <button
             type="button"
             className="tv-btn tv-btn-primary"

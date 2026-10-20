@@ -25,32 +25,60 @@ def check_memory_budget(
     suggestion: Reduction | None,
     forced: bool,
 ) -> None:
-    """Emit the estimate verdict and refuse over-budget jobs unless forced."""
+    """Emit the estimate verdict and refuse over-budget jobs unless forced.
+
+    The force escape hatch has its own ceiling (settings.heavy_memory_hard_cap_mb):
+    a job past it can OOM-kill the container, so it is refused outright.
+    """
     budget_mb = settings.heavy_memory_budget_mb
+    hard_cap_mb = settings.heavy_memory_hard_cap_mb
     over = estimated_mb > budget_mb
+    unforceable = estimated_mb > hard_cap_mb
+    if not over:
+        verdict = "ok"
+    elif unforceable:
+        verdict = "refused"
+    elif forced:
+        verdict = "forced"
+    else:
+        verdict = "oversize"
     emit(
         "memory_estimate",
         kind=kind,
         estimated_mb=round(estimated_mb),
         budget_mb=round(budget_mb),
-        verdict="forced" if over and forced else ("oversize" if over else "ok"),
+        verdict=verdict,
     )
-    if not over or forced:
+    if not over or (forced and not unforceable):
         return
+    force_allowed = not unforceable
     detail = {
         "code": JOB_TOO_LARGE,
         "estimatedMb": round(estimated_mb),
         "budgetMb": round(budget_mb),
+        "forceAllowed": force_allowed,
         "message": (
             f"This job is estimated to need {estimated_mb / 1024:.1f} GB of memory, "
             f"over the {budget_mb / 1024:.1f} GB server budget, and could crash it. "
             "Scale down, or confirm to run it anyway."
+        )
+        if force_allowed
+        else (
+            f"This job is estimated to need {estimated_mb / 1024:.1f} GB of memory, "
+            f"beyond what this server can run even with explicit confirmation "
+            "without crashing it. Scale down to continue."
         ),
     }
     if suggestion is not None:
         detail["suggestion"] = suggestion.as_dict()
-    logger.info(
-        "Refusing over-budget job: kind=%s estimated=%.0fMB budget=%.0fMB",
-        kind, estimated_mb, budget_mb,
-    )
+    if force_allowed:
+        logger.info(
+            "Refusing over-budget job: kind=%s estimated=%.0fMB budget=%.0fMB",
+            kind, estimated_mb, budget_mb,
+        )
+    else:
+        logger.info(
+            "Refusing unforceable job: kind=%s estimated=%.0fMB hard_cap=%.0fMB",
+            kind, estimated_mb, hard_cap_mb,
+        )
     raise HTTPException(status_code=422, detail=detail)
