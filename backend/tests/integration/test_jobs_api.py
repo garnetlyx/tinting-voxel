@@ -215,6 +215,17 @@ def test_oversize_hard_cap_refuses_even_forced(client, monkeypatch):
     assert "colorMatrix" in forced.json()
 
 
+def test_oversize_hard_cap_binds_within_budget(client, monkeypatch):
+    """The cap binds on its own: an estimate between cap and budget is
+    refused even unforced, so a mis-set budget cannot void the ceiling."""
+    monkeypatch.setattr(settings, "heavy_memory_hard_cap_mb", 1.0)
+
+    refused = client.post("/api/filament-preview", json=PREVIEW_BODY)
+    assert refused.status_code == 422
+    detail = refused.json()["detail"]
+    assert detail["forceAllowed"] is False
+
+
 def test_estimate_endpoint_shapes(client):
     response = client.post("/api/v2/estimate-job", json={
         "kind": "filament_preview",

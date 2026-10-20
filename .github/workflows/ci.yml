@@ -89,6 +89,12 @@ jobs:
       - name: Run E2E tests
         run: npx playwright test
 
+      - name: Run oversize-cap E2E (cap below estimate)
+        run: npx playwright test --config playwright.oversize.config.ts
+
+      - name: Run oversize-cap E2E (cap above estimate, force allowed)
+        run: E2E_FORCE_ALLOWED=1 npx playwright test --config playwright.oversize.config.ts
+
       - name: Upload failure traces
         if: failure()
         uses: actions/upload-artifact@v4

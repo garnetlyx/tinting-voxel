@@ -1,18 +1,14 @@
 /**
  * The forced-oversize hard cap (guard for the 2026-10-20 OOM crash).
  *
- * These tests run against an E2E backend started with
- * HEAVY_MEMORY_BUDGET_MB=80 and a hard cap chosen per run:
+ * Runs via playwright.oversize.config.ts, which starts the backend with
+ * HEAVY_MEMORY_BUDGET_MB=80 and a cap chosen per run:
  *
- * - cap 95 MB: the default preset's seven-layer preview estimates 105 MB,
- *   over budget AND past the cap, so the dialog must drop the "Run anyway"
- *   button and only the scale-down may proceed.
- * - cap 200 MB: the same job is over budget but under the cap, so
- *   "Run anyway" stays available and forcing must run it.
- *
- * Pick the case with E2E_FORCE_ALLOWED=1 (cap 200) or unset (cap 95); the
- * companion backend must be started with the matching
- * HEAVY_MEMORY_HARD_CAP_MB.
+ * - cap 95 MB (default): the default preset's seven-layer preview estimates
+ *   105 MB, over budget AND past the cap, so the dialog must drop the
+ *   "Run anyway" button and only the scale-down may proceed.
+ * - cap 200 MB (E2E_FORCE_ALLOWED=1): the same job is over budget but under
+ *   the cap, so "Run anyway" stays available and forcing must run it.
  */
 import { expect, test } from '@playwright/test';
 

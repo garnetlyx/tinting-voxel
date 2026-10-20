@@ -28,16 +28,18 @@ def check_memory_budget(
     """Emit the estimate verdict and refuse over-budget jobs unless forced.
 
     The force escape hatch has its own ceiling (settings.heavy_memory_hard_cap_mb):
-    a job past it can OOM-kill the container, so it is refused outright.
+    a job past it can OOM-kill the container, so it is refused outright. The cap
+    binds on its own - an estimate past it is refused even when the budget would
+    allow it - so a mis-set budget can never void the ceiling.
     """
     budget_mb = settings.heavy_memory_budget_mb
     hard_cap_mb = settings.heavy_memory_hard_cap_mb
     over = estimated_mb > budget_mb
     unforceable = estimated_mb > hard_cap_mb
-    if not over:
-        verdict = "ok"
-    elif unforceable:
+    if unforceable:
         verdict = "refused"
+    elif not over:
+        verdict = "ok"
     elif forced:
         verdict = "forced"
     else:
@@ -49,7 +51,7 @@ def check_memory_budget(
         budget_mb=round(budget_mb),
         verdict=verdict,
     )
-    if not over or (forced and not unforceable):
+    if not unforceable and (not over or forced):
         return
     force_allowed = not unforceable
     detail = {

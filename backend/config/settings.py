@@ -4,7 +4,7 @@ Supports both development and production (cloud) environments
 """
 import os
 
-from pydantic import ConfigDict, SecretStr
+from pydantic import ConfigDict, SecretStr, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -144,6 +144,19 @@ class Settings(BaseSettings):
     # job can OOM-kill the whole container and drop every queued job
     # (2026-10-20 crash: a forced 7.2 GB estimate on the 8 GB box).
     heavy_memory_hard_cap_mb: float = 6144.0
+
+    @model_validator(mode="after")
+    def _hard_cap_not_below_budget(self) -> "Settings":
+        """A cap below the budget would void the forced-oversize ceiling:
+        the guard would return early on `not over` and never reach the cap
+        check, so lowering the cap alone could not protect the container."""
+        if self.heavy_memory_hard_cap_mb < self.heavy_memory_budget_mb:
+            raise ValueError(
+                f"heavy_memory_hard_cap_mb ({self.heavy_memory_hard_cap_mb:g}) must be "
+                f">= heavy_memory_budget_mb ({self.heavy_memory_budget_mb:g}); a cap "
+                "below the budget would silently disable the forced-oversize ceiling."
+            )
+        return self
 
     # Bug reports are saved locally before optional email delivery.
     bug_report_storage_dir: str = "bug-reports"
