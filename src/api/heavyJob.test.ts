@@ -60,6 +60,26 @@ describe('runHeavy', () => {
     expect(onOversize).toHaveBeenCalledWith(expect.objectContaining({ estimatedMb: 4096 }));
   });
 
+  it('refuses to force when the server marks the job unforceable', async () => {
+    const starts: boolean[] = [];
+    const onOversize = vi.fn(async (): Promise<OversizeChoice> => 'force');
+    const detail = { ...OVERSIZE_DETAIL, forceAllowed: false };
+    await expect(
+      runHeavy(
+        forced => {
+          starts.push(forced);
+          return Promise.resolve(jsonResponse({ detail }, 422));
+        },
+        response => response.json(),
+        { onOversize },
+      ),
+    ).rejects.toMatchObject({ code: 'job_too_large', forceAllowed: false });
+    expect(onOversize).toHaveBeenCalledWith(
+      expect.objectContaining({ estimatedMb: 4096, forceAllowed: false }),
+    );
+    expect(starts).toEqual([false]);
+  });
+
   it('applies the suggestion when the user downscales', async () => {
     const applySuggestion = vi.fn();
     const bodies: unknown[] = [];

@@ -7,6 +7,11 @@ const FRONTEND_PORT = Number(process.env.E2E_FRONTEND_PORT ?? 5183);
 
 export default defineConfig({
   testDir: './e2e',
+  // The oversize-cap spec needs a backend started with a tiny memory budget
+  // and cap; it runs through playwright.oversize.config.ts, which supplies
+  // that environment. Keeping it out of the default run (and CI's plain
+  // `playwright test`) avoids asserting against the wrong backend env.
+  testIgnore: ['**/oversize-cap.spec.ts'],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

@@ -10,6 +10,7 @@
   "cancelQueued": "取消此排队任务",
   "oversizeTitle": "此任务可能超出服务器承载",
   "oversizeBody": "预计需要 {{estimated}} GB 内存,超过服务器 {{budget}} GB 上限,可能让服务崩溃影响所有人。",
+  "oversizeHardBody": "预计需要 {{estimated}} GB 内存,已超过本服务器即使明确确认也不会运行的上限,请缩小规模后重试。",
   "oversizeSuggestionLabel": "建议:",
   "suggestPage": "仅显示前 {{count, number}} 个颜色组合",
   "suggestLayers": "颜色层数减少到 {{count}}",
